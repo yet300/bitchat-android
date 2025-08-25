@@ -64,7 +64,7 @@ class MessageHandler(private val myPeerID: String) {
             }
             
             // NEW: Use NoisePayload system exactly like iOS
-            val noisePayload = com.bitchat.android.model.NoisePayload.decode(decryptedData)
+            val noisePayload = com.bitchat.android.model.decodeNoisePayload(decryptedData)
             if (noisePayload == null) {
                 Log.w(TAG, "Failed to parse NoisePayload from $peerID")
                 return
@@ -173,7 +173,7 @@ class MessageHandler(private val myPeerID: String) {
         if (peerID == myPeerID) return false
         
         // Try to decode as iOS-compatible IdentityAnnouncement with TLV format
-        val announcement = IdentityAnnouncement.decode(packet.payload)
+        val announcement = com.bitchat.android.model.decodeIdentityAnnouncement(packet.payload)
         if (announcement == null) {
             Log.w(TAG, "Failed to decode announce from $peerID as iOS-compatible TLV format")
             return false

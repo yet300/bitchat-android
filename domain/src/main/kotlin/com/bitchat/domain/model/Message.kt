@@ -20,7 +20,7 @@ data class Message(
     val originalSender: String? = null,
     val isPrivate: Boolean = false,
     val recipientNickname: String? = null,
-    val senderPeerId: String? = null,
+    val senderPeerID: String? = null,
     val mentions: List<String>? = null,
     val channel: String? = null,
     val encryptedContent: ByteArray? = null,

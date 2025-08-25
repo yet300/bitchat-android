@@ -100,6 +100,7 @@ dependencies {
 
     // Security preferences
     implementation(libs.androidx.security.crypto)
+    implementation(project(":domain"))
     
     // Testing
     testImplementation(libs.bundles.testing)

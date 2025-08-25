@@ -292,7 +292,7 @@ class NostrGeohashService(
             }
             
             // Parse plaintext typed payload (NoisePayload)
-            val noisePayload = com.bitchat.android.model.NoisePayload.decode(packet.payload)
+            val noisePayload = com.bitchat.android.model.decodeNoisePayload(packet.payload)
             if (noisePayload == null) {
                 Log.e(TAG, "Failed to parse embedded NoisePayload")
                 return
@@ -1211,7 +1211,7 @@ class NostrGeohashService(
             
             if (packet.type != com.bitchat.android.protocol.MessageType.NOISE_ENCRYPTED.value) return
             
-            val noisePayload = com.bitchat.android.model.NoisePayload.decode(packet.payload) ?: return
+            val noisePayload = com.bitchat.android.model.decodeNoisePayload(packet.payload) ?: return
             val messageTimestamp = Date(rumorTimestamp * 1000L)
             val convKey = "nostr_${senderPubkey.take(16)}"
             nostrKeyMapping[convKey] = senderPubkey

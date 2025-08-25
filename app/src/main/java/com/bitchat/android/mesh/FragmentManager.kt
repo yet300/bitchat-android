@@ -4,7 +4,12 @@ import android.util.Log
 import com.bitchat.android.protocol.BitchatPacket
 import com.bitchat.android.protocol.MessageType
 import com.bitchat.android.protocol.MessagePadding
-import com.bitchat.android.model.FragmentPayload
+import com.bitchat.domain.model.FragmentPayload
+import com.bitchat.android.model.FRAGMENT_HEADER_SIZE
+import com.bitchat.android.model.decodeFragmentPayload
+import com.bitchat.android.model.encodeFragmentPayload
+import com.bitchat.android.model.generateFragmentID
+import com.bitchat.android.model.isValid
 import kotlinx.coroutines.*
 import java.util.concurrent.ConcurrentHashMap
 
@@ -26,6 +31,8 @@ class FragmentManager {
         private const val MAX_FRAGMENT_SIZE = 469        // Matches iOS: maxFragmentSize = 469 
         private const val FRAGMENT_TIMEOUT = 30000L     // Matches iOS: 30 seconds cleanup
         private const val CLEANUP_INTERVAL = 10000L     // 10 seconds cleanup check
+
+        private const val HEADER_SIZE = FRAGMENT_HEADER_SIZE
     }
     
     // Fragment storage - iOS equivalent: incomingFragments: [String: [Int: Data]]
@@ -61,7 +68,7 @@ class FragmentManager {
         val fragments = mutableListOf<BitchatPacket>()
         
         // iOS: let fragmentID = Data((0..<8).map { _ in UInt8.random(in: 0...255) })
-        val fragmentID = FragmentPayload.generateFragmentID()
+        val fragmentID = generateFragmentID()
         
         // iOS: stride(from: 0, to: fullData.count, by: maxFragmentSize)
         val fragmentChunks = stride(0, fullData.size, MAX_FRAGMENT_SIZE) { offset ->
@@ -91,7 +98,7 @@ class FragmentManager {
                 senderID = packet.senderID,
                 recipientID = packet.recipientID,
                 timestamp = packet.timestamp,
-                payload = fragmentPayload.encode(),
+                payload = encodeFragmentPayload(fragmentPayload),
                 signature = null // iOS: signature: nil
             )
             
@@ -107,7 +114,7 @@ class FragmentManager {
      */
     fun handleFragment(packet: BitchatPacket): BitchatPacket? {
         // iOS: guard packet.payload.count > 13 else { return }
-        if (packet.payload.size < FragmentPayload.HEADER_SIZE) {
+        if (packet.payload.size < HEADER_SIZE) {
             Log.w(TAG, "Fragment packet too small: ${packet.payload.size}")
             return null
         }
@@ -117,14 +124,14 @@ class FragmentManager {
         
         try {
             // Use FragmentPayload for type-safe decoding
-            val fragmentPayload = FragmentPayload.decode(packet.payload)
-            if (fragmentPayload == null || !fragmentPayload.isValid()) {
+            val fragmentPayload = decodeFragmentPayload(packet.payload)
+            if (fragmentPayload == null || !isValid(fragmentPayload)) {
                 Log.w(TAG, "Invalid fragment payload")
                 return null
             }
             
             // iOS: let fragmentID = packet.payload[0..<8].map { String(format: "%02x", $0) }.joined()
-            val fragmentIDString = fragmentPayload.getFragmentIDString()
+            val fragmentIDString = fragmentPayload.fragmentId.joinToString("") { "%02x".format(it) }
             
             Log.d(TAG, "Received fragment ${fragmentPayload.index}/${fragmentPayload.total} for fragmentID: $fragmentIDString, originalType: ${fragmentPayload.originalType}")
             
