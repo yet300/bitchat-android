@@ -18,3 +18,6 @@ dependencyResolutionManagement {
 rootProject.name = "bitchat-android"
 include(":app")
 // Using published Arti AAR; local module not included
+include(":core")
+include(":core:domain")
+include(":core:data")
