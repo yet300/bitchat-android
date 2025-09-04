@@ -21,3 +21,10 @@ include(":app")
 include(":core")
 include(":core:domain")
 include(":core:data")
+include(":core:network")
+include(":core:crypto")
+
+
+include(":feature:chat")
+include(":feature:onboarding")
+include(":feature:nostr")
