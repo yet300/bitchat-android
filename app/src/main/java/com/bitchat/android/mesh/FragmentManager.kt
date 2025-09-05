@@ -1,10 +1,10 @@
 package com.bitchat.android.mesh
 
 import android.util.Log
-import com.bitchat.android.protocol.BitchatPacket
-import com.bitchat.android.protocol.MessageType
-import com.bitchat.android.protocol.MessagePadding
-import com.bitchat.android.model.FragmentPayload
+import com.bitchat.domain.protocol.BitchatPacket
+import com.bitchat.domain.protocol.MessageType
+import com.bitchat.domain.protocol.MessagePadding
+import com.bitchat.domain.model.FragmentPayload
 import kotlinx.coroutines.*
 import java.util.concurrent.ConcurrentHashMap
 

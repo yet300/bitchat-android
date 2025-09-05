@@ -2,10 +2,10 @@ package com.bitchat.android.mesh
 
 import android.util.Log
 import com.bitchat.android.crypto.EncryptionService
-import com.bitchat.android.protocol.BitchatPacket
-import com.bitchat.android.protocol.MessageType
-import com.bitchat.android.model.RoutedPacket
-import com.bitchat.android.util.toHexString
+import com.bitchat.domain.model.PeerInfo
+import com.bitchat.domain.protocol.BitchatPacket
+import com.bitchat.domain.protocol.MessageType
+import com.bitchat.domain.model.RoutedPacket
 import kotlinx.coroutines.*
 import java.util.*
 import kotlin.collections.mutableSetOf

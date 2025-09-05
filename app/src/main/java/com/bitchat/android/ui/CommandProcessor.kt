@@ -1,7 +1,8 @@
 package com.bitchat.android.ui
 
 import com.bitchat.android.mesh.BluetoothMeshService
-import com.bitchat.android.model.BitchatMessage
+import com.bitchat.domain.model.BitchatMessage
+import com.bitchat.domain.geohash.ChannelID
 import java.util.*
 
 /**
@@ -134,7 +135,7 @@ class CommandProcessor(
         // Channel-aware who command (matches iOS behavior)
         val (peerList, contextDescription) = if (viewModel != null) {
             when (val selectedChannel = viewModel.selectedLocationChannel.value) {
-                is com.bitchat.android.geohash.ChannelID.Mesh,
+                is ChannelID.Mesh,
                 null -> {
                     // Mesh channel: show Bluetooth-connected peers
                     val connectedPeers = state.getConnectedPeersValue()
@@ -144,7 +145,7 @@ class CommandProcessor(
                     Pair(peerList, "online users")
                 }
                 
-                is com.bitchat.android.geohash.ChannelID.Location -> {
+                is ChannelID.Location -> {
                     // Location channel: show geohash participants
                     val geohashPeople = viewModel.geohashPeople.value ?: emptyList()
                     val currentNickname = state.getNicknameValue()
@@ -439,13 +440,13 @@ class CommandProcessor(
         // Get peer candidates based on active channel (matches iOS logic exactly)
         val peerCandidates: List<String> = if (viewModel != null) {
             when (val selectedChannel = viewModel.selectedLocationChannel.value) {
-                is com.bitchat.android.geohash.ChannelID.Mesh,
+                is ChannelID.Mesh,
                 null -> {
                     // Mesh channel: use Bluetooth mesh peer nicknames
                     meshService.getPeerNicknames().values.filter { it != meshService.getPeerNicknames()[meshService.myPeerID] }
                 }
                 
-                is com.bitchat.android.geohash.ChannelID.Location -> {
+                is ChannelID.Location -> {
                     // Location channel: use geohash participants with collision-resistant suffixes
                     val geohashPeople = viewModel.geohashPeople.value ?: emptyList()
                     val currentNickname = state.getNicknameValue()

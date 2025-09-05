@@ -8,13 +8,12 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.viewModelScope
 import com.bitchat.android.mesh.BluetoothMeshDelegate
 import com.bitchat.android.mesh.BluetoothMeshService
-import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.protocol.BitchatPacket
+import com.bitchat.domain.model.BitchatMessage
 import com.bitchat.android.nostr.NostrGeohashService
 import kotlinx.coroutines.launch
-import com.bitchat.android.util.NotificationIntervalManager
+import com.bitchat.domain.geohash.ChannelID
+import com.bitchat.domain.utils.NotificationIntervalManager
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.util.Date
 import kotlin.random.Random
 
@@ -107,7 +106,7 @@ class ChatViewModel(
     val peerNicknames: LiveData<Map<String, String>> = state.peerNicknames
     val peerRSSI: LiveData<Map<String, Int>> = state.peerRSSI
     val showAppInfo: LiveData<Boolean> = state.showAppInfo
-    val selectedLocationChannel: LiveData<com.bitchat.android.geohash.ChannelID?> = state.selectedLocationChannel
+    val selectedLocationChannel: LiveData<ChannelID?> = state.selectedLocationChannel
     val isTeleported: LiveData<Boolean> = state.isTeleported
     val geohashPeople: LiveData<List<GeoPerson>> = state.geohashPeople
     val teleportedGeo: LiveData<Set<String>> = state.teleportedGeo
@@ -291,7 +290,7 @@ class ChatViewModel(
         } else {
             // Check if we're in a location channel
             val selectedLocationChannel = state.selectedLocationChannel.value
-            if (selectedLocationChannel is com.bitchat.android.geohash.ChannelID.Location) {
+            if (selectedLocationChannel is ChannelID.Location) {
                 // Send to geohash channel via Nostr ephemeral event
                 nostrGeohashService.sendGeohashMessage(content, selectedLocationChannel.channel, meshService.myPeerID, state.getNicknameValue())
             } else {
@@ -648,7 +647,7 @@ class ChatViewModel(
         }
     }
 
-    fun selectLocationChannel(channel: com.bitchat.android.geohash.ChannelID) {
+    fun selectLocationChannel(channel: ChannelID) {
         nostrGeohashService.selectLocationChannel(channel)
     }
 

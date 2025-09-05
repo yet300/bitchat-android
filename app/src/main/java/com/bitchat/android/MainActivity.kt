@@ -1,7 +1,6 @@
 package com.bitchat.android
 
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -10,7 +9,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.core.view.WindowCompat
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -40,9 +38,10 @@ import com.bitchat.android.onboarding.PermissionManager
 import com.bitchat.android.ui.ChatScreen
 import com.bitchat.android.ui.ChatViewModel
 import com.bitchat.android.ui.theme.BitchatTheme
-import com.bitchat.android.ui.theme.ThemePreference
-import com.bitchat.android.ui.theme.ThemePreferenceManager
 import com.bitchat.android.nostr.PoWPreferenceManager
+import com.bitchat.domain.geohash.ChannelID
+import com.bitchat.domain.geohash.GeohashChannel
+import com.bitchat.domain.geohash.GeohashChannelLevel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -709,15 +708,15 @@ class MainActivity : ComponentActivity() {
                     
                     // Switch to the geohash channel - create appropriate geohash channel level
                     val level = when (geohash.length) {
-                        7 -> com.bitchat.android.geohash.GeohashChannelLevel.BLOCK
-                        6 -> com.bitchat.android.geohash.GeohashChannelLevel.NEIGHBORHOOD
-                        5 -> com.bitchat.android.geohash.GeohashChannelLevel.CITY
-                        4 -> com.bitchat.android.geohash.GeohashChannelLevel.PROVINCE
-                        2 -> com.bitchat.android.geohash.GeohashChannelLevel.REGION
-                        else -> com.bitchat.android.geohash.GeohashChannelLevel.CITY // Default fallback
+                        7 -> GeohashChannelLevel.BLOCK
+                        6 -> GeohashChannelLevel.NEIGHBORHOOD
+                        5 -> GeohashChannelLevel.CITY
+                        4 -> GeohashChannelLevel.PROVINCE
+                        2 -> GeohashChannelLevel.REGION
+                        else -> GeohashChannelLevel.CITY // Default fallback
                     }
-                    val geohashChannel = com.bitchat.android.geohash.GeohashChannel(level, geohash)
-                    val channelId = com.bitchat.android.geohash.ChannelID.Location(geohashChannel)
+                    val geohashChannel = GeohashChannel(level, geohash)
+                    val channelId = ChannelID.Location(geohashChannel)
                     chatViewModel.selectLocationChannel(channelId)
                     
                     // Update current geohash state for notifications

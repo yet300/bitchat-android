@@ -9,6 +9,7 @@ import java.security.SecureRandom
 /**
  * Manages Nostr identity (secp256k1 keypair) for NIP-17 private messaging
  * Compatible with iOS implementation
+ * TODO LATER MOVE TO NETWORK Module to NostrIdentityDTO
  */
 data class NostrIdentity(
     val privateKeyHex: String,

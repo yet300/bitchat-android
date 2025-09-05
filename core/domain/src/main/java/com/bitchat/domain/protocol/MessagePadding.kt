@@ -1,4 +1,4 @@
-package com.bitchat.android.protocol
+package com.bitchat.domain.protocol
 
 import java.security.SecureRandom
 

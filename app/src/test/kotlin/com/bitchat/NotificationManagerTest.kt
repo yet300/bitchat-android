@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.core.app.NotificationManagerCompat
 import androidx.test.core.app.ApplicationProvider
 import com.bitchat.android.ui.NotificationManager
-import com.bitchat.android.util.NotificationIntervalManager
+import com.bitchat.domain.utils.NotificationIntervalManager
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith

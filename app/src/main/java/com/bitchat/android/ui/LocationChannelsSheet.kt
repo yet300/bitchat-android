@@ -5,7 +5,6 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicTextField
@@ -25,11 +24,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bitchat.android.ui.theme.BASE_FONT_SIZE
 import kotlinx.coroutines.launch
-import com.bitchat.android.geohash.ChannelID
-import com.bitchat.android.geohash.GeohashChannel
-import com.bitchat.android.geohash.GeohashChannelLevel
+import com.bitchat.domain.geohash.ChannelID
+import com.bitchat.domain.geohash.GeohashChannel
+import com.bitchat.domain.geohash.GeohashChannelLevel
 import com.bitchat.android.geohash.LocationChannelManager
-import java.util.*
 
 /**
  * Location Channels Sheet for selecting geohash-based location channels

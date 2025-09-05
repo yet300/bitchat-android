@@ -2,8 +2,9 @@ package com.bitchat.android.ui
 
 import com.bitchat.android.mesh.BluetoothMeshDelegate
 import com.bitchat.android.mesh.BluetoothMeshService
-import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.model.DeliveryStatus
+import com.bitchat.domain.model.BitchatMessage
+import com.bitchat.domain.model.DeliveryStatus
+import com.bitchat.domain.model.PeerInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.util.Date
@@ -64,7 +65,7 @@ class MeshDelegateHandler(
             } else if (message.channel != null) {
                 // Channel message
                 if (state.getJoinedChannelsValue().contains(message.channel)) {
-                    channelManager.addChannelMessage(message.channel, message, message.senderPeerID)
+                    channelManager.addChannelMessage(message.channel!!, message, message.senderPeerID)
                 }
             } else {
                 // Public message
@@ -277,7 +278,7 @@ class MeshDelegateHandler(
     /**
      * Expose mesh peer info for components that need to resolve identities (e.g., Nostr mapping)
      */
-    fun getPeerInfo(peerID: String): com.bitchat.android.mesh.PeerInfo? {
+    fun getPeerInfo(peerID: String): PeerInfo? {
         return getMeshService().getPeerInfo(peerID)
     }
 }

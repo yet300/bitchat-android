@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import com.bitchat.android.ui.theme.BASE_FONT_SIZE
 import java.util.*
 import androidx.compose.ui.text.style.TextOverflow
+import com.bitchat.domain.geohash.ChannelID
 
 /**
  * GeohashPeopleList - iOS-compatible component for displaying geohash participants
@@ -90,7 +91,7 @@ fun GeohashPeopleList(
             // Get current geohash identity for "me" detection
             val myHex = remember(selectedLocationChannel) {
                 when (val channel = selectedLocationChannel) {
-                    is com.bitchat.android.geohash.ChannelID.Location -> {
+                    is ChannelID.Location -> {
                         try {
                             val identity = com.bitchat.android.nostr.NostrIdentityBridge.deriveIdentity(
                                 forGeohash = channel.channel.geohash,

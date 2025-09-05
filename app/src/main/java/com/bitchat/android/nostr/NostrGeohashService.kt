@@ -3,15 +3,23 @@ package com.bitchat.android.nostr
 
 import android.app.Application
 import android.util.Log
-import androidx.lifecycle.viewModelScope
-import com.bitchat.android.mesh.BluetoothMeshService
-import com.bitchat.android.model.BitchatMessage
+import com.bitchat.domain.model.BitchatMessage
 import com.bitchat.android.ui.ChatState
 import com.bitchat.android.ui.MessageManager
 import com.bitchat.android.ui.MeshDelegateHandler
 import com.bitchat.android.ui.PrivateChatManager
 import com.bitchat.android.ui.GeoPerson
 import com.bitchat.android.ui.colorForPeerSeed
+import com.bitchat.domain.geohash.ChannelID
+import com.bitchat.domain.geohash.GeohashChannel
+import com.bitchat.domain.geohash.GeohashChannelLevel
+import com.bitchat.domain.model.DeliveryStatus
+import com.bitchat.domain.model.NoisePayload
+import com.bitchat.domain.model.NoisePayloadType
+import com.bitchat.domain.model.PrivateMessagePacket
+import com.bitchat.domain.model.ReadReceipt
+import com.bitchat.domain.protocol.BitchatPacket
+import com.bitchat.domain.protocol.MessageType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -230,7 +238,7 @@ class NostrGeohashService(
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to initialize location channel state: ${e.message}")
             // Set default values in case of failure
-            state.setSelectedLocationChannel(com.bitchat.android.geohash.ChannelID.Mesh)
+            state.setSelectedLocationChannel(ChannelID.Mesh)
             state.setIsTeleported(false)
         }
     }
@@ -240,7 +248,7 @@ class NostrGeohashService(
     /**
      * Send message to geohash channel via Nostr ephemeral event
      */
-    fun sendGeohashMessage(content: String, channel: com.bitchat.android.geohash.GeohashChannel, myPeerID: String, nickname: String?) {
+    fun sendGeohashMessage(content: String, channel: GeohashChannel, myPeerID: String, nickname: String?) {
         coroutineScope.launch {
             try {
                 // Generate a temporary message ID for tracking animation
@@ -374,14 +382,14 @@ class NostrGeohashService(
                 return@launch
             }
             
-            val packet = com.bitchat.android.protocol.BitchatPacket.fromBinaryData(packetData)
+            val packet = BitchatPacket.fromBinaryData(packetData)
             if (packet == null) {
                 Log.e(TAG, "Failed to parse embedded BitChat packet from Nostr DM")
                 return@launch
             }
             
             // Only process noiseEncrypted envelope for private messages/receipts
-            if (packet.type != com.bitchat.android.protocol.MessageType.NOISE_ENCRYPTED.value) {
+            if (packet.type != MessageType.NOISE_ENCRYPTED.value) {
                 Log.w(TAG, "Unsupported embedded packet type: ${packet.type}")
                 return@launch
             }
@@ -394,7 +402,7 @@ class NostrGeohashService(
             }
             
             // Parse plaintext typed payload (NoisePayload)
-            val noisePayload = com.bitchat.android.model.NoisePayload.decode(packet.payload)
+            val noisePayload = NoisePayload.decode(packet.payload)
             if (noisePayload == null) {
                 Log.e(TAG, "Failed to parse embedded NoisePayload")
                 return@launch
@@ -448,8 +456,8 @@ class NostrGeohashService(
             processNoisePayload(noisePayload, targetPeerID, senderNickname, messageTimestamp)
 
             // If this was a private message, send a delivery ACK back over Nostr
-            if (noisePayload.type == com.bitchat.android.model.NoisePayloadType.PRIVATE_MESSAGE) {
-                val pm = com.bitchat.android.model.PrivateMessagePacket.decode(noisePayload.data)
+            if (noisePayload.type == NoisePayloadType.PRIVATE_MESSAGE) {
+                val pm = PrivateMessagePacket.decode(noisePayload.data)
                 pm?.let { pmsg ->
                     val seen = com.bitchat.android.services.SeenMessageStore.getInstance(application)
                     if (!seen.hasDelivered(pmsg.messageID)) {
@@ -478,14 +486,14 @@ class NostrGeohashService(
      * Process NoisePayload from Nostr message
      */
     private suspend fun processNoisePayload(
-        noisePayload: com.bitchat.android.model.NoisePayload,
+        noisePayload: NoisePayload,
         targetPeerID: String,
         senderNickname: String,
         messageTimestamp: Date
     ) {
         when (noisePayload.type) {
-            com.bitchat.android.model.NoisePayloadType.PRIVATE_MESSAGE -> {
-                val pm = com.bitchat.android.model.PrivateMessagePacket.decode(noisePayload.data)
+            NoisePayloadType.PRIVATE_MESSAGE -> {
+                val pm = PrivateMessagePacket.decode(noisePayload.data)
                 if (pm == null) {
                     Log.e(TAG, "Failed to decode PrivateMessagePacket")
                     return
@@ -526,7 +534,7 @@ class NostrGeohashService(
                     isPrivate = true,
                     recipientNickname = state.getNicknameValue(),
                     senderPeerID = targetPeerID,
-                    deliveryStatus = com.bitchat.android.model.DeliveryStatus.Delivered(
+                    deliveryStatus = DeliveryStatus.Delivered(
                         to = state.getNicknameValue() ?: "Unknown",
                         at = Date()
                     )
@@ -540,7 +548,7 @@ class NostrGeohashService(
                 // Send read receipt if viewing (only once across restarts)
                 if (isViewingThisChat && !seen.hasRead(messageId)) {
                     try {
-                        val rr = com.bitchat.android.model.ReadReceipt(originalMessageID = messageId)
+                        val rr = ReadReceipt(originalMessageID = messageId)
                         NostrTransport.getInstance(application).sendReadReceipt(rr, targetPeerID)
                         seen.markRead(messageId)
                     } catch (_: Exception) { }
@@ -549,7 +557,7 @@ class NostrGeohashService(
                 Log.i(TAG, "📥 Processed Nostr private message from $senderNickname")
             }
             
-            com.bitchat.android.model.NoisePayloadType.DELIVERED -> {
+            NoisePayloadType.DELIVERED -> {
                 val messageId = String(noisePayload.data, Charsets.UTF_8)
                 // Use the existing delegate to handle delivery acknowledgment on Main
                 withContext(Dispatchers.Main) {
@@ -558,7 +566,7 @@ class NostrGeohashService(
                 Log.d(TAG, "📥 Processed Nostr delivery ACK for message $messageId")
             }
             
-            com.bitchat.android.model.NoisePayloadType.READ_RECEIPT -> {
+            NoisePayloadType.READ_RECEIPT -> {
                 val messageId = String(noisePayload.data, Charsets.UTF_8)
                 // Use the existing delegate to handle read receipt on Main
                 withContext(Dispatchers.Main) {
@@ -980,7 +988,7 @@ class NostrGeohashService(
     
     // MARK: - Location Channel Management
     
-    fun selectLocationChannel(channel: com.bitchat.android.geohash.ChannelID) {
+    fun selectLocationChannel(channel: ChannelID) {
         locationChannelManager?.select(channel) ?: run {
             Log.w(TAG, "Cannot select location channel - LocationChannelManager not initialized")
         }
@@ -990,7 +998,7 @@ class NostrGeohashService(
      * Switch to location channel and set up proper Nostr subscriptions (iOS-compatible)
      * Optimized for non-blocking UI with immediate feedback
      */
-    private fun switchLocationChannel(channel: com.bitchat.android.geohash.ChannelID?) {
+    private fun switchLocationChannel(channel: ChannelID?) {
         // STEP 1: Immediate UI updates (synchronous, no blocking)
         try {
             // Clear all displayed messages and load stored messages for the new channel
@@ -998,7 +1006,7 @@ class NostrGeohashService(
             Log.d(TAG, "🗑️ Cleared all messages for channel switch")
             
             when (channel) {
-                is com.bitchat.android.geohash.ChannelID.Mesh -> {
+                is ChannelID.Mesh -> {
                     Log.d(TAG, "📡 Switched to mesh channel")
                     // Immediate UI state updates
                     currentGeohash = null
@@ -1012,7 +1020,7 @@ class NostrGeohashService(
                     state.setTeleportedGeo(emptySet())
                 }
                 
-                is com.bitchat.android.geohash.ChannelID.Location -> {
+                is ChannelID.Location -> {
                     Log.d(TAG, "📍 Switching to geohash channel: ${channel.channel.geohash}")
                     currentGeohash = channel.channel.geohash
                     // Update notification manager with current geohash
@@ -1099,7 +1107,7 @@ class NostrGeohashService(
                 }
                 
                 // Setup new subscriptions for location channels
-                if (channel is com.bitchat.android.geohash.ChannelID.Location) {
+                if (channel is ChannelID.Location) {
                     Log.d(TAG, "🌐 Setting up Nostr subscriptions for geohash: ${channel.channel.geohash}")
                     
                     try {
@@ -1297,7 +1305,7 @@ class NostrGeohashService(
             // This prevents messages from being lost during channel switching race conditions
             val selectedLocationChannel = state.selectedLocationChannel.value
             val shouldShowMessage = currentGeohash == geohash || 
-                (selectedLocationChannel is com.bitchat.android.geohash.ChannelID.Location && 
+                (selectedLocationChannel is ChannelID.Location &&
                  selectedLocationChannel.channel.geohash == geohash)
             
             if (shouldShowMessage) {
@@ -1469,18 +1477,18 @@ class NostrGeohashService(
             
             val base64Content = content.removePrefix("bitchat1:")
             val packetData = base64URLDecode(base64Content) ?: return@launch
-            val packet = com.bitchat.android.protocol.BitchatPacket.fromBinaryData(packetData) ?: return@launch
+            val packet = BitchatPacket.fromBinaryData(packetData) ?: return@launch
             
-            if (packet.type != com.bitchat.android.protocol.MessageType.NOISE_ENCRYPTED.value) return@launch
+            if (packet.type != MessageType.NOISE_ENCRYPTED.value) return@launch
             
-            val noisePayload = com.bitchat.android.model.NoisePayload.decode(packet.payload) ?: return@launch
+            val noisePayload = NoisePayload.decode(packet.payload) ?: return@launch
             val messageTimestamp = Date(rumorTimestamp * 1000L)
             val convKey = "nostr_${senderPubkey.take(16)}"
             nostrKeyMapping[convKey] = senderPubkey
             
             when (noisePayload.type) {
-                com.bitchat.android.model.NoisePayloadType.PRIVATE_MESSAGE -> {
-                    val pm = com.bitchat.android.model.PrivateMessagePacket.decode(noisePayload.data) ?: return@launch
+                NoisePayloadType.PRIVATE_MESSAGE -> {
+                    val pm = PrivateMessagePacket.decode(noisePayload.data) ?: return@launch
                     val messageId = pm.messageID
                     
                     Log.d(TAG, "📥 Received geohash DM from ${senderPubkey.take(8)}...")
@@ -1510,7 +1518,7 @@ class NostrGeohashService(
                         recipientNickname = state.getNicknameValue(),
                         senderPeerID = convKey,
                         originalSender = senderHandle,
-                        deliveryStatus = com.bitchat.android.model.DeliveryStatus.Delivered(
+                        deliveryStatus = DeliveryStatus.Delivered(
                             to = state.getNicknameValue() ?: "Unknown",
                             at = Date()
                         )
@@ -1536,12 +1544,12 @@ class NostrGeohashService(
                     }
                 }
                 
-                com.bitchat.android.model.NoisePayloadType.DELIVERED -> {
+                NoisePayloadType.DELIVERED -> {
                     val messageId = String(noisePayload.data, Charsets.UTF_8)
                     meshDelegateHandler.didReceiveDeliveryAck(messageId, convKey)
                 }
                 
-                com.bitchat.android.model.NoisePayloadType.READ_RECEIPT -> {
+                NoisePayloadType.READ_RECEIPT -> {
                     val messageId = String(noisePayload.data, Charsets.UTF_8)
                     meshDelegateHandler.didReceiveReadReceipt(messageId, convKey)
                 }
@@ -1674,7 +1682,7 @@ class NostrGeohashService(
                 val locationChannelManager = com.bitchat.android.geohash.LocationChannelManager.getInstance(application)
                 val selectedChannel = locationChannelManager.selectedChannel.value
                 
-                if (selectedChannel !is com.bitchat.android.geohash.ChannelID.Location) {
+                if (selectedChannel !is ChannelID.Location) {
                     Log.w(TAG, "Cannot send geohash DM: not in a location channel")
                     return@launch
                 }
@@ -1722,7 +1730,7 @@ class NostrGeohashService(
                 val locationChannelManager = com.bitchat.android.geohash.LocationChannelManager.getInstance(application)
                 val selectedChannel = locationChannelManager.selectedChannel.value
                 
-                if (selectedChannel !is com.bitchat.android.geohash.ChannelID.Location) {
+                if (selectedChannel !is ChannelID.Location) {
                     Log.w(TAG, "Cannot send geohash read receipt: not in a location channel")
                     return@launch
                 }
@@ -1776,10 +1784,10 @@ class NostrGeohashService(
             dataManager.addGeohashBlockedUser(pubkeyHex)
             
             // Add system message
-            val systemMessage = com.bitchat.android.model.BitchatMessage(
+            val systemMessage = BitchatMessage(
                 sender = "system",
                 content = "blocked $targetNickname in geohash channels",
-                timestamp = java.util.Date(),
+                timestamp = Date(),
                 isRelay = false
             )
             messageManager.addMessage(systemMessage)
@@ -1787,10 +1795,10 @@ class NostrGeohashService(
             Log.i(TAG, "🚫 Blocked geohash user: $targetNickname (pubkey: ${pubkeyHex.take(8)}...)")
         } else {
             // User not found
-            val systemMessage = com.bitchat.android.model.BitchatMessage(
+            val systemMessage = BitchatMessage(
                 sender = "system",
                 content = "user '$targetNickname' not found in current geohash",
-                timestamp = java.util.Date(),
+                timestamp = Date(),
                 isRelay = false
             )
             messageManager.addMessage(systemMessage)
@@ -1815,12 +1823,12 @@ class NostrGeohashService(
             
             // Determine the level from geohash length
             val level = when (geohash.length) {
-                in 0..2 -> com.bitchat.android.geohash.GeohashChannelLevel.REGION
-                in 3..4 -> com.bitchat.android.geohash.GeohashChannelLevel.PROVINCE
-                5 -> com.bitchat.android.geohash.GeohashChannelLevel.CITY
-                6 -> com.bitchat.android.geohash.GeohashChannelLevel.NEIGHBORHOOD
-                7 -> com.bitchat.android.geohash.GeohashChannelLevel.BLOCK
-                else -> com.bitchat.android.geohash.GeohashChannelLevel.BLOCK
+                in 0..2 -> GeohashChannelLevel.REGION
+                in 3..4 -> GeohashChannelLevel.PROVINCE
+                5 -> GeohashChannelLevel.CITY
+                6 -> GeohashChannelLevel.NEIGHBORHOOD
+                7 -> GeohashChannelLevel.BLOCK
+                else -> GeohashChannelLevel.BLOCK
             }
 
             // Only show location name if the notification's geohash matches the device's current geohash at that level

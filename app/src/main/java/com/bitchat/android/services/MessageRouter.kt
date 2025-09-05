@@ -3,7 +3,7 @@ package com.bitchat.android.services
 import android.content.Context
 import android.util.Log
 import com.bitchat.android.mesh.BluetoothMeshService
-import com.bitchat.android.model.ReadReceipt
+import com.bitchat.domain.model.ReadReceipt
 import com.bitchat.android.nostr.NostrTransport
 
 /**

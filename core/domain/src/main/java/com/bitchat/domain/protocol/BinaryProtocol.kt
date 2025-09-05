@@ -1,10 +1,8 @@
-package com.bitchat.android.protocol
+package com.bitchat.domain.protocol
 
-import android.os.Parcelable
-import kotlinx.parcelize.Parcelize
+import com.bitchat.domain.utils.CompressionUtil
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import android.util.Log
 
 /**
  * Message types - exact same as iOS version with Noise Protocol support
@@ -48,7 +46,6 @@ object SpecialRecipients {
  * - Payload: Variable length (includes original size if compressed)
  * - Signature: 64 bytes (if hasSignature flag set)
  */
-@Parcelize
 data class BitchatPacket(
     val version: UByte = 1u,
     val type: UByte,
@@ -58,7 +55,7 @@ data class BitchatPacket(
     val payload: ByteArray,
     var signature: ByteArray? = null,  // Changed from val to var for packet signing
     var ttl: UByte
-) : Parcelable {
+) {
 
     constructor(
         type: UByte,
@@ -262,7 +259,7 @@ object BinaryProtocol {
             return paddedData
             
         } catch (e: Exception) {
-            Log.e("BinaryProtocol", "Error encoding packet type ${packet.type}: ${e.message}")
+            println("Error encoding packet type ${packet.type}: ${e.message}")
             return null
         }
     }
@@ -361,7 +358,7 @@ object BinaryProtocol {
             )
             
         } catch (e: Exception) {
-            Log.e("BinaryProtocol", "Error decoding packet: ${e.message}")
+            println("Error decoding packet: ${e.message}")
             return null
         }
     }

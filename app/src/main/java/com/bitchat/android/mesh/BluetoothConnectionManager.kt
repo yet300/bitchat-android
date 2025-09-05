@@ -3,8 +3,8 @@ package com.bitchat.android.mesh
 import android.bluetooth.*
 import android.content.Context
 import android.util.Log
-import com.bitchat.android.model.RoutedPacket
-import com.bitchat.android.protocol.BitchatPacket
+import com.bitchat.domain.model.RoutedPacket
+import com.bitchat.domain.protocol.BitchatPacket
 import kotlinx.coroutines.*
 
 /**

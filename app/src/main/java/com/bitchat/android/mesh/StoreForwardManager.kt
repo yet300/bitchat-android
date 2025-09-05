@@ -1,9 +1,9 @@
 package com.bitchat.android.mesh
 
 import android.util.Log
-import com.bitchat.android.protocol.BitchatPacket
-import com.bitchat.android.protocol.MessageType
-import com.bitchat.android.protocol.SpecialRecipients
+import com.bitchat.domain.protocol.BitchatPacket
+import com.bitchat.domain.protocol.MessageType
+import com.bitchat.domain.protocol.SpecialRecipients
 import kotlinx.coroutines.*
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap

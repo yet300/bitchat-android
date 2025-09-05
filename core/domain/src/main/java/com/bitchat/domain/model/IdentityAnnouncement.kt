@@ -1,19 +1,14 @@
-package com.bitchat.android.model
-
-import android.os.Parcelable
-import kotlinx.parcelize.Parcelize
-import com.bitchat.android.util.*
+package com.bitchat.domain.model
 
 /**
  * Identity announcement structure with TLV encoding
  * Compatible with iOS AnnouncementPacket TLV format
  */
-@Parcelize
 data class IdentityAnnouncement(
     val nickname: String,
     val noisePublicKey: ByteArray,    // Noise static public key (Curve25519.KeyAgreement)
     val signingPublicKey: ByteArray   // Ed25519 public key for signing
-) : Parcelable {
+) {
 
     /**
      * TLV types matching iOS implementation

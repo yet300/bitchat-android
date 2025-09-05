@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.TextOverflow
 import com.bitchat.android.ui.theme.BASE_FONT_SIZE
+import com.bitchat.domain.geohash.ChannelID
 
 
 /**
@@ -113,7 +114,7 @@ fun SidebarOverlay(
                         val selectedLocationChannel by viewModel.selectedLocationChannel.observeAsState()
                         
                         when (selectedLocationChannel) {
-                            is com.bitchat.android.geohash.ChannelID.Location -> {
+                            is ChannelID.Location -> {
                                 // Show geohash people list when in location channel
                                 GeohashPeopleList(
                                     viewModel = viewModel,

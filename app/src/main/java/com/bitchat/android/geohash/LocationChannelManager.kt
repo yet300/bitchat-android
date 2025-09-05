@@ -7,11 +7,14 @@ import android.location.Geocoder
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
-import android.os.Bundle
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import com.bitchat.domain.geohash.ChannelID
+import com.bitchat.domain.geohash.Geohash
+import com.bitchat.domain.geohash.GeohashChannel
+import com.bitchat.domain.geohash.GeohashChannelLevel
 import kotlinx.coroutines.*
 import java.util.*
 import com.google.gson.Gson

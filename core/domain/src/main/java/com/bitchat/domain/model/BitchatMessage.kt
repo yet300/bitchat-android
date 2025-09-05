@@ -1,8 +1,5 @@
-package com.bitchat.android.model
+package com.bitchat.domain.model
 
-import android.os.Parcelable
-import com.google.gson.GsonBuilder
-import kotlinx.parcelize.Parcelize
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.*
@@ -10,23 +7,17 @@ import java.util.*
 /**
  * Delivery status for messages - exact same as iOS version
  */
-sealed class DeliveryStatus : Parcelable {
-    @Parcelize
+sealed class DeliveryStatus {
     object Sending : DeliveryStatus()
 
-    @Parcelize
     object Sent : DeliveryStatus()
 
-    @Parcelize
     data class Delivered(val to: String, val at: Date) : DeliveryStatus()
 
-    @Parcelize
     data class Read(val by: String, val at: Date) : DeliveryStatus()
 
-    @Parcelize
     data class Failed(val reason: String) : DeliveryStatus()
 
-    @Parcelize
     data class PartiallyDelivered(val reached: Int, val total: Int) : DeliveryStatus()
 
     fun getDisplayText(): String {
@@ -44,7 +35,6 @@ sealed class DeliveryStatus : Parcelable {
 /**
  * BitchatMessage - 100% compatible with iOS version
  */
-@Parcelize
 data class BitchatMessage(
     val id: String = UUID.randomUUID().toString().uppercase(),
     val sender: String,
@@ -61,7 +51,7 @@ data class BitchatMessage(
     val isEncrypted: Boolean = false,
     val deliveryStatus: DeliveryStatus? = null,
     val powDifficulty: Int? = null
-) : Parcelable {
+) {
 
     /**
      * Convert message to binary payload format - exactly same as iOS version
@@ -342,5 +332,3 @@ data class BitchatMessage(
         return result
     }
 }
-
-

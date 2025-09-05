@@ -1,8 +1,7 @@
 package com.bitchat.android.ui
 
-import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.model.DeliveryStatus
-import java.util.*
+import com.bitchat.domain.model.BitchatMessage
+import com.bitchat.domain.model.DeliveryStatus
 import java.util.Collections
 
 /**

@@ -1,6 +1,6 @@
-package com.bitchat.android.model
+package com.bitchat.domain.model
 
-import com.bitchat.android.protocol.MessageType
+import kotlin.random.Random
 
 /**
  * FragmentPayload - 100% iOS-compatible fragment payload structure
@@ -73,7 +73,7 @@ data class FragmentPayload(
          */
         fun generateFragmentID(): ByteArray {
             val fragmentID = ByteArray(FRAGMENT_ID_SIZE)
-            kotlin.random.Random.nextBytes(fragmentID)
+            Random.nextBytes(fragmentID)
             return fragmentID
         }
     }

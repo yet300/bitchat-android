@@ -4,10 +4,9 @@ import android.content.Context
 import android.util.Log
 import com.bitchat.android.identity.SecureIdentityStateManager
 import com.bitchat.android.mesh.PeerFingerprintManager
-import com.bitchat.android.noise.southernstorm.protocol.Noise
+import com.bitchat.domain.protocol.BitchatPacket
 import java.security.MessageDigest
 import java.security.SecureRandom
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Main Noise encryption service - 100% compatible with iOS implementation
@@ -371,7 +370,7 @@ class NoiseEncryptionService(private val context: Context) {
     /**
      * Sign a BitchatPacket using our Ed25519 signing key
      */
-    fun signPacket(packet: com.bitchat.android.protocol.BitchatPacket): com.bitchat.android.protocol.BitchatPacket? {
+    fun signPacket(packet: BitchatPacket): BitchatPacket? {
         // Create canonical packet bytes for signing
         val packetData = packet.toBinaryDataForSigning() ?: return null
         
@@ -385,7 +384,7 @@ class NoiseEncryptionService(private val context: Context) {
     /**
      * Verify a BitchatPacket signature using the provided public key
      */
-    fun verifyPacketSignature(packet: com.bitchat.android.protocol.BitchatPacket, publicKey: ByteArray): Boolean {
+    fun verifyPacketSignature(packet: BitchatPacket, publicKey: ByteArray): Boolean {
         val signature = packet.signature ?: return false
         
         // Create canonical packet bytes for verification (without signature)

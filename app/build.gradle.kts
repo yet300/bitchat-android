@@ -62,6 +62,8 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:domain"))
+
     // Core Android dependencies
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
@@ -106,6 +108,7 @@ dependencies {
     
     // Testing
     testImplementation(libs.bundles.testing)
+    testImplementation(project(":core:domain"))
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.bundles.compose.testing)
     debugImplementation(libs.androidx.compose.ui.tooling)

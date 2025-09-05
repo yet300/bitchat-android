@@ -12,7 +12,7 @@ import androidx.core.app.Person
 import androidx.core.app.NotificationManagerCompat
 import com.bitchat.android.MainActivity
 import com.bitchat.android.R
-import com.bitchat.android.util.NotificationIntervalManager
+import com.bitchat.domain.utils.NotificationIntervalManager
 import java.util.concurrent.ConcurrentHashMap
 
 /**

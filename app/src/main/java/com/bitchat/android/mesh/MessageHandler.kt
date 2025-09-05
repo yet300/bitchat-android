@@ -1,15 +1,17 @@
 package com.bitchat.android.mesh
 
 import android.util.Log
-import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.model.IdentityAnnouncement
-import com.bitchat.android.model.RoutedPacket
-import com.bitchat.android.protocol.BitchatPacket
-import com.bitchat.android.protocol.MessageType
-import com.bitchat.android.util.toHexString
+import com.bitchat.domain.model.BitchatMessage
+import com.bitchat.domain.model.IdentityAnnouncement
+import com.bitchat.domain.model.RoutedPacket
+import com.bitchat.domain.protocol.BitchatPacket
+import com.bitchat.domain.protocol.MessageType
+import com.bitchat.domain.model.NoisePayload
+import com.bitchat.domain.model.NoisePayloadType
+import com.bitchat.domain.model.PeerInfo
+import com.bitchat.domain.model.PrivateMessagePacket
 import kotlinx.coroutines.*
 import java.util.*
-import kotlin.random.Random
 
 /**
  * Handles processing of different message types
@@ -64,7 +66,7 @@ class MessageHandler(private val myPeerID: String) {
             }
             
             // NEW: Use NoisePayload system exactly like iOS
-            val noisePayload = com.bitchat.android.model.NoisePayload.decode(decryptedData)
+            val noisePayload = NoisePayload.decode(decryptedData)
             if (noisePayload == null) {
                 Log.w(TAG, "Failed to parse NoisePayload from $peerID")
                 return
@@ -73,9 +75,9 @@ class MessageHandler(private val myPeerID: String) {
             Log.d(TAG, "🔓 Decrypted NoisePayload type ${noisePayload.type} from $peerID")
             
             when (noisePayload.type) {
-                com.bitchat.android.model.NoisePayloadType.PRIVATE_MESSAGE -> {
+                NoisePayloadType.PRIVATE_MESSAGE -> {
                     // Decode TLV private message exactly like iOS
-                    val privateMessage = com.bitchat.android.model.PrivateMessagePacket.decode(noisePayload.data)
+                    val privateMessage = PrivateMessagePacket.decode(noisePayload.data)
                     if (privateMessage != null) {
                         Log.d(TAG, "🔓 Decrypted TLV PM from $peerID: ${privateMessage.content.take(30)}...")
 
@@ -93,7 +95,7 @@ class MessageHandler(private val myPeerID: String) {
                             id = privateMessage.messageID,
                             sender = delegate?.getPeerNickname(peerID) ?: "Unknown",
                             content = privateMessage.content,
-                            timestamp = java.util.Date(packet.timestamp.toLong()),
+                            timestamp = Date(packet.timestamp.toLong()),
                             isRelay = false,
                             originalSender = null,
                             isPrivate = true,
@@ -110,7 +112,7 @@ class MessageHandler(private val myPeerID: String) {
                     }
                 }
                 
-                com.bitchat.android.model.NoisePayloadType.DELIVERED -> {
+                NoisePayloadType.DELIVERED -> {
                     // Handle delivery ACK exactly like iOS
                     val messageID = String(noisePayload.data, Charsets.UTF_8)
                     Log.d(TAG, "📬 Delivery ACK received from $peerID for message $messageID")
@@ -119,7 +121,7 @@ class MessageHandler(private val myPeerID: String) {
                     delegate?.onDeliveryAckReceived(messageID, peerID)
                 }
                 
-                com.bitchat.android.model.NoisePayloadType.READ_RECEIPT -> {
+                NoisePayloadType.READ_RECEIPT -> {
                     // Handle read receipt exactly like iOS
                     val messageID = String(noisePayload.data, Charsets.UTF_8)
                     Log.d(TAG, "👁️ Read receipt received from $peerID for message $messageID")
@@ -140,8 +142,8 @@ class MessageHandler(private val myPeerID: String) {
     private suspend fun sendDeliveryAck(messageID: String, senderPeerID: String) {
         try {
             // Create ACK payload: [type byte] + [message ID] - exactly like iOS
-            val ackPayload = com.bitchat.android.model.NoisePayload(
-                type = com.bitchat.android.model.NoisePayloadType.DELIVERED,
+            val ackPayload = NoisePayload(
+                type = NoisePayloadType.DELIVERED,
                 data = messageID.toByteArray(Charsets.UTF_8)
             )
             
@@ -469,10 +471,10 @@ class MessageHandler(private val myPeerID: String) {
 
                 // Emit system message via delegate callback
                 val action = if (isFavorite) "favorited" else "unfavorited"
-                val sys = com.bitchat.android.model.BitchatMessage(
+                val sys = BitchatMessage(
                     sender = "system",
                     content = "${peerInfo.nickname} $action you$guidance",
-                    timestamp = java.util.Date(),
+                    timestamp = Date(),
                     isRelay = false
                 )
                 delegate?.onMessageReceived(sys)

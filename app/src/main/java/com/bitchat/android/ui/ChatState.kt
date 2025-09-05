@@ -4,7 +4,8 @@ import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
-import com.bitchat.android.model.BitchatMessage
+import com.bitchat.domain.model.BitchatMessage
+import com.bitchat.domain.geohash.ChannelID
 
 /**
  * Centralized state definitions and data classes for the chat system
@@ -111,8 +112,8 @@ class ChatState {
     val showAppInfo: LiveData<Boolean> = _showAppInfo
     
     // Location channels state (for Nostr geohash features)
-    private val _selectedLocationChannel = MutableLiveData<com.bitchat.android.geohash.ChannelID?>(com.bitchat.android.geohash.ChannelID.Mesh)
-    val selectedLocationChannel: LiveData<com.bitchat.android.geohash.ChannelID?> = _selectedLocationChannel
+    private val _selectedLocationChannel = MutableLiveData<ChannelID?>(ChannelID.Mesh)
+    val selectedLocationChannel: LiveData<ChannelID?> = _selectedLocationChannel
     
     private val _isTeleported = MutableLiveData<Boolean>(false)
     val isTeleported: LiveData<Boolean> = _isTeleported
@@ -281,7 +282,7 @@ class ChatState {
         _showAppInfo.value = show
     }
     
-    fun setSelectedLocationChannel(channel: com.bitchat.android.geohash.ChannelID?) {
+    fun setSelectedLocationChannel(channel: ChannelID?) {
         _selectedLocationChannel.value = channel
     }
     

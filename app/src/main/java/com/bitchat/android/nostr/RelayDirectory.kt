@@ -3,6 +3,7 @@ package com.bitchat.android.nostr
 import android.app.Application
 import android.content.SharedPreferences
 import android.util.Log
+import com.bitchat.domain.geohash.Geohash
 import java.io.BufferedReader
 import java.io.File
 import java.io.FileInputStream
@@ -89,7 +90,7 @@ object RelayDirectory {
         val snapshot = synchronized(relaysLock) { relays.toList() }
         if (snapshot.isEmpty()) return emptyList()
         val center = try {
-            val c = com.bitchat.android.geohash.Geohash.decodeToCenter(geohash)
+            val c = Geohash.decodeToCenter(geohash)
             c
         } catch (e: Exception) {
             Log.e(TAG, "Failed to decode geohash '$geohash': ${e.message}")

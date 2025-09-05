@@ -3,17 +3,17 @@ package com.bitchat.android.mesh
 import android.content.Context
 import android.util.Log
 import com.bitchat.android.crypto.EncryptionService
-import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.protocol.MessagePadding
-import com.bitchat.android.model.RoutedPacket
-import com.bitchat.android.model.IdentityAnnouncement
-import com.bitchat.android.protocol.BitchatPacket
-import com.bitchat.android.protocol.MessageType
-import com.bitchat.android.protocol.SpecialRecipients
-import com.bitchat.android.util.toHexString
+import com.bitchat.domain.model.BitchatMessage
+import com.bitchat.domain.model.RoutedPacket
+import com.bitchat.domain.model.IdentityAnnouncement
+import com.bitchat.domain.model.NoisePayload
+import com.bitchat.domain.model.NoisePayloadType
+import com.bitchat.domain.model.PeerInfo
+import com.bitchat.domain.model.PrivateMessagePacket
+import com.bitchat.domain.protocol.BitchatPacket
+import com.bitchat.domain.protocol.MessageType
+import com.bitchat.domain.protocol.SpecialRecipients
 import kotlinx.coroutines.*
-import java.util.*
-import kotlin.math.sign
 import kotlin.random.Random
 
 /**
@@ -501,7 +501,7 @@ class BluetoothMeshService(private val context: Context) {
             if (encryptionService.hasEstablishedSession(recipientPeerID)) {
                 try {
                     // Create TLV-encoded private message exactly like iOS
-                    val privateMessage = com.bitchat.android.model.PrivateMessagePacket(
+                    val privateMessage = PrivateMessagePacket(
                         messageID = finalMessageID,
                         content = content
                     )
@@ -513,8 +513,8 @@ class BluetoothMeshService(private val context: Context) {
                     }
                     
                     // Create message payload with NoisePayloadType prefix: [type byte] + [TLV data]
-                    val messagePayload = com.bitchat.android.model.NoisePayload(
-                        type = com.bitchat.android.model.NoisePayloadType.PRIVATE_MESSAGE,
+                    val messagePayload = NoisePayload(
+                        type = NoisePayloadType.PRIVATE_MESSAGE,
                         data = tlvData
                     )
                     
@@ -578,8 +578,8 @@ class BluetoothMeshService(private val context: Context) {
             
             try {
                 // Create read receipt payload using NoisePayloadType exactly like iOS
-                val readReceiptPayload = com.bitchat.android.model.NoisePayload(
-                    type = com.bitchat.android.model.NoisePayloadType.READ_RECEIPT,
+                val readReceiptPayload = NoisePayload(
+                    type = NoisePayloadType.READ_RECEIPT,
                     data = messageID.toByteArray(Charsets.UTF_8)
                 )
                 

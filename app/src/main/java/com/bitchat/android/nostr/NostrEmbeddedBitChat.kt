@@ -2,11 +2,10 @@ package com.bitchat.android.nostr
 
 import android.util.Base64
 import android.util.Log
-import com.bitchat.android.model.PrivateMessagePacket
-import com.bitchat.android.model.NoisePayloadType
-import com.bitchat.android.protocol.BitchatPacket
-import com.bitchat.android.protocol.MessageType
-import java.util.*
+import com.bitchat.domain.model.PrivateMessagePacket
+import com.bitchat.domain.model.NoisePayloadType
+import com.bitchat.domain.protocol.BitchatPacket
+import com.bitchat.domain.protocol.MessageType
 
 /**
  * BitChat-over-Nostr Adapter

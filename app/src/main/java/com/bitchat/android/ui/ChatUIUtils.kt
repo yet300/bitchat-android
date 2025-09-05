@@ -3,11 +3,10 @@ package com.bitchat.android.ui
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.sp
-import com.bitchat.android.model.BitchatMessage
+import com.bitchat.domain.model.BitchatMessage
 import com.bitchat.android.mesh.BluetoothMeshService
 import androidx.compose.material3.ColorScheme
 import com.bitchat.android.ui.theme.BASE_FONT_SIZE
@@ -162,15 +161,15 @@ fun getPeerColor(message: BitchatMessage, isDark: Boolean): Color {
     val seed = when {
         message.senderPeerID?.startsWith("nostr:") == true || message.senderPeerID?.startsWith("nostr_") == true -> {
             // For Nostr peers, use the full key if available, otherwise the peer ID
-            "nostr:${message.senderPeerID.lowercase()}"
+            "nostr:${message.senderPeerID!!.lowercase()}"
         }
         message.senderPeerID?.length == 16 -> {
             // For ephemeral peer IDs, try to get stable Noise key, fallback to peer ID  
-            "noise:${message.senderPeerID.lowercase()}"
+            "noise:${message.senderPeerID!!.lowercase()}"
         }
         message.senderPeerID?.length == 64 -> {
             // This is already a stable Noise key
-            "noise:${message.senderPeerID.lowercase()}"
+            "noise:${message.senderPeerID!!.lowercase()}"
         }
         else -> {
             // Fallback to sender name

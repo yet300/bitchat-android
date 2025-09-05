@@ -1,7 +1,7 @@
 package com.bitchat.android.ui
 
-import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.model.DeliveryStatus
+import com.bitchat.domain.model.BitchatMessage
+import com.bitchat.domain.model.DeliveryStatus
 import com.bitchat.android.mesh.PeerFingerprintManager
 import com.bitchat.android.mesh.BluetoothMeshService
 import java.util.*
