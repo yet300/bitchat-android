@@ -14,8 +14,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.bitchat.android.nostr.NostrProofOfWork
-import com.bitchat.android.nostr.PoWPreferenceManager
+import com.bitchat.network.nostr.NostrProofOfWork
+import com.bitchat.network.nostr.PoWPreferenceManager
 
 /**
  * Shows the current Proof of Work status and settings

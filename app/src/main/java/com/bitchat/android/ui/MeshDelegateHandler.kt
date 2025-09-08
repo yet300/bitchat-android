@@ -111,7 +111,7 @@ class MeshDelegateHandler(
                         nostrPubHexForAlias = { alias ->
                             // Best-effort: derive pub hex from favorites mapping
                             val prefix = alias.removePrefix("nostr_")
-                            val favs = try { com.bitchat.android.favorites.FavoritesPersistenceService.shared.getOurFavorites() } catch (_: Exception) { emptyList() }
+                            val favs = try { com.bitchat.network.favorites.FavoritesPersistenceService.shared.getOurFavorites() } catch (_: Exception) { emptyList() }
                             favs.firstNotNullOfOrNull { rel ->
                                 rel.peerNostrPublicKey?.let { s ->
                                     runCatching { Bech32.decode(s) }.getOrNull()?.let { dec ->
@@ -120,7 +120,7 @@ class MeshDelegateHandler(
                                 }
                             }?.takeIf { it.startsWith(prefix, ignoreCase = true) }
                         },
-                        findNoiseKeyForNostr = { key -> com.bitchat.android.favorites.FavoritesPersistenceService.shared.findNoiseKey(key) }
+                        findNoiseKeyForNostr = { key -> com.bitchat.network.favorites.FavoritesPersistenceService.shared.findNoiseKey(key) }
                     )
                     if (canonical != currentPeer) {
                         // Merge conversations and switch selection to the live mesh peer (or noiseHex)
@@ -133,7 +133,7 @@ class MeshDelegateHandler(
                         val info = getPeerInfo(currentPeer)
                         val noiseKey = info?.noisePublicKey
                         if (noiseKey != null) {
-                            com.bitchat.android.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey)
+                            com.bitchat.network.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey)
                         } else null
                     } catch (_: Exception) { null }
 
@@ -162,7 +162,7 @@ class MeshDelegateHandler(
                     val noiseHex = noiseKey.joinToString("") { b -> "%02x".format(b) }
 
                     // Derive temp nostr key from favorites npub
-                    val npub = com.bitchat.android.favorites.FavoritesPersistenceService.shared.findNostrPubkey(noiseKey)
+                    val npub = com.bitchat.network.favorites.FavoritesPersistenceService.shared.findNostrPubkey(noiseKey)
                     val tempNostrKey: String? = try {
                         if (npub != null) {
                             val (hrp, data) = Bech32.decode(npub)

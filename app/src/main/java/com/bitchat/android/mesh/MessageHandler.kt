@@ -452,13 +452,13 @@ class MessageHandler(private val myPeerID: String) {
             val peerInfo = delegate?.getPeerInfo(fromPeerID)
             val noiseKey = peerInfo?.noisePublicKey
             if (noiseKey != null) {
-                com.bitchat.android.favorites.FavoritesPersistenceService.shared.updatePeerFavoritedUs(noiseKey, isFavorite)
+                com.bitchat.network.favorites.FavoritesPersistenceService.shared.updatePeerFavoritedUs(noiseKey, isFavorite)
                 if (npub != null) {
-                    com.bitchat.android.favorites.FavoritesPersistenceService.shared.updateNostrPublicKey(noiseKey, npub)
+                    com.bitchat.network.favorites.FavoritesPersistenceService.shared.updateNostrPublicKey(noiseKey, npub)
                 }
 
                 // Determine iOS-style guidance text
-                val rel = com.bitchat.android.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey)
+                val rel = com.bitchat.network.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey)
                 val guidance = if (isFavorite) {
                     if (rel?.isFavorite == true) {
                         " — mutual! You can continue DMs via Nostr when out of mesh."

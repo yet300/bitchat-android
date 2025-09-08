@@ -1,4 +1,4 @@
-package com.bitchat.android.nostr
+package com.bitchat.network.nostr
 
 import android.app.Application
 import android.content.SharedPreferences
@@ -36,7 +36,7 @@ object RelayDirectory {
 
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val httpClient: OkHttpClient
-        get() = com.bitchat.android.net.OkHttpProvider.httpClient()
+        get() = com.bitchat.network.OkHttpProvider.httpClient()
 
     data class RelayInfo(
         val url: String,

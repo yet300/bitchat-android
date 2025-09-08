@@ -1,7 +1,8 @@
-package com.bitchat.android.net
+package com.bitchat.network.tor
 
 import android.app.Application
 import android.util.Log
+import com.bitchat.network.OkHttpProvider
 import info.guardianproject.arti.ArtiLogListener
 import info.guardianproject.arti.ArtiProxy
 import kotlinx.coroutines.CoroutineScope
@@ -113,7 +114,7 @@ object TorManager {
                         // Rebuild clients WITHOUT proxy and reconnect relays
                         try {
                             OkHttpProvider.reset()
-                            com.bitchat.android.nostr.NostrRelayManager.shared.resetAllConnections()
+                            com.bitchat.network.nostr.NostrRelayManager.shared.resetAllConnections()
                         } catch (_: Throwable) { }
                     }
                     TorMode.ON -> {
@@ -133,7 +134,7 @@ object TorManager {
                                 socksAddr = InetSocketAddress("127.0.0.1", currentSocksPort)
                                 Log.i(TAG, "Tor ON: proxy set to ${socksAddr}")
                                 OkHttpProvider.reset()
-                                try { com.bitchat.android.nostr.NostrRelayManager.shared.resetAllConnections() } catch (_: Throwable) { }
+                                try { com.bitchat.network.nostr.NostrRelayManager.shared.resetAllConnections() } catch (_: Throwable) { }
                             }
                         }
                     }

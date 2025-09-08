@@ -13,7 +13,7 @@
 }
 
 # Keep all classes that might use reflection
--keep class com.bitchat.android.favorites.** { *; }
+-keep class ** { *; }
 -keep class com.bitchat.android.nostr.** { *; }
 -keep class com.bitchat.android.identity.** { *; }
 

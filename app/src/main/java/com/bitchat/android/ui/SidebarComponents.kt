@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.TextOverflow
 import com.bitchat.android.ui.theme.BASE_FONT_SIZE
 import com.bitchat.domain.geohash.ChannelID
+import com.bitchat.network.favorites.FavoritesPersistenceService
 
 
 /**
@@ -341,7 +342,7 @@ fun PeopleSection(
         }
 
         // Offline favorites (exclude ones mapped to connected)
-        val offlineFavorites = com.bitchat.android.favorites.FavoritesPersistenceService.shared.getOurFavorites()
+        val offlineFavorites = FavoritesPersistenceService.shared.getOurFavorites()
         offlineFavorites.forEach { fav ->
             val favPeerID = fav.peerNoisePublicKey.joinToString("") { b -> "%02x".format(b) }
             val isMappedToConnected = noiseHexByPeerID.values.any { it.equals(favPeerID, ignoreCase = true) }

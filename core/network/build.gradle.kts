@@ -37,9 +37,13 @@ android {
 dependencies {
     // Core domain dependency
     implementation(project(":core:domain"))
+    implementation(project(":core:crypto"))
     
     // Android Core
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.lifecycle.livedata.ktx)
+    implementation(libs.androidx.security.crypto)
     
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
@@ -52,6 +56,15 @@ dependencies {
     
     // JSON
     implementation(libs.gson)
+    
+    // Arti (Tor in Rust) Android bridge - use published AAR with native libs
+    implementation("info.guardianproject:arti-mobile-ex:1.2.3")
+    
+    // Cryptography
+    implementation(libs.bundles.cryptography)
+    
+    // Location services
+    implementation(libs.gms.location)
     
     // Testing
     testImplementation(libs.junit)

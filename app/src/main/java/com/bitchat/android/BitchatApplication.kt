@@ -1,9 +1,9 @@
 package com.bitchat.android
 
 import android.app.Application
-import com.bitchat.android.nostr.RelayDirectory
+import com.bitchat.network.nostr.RelayDirectory
 import com.bitchat.android.ui.theme.ThemePreferenceManager
-import com.bitchat.android.net.TorManager
+import com.bitchat.network.tor.TorManager
 import com.bitchat.crypto.nostr.NostrIdentityBridge
 
 /**
@@ -22,7 +22,7 @@ class BitchatApplication : Application() {
 
         // Initialize favorites persistence early so MessageRouter/NostrTransport can use it on startup
         try {
-            com.bitchat.android.favorites.FavoritesPersistenceService.initialize(this)
+            com.bitchat.network.favorites.FavoritesPersistenceService.initialize(this)
         } catch (_: Exception) { }
 
         // Warm up Nostr identity to ensure npub is available for favorite notifications

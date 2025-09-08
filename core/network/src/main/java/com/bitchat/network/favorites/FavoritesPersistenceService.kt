@@ -1,4 +1,4 @@
-package com.bitchat.android.favorites
+package com.bitchat.network.favorites
 
 import android.content.Context
 import android.util.Log

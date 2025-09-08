@@ -1,4 +1,4 @@
-package com.bitchat.android.nostr
+package com.bitchat.network.nostr
 
 import com.bitchat.crypto.nostr.NostrEvent
 import com.bitchat.crypto.nostr.NostrKind

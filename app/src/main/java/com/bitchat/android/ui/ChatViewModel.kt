@@ -9,7 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.bitchat.android.mesh.BluetoothMeshDelegate
 import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.domain.model.BitchatMessage
-import com.bitchat.android.nostr.NostrGeohashService
+import com.bitchat.android.services.NostrGeohashService
 import com.bitchat.crypto.noise.identity.PeerFingerprintManager
 import com.bitchat.crypto.noise.identity.SecureIdentityStateManager
 import com.bitchat.crypto.nostr.NostrIdentityBridge
@@ -156,14 +156,14 @@ class ChatViewModel(
         nostrGeohashService.initializeLocationChannelState()
 
         // Initialize favorites persistence service
-        com.bitchat.android.favorites.FavoritesPersistenceService.initialize(getApplication())
+        com.bitchat.network.favorites.FavoritesPersistenceService.initialize(getApplication())
 
         // Initialize Nostr integration
         nostrGeohashService.initializeNostrIntegration()
 
         // Ensure NostrTransport knows our mesh peer ID for embedded packets
         try {
-            val nostrTransport = com.bitchat.android.nostr.NostrTransport.getInstance(getApplication())
+            val nostrTransport = com.bitchat.network.nostr.NostrTransport.getInstance(getApplication())
             nostrTransport.senderPeerID = meshService.myPeerID
         } catch (_: Exception) { }
 
@@ -271,7 +271,7 @@ class ChatViewModel(
                 meshNoiseKeyForPeer = { pid -> meshService.getPeerInfo(pid)?.noisePublicKey },
                 meshHasPeer = { pid -> meshService.getPeerInfo(pid)?.isConnected == true },
                 nostrPubHexForAlias = { alias -> nostrGeohashService.getNostrKeyMapping()[alias] },
-                findNoiseKeyForNostr = { key -> com.bitchat.android.favorites.FavoritesPersistenceService.shared.findNoiseKey(key) }
+                findNoiseKeyForNostr = { key -> com.bitchat.network.favorites.FavoritesPersistenceService.shared.findNoiseKey(key) }
             ).also { canonical ->
                 if (canonical != state.getSelectedPrivateChatPeerValue()) {
                     privateChatManager.startPrivateChat(canonical, meshService)
@@ -357,7 +357,7 @@ class ChatViewModel(
                 val isNowFavorite = dataManager.favoritePeers.contains(
                     PeerFingerprintManager.getInstance().getFingerprintForPeer(peerID) ?: ""
                 )
-                com.bitchat.android.favorites.FavoritesPersistenceService.shared.updateFavoriteStatus(
+                com.bitchat.network.favorites.FavoritesPersistenceService.shared.updateFavoriteStatus(
                     noisePublicKey = noiseKey,
                     nickname = nickname,
                     isFavorite = isNowFavorite
@@ -377,7 +377,7 @@ class ChatViewModel(
                             java.util.UUID.randomUUID().toString()
                         )
                     } else {
-                        val nostrTransport = com.bitchat.android.nostr.NostrTransport.getInstance(getApplication())
+                        val nostrTransport = com.bitchat.network.nostr.NostrTransport.getInstance(getApplication())
                         nostrTransport.senderPeerID = meshService.myPeerID
                         nostrTransport.sendFavoriteNotification(peerID, isNowFavorite)
                     }

@@ -1,4 +1,4 @@
-package com.bitchat.android.nostr
+package com.bitchat.network.nostr
 
 import android.util.Log
 import androidx.lifecycle.LiveData
@@ -114,7 +114,7 @@ class NostrRelayManager private constructor() {
     
     // OkHttp client for WebSocket connections (via provider to honor Tor)
     private val httpClient: OkHttpClient
-        get() = com.bitchat.android.net.OkHttpProvider.webSocketClient()
+        get() = com.bitchat.network.OkHttpProvider.webSocketClient()
     
     private val gson by lazy { NostrRequest.createGson() }
     

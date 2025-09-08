@@ -1,4 +1,4 @@
-package com.bitchat.android.net
+package com.bitchat.network.tor
 
 enum class TorMode {
     OFF,

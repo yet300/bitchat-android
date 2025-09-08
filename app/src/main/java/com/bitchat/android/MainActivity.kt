@@ -38,7 +38,7 @@ import com.bitchat.android.onboarding.PermissionManager
 import com.bitchat.android.ui.ChatScreen
 import com.bitchat.android.ui.ChatViewModel
 import com.bitchat.android.ui.theme.BitchatTheme
-import com.bitchat.android.nostr.PoWPreferenceManager
+import com.bitchat.network.nostr.PoWPreferenceManager
 import com.bitchat.domain.geohash.ChannelID
 import com.bitchat.domain.geohash.GeohashChannel
 import com.bitchat.domain.geohash.GeohashChannelLevel

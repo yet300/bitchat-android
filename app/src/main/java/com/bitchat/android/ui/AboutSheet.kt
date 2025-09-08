@@ -21,8 +21,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.bitchat.android.nostr.NostrProofOfWork
-import com.bitchat.android.nostr.PoWPreferenceManager
+import com.bitchat.network.nostr.NostrProofOfWork
+import com.bitchat.network.nostr.PoWPreferenceManager
+import com.bitchat.network.tor.TorMode
+import com.bitchat.network.tor.TorPreferenceManager
 
 /**
  * About Sheet for bitchat app information
@@ -296,8 +298,8 @@ fun AboutSheet(
                 // Network (Tor) section
                 item {
                     val ctx = LocalContext.current
-                    val torMode = remember { mutableStateOf(com.bitchat.android.net.TorPreferenceManager.get(ctx)) }
-                    val torStatus by com.bitchat.android.net.TorManager.statusFlow.collectAsState()
+                    val torMode = remember { mutableStateOf(com.bitchat.network.tor.TorPreferenceManager.get(ctx)) }
+                    val torStatus by com.bitchat.network.tor.TorManager.statusFlow.collectAsState()
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -311,18 +313,18 @@ fun AboutSheet(
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                             FilterChip(
-                                selected = torMode.value == com.bitchat.android.net.TorMode.OFF,
+                                selected = torMode.value == TorMode.OFF,
                                 onClick = {
-                                    torMode.value = com.bitchat.android.net.TorMode.OFF
-                                    com.bitchat.android.net.TorPreferenceManager.set(ctx, torMode.value)
+                                    torMode.value = TorMode.OFF
+                                    TorPreferenceManager.set(ctx, torMode.value)
                                 },
                                 label = { Text("tor off", fontFamily = FontFamily.Monospace) }
                             )
                             FilterChip(
-                                selected = torMode.value == com.bitchat.android.net.TorMode.ON,
+                                selected = torMode.value == TorMode.ON,
                                 onClick = {
-                                    torMode.value = com.bitchat.android.net.TorMode.ON
-                                    com.bitchat.android.net.TorPreferenceManager.set(ctx, torMode.value)
+                                    torMode.value = TorMode.ON
+                                    TorPreferenceManager.set(ctx, torMode.value)
                                 },
                                 label = { 
                                     Row(

@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bitchat.android.core.ui.utils.singleOrTripleClickable
 import com.bitchat.domain.geohash.ChannelID
+import com.bitchat.network.tor.TorMode
 
 /**
  * Header components for ChatScreen
@@ -53,9 +54,9 @@ fun isFavoriteReactive(
 fun TorStatusIcon(
     modifier: Modifier = Modifier
 ) {
-    val torStatus by com.bitchat.android.net.TorManager.statusFlow.collectAsState()
+    val torStatus by com.bitchat.network.tor.TorManager.statusFlow.collectAsState()
     
-    if (torStatus.mode != com.bitchat.android.net.TorMode.OFF) {
+    if (torStatus.mode != TorMode.OFF) {
         val cableColor = when {
             torStatus.running && torStatus.bootstrapPercent < 100 -> Color(0xFFFF9500)
             torStatus.running && torStatus.bootstrapPercent >= 100 -> Color(0xFF00C851)
@@ -337,9 +338,9 @@ private fun PrivateChatHeader(
             if (isNostrDM) return@remember false
             if (peerID.length == 64 && peerID.matches(Regex("^[0-9a-fA-F]+$"))) {
                 val noiseKeyBytes = peerID.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-                com.bitchat.android.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(noiseKeyBytes)?.isMutual == true
+                com.bitchat.network.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(noiseKeyBytes)?.isMutual == true
             } else if (peerID.length == 16 && peerID.matches(Regex("^[0-9a-fA-F]+$"))) {
-                com.bitchat.android.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(peerID)?.isMutual == true
+                com.bitchat.network.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(peerID)?.isMutual == true
             } else false
         } catch (_: Exception) { false }
     }
@@ -358,9 +359,9 @@ private fun PrivateChatHeader(
             val titleFromFavorites = try {
                 if (peerID.length == 64 && peerID.matches(Regex("^[0-9a-fA-F]+$"))) {
                     val noiseKeyBytes = peerID.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-                    com.bitchat.android.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(noiseKeyBytes)?.peerNickname
+                    com.bitchat.network.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(noiseKeyBytes)?.peerNickname
                 } else if (peerID.length == 16 && peerID.matches(Regex("^[0-9a-fA-F]+$"))) {
-                    com.bitchat.android.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(peerID)?.peerNickname
+                    com.bitchat.network.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(peerID)?.peerNickname
                 } else null
             } catch (_: Exception) { null }
             titleFromFavorites ?: peerID.take(12)

@@ -65,6 +65,7 @@ dependencies {
     implementation(project(":core:domain"))
     implementation(project(":core:bluetooth"))
     implementation(project(":core:crypto"))
+    implementation(project(":core:network"))
 
     // Core Android dependencies
     implementation(libs.androidx.core.ktx)
@@ -92,13 +93,7 @@ dependencies {
     
     // Bluetooth
     implementation(libs.nordic.ble)
-
-    // WebSocket
-    implementation(libs.okhttp)
-
-    // Arti (Tor in Rust) Android bridge - use published AAR with native libs
-    implementation("info.guardianproject:arti-mobile-ex:1.2.3")
-
+    
     // Google Play Services Location
     implementation(libs.gms.location)
 

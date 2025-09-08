@@ -1,5 +1,6 @@
-package com.bitchat.android.net
+package com.bitchat.network
 
+import com.bitchat.network.tor.TorManager
 import okhttp3.OkHttpClient
 import java.net.InetSocketAddress
 import java.net.Proxy

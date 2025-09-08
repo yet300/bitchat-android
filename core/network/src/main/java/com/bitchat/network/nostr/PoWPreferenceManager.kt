@@ -1,4 +1,4 @@
-package com.bitchat.android.nostr
+package com.bitchat.network.nostr
 
 import android.content.Context
 import android.content.SharedPreferences

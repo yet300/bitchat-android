@@ -1,4 +1,4 @@
-package com.bitchat.android.nostr
+package com.bitchat.network.nostr
 
 import android.content.Context
 import android.util.Log
@@ -7,6 +7,7 @@ import com.bitchat.crypto.nostr.NostrIdentity
 import com.bitchat.crypto.nostr.NostrIdentityBridge
 import com.bitchat.domain.model.ReadReceipt
 import com.bitchat.domain.model.NoisePayloadType
+import com.bitchat.network.favorites.FavoritesPersistenceService
 import kotlinx.coroutines.*
 import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -463,14 +464,14 @@ class NostrTransport(
         try {
             // Try to resolve from favorites persistence service
             val noiseKey = hexStringToByteArray(peerID)
-            val favoriteStatus = com.bitchat.android.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey)
+            val favoriteStatus = FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey)
             if (favoriteStatus?.peerNostrPublicKey != null) {
                 return favoriteStatus.peerNostrPublicKey
             }
             
             // Fallback: try with 16-hex peerID lookup
             if (peerID.length == 16) {
-                val fallbackStatus = com.bitchat.android.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(peerID)
+                val fallbackStatus = FavoritesPersistenceService.shared.getFavoriteStatus(peerID)
                 return fallbackStatus?.peerNostrPublicKey
             }
             

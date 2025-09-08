@@ -2,6 +2,7 @@ package com.bitchat.android.mesh
 
 import android.content.Context
 import android.util.Log
+import com.bitchat.android.services.NostrGeohashService
 import com.bitchat.crypto.EncryptionServiceImpl
 import com.bitchat.domain.model.BitchatMessage
 import com.bitchat.domain.model.RoutedPacket
@@ -491,7 +492,7 @@ class BluetoothMeshService(private val context: Context) {
             if (recipientPeerID.startsWith("nostr_")) {
                 // Get NostrGeohashService instance and send via Nostr
                 try {
-                    val nostrGeohashService = com.bitchat.android.nostr.NostrGeohashService.getInstance(context.applicationContext as android.app.Application)
+                    val nostrGeohashService = NostrGeohashService.getInstance(context.applicationContext as android.app.Application)
                     nostrGeohashService.sendNostrGeohashDM(content, recipientPeerID, finalMessageID, myPeerID)
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to send Nostr geohash DM: ${e.message}")
@@ -570,7 +571,7 @@ class BluetoothMeshService(private val context: Context) {
             if (recipientPeerID.startsWith("nostr_")) {
                 // Get NostrGeohashService instance and send read receipt via Nostr
                 try {
-                    val nostrGeohashService = com.bitchat.android.nostr.NostrGeohashService.getInstance(context.applicationContext as android.app.Application)
+                    val nostrGeohashService = NostrGeohashService.getInstance(context.applicationContext as android.app.Application)
                     nostrGeohashService.sendNostrGeohashReadReceipt(messageID, recipientPeerID, myPeerID)
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to send Nostr geohash read receipt: ${e.message}")
