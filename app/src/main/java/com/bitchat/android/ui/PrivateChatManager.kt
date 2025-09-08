@@ -2,10 +2,11 @@ package com.bitchat.android.ui
 
 import com.bitchat.domain.model.BitchatMessage
 import com.bitchat.domain.model.DeliveryStatus
-import com.bitchat.android.mesh.PeerFingerprintManager
+import com.bitchat.crypto.noise.identity.PeerFingerprintManager
 import com.bitchat.android.mesh.BluetoothMeshService
 import java.util.*
 import android.util.Log
+import com.bitchat.crypto.nostr.Bech32
 
 /**
  * Interface for Noise session operations needed by PrivateChatManager
@@ -471,7 +472,7 @@ class PrivateChatManager(
             val npub = com.bitchat.android.favorites.FavoritesPersistenceService.shared.findNostrPubkey(noiseKeyBytes)
             if (npub != null) {
                 // Normalize to hex to match how we formed temp keys (nostr_<pub16>)
-                val (hrp, data) = com.bitchat.android.nostr.Bech32.decode(npub)
+                val (hrp, data) = Bech32.decode(npub)
                 if (hrp == "npub") {
                     val pubHex = data.joinToString("") { "%02x".format(it) }
                     tryMergeKeys.add("nostr_${pubHex.take(16)}")

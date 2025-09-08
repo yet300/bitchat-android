@@ -1,7 +1,8 @@
 package com.bitchat.android.nostr
 
+import com.bitchat.crypto.nostr.NostrEvent
+import com.bitchat.crypto.nostr.NostrKind
 import com.google.gson.*
-import com.google.gson.annotations.SerializedName
 import java.lang.reflect.Type
 
 /**

@@ -7,7 +7,7 @@
 -keep class org.bouncycastle.** { *; }
 
 # Keep SecureIdentityStateManager from being obfuscated to prevent reflection issues
--keep class com.bitchat.android.identity.SecureIdentityStateManager {
+-keep class com.bitchat.crypto.noise.identity.SecureIdentityStateManager {
     private android.content.SharedPreferences prefs;
     *;
 }

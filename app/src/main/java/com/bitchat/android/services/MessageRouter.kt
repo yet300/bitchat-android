@@ -5,6 +5,7 @@ import android.util.Log
 import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.domain.model.ReadReceipt
 import com.bitchat.android.nostr.NostrTransport
+import com.bitchat.crypto.nostr.NostrIdentityBridge
 
 /**
  * Routes messages between BLE mesh and Nostr transports, matching iOS behavior.
@@ -91,7 +92,7 @@ class MessageRouter private constructor(
     fun sendFavoriteNotification(toPeerID: String, isFavorite: Boolean) {
         if (mesh.getPeerInfo(toPeerID)?.isConnected == true) {
             val myNpub = try {
-                com.bitchat.android.nostr.NostrIdentityBridge.getCurrentNostrIdentity(context)?.npub
+                NostrIdentityBridge.getCurrentNostrIdentity(context)?.npub
             } catch (_: Exception) { null }
             val content = if (isFavorite) "[FAVORITED]:${myNpub ?: ""}" else "[UNFAVORITED]:${myNpub ?: ""}"
             val nickname = mesh.getPeerNicknames()[toPeerID] ?: toPeerID

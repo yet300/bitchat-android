@@ -2,17 +2,19 @@ package com.bitchat.android.mesh
 
 import android.content.Context
 import android.util.Log
-import com.bitchat.android.crypto.EncryptionService
+import com.bitchat.crypto.EncryptionServiceImpl
 import com.bitchat.domain.model.BitchatMessage
 import com.bitchat.domain.model.RoutedPacket
 import com.bitchat.domain.model.IdentityAnnouncement
 import com.bitchat.domain.model.NoisePayload
 import com.bitchat.domain.model.NoisePayloadType
+import com.bitchat.domain.model.NoiseSessionState
 import com.bitchat.domain.model.PeerInfo
 import com.bitchat.domain.model.PrivateMessagePacket
 import com.bitchat.domain.protocol.BitchatPacket
 import com.bitchat.domain.protocol.MessageType
 import com.bitchat.domain.protocol.SpecialRecipients
+import com.bitchat.domain.repository.EncryptionRepository
 import kotlinx.coroutines.*
 import kotlin.random.Random
 
@@ -40,7 +42,7 @@ class BluetoothMeshService(private val context: Context) {
     val myPeerID: String = generateCompatiblePeerID()
     
     // Core components - each handling specific responsibilities
-    private val encryptionService = EncryptionService(context)
+    private val encryptionService : EncryptionRepository = EncryptionServiceImpl(context)
     private val peerManager = PeerManager()
     private val fragmentManager = FragmentManager()
     private val securityManager = SecurityManager(encryptionService, myPeerID)
@@ -740,7 +742,7 @@ class BluetoothMeshService(private val context: Context) {
     /**
      * Get session state for a peer (for UI state display)
      */
-    fun getSessionState(peerID: String): com.bitchat.android.noise.NoiseSession.NoiseSessionState {
+    fun getSessionState(peerID: String): NoiseSessionState {
         return encryptionService.getSessionState(peerID)
     }
     

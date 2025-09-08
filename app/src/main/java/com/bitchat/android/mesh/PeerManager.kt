@@ -1,6 +1,7 @@
 package com.bitchat.android.mesh
 
 import android.util.Log
+import com.bitchat.crypto.noise.identity.PeerFingerprintManager
 import com.bitchat.domain.model.PeerInfo
 import kotlinx.coroutines.*
 import java.util.concurrent.ConcurrentHashMap

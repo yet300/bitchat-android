@@ -63,6 +63,8 @@ android {
 
 dependencies {
     implementation(project(":core:domain"))
+    implementation(project(":core:bluetooth"))
+    implementation(project(":core:crypto"))
 
     // Core Android dependencies
     implementation(libs.androidx.core.ktx)
@@ -82,9 +84,6 @@ dependencies {
     // Permissions
     implementation(libs.accompanist.permissions)
     
-    // Cryptography
-    implementation(libs.bundles.cryptography)
-    
     // JSON
     implementation(libs.gson)
     
@@ -103,8 +102,6 @@ dependencies {
     // Google Play Services Location
     implementation(libs.gms.location)
 
-    // Security preferences
-    implementation(libs.androidx.security.crypto)
     
     // Testing
     testImplementation(libs.bundles.testing)

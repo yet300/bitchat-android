@@ -1,6 +1,7 @@
 package com.bitchat.android.nostr
 
 import android.util.Log
+import com.bitchat.crypto.nostr.NostrEvent
 import java.util.concurrent.ConcurrentHashMap
 
 /**

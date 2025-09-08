@@ -3,13 +3,12 @@ package com.bitchat.android.nostr
 import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import com.google.gson.Gson
-import com.google.gson.JsonArray
+import com.bitchat.crypto.nostr.NostrEvent
+import com.bitchat.crypto.nostr.NostrKind
 import com.google.gson.JsonParser
 import kotlinx.coroutines.*
 import okhttp3.*
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
 import kotlin.math.min
 import kotlin.math.pow
 

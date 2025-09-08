@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import com.bitchat.android.ui.theme.BASE_FONT_SIZE
 import java.util.*
 import androidx.compose.ui.text.style.TextOverflow
+import com.bitchat.crypto.nostr.NostrIdentityBridge
 import com.bitchat.domain.geohash.ChannelID
 
 /**
@@ -93,7 +94,7 @@ fun GeohashPeopleList(
                 when (val channel = selectedLocationChannel) {
                     is ChannelID.Location -> {
                         try {
-                            val identity = com.bitchat.android.nostr.NostrIdentityBridge.deriveIdentity(
+                            val identity = NostrIdentityBridge.deriveIdentity(
                                 forGeohash = channel.channel.geohash,
                                 context = viewModel.getApplication()
                             )

@@ -2,6 +2,7 @@ package com.bitchat.android.ui
 
 import com.bitchat.android.mesh.BluetoothMeshDelegate
 import com.bitchat.android.mesh.BluetoothMeshService
+import com.bitchat.crypto.nostr.Bech32
 import com.bitchat.domain.model.BitchatMessage
 import com.bitchat.domain.model.DeliveryStatus
 import com.bitchat.domain.model.PeerInfo
@@ -113,7 +114,7 @@ class MeshDelegateHandler(
                             val favs = try { com.bitchat.android.favorites.FavoritesPersistenceService.shared.getOurFavorites() } catch (_: Exception) { emptyList() }
                             favs.firstNotNullOfOrNull { rel ->
                                 rel.peerNostrPublicKey?.let { s ->
-                                    runCatching { com.bitchat.android.nostr.Bech32.decode(s) }.getOrNull()?.let { dec ->
+                                    runCatching { Bech32.decode(s) }.getOrNull()?.let { dec ->
                                         if (dec.first == "npub") dec.second.joinToString("") { b -> "%02x".format(b) } else null
                                     }
                                 }
@@ -164,7 +165,7 @@ class MeshDelegateHandler(
                     val npub = com.bitchat.android.favorites.FavoritesPersistenceService.shared.findNostrPubkey(noiseKey)
                     val tempNostrKey: String? = try {
                         if (npub != null) {
-                            val (hrp, data) = com.bitchat.android.nostr.Bech32.decode(npub)
+                            val (hrp, data) = Bech32.decode(npub)
                             if (hrp == "npub") "nostr_${data.joinToString("") { b -> "%02x".format(b) }.take(16)}" else null
                         } else null
                     } catch (_: Exception) { null }

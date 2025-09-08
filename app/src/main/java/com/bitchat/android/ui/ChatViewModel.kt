@@ -10,6 +10,9 @@ import com.bitchat.android.mesh.BluetoothMeshDelegate
 import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.domain.model.BitchatMessage
 import com.bitchat.android.nostr.NostrGeohashService
+import com.bitchat.crypto.noise.identity.PeerFingerprintManager
+import com.bitchat.crypto.noise.identity.SecureIdentityStateManager
+import com.bitchat.crypto.nostr.NostrIdentityBridge
 import kotlinx.coroutines.launch
 import com.bitchat.domain.geohash.ChannelID
 import com.bitchat.domain.utils.NotificationIntervalManager
@@ -352,7 +355,7 @@ class ChatViewModel(
             val nickname = peerInfo?.nickname ?: (meshService.getPeerNicknames()[peerID] ?: peerID)
             if (noiseKey != null) {
                 val isNowFavorite = dataManager.favoritePeers.contains(
-                    com.bitchat.android.mesh.PeerFingerprintManager.getInstance().getFingerprintForPeer(peerID) ?: ""
+                    PeerFingerprintManager.getInstance().getFingerprintForPeer(peerID) ?: ""
                 )
                 com.bitchat.android.favorites.FavoritesPersistenceService.shared.updateFavoriteStatus(
                     noisePublicKey = noiseKey,
@@ -362,7 +365,7 @@ class ChatViewModel(
 
                 // Send favorite notification via mesh or Nostr with our npub if available
                 try {
-                    val myNostr = com.bitchat.android.nostr.NostrIdentityBridge.getCurrentNostrIdentity(getApplication())
+                    val myNostr = NostrIdentityBridge.getCurrentNostrIdentity(getApplication())
                     val announcementContent = if (isNowFavorite) "[FAVORITED]:${myNostr?.npub ?: ""}" else "[UNFAVORITED]:${myNostr?.npub ?: ""}"
                     // Prefer mesh if session established, else try Nostr
                     if (meshService.hasEstablishedSession(peerID)) {
@@ -597,7 +600,7 @@ class ChatViewModel(
             
             // Clear secure identity state (if used)
             try {
-                val identityManager = com.bitchat.android.identity.SecureIdentityStateManager(getApplication())
+                val identityManager = SecureIdentityStateManager(getApplication())
                 identityManager.clearIdentityData()
                 Log.d(TAG, "✅ Cleared secure identity state")
             } catch (e: Exception) {

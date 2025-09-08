@@ -2,6 +2,11 @@ package com.bitchat.android.nostr
 
 import android.content.Context
 import android.util.Log
+import com.bitchat.crypto.nostr.Bech32
+import com.bitchat.crypto.nostr.NostrCrypto
+import com.bitchat.crypto.nostr.NostrIdentityBridge
+import com.bitchat.crypto.nostr.hexToByteArray
+import com.bitchat.crypto.nostr.toHexString
 import kotlinx.coroutines.*
 
 /**

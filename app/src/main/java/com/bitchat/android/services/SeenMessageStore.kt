@@ -2,7 +2,7 @@ package com.bitchat.android.services
 
 import android.content.Context
 import android.util.Log
-import com.bitchat.android.identity.SecureIdentityStateManager
+import com.bitchat.crypto.noise.identity.SecureIdentityStateManager
 import com.google.gson.Gson
 
 /**

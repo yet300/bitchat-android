@@ -4,6 +4,7 @@ import android.app.Application
 import com.bitchat.android.nostr.RelayDirectory
 import com.bitchat.android.ui.theme.ThemePreferenceManager
 import com.bitchat.android.net.TorManager
+import com.bitchat.crypto.nostr.NostrIdentityBridge
 
 /**
  * Main application class for bitchat Android
@@ -26,7 +27,7 @@ class BitchatApplication : Application() {
 
         // Warm up Nostr identity to ensure npub is available for favorite notifications
         try {
-            com.bitchat.android.nostr.NostrIdentityBridge.getCurrentNostrIdentity(this)
+            NostrIdentityBridge.getCurrentNostrIdentity(this)
         } catch (_: Exception) { }
 
         // Initialize theme preference

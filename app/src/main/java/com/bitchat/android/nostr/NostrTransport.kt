@@ -2,6 +2,9 @@ package com.bitchat.android.nostr
 
 import android.content.Context
 import android.util.Log
+import com.bitchat.crypto.nostr.Bech32
+import com.bitchat.crypto.nostr.NostrIdentity
+import com.bitchat.crypto.nostr.NostrIdentityBridge
 import com.bitchat.domain.model.ReadReceipt
 import com.bitchat.domain.model.NoisePayloadType
 import kotlinx.coroutines.*

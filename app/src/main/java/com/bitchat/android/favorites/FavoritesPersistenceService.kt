@@ -2,50 +2,12 @@ package com.bitchat.android.favorites
 
 import android.content.Context
 import android.util.Log
-import com.bitchat.android.identity.SecureIdentityStateManager
+import com.bitchat.crypto.noise.identity.SecureIdentityStateManager
+import com.bitchat.crypto.nostr.Bech32
+import com.bitchat.domain.model.FavoriteRelationship
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.util.*
-
-/**
- * Bridging Noise and Nostr favorites
- * Direct port from iOS FavoritesPersistenceService.swift
- */
-data class FavoriteRelationship(
-    val peerNoisePublicKey: ByteArray,    // Noise static public key (32 bytes)
-    val peerNostrPublicKey: String?,      // npub bech32 string  
-    val peerNickname: String,
-    val isFavorite: Boolean,              // We favorited them
-    val theyFavoritedUs: Boolean,         // They favorited us
-    val favoritedAt: Date,
-    val lastUpdated: Date
-) {
-    val isMutual: Boolean get() = isFavorite && theyFavoritedUs
-    
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-        
-        other as FavoriteRelationship
-        
-        if (!peerNoisePublicKey.contentEquals(other.peerNoisePublicKey)) return false
-        if (peerNostrPublicKey != other.peerNostrPublicKey) return false
-        if (peerNickname != other.peerNickname) return false
-        if (isFavorite != other.isFavorite) return false
-        if (theyFavoritedUs != other.theyFavoritedUs) return false
-        
-        return true
-    }
-    
-    override fun hashCode(): Int {
-        var result = peerNoisePublicKey.contentHashCode()
-        result = 31 * result + (peerNostrPublicKey?.hashCode() ?: 0)
-        result = 31 * result + peerNickname.hashCode()
-        result = 31 * result + isFavorite.hashCode()
-        result = 31 * result + theyFavoritedUs.hashCode()
-        return result
-    }
-}
 
 interface FavoritesChangeListener {
     fun onFavoriteChanged(noiseKeyHex: String)
@@ -305,7 +267,7 @@ class FavoritesPersistenceService private constructor(private val context: Conte
     private fun normalizeNostrKeyToHex(value: String): String? {
         return try {
             if (value.startsWith("npub1")) {
-                val (hrp, data) = com.bitchat.android.nostr.Bech32.decode(value)
+                val (hrp, data) = Bech32.decode(value)
                 if (hrp != "npub") return null
                 data.joinToString("") { "%02x".format(it) }
             } else {

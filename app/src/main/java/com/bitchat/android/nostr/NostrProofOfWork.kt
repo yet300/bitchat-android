@@ -1,9 +1,9 @@
 package com.bitchat.android.nostr
 
 import android.util.Log
+import com.bitchat.crypto.nostr.NostrEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.security.MessageDigest
 import kotlin.random.Random
 
 /**

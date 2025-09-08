@@ -23,6 +23,7 @@ include(":core:domain")
 include(":core:data")
 include(":core:network")
 include(":core:crypto")
+include(":core:bluetooth")
 
 
 include(":feature:chat")

@@ -1,11 +1,11 @@
 package com.bitchat.android.mesh
 
 import android.util.Log
-import com.bitchat.android.crypto.EncryptionService
 import com.bitchat.domain.model.PeerInfo
 import com.bitchat.domain.protocol.BitchatPacket
 import com.bitchat.domain.protocol.MessageType
 import com.bitchat.domain.model.RoutedPacket
+import com.bitchat.domain.repository.EncryptionRepository
 import kotlinx.coroutines.*
 import java.util.*
 import kotlin.collections.mutableSetOf
@@ -15,7 +15,7 @@ import kotlin.collections.mutableSetOf
  * replay attack protection, and key exchange handling
  * Extracted from BluetoothMeshService for better separation of concerns
  */
-class SecurityManager(private val encryptionService: EncryptionService, private val myPeerID: String) {
+class SecurityManager(private val encryptionService: EncryptionRepository, private val myPeerID: String) {
     
     companion object {
         private const val TAG = "SecurityManager"

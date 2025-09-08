@@ -1,6 +1,10 @@
 package com.bitchat.android.nostr
 
 import android.util.Log
+import com.bitchat.crypto.nostr.NostrCrypto
+import com.bitchat.crypto.nostr.NostrEvent
+import com.bitchat.crypto.nostr.NostrIdentity
+import com.bitchat.crypto.nostr.NostrKind
 import com.google.gson.Gson
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers

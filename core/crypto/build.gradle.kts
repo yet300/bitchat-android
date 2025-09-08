@@ -39,6 +39,7 @@ dependencies {
     
     // Android Core
     implementation(libs.androidx.core.ktx)
+
     implementation(libs.androidx.security.crypto)
     
     // Coroutines

@@ -10,6 +10,9 @@ import com.bitchat.android.ui.MeshDelegateHandler
 import com.bitchat.android.ui.PrivateChatManager
 import com.bitchat.android.ui.GeoPerson
 import com.bitchat.android.ui.colorForPeerSeed
+import com.bitchat.crypto.nostr.NostrEvent
+import com.bitchat.crypto.nostr.NostrIdentity
+import com.bitchat.crypto.nostr.NostrIdentityBridge
 import com.bitchat.domain.geohash.ChannelID
 import com.bitchat.domain.geohash.GeohashChannel
 import com.bitchat.domain.geohash.GeohashChannelLevel
@@ -1447,8 +1450,8 @@ class NostrGeohashService(
      * Handle geohash DM event (private messages in geohash context) - iOS compatible
      */
     private fun handleGeohashDmEvent(
-        giftWrap: NostrEvent, 
-        geohash: String, 
+        giftWrap: NostrEvent,
+        geohash: String,
         identity: NostrIdentity
     ) {
         coroutineScope.launch(kotlinx.coroutines.Dispatchers.Default) {
