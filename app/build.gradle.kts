@@ -76,8 +76,9 @@ dependencies {
     implementation(libs.bundles.lifecycle)
     
     // Navigation
-    implementation(libs.androidx.navigation.compose)
-    
+    implementation(libs.bundles.decompose)
+    implementation(libs.decompose.compose)
+
     // Permissions
     implementation(libs.accompanist.permissions)
     
