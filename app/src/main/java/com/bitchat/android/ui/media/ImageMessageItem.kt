@@ -27,7 +27,6 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.text.font.FontFamily
-import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.model.BitchatMessageType
 import androidx.compose.material3.ColorScheme
@@ -39,7 +38,7 @@ fun ImageMessageItem(
     message: BitchatMessage,
     messages: List<BitchatMessage>,
     currentUserNickname: String,
-    meshService: BluetoothMeshService,
+    myPeerID: String,
     colorScheme: ColorScheme,
     timeFormatter: SimpleDateFormat,
     onNicknameClick: ((String) -> Unit)?,
@@ -53,7 +52,7 @@ fun ImageMessageItem(
         val headerText = com.bitchat.android.ui.formatMessageHeaderAnnotatedString(
             message = message,
             currentUserNickname = currentUserNickname,
-            meshService = meshService,
+            myPeerID = myPeerID,
             colorScheme = colorScheme,
             timeFormatter = timeFormatter
         )

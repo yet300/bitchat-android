@@ -143,7 +143,7 @@ fun ChatScreen(
             MessagesList(
                 messages = displayMessages,
                 currentUserNickname = nickname,
-                meshService = viewModel.meshService,
+                myPeerID = viewModel.myPeerID,
                 modifier = Modifier.weight(1f),
                 forceScrollToBottom = forceScrollToBottom,
                 onScrolledUpChanged = { isUp -> isScrolledUp = isUp },

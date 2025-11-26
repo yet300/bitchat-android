@@ -76,7 +76,7 @@ fun MessageWithMatrixAnimation(
     message: com.bitchat.android.model.BitchatMessage,
     messages: List<com.bitchat.android.model.BitchatMessage> = emptyList(),
     currentUserNickname: String,
-    meshService: com.bitchat.android.mesh.BluetoothMeshService,
+    myPeerID: String,
     colorScheme: androidx.compose.material3.ColorScheme,
     timeFormatter: java.text.SimpleDateFormat,
     onNicknameClick: ((String) -> Unit)?,
@@ -91,7 +91,7 @@ fun MessageWithMatrixAnimation(
         AnimatedMessageDisplay(
             message = message,
             currentUserNickname = currentUserNickname,
-            meshService = meshService,
+            myPeerID = myPeerID,
             colorScheme = colorScheme,
             timeFormatter = timeFormatter,
             modifier = modifier
@@ -101,7 +101,7 @@ fun MessageWithMatrixAnimation(
         val annotatedText = formatMessageAsAnnotatedString(
             message = message,
             currentUserNickname = currentUserNickname,
-            meshService = meshService,
+            myPeerID = myPeerID,
             colorScheme = colorScheme,
             timeFormatter = timeFormatter
         )
@@ -123,7 +123,7 @@ fun MessageWithMatrixAnimation(
 private fun AnimatedMessageDisplay(
     message: com.bitchat.android.model.BitchatMessage,
     currentUserNickname: String,
-    meshService: com.bitchat.android.mesh.BluetoothMeshService,
+    myPeerID: String,
     colorScheme: androidx.compose.material3.ColorScheme,
     timeFormatter: java.text.SimpleDateFormat,
     modifier: Modifier = Modifier
@@ -206,14 +206,14 @@ private fun AnimatedMessageDisplay(
         formatMessageAsAnnotatedStringWithoutTimestamp(
             message = animatedMessage,
             currentUserNickname = currentUserNickname,
-            meshService = meshService,
+            myPeerID = myPeerID,
             colorScheme = colorScheme
         )
     } else {
         formatMessageAsAnnotatedString(
             message = animatedMessage,
             currentUserNickname = currentUserNickname,
-            meshService = meshService,
+            myPeerID = myPeerID,
             colorScheme = colorScheme,
             timeFormatter = timeFormatter
         )
@@ -240,7 +240,7 @@ private fun AnimatedMessageDisplay(
 private fun formatMessageAsAnnotatedStringWithoutTimestamp(
     message: com.bitchat.android.model.BitchatMessage,
     currentUserNickname: String,
-    meshService: com.bitchat.android.mesh.BluetoothMeshService,
+    myPeerID: String,
     colorScheme: androidx.compose.material3.ColorScheme
 ): AnnotatedString {
     // Get the full formatted text first
@@ -248,7 +248,7 @@ private fun formatMessageAsAnnotatedStringWithoutTimestamp(
     val fullText = formatMessageAsAnnotatedString(
         message = message,
         currentUserNickname = currentUserNickname,
-        meshService = meshService,
+        myPeerID = myPeerID,
         colorScheme = colorScheme,
         timeFormatter = timeFormatter
     )

@@ -307,9 +307,7 @@ fun PeopleSection(
         
         // Build mapping of connected peerID -> noise key hex to unify with offline favorites
         val noiseHexByPeerID: Map<String, String> = connectedPeers.associateWith { pid ->
-            try {
-                viewModel.meshService.getPeerInfo(pid)?.noisePublicKey?.joinToString("") { b -> "%02x".format(b) }
-            } catch (_: Exception) { null }
+            viewModel.getPeerNoisePublicKeyHex(pid)
         }.filterValues { it != null }.mapValues { it.value!! }
 
         Log.d("SidebarComponents", "Recomposing with ${favoritePeers.size} favorites, peer states: $peerFavoriteStates")
@@ -385,7 +383,7 @@ fun PeopleSection(
             val showHash = (baseNameCounts[bName] ?: 0) > 1
 
             val directMap by viewModel.peerDirect.observeAsState(emptyMap())
-            val isDirectLive = directMap[peerID] ?: try { viewModel.meshService.getPeerInfo(peerID)?.isDirectConnection == true } catch (_: Exception) { false }
+            val isDirectLive = directMap[peerID] ?: viewModel.isPeerDirectConnection(peerID)
             PeerItem(
                 peerID = peerID,
                 displayName = displayName,

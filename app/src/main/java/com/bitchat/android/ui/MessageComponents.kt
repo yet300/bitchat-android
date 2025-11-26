@@ -31,7 +31,6 @@ import android.content.Intent
 import android.net.Uri
 import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.model.DeliveryStatus
-import com.bitchat.android.mesh.BluetoothMeshService
 import java.text.SimpleDateFormat
 import java.util.*
 import com.bitchat.android.ui.media.VoiceNotePlayer
@@ -58,7 +57,7 @@ import androidx.compose.ui.res.stringResource
 fun MessagesList(
     messages: List<BitchatMessage>,
     currentUserNickname: String,
-    meshService: BluetoothMeshService,
+    myPeerID: String,
     modifier: Modifier = Modifier,
     forceScrollToBottom: Boolean = false,
     onScrolledUpChanged: ((Boolean) -> Unit)? = null,
@@ -126,7 +125,7 @@ fun MessagesList(
                     message = message,
                     messages = messages,
                     currentUserNickname = currentUserNickname,
-                    meshService = meshService,
+                    myPeerID = myPeerID,
                     onNicknameClick = onNicknameClick,
                     onMessageLongPress = onMessageLongPress,
                     onCancelTransfer = onCancelTransfer,
@@ -142,7 +141,7 @@ fun MessagesList(
 fun MessageItem(
     message: BitchatMessage,
     currentUserNickname: String,
-    meshService: BluetoothMeshService,
+    myPeerID: String,
     messages: List<BitchatMessage> = emptyList(),
     onNicknameClick: ((String) -> Unit)? = null,
     onMessageLongPress: ((BitchatMessage) -> Unit)? = null,
@@ -170,7 +169,7 @@ fun MessageItem(
                     message = message,
                     messages = messages,
                     currentUserNickname = currentUserNickname,
-                    meshService = meshService,
+                    myPeerID = myPeerID,
                     colorScheme = colorScheme,
                     timeFormatter = timeFormatter,
                     onNicknameClick = onNicknameClick,
@@ -208,7 +207,7 @@ fun MessageItem(
         message: BitchatMessage,
         messages: List<BitchatMessage>,
         currentUserNickname: String,
-        meshService: BluetoothMeshService,
+        myPeerID: String,
         colorScheme: ColorScheme,
         timeFormatter: SimpleDateFormat,
         onNicknameClick: ((String) -> Unit)?,
@@ -224,7 +223,7 @@ fun MessageItem(
             message = message,
             messages = messages,
             currentUserNickname = currentUserNickname,
-            meshService = meshService,
+            myPeerID = myPeerID,
             colorScheme = colorScheme,
             timeFormatter = timeFormatter,
             onNicknameClick = onNicknameClick,
@@ -241,7 +240,7 @@ fun MessageItem(
         com.bitchat.android.ui.media.AudioMessageItem(
             message = message,
             currentUserNickname = currentUserNickname,
-            meshService = meshService,
+            myPeerID = myPeerID,
             colorScheme = colorScheme,
             timeFormatter = timeFormatter,
             onNicknameClick = onNicknameClick,
@@ -269,7 +268,7 @@ fun MessageItem(
             val headerText = formatMessageHeaderAnnotatedString(
                 message = message,
                 currentUserNickname = currentUserNickname,
-                meshService = meshService,
+                myPeerID = myPeerID,
                 colorScheme = colorScheme,
                 timeFormatter = timeFormatter
             )
@@ -364,7 +363,7 @@ fun MessageItem(
             message = message,
             messages = messages,
             currentUserNickname = currentUserNickname,
-            meshService = meshService,
+            myPeerID = myPeerID,
             colorScheme = colorScheme,
             timeFormatter = timeFormatter,
             onNicknameClick = onNicknameClick,
@@ -377,13 +376,13 @@ fun MessageItem(
         val annotatedText = formatMessageAsAnnotatedString(
             message = message,
             currentUserNickname = currentUserNickname,
-            meshService = meshService,
+            myPeerID = myPeerID,
             colorScheme = colorScheme,
             timeFormatter = timeFormatter
         )
         
         // Check if this message was sent by self to avoid click interactions on own nickname
-        val isSelf = message.senderPeerID == meshService.myPeerID || 
+        val isSelf = message.senderPeerID == myPeerID || 
                      message.sender == currentUserNickname ||
                      message.sender.startsWith("$currentUserNickname#")
         

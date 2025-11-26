@@ -634,7 +634,7 @@ private fun MainHeader(
             )
             Spacer(modifier = Modifier.width(2.dp))
             PeerCounter(
-                connectedPeers = connectedPeers.filter { it != viewModel.meshService.myPeerID },
+                connectedPeers = connectedPeers.filter { it != viewModel.myPeerID },
                 joinedChannels = joinedChannels,
                 hasUnreadChannels = hasUnreadChannels,
                 isConnected = isConnected,

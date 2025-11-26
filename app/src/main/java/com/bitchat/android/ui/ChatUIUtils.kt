@@ -11,7 +11,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.mesh.BluetoothMeshService
 import androidx.compose.material3.ColorScheme
 import com.bitchat.android.ui.theme.BASE_FONT_SIZE
 import java.text.SimpleDateFormat
@@ -42,7 +41,7 @@ fun getRSSIColor(rssi: Int): Color {
 fun formatMessageAsAnnotatedString(
     message: BitchatMessage,
     currentUserNickname: String,
-    meshService: BluetoothMeshService,
+    myPeerID: String,
     colorScheme: ColorScheme,
     timeFormatter: SimpleDateFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 ): AnnotatedString {
@@ -50,7 +49,7 @@ fun formatMessageAsAnnotatedString(
     val isDark = colorScheme.background.red + colorScheme.background.green + colorScheme.background.blue < 1.5f
     
     // Determine if this message was sent by self
-    val isSelf = message.senderPeerID == meshService.myPeerID || 
+    val isSelf = message.senderPeerID == myPeerID || 
                  message.sender == currentUserNickname ||
                  message.sender.startsWith("$currentUserNickname#")
     
@@ -162,14 +161,14 @@ fun formatMessageAsAnnotatedString(
 fun formatMessageHeaderAnnotatedString(
     message: BitchatMessage,
     currentUserNickname: String,
-    meshService: BluetoothMeshService,
+    myPeerID: String,
     colorScheme: ColorScheme,
     timeFormatter: SimpleDateFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 ): AnnotatedString {
     val builder = AnnotatedString.Builder()
     val isDark = colorScheme.background.red + colorScheme.background.green + colorScheme.background.blue < 1.5f
 
-    val isSelf = message.senderPeerID == meshService.myPeerID ||
+    val isSelf = message.senderPeerID == myPeerID ||
             message.sender == currentUserNickname ||
             message.sender.startsWith("$currentUserNickname#")
 

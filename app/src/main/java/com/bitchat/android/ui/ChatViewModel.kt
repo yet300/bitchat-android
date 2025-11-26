@@ -136,6 +136,22 @@ class ChatViewModel @Inject constructor(
 
     // Expose state through LiveData (maintaining the same interface)
     val messages: LiveData<List<BitchatMessage>> = state.messages
+    
+    // Expose myPeerID for UI components (avoids passing meshService to UI layer)
+    val myPeerID: String get() = meshService.myPeerID
+    
+    // Expose peer info methods for UI components (avoids passing meshService to UI layer)
+    fun getPeerNoisePublicKeyHex(peerID: String): String? {
+        return try {
+            meshService.getPeerInfo(peerID)?.noisePublicKey?.joinToString("") { b -> "%02x".format(b) }
+        } catch (_: Exception) { null }
+    }
+    
+    fun isPeerDirectConnection(peerID: String): Boolean {
+        return try {
+            meshService.getPeerInfo(peerID)?.isDirectConnection == true
+        } catch (_: Exception) { false }
+    }
     val connectedPeers: LiveData<List<String>> = state.connectedPeers
     val nickname: LiveData<String> = state.nickname
     val isConnected: LiveData<Boolean> = state.isConnected

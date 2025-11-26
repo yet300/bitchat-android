@@ -21,7 +21,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import com.bitchat.android.R
-import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.model.BitchatMessage
 import androidx.compose.material3.ColorScheme
 import java.text.SimpleDateFormat
@@ -30,7 +29,7 @@ import java.text.SimpleDateFormat
 fun AudioMessageItem(
     message: BitchatMessage,
     currentUserNickname: String,
-    meshService: BluetoothMeshService,
+    myPeerID: String,
     colorScheme: ColorScheme,
     timeFormatter: SimpleDateFormat,
     onNicknameClick: ((String) -> Unit)?,
@@ -53,7 +52,7 @@ fun AudioMessageItem(
         val headerText = com.bitchat.android.ui.formatMessageHeaderAnnotatedString(
             message = message,
             currentUserNickname = currentUserNickname,
-            meshService = meshService,
+            myPeerID = myPeerID,
             colorScheme = colorScheme,
             timeFormatter = timeFormatter
         )
