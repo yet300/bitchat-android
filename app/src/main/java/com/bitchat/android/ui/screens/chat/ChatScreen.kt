@@ -1,9 +1,11 @@
-package com.bitchat.android.ui
+package com.bitchat.android.ui.screens.chat
 // [Goose] Bridge file share events to ViewModel via dispatcher is installed in ChatScreen composition
 
 // [Goose] Installing FileShareDispatcher handler in ChatScreen to forward file sends to ViewModel
 
 
+import androidx.activity.compose.BackHandler
+import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -26,6 +28,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.zIndex
 import com.bitchat.android.model.BitchatMessage
+import com.bitchat.android.ui.*
+import com.bitchat.android.ui.components.ModalBottomSheet
+import com.bitchat.android.ui.components.PasswordPromptDialog
+import com.bitchat.android.ui.screens.chat.sheets.AboutSheetContent
+import com.bitchat.android.ui.screens.chat.sheets.ChatUserSheetContent
+import com.bitchat.android.ui.screens.chat.sheets.LocationChannelsSheetContent
+import com.bitchat.android.ui.screens.chat.sheets.LocationNotesSheetPresenterContent
 import com.bitchat.android.ui.media.FullScreenImageViewer
 
 /**
@@ -39,7 +48,10 @@ import com.bitchat.android.ui.media.FullScreenImageViewer
  * - ChatUIUtils: Utility functions for formatting and colors
  */
 @Composable
-fun ChatScreen(viewModel: ChatViewModel) {
+fun ChatScreen(
+    component: com.bitchat.android.feature.chat.ChatComponent,
+    viewModel: ChatViewModel
+) {
     val colorScheme = MaterialTheme.colorScheme
     val messages by viewModel.messages.observeAsState(emptyList())
     val connectedPeers by viewModel.connectedPeers.observeAsState(emptyList())
@@ -58,15 +70,16 @@ fun ChatScreen(viewModel: ChatViewModel) {
     val mentionSuggestions by viewModel.mentionSuggestions.observeAsState(emptyList())
     val showAppInfo by viewModel.showAppInfo.observeAsState(false)
 
+    // Handle back press
+    val isBackHandlerEnabled = showSidebar || selectedPrivatePeer != null || currentChannel != null
+    BackHandler(enabled = isBackHandlerEnabled) {
+        viewModel.handleBackPressed()
+    }
+
     var messageText by remember { mutableStateOf(TextFieldValue("")) }
     var showPasswordPrompt by remember { mutableStateOf(false) }
     var showPasswordDialog by remember { mutableStateOf(false) }
     var passwordInput by remember { mutableStateOf("") }
-    var showLocationChannelsSheet by remember { mutableStateOf(false) }
-    var showLocationNotesSheet by remember { mutableStateOf(false) }
-    var showUserSheet by remember { mutableStateOf(false) }
-    var selectedUserForSheet by remember { mutableStateOf("") }
-    var selectedMessageForSheet by remember { mutableStateOf<BitchatMessage?>(null) }
     var showFullScreenImageViewer by remember { mutableStateOf(false) }
     var viewerImagePaths by remember { mutableStateOf(emptyList<String>()) }
     var initialViewerIndex by remember { mutableStateOf(0) }
@@ -168,9 +181,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                     // Message long press - open user action sheet with message context
                     // Extract base nickname from message sender (contains all necessary info)
                     val (baseName, _) = splitSuffix(message.sender)
-                    selectedUserForSheet = baseName
-                    selectedMessageForSheet = message
-                    showUserSheet = true
+                    component.onShowUserSheet(baseName, message.id)
                 },
                 onCancelTransfer = { msg ->
                     viewModel.cancelMediaSend(msg.id)
@@ -251,10 +262,14 @@ fun ChatScreen(viewModel: ChatViewModel) {
             viewModel = viewModel,
             colorScheme = colorScheme,
             onSidebarToggle = { viewModel.showSidebar() },
-            onShowAppInfo = { viewModel.showAppInfo() },
+            onShowAppInfo = { component.onShowAppInfo() },
             onPanicClear = { viewModel.panicClearAllData() },
-            onLocationChannelsClick = { showLocationChannelsSheet = true },
-            onLocationNotesClick = { showLocationNotesSheet = true }
+            onLocationChannelsClick = { component.onShowLocationChannels() },
+            onLocationNotesClick = {
+                // Ensure location is loaded before showing sheet
+                viewModel.refreshLocationChannels()
+                component.onShowLocationNotes()
+            }
         )
 
         // Divider under header - positioned after status bar + header height
@@ -344,13 +359,13 @@ fun ChatScreen(viewModel: ChatViewModel) {
         )
     }
 
-    // Dialogs and Sheets
-    ChatDialogs(
-        showPasswordDialog = showPasswordDialog,
-        passwordPromptChannel = passwordPromptChannel,
+    // Password dialog (still using local state for now)
+    PasswordPromptDialog(
+        show = showPasswordDialog,
+        channelName = passwordPromptChannel,
         passwordInput = passwordInput,
         onPasswordChange = { passwordInput = it },
-        onPasswordConfirm = {
+        onConfirm = {
             if (passwordInput.isNotEmpty()) {
                 val success = viewModel.joinChannel(passwordPromptChannel!!, passwordInput)
                 if (success) {
@@ -359,23 +374,15 @@ fun ChatScreen(viewModel: ChatViewModel) {
                 }
             }
         },
-        onPasswordDismiss = {
+        onDismiss = {
             showPasswordDialog = false
             passwordInput = ""
-        },
-        showAppInfo = showAppInfo,
-        onAppInfoDismiss = { viewModel.hideAppInfo() },
-        showLocationChannelsSheet = showLocationChannelsSheet,
-        onLocationChannelsSheetDismiss = { showLocationChannelsSheet = false },
-        showLocationNotesSheet = showLocationNotesSheet,
-        onLocationNotesSheetDismiss = { showLocationNotesSheet = false },
-        showUserSheet = showUserSheet,
-        onUserSheetDismiss = { 
-            showUserSheet = false
-            selectedMessageForSheet = null // Reset message when dismissing
-        },
-        selectedUserForSheet = selectedUserForSheet,
-        selectedMessageForSheet = selectedMessageForSheet,
+        }
+    )
+
+    // Decompose-managed sheets
+    ChatSheets(
+        component = component,
         viewModel = viewModel
     )
 }
@@ -494,78 +501,65 @@ private fun ChatFloatingHeader(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ChatDialogs(
-    showPasswordDialog: Boolean,
-    passwordPromptChannel: String?,
-    passwordInput: String,
-    onPasswordChange: (String) -> Unit,
-    onPasswordConfirm: () -> Unit,
-    onPasswordDismiss: () -> Unit,
-    showAppInfo: Boolean,
-    onAppInfoDismiss: () -> Unit,
-    showLocationChannelsSheet: Boolean,
-    onLocationChannelsSheetDismiss: () -> Unit,
-    showLocationNotesSheet: Boolean,
-    onLocationNotesSheetDismiss: () -> Unit,
-    showUserSheet: Boolean,
-    onUserSheetDismiss: () -> Unit,
-    selectedUserForSheet: String,
-    selectedMessageForSheet: BitchatMessage?,
+private fun ChatSheets(
+    component: com.bitchat.android.feature.chat.ChatComponent,
     viewModel: ChatViewModel
 ) {
-    // Password dialog
-    PasswordPromptDialog(
-        show = showPasswordDialog,
-        channelName = passwordPromptChannel,
-        passwordInput = passwordInput,
-        onPasswordChange = onPasswordChange,
-        onConfirm = onPasswordConfirm,
-        onDismiss = onPasswordDismiss
-    )
-
-    // About sheet
-    var showDebugSheet by remember { mutableStateOf(false) }
-    AboutSheet(
-        isPresented = showAppInfo,
-        onDismiss = onAppInfoDismiss,
-        viewModel = viewModel,
-        onShowDebug = { showDebugSheet = true }
-    )
-    if (showDebugSheet) {
-        com.bitchat.android.ui.debug.DebugSettingsSheet(
-            isPresented = showDebugSheet,
-            onDismiss = { showDebugSheet = false },
-            meshService = viewModel.meshService
-        )
-    }
+    val sheetSlot by component.sheetSlot.subscribeAsState()
     
-    // Location channels sheet
-    if (showLocationChannelsSheet) {
-        LocationChannelsSheet(
-            isPresented = showLocationChannelsSheet,
-            onDismiss = onLocationChannelsSheetDismiss,
-            viewModel = viewModel
-        )
-    }
-    
-    // Location notes sheet (extracted to separate presenter)
-    if (showLocationNotesSheet) {
-        LocationNotesSheetPresenter(
-            viewModel = viewModel,
-            onDismiss = onLocationNotesSheetDismiss
-        )
-    }
-    
-    // User action sheet
-    if (showUserSheet) {
-        ChatUserSheet(
-            isPresented = showUserSheet,
-            onDismiss = onUserSheetDismiss,
-            targetNickname = selectedUserForSheet,
-            selectedMessage = selectedMessageForSheet,
-            viewModel = viewModel
-        )
+    sheetSlot.child?.instance?.let { child ->
+        ModalBottomSheet(
+            onDismiss = component::onDismissSheet
+        ) { listState ->
+            when (child) {
+                is com.bitchat.android.feature.chat.ChatComponent.SheetChild.AppInfo -> {
+                    var showDebugSheet by remember { mutableStateOf(false) }
+                    AboutSheetContent(
+                        viewModel = viewModel,
+                        lazyListState = listState,
+                        onShowDebug = { showDebugSheet = true }
+                    )
+                    if (showDebugSheet) {
+                        com.bitchat.android.ui.debug.DebugSettingsSheet(
+                            isPresented = showDebugSheet,
+                            onDismiss = { showDebugSheet = false },
+                            meshService = viewModel.meshService
+                        )
+                    }
+                }
+                
+                is com.bitchat.android.feature.chat.ChatComponent.SheetChild.LocationChannels -> {
+                    LocationChannelsSheetContent(
+                        viewModel = viewModel,
+                        lazyListState = listState,
+                        onDismiss = component::onDismissSheet
+                    )
+                }
+                
+                is com.bitchat.android.feature.chat.ChatComponent.SheetChild.LocationNotes -> {
+                    LocationNotesSheetPresenterContent(
+                        viewModel = viewModel,
+                        lazyListState = listState,
+                    )
+                }
+                
+                is com.bitchat.android.feature.chat.ChatComponent.SheetChild.UserSheet -> {
+                    // Find the message if messageId is provided
+                    val selectedMessage = child.messageId?.let { messageId ->
+                        viewModel.messages.value?.find { it.id == messageId }
+                    }
+                    
+                    ChatUserSheetContent(
+                        targetNickname = child.nickname,
+                        selectedMessage = selectedMessage,
+                        viewModel = viewModel,
+                        lazyListState = listState,
+                        onDismiss = component::onDismissSheet
+                    )
+                }
+            }
+        }
     }
 }
+

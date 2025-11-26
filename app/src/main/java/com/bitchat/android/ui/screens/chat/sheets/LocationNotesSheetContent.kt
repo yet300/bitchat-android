@@ -1,12 +1,12 @@
-package com.bitchat.android.ui
+package com.bitchat.android.ui.screens.chat.sheets
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowUpward
@@ -15,41 +15,33 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
-import com.bitchat.android.R
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.bitchat.android.R
 import com.bitchat.android.geohash.GeohashChannelLevel
 import com.bitchat.android.nostr.LocationNotesManager
+import com.bitchat.android.ui.ChatViewModel
 import java.text.SimpleDateFormat
 import java.util.*
-import java.util.Calendar
 
-/**
- * Location Notes Sheet - EXACT iOS UI match for bitchat
- * Matches iOS LocationNotesView.swift exactly in style, colors, fonts, and text
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LocationNotesSheet(
+fun LocationNotesSheetContent(
     geohash: String,
     locationName: String?,
     nickname: String?,
-    onDismiss: () -> Unit,
     viewModel: ChatViewModel,
+    lazyListState: LazyListState,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
     val isDark = isSystemInDarkTheme()
     
     // iOS color scheme
-    val backgroundColor = if (isDark) Color.Black else Color.White
     val accentGreen = if (isDark) Color.Green else Color(0xFF008000) // dark: green, light: dark green (0, 0.5, 0)
 
     // State
@@ -70,9 +62,6 @@ fun LocationNotesSheet(
     var draft by remember { mutableStateOf("") }
     val sendButtonEnabled = draft.trim().isNotEmpty() && state != LocationNotesManager.State.NO_RELAYS
     
-    // Scroll state
-    val listState = rememberLazyListState()
-    
     // Effect to set geohash when sheet opens
     LaunchedEffect(geohash) {
         viewModel.setLocationNotesGeohash(geohash)
@@ -85,111 +74,100 @@ fun LocationNotesSheet(
         }
     }
     
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        modifier = modifier,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = backgroundColor,
-        contentColor = if (isDark) Color.White else Color.Black
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .fillMaxSize()
     ) {
-        Column(
+        // ScrollView with notes content
+        Box(
             modifier = Modifier
+                .weight(1f)
                 .fillMaxWidth()
-                .fillMaxHeight(0.9f)
         ) {
-            // Header section (matches iOS headerSection)
-            LocationNotesHeader(
-                geohash = geohash,
-                count = count,
-                locationName = displayLocationName,
-                state = state,
-                accentGreen = accentGreen,
-                backgroundColor = backgroundColor,
-                onClose = onDismiss
-            )
-            
-            // ScrollView with notes content
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .background(backgroundColor)
+            LazyColumn(
+                state = lazyListState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(top = 80.dp, bottom = 20.dp)
             ) {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                ) {
-                    // Notes content (matches iOS notesContent)
-                    when {
-                        state == LocationNotesManager.State.NO_RELAYS -> {
-                            item {
-                                NoRelaysRow(
-                                    onRetry = { viewModel.refreshLocationNotes() }
-                                )
-                            }
-                        }
-                        state == LocationNotesManager.State.LOADING && !initialLoadComplete -> {
-                            item {
-                                LoadingRow()
-                            }
-                        }
-                        notes.isEmpty() -> {
-                            item {
-                                EmptyRow()
-                            }
-                        }
-                        else -> {
-                            items(notes, key = { it.id }) { note ->
-                                NoteRow(note = note)
-                                Spacer(modifier = Modifier.height(12.dp))
-                            }
+                // Header section (matches iOS headerSection)
+                item {
+                    LocationNotesHeader(
+                        geohash = geohash,
+                        count = count,
+                        locationName = displayLocationName,
+                        state = state,
+                        accentGreen = accentGreen
+                    )
+                }
+                // Notes content (matches iOS notesContent)
+                when {
+                    state == LocationNotesManager.State.NO_RELAYS -> {
+                        item {
+                            NoRelaysRow(
+                                onRetry = { viewModel.refreshLocationNotes() }
+                            )
                         }
                     }
-                    
-                    // Error row (matches iOS errorRow)
-                    errorMessage?.let { error ->
-                        if (state != LocationNotesManager.State.NO_RELAYS) {
-                            item {
-                                ErrorRow(
-                                    message = error,
-                                    onDismiss = { viewModel.clearLocationNotesError() }
-                                )
-                            }
+                    state == LocationNotesManager.State.LOADING && !initialLoadComplete -> {
+                        item {
+                            LoadingRow()
+                        }
+                    }
+                    notes.isEmpty() -> {
+                        item {
+                            EmptyRow()
+                        }
+                    }
+                    else -> {
+                        items(notes, key = { it.id }) { note ->
+                            NoteRow(note = note)
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+                    }
+                }
+                
+                // Error row (matches iOS errorRow)
+                errorMessage?.let { error ->
+                    if (state != LocationNotesManager.State.NO_RELAYS) {
+                        item {
+                            ErrorRow(
+                                message = error,
+                                onDismiss = { viewModel.clearLocationNotesError() }
+                            )
                         }
                     }
                 }
             }
-            
-            // Divider before input (matches iOS overlay)
-            HorizontalDivider(
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
-                thickness = 1.dp
-            )
-            
-            // Input section (matches iOS inputSection)
-            LocationNotesInputSection(
-                draft = draft,
-                onDraftChange = { draft = it },
-                sendButtonEnabled = sendButtonEnabled,
-                accentGreen = accentGreen,
-                backgroundColor = backgroundColor,
-                onSend = {
-                    val content = draft.trim()
-                    if (content.isNotEmpty()) {
-                        viewModel.sendLocationNote(content, nickname)
-                        draft = ""
-                    }
-                }
-            )
         }
+        
+        // Divider before input (matches iOS overlay)
+        HorizontalDivider(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+            thickness = 1.dp
+        )
+        
+        // Input section (matches iOS inputSection)
+        LocationNotesInputSection(
+            draft = draft,
+            onDraftChange = { draft = it },
+            sendButtonEnabled = sendButtonEnabled,
+            accentGreen = accentGreen,
+            onSend = {
+                val content = draft.trim()
+                if (content.isNotEmpty()) {
+                    viewModel.sendLocationNote(content, nickname)
+                    draft = ""
+                }
+            }
+        )
     }
 }
 
 /**
  * Header section - matches iOS headerSection exactly
- * Shows: "#geohash • X notes", location name, description, and close button
+ * Shows: "#geohash • X notes", location name, description
  */
 @Composable
 private fun LocationNotesHeader(
@@ -197,18 +175,15 @@ private fun LocationNotesHeader(
     count: Int,
     locationName: String?,
     state: LocationNotesManager.State,
-    accentGreen: Color,
-    backgroundColor: Color,
-    onClose: () -> Unit
+    accentGreen: Color
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(backgroundColor)
-            .padding(horizontal = 16.dp)
-            .padding(top = 16.dp, bottom = 12.dp)
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 12.dp)
     ) {
-        // Title row with close button
+        // Title row
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -226,22 +201,6 @@ private fun LocationNotesHeader(
                 fontSize = 18.sp,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            
-            // Close button - iOS style with xmark icon
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clickable(onClick = onClose),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "✕",
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
         }
         
         Spacer(modifier = Modifier.height(8.dp))
@@ -293,7 +252,7 @@ private fun NoteRow(note: LocationNotesManager.Note) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(horizontal = 24.dp, vertical = 4.dp)
     ) {
         // First row: @nickname and timestamp
         Row(
@@ -339,7 +298,7 @@ private fun NoRelaysRow(onRetry: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp)
+            .padding(horizontal = 24.dp, vertical = 6.dp)
     ) {
         Text(
             text = stringResource(R.string.location_notes_no_relays_title),
@@ -374,7 +333,7 @@ private fun LoadingRow() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(horizontal = 24.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -400,7 +359,7 @@ private fun EmptyRow() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp)
+            .padding(horizontal = 24.dp, vertical = 6.dp)
     ) {
         Text(
             text = stringResource(R.string.location_notes_empty_title),
@@ -427,7 +386,7 @@ private fun ErrorRow(message: String, onDismiss: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp)
+            .padding(horizontal = 24.dp, vertical = 6.dp)
     ) {
         Row(
             horizontalArrangement = Arrangement.Start,
@@ -465,7 +424,6 @@ private fun LocationNotesInputSection(
     onDraftChange: (String) -> Unit,
     sendButtonEnabled: Boolean,
     accentGreen: Color,
-    backgroundColor: Color,
     onSend: () -> Unit
 ) {
     val isDark = isSystemInDarkTheme()
@@ -474,7 +432,7 @@ private fun LocationNotesInputSection(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(backgroundColor)
+            .background(MaterialTheme.colorScheme.background) // Ensure opaque background for input section
             .padding(horizontal = 12.dp, vertical = 8.dp), // Match main chat padding
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp) // Match main chat spacing
