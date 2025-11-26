@@ -27,10 +27,9 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.zIndex
-import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.ui.*
 import com.bitchat.android.ui.components.ModalBottomSheet
-import com.bitchat.android.ui.components.PasswordPromptDialog
+import com.bitchat.android.ui.screens.chat.dialogs.PasswordPromptDialog
 import com.bitchat.android.ui.screens.chat.sheets.AboutSheetContent
 import com.bitchat.android.ui.screens.chat.sheets.ChatUserSheetContent
 import com.bitchat.android.ui.screens.chat.sheets.LocationChannelsSheetContent
@@ -77,22 +76,21 @@ fun ChatScreen(
     }
 
     var messageText by remember { mutableStateOf(TextFieldValue("")) }
-    var showPasswordPrompt by remember { mutableStateOf(false) }
-    var showPasswordDialog by remember { mutableStateOf(false) }
-    var passwordInput by remember { mutableStateOf("") }
     var showFullScreenImageViewer by remember { mutableStateOf(false) }
     var viewerImagePaths by remember { mutableStateOf(emptyList<String>()) }
     var initialViewerIndex by remember { mutableStateOf(0) }
     var forceScrollToBottom by remember { mutableStateOf(false) }
     var isScrolledUp by remember { mutableStateOf(false) }
 
-    // Show password dialog when needed
-    LaunchedEffect(showPasswordPrompt) {
-        showPasswordDialog = showPasswordPrompt
-    }
-
     val isConnected by viewModel.isConnected.observeAsState(false)
     val passwordPromptChannel by viewModel.passwordPromptChannel.observeAsState(null)
+    
+    // Trigger password dialog through component when ViewModel requests it
+    LaunchedEffect(passwordPromptChannel) {
+        passwordPromptChannel?.let { channel ->
+            component.onShowPasswordPrompt(channel)
+        }
+    }
 
     // Get location channel info for timeline switching
     val selectedLocationChannel by viewModel.selectedLocationChannel.observeAsState()
@@ -359,25 +357,10 @@ fun ChatScreen(
         )
     }
 
-    // Password dialog (still using local state for now)
-    PasswordPromptDialog(
-        show = showPasswordDialog,
-        channelName = passwordPromptChannel,
-        passwordInput = passwordInput,
-        onPasswordChange = { passwordInput = it },
-        onConfirm = {
-            if (passwordInput.isNotEmpty()) {
-                val success = viewModel.joinChannel(passwordPromptChannel!!, passwordInput)
-                if (success) {
-                    showPasswordDialog = false
-                    passwordInput = ""
-                }
-            }
-        },
-        onDismiss = {
-            showPasswordDialog = false
-            passwordInput = ""
-        }
+    // Dialogs (using Decompose slot)
+    ChatDialogs(
+        component = component,
+        viewModel = viewModel
     )
 
     // Decompose-managed sheets
@@ -563,3 +546,38 @@ private fun ChatSheets(
     }
 }
 
+@Composable
+private fun ChatDialogs(
+    component: com.bitchat.android.feature.chat.ChatComponent,
+    viewModel: ChatViewModel
+) {
+    val dialogSlot by component.dialogSlot.subscribeAsState()
+    
+    dialogSlot.child?.instance?.let { child ->
+        when (child) {
+            is com.bitchat.android.feature.chat.ChatComponent.DialogChild.PasswordPrompt -> {
+                var passwordInput by remember { mutableStateOf("") }
+                
+                PasswordPromptDialog(
+                    show = true,
+                    channelName = child.channelName,
+                    passwordInput = passwordInput,
+                    onPasswordChange = { passwordInput = it },
+                    onConfirm = {
+                        if (passwordInput.isNotEmpty()) {
+                            val success = viewModel.joinChannel(child.channelName, passwordInput)
+                            if (success) {
+                                component.onDismissDialog()
+                                passwordInput = ""
+                            }
+                        }
+                    },
+                    onDismiss = {
+                        component.onDismissDialog()
+                        passwordInput = ""
+                    }
+                )
+            }
+        }
+    }
+}

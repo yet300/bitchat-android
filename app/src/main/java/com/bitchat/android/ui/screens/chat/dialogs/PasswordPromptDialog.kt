@@ -1,4 +1,4 @@
-package com.bitchat.android.ui.components
+package com.bitchat.android.ui.screens.chat.dialogs
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer

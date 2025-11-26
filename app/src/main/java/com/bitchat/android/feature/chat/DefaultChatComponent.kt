@@ -15,6 +15,7 @@ class DefaultChatComponent(
 ) : ChatComponent, ComponentContext by componentContext, KoinComponent {
 
     private val sheetNavigation = SlotNavigation<SheetConfig>()
+    private val dialogNavigation = SlotNavigation<DialogConfig>()
 
     override val sheetSlot: Value<ChildSlot<*, ChatComponent.SheetChild>> =
         childSlot(
@@ -23,6 +24,15 @@ class DefaultChatComponent(
             key = "ChatSheet",
             handleBackButton = true,
             childFactory = ::createSheetChild
+        )
+
+    override val dialogSlot: Value<ChildSlot<*, ChatComponent.DialogChild>> =
+        childSlot(
+            source = dialogNavigation,
+            serializer = DialogConfig.serializer(),
+            key = "ChatDialog",
+            handleBackButton = true,
+            childFactory = ::createDialogChild
         )
 
     override fun onDismissSheet() {
@@ -45,6 +55,14 @@ class DefaultChatComponent(
         sheetNavigation.activate(SheetConfig.UserSheet(nickname, messageId))
     }
 
+    override fun onDismissDialog() {
+        dialogNavigation.dismiss()
+    }
+
+    override fun onShowPasswordPrompt(channelName: String) {
+        dialogNavigation.activate(DialogConfig.PasswordPrompt(channelName))
+    }
+
     private fun createSheetChild(
         config: SheetConfig,
         componentContext: ComponentContext
@@ -56,6 +74,16 @@ class DefaultChatComponent(
             is SheetConfig.UserSheet -> ChatComponent.SheetChild.UserSheet(
                 nickname = config.nickname,
                 messageId = config.messageId
+            )
+        }
+
+    private fun createDialogChild(
+        config: DialogConfig,
+        componentContext: ComponentContext
+    ): ChatComponent.DialogChild =
+        when (config) {
+            is DialogConfig.PasswordPrompt -> ChatComponent.DialogChild.PasswordPrompt(
+                channelName = config.channelName
             )
         }
 
@@ -75,5 +103,11 @@ class DefaultChatComponent(
             val nickname: String,
             val messageId: String?
         ) : SheetConfig
+    }
+
+    @Serializable
+    sealed interface DialogConfig {
+        @Serializable
+        data class PasswordPrompt(val channelName: String) : DialogConfig
     }
 }
