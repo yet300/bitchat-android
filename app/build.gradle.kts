@@ -76,6 +76,7 @@ dependencies {
     implementation(libs.bundles.lifecycle)
     
     // Navigation
+    implementation(libs.bundles.mvi)
     implementation(libs.bundles.decompose)
     implementation(libs.decompose.compose)
 
