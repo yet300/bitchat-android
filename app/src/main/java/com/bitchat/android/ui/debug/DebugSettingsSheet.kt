@@ -23,17 +23,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.rotate
-import com.bitchat.android.mesh.BluetoothMeshService
 import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
 import com.bitchat.android.R
+import com.bitchat.android.ui.ChatViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DebugSettingsSheet(
     isPresented: Boolean,
     onDismiss: () -> Unit,
-    meshService: BluetoothMeshService
+    viewModel: ChatViewModel
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val colorScheme = MaterialTheme.colorScheme
@@ -55,29 +55,12 @@ fun DebugSettingsSheet(
     val gcsFpr by manager.gcsFprPercent.collectAsState()
 
     // Push live connected devices from mesh service whenever sheet is visible
-    LaunchedEffect(isPresented) {
+    DisposableEffect(isPresented) {
         if (isPresented) {
-            // Poll device list periodically for now (TODO: add callbacks)
-            while (true) {
-                val entries = meshService.connectionManager.getConnectedDeviceEntries()
-                val mapping = meshService.getDeviceAddressToPeerMapping()
-                val peers = mapping.values.toSet()
-                val nicknames = meshService.getPeerNicknames()
-                val directMap = peers.associateWith { pid -> meshService.getPeerInfo(pid)?.isDirectConnection == true }
-                val devices = entries.map { (address, isClient, rssi) ->
-                    val pid = mapping[address]
-                    com.bitchat.android.ui.debug.ConnectedDevice(
-                        deviceAddress = address,
-                        peerID = pid,
-                        nickname = pid?.let { nicknames[it] },
-                        rssi = rssi,
-                        connectionType = if (isClient) ConnectionType.GATT_CLIENT else ConnectionType.GATT_SERVER,
-                        isDirectConnection = pid?.let { directMap[it] } ?: false
-                    )
-                }
-                manager.updateConnectedDevices(devices)
-                kotlinx.coroutines.delay(1000)
-            }
+            viewModel.startMonitoringDebugDevices()
+        }
+        onDispose {
+            viewModel.stopMonitoringDebugDevices()
         }
     }
 
@@ -140,10 +123,7 @@ fun DebugSettingsSheet(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(stringResource(R.string.debug_gatt_server), fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f))
                             Switch(checked = gattServerEnabled, onCheckedChange = {
-                                manager.setGattServerEnabled(it)
-                                scope.launch {
-                                    if (it) meshService.connectionManager.startServer() else meshService.connectionManager.stopServer()
-                                }
+                                viewModel.setGattServerEnabled(it)
                             })
                         }
                         val serverCount = connectedDevices.count { it.connectionType == ConnectionType.GATT_SERVER }
@@ -160,10 +140,7 @@ fun DebugSettingsSheet(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(stringResource(R.string.debug_gatt_client), fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f))
                             Switch(checked = gattClientEnabled, onCheckedChange = {
-                                manager.setGattClientEnabled(it)
-                                scope.launch {
-                                    if (it) meshService.connectionManager.startClient() else meshService.connectionManager.stopClient()
-                                }
+                                viewModel.setGattClientEnabled(it)
                             })
                         }
                         val clientCount = connectedDevices.count { it.connectionType == ConnectionType.GATT_CLIENT }
@@ -321,7 +298,7 @@ fun DebugSettingsSheet(
                             Icon(Icons.Filled.Devices, contentDescription = null, tint = Color(0xFF4CAF50))
                             Text(stringResource(R.string.debug_connected_devices), fontFamily = FontFamily.Monospace, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                         }
-                        val localAddr = remember { meshService.connectionManager.getLocalAdapterAddress() }
+                        val localAddr = remember { viewModel.getLocalAdapterAddress() }
                         Text(stringResource(R.string.debug_our_device_id_fmt, localAddr ?: stringResource(R.string.unknown)), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = colorScheme.onSurface.copy(alpha = 0.7f))
                         if (connectedDevices.isEmpty()) {
                             Text("none", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = colorScheme.onSurface.copy(alpha = 0.6f))
@@ -335,7 +312,7 @@ fun DebugSettingsSheet(
                                             Text("${dev.nickname ?: ""} • " + stringResource(R.string.debug_rssi_fmt, dev.rssi ?: stringResource(R.string.debug_question_mark)) + " • $roleLabel" + (if (dev.isDirectConnection) stringResource(R.string.debug_direct_suffix) else ""), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = colorScheme.onSurface.copy(alpha = 0.7f))
                                         }
                                         Text(stringResource(R.string.debug_disconnect), color = Color(0xFFBF1A1A), fontFamily = FontFamily.Monospace, modifier = Modifier.clickable {
-                                            meshService.connectionManager.disconnectAddress(dev.deviceAddress)
+                                            viewModel.disconnectDebugDevice(dev.deviceAddress)
                                         })
                                     }
                                 }
@@ -364,7 +341,7 @@ fun DebugSettingsSheet(
                                             Text(stringResource(R.string.debug_rssi_fmt, res.rssi.toString()), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = colorScheme.onSurface.copy(alpha = 0.7f))
                                         }
                                         Text(stringResource(R.string.debug_connect), color = Color(0xFF00C851), fontFamily = FontFamily.Monospace, modifier = Modifier.clickable {
-                                            meshService.connectionManager.connectToAddress(res.deviceAddress)
+                                            viewModel.connectToDebugDevice(res.deviceAddress)
                                         })
                                     }
                                 }

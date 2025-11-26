@@ -507,7 +507,7 @@ private fun ChatSheets(
                         com.bitchat.android.ui.debug.DebugSettingsSheet(
                             isPresented = showDebugSheet,
                             onDismiss = { showDebugSheet = false },
-                            meshService = viewModel.meshService
+                            viewModel = viewModel
                         )
                     }
                 }

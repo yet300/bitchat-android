@@ -39,7 +39,7 @@ import kotlin.random.Random
 @KoinViewModel
 class ChatViewModel @Inject constructor(
     application: Application,
-    val meshService: BluetoothMeshService,
+    private val meshService: BluetoothMeshService,
     private val nostrRelayManager: NostrRelayManager,
     private val nostrTransport: NostrTransport,
     private val messageRouter: MessageRouter,
@@ -786,6 +786,76 @@ class ChatViewModel @Inject constructor(
     }
     
     // registerPeerPublicKey REMOVED - fingerprints now handled centrally in PeerManager
+
+    // MARK: - Debug Settings Delegation
+
+    private var debugMonitoringJob: kotlinx.coroutines.Job? = null
+
+    fun startMonitoringDebugDevices() {
+        if (debugMonitoringJob?.isActive == true) return
+        debugMonitoringJob = viewModelScope.launch {
+            while (true) {
+                try {
+                    val entries = meshService.connectionManager.getConnectedDeviceEntries()
+                    val mapping = meshService.getDeviceAddressToPeerMapping()
+                    val peers = mapping.values.toSet()
+                    val nicknames = meshService.getPeerNicknames()
+                    val directMap = peers.associateWith { pid -> meshService.getPeerInfo(pid)?.isDirectConnection == true }
+
+                    val devices = entries.map { (address, isClient, rssi) ->
+                        val pid = mapping[address]
+                        com.bitchat.android.ui.debug.ConnectedDevice(
+                            deviceAddress = address,
+                            peerID = pid,
+                            nickname = pid?.let { nicknames[it] },
+                            rssi = rssi,
+                            connectionType = if (isClient) com.bitchat.android.ui.debug.ConnectionType.GATT_CLIENT else com.bitchat.android.ui.debug.ConnectionType.GATT_SERVER,
+                            isDirectConnection = pid?.let { directMap[it] } ?: false
+                        )
+                    }
+                    debugManager.updateConnectedDevices(devices)
+                } catch (e: Exception) {
+                    // Ignore
+                }
+                delay(1000)
+            }
+        }
+    }
+
+    fun stopMonitoringDebugDevices() {
+        debugMonitoringJob?.cancel()
+        debugMonitoringJob = null
+    }
+
+    fun setGattServerEnabled(enabled: Boolean) {
+        debugManager.setGattServerEnabled(enabled)
+        viewModelScope.launch {
+            if (enabled) meshService.connectionManager.startServer() else meshService.connectionManager.stopServer()
+        }
+    }
+
+    fun setGattClientEnabled(enabled: Boolean) {
+        debugManager.setGattClientEnabled(enabled)
+        viewModelScope.launch {
+            if (enabled) meshService.connectionManager.startClient() else meshService.connectionManager.stopClient()
+        }
+    }
+
+    fun connectToDebugDevice(address: String) {
+        meshService.connectionManager.connectToAddress(address)
+    }
+
+    fun disconnectDebugDevice(address: String) {
+        meshService.connectionManager.disconnectAddress(address)
+    }
+
+    fun getLocalAdapterAddress(): String? {
+        return try {
+            meshService.connectionManager.getLocalAdapterAddress()
+        } catch (e: Exception) {
+            null
+        }
+    }
     
     // MARK: - Emergency Clear
     
