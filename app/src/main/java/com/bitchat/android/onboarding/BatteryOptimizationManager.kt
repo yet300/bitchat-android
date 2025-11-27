@@ -1,5 +1,6 @@
 package com.bitchat.android.onboarding
 
+import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -7,103 +8,90 @@ import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
-import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.contract.ActivityResultContracts
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import jakarta.inject.Singleton
 
 /**
- * Manages battery optimization settings for the app
- * Handles checking if the app is whitelisted from battery optimization
- * and requesting the user to disable battery optimization
+ * Manages Battery Optimization settings.
+ * Exposes a reactive StateFlow<BatteryOptimizationStatus>.
  */
+@Singleton
 class BatteryOptimizationManager(
-    private val activity: ComponentActivity,
-    private val context: Context,
-    private val onBatteryOptimizationDisabled: () -> Unit,
-    private val onBatteryOptimizationFailed: (String) -> Unit
+    private val application: Application
 ) {
 
     companion object {
         private const val TAG = "BatteryOptimizationManager"
     }
 
+    private val _status = MutableStateFlow(BatteryOptimizationStatus.NOT_SUPPORTED)
+    val status: StateFlow<BatteryOptimizationStatus> = _status.asStateFlow()
+
     private var batteryOptimizationLauncher: ActivityResultLauncher<Intent>? = null
 
     init {
-        setupBatteryOptimizationLauncher()
+        checkBatteryOptimizationStatus()
     }
 
-    /**
-     * Setup the battery optimization request launcher
-     */
-    private fun setupBatteryOptimizationLauncher() {
-        batteryOptimizationLauncher = activity.registerForActivityResult(
-            ActivityResultContracts.StartActivityForResult()
-        ) { result ->
-            Log.d(TAG, "Battery optimization request result: ${result.resultCode}")
-            
-            // Check if battery optimization is now disabled
-            if (isBatteryOptimizationDisabled()) {
-                Log.d(TAG, "Battery optimization successfully disabled")
-                onBatteryOptimizationDisabled()
-            } else {
-                Log.w(TAG, "Battery optimization still enabled after user interaction")
-                // Don't treat this as a failure - user might have chosen not to disable it
-                // We'll proceed anyway but log the status
-                onBatteryOptimizationDisabled()
-            }
-        }
+    fun setLauncher(launcher: ActivityResultLauncher<Intent>) {
+        this.batteryOptimizationLauncher = launcher
     }
 
-    /**
-     * Check if battery optimization is disabled for this app
-     */
     fun isBatteryOptimizationDisabled(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             try {
-                val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-                val isIgnoring = powerManager.isIgnoringBatteryOptimizations(context.packageName)
-                Log.d(TAG, "Battery optimization disabled: $isIgnoring")
-                isIgnoring
+                val powerManager = application.getSystemService(Context.POWER_SERVICE) as PowerManager
+                powerManager.isIgnoringBatteryOptimizations(application.packageName)
             } catch (e: Exception) {
                 Log.e(TAG, "Error checking battery optimization status", e)
-                // If we can't check, assume it's enabled (more conservative)
                 false
             }
         } else {
-            // Battery optimization doesn't exist on Android < 6.0
-            Log.d(TAG, "Battery optimization not applicable for Android < 6.0")
-            true
+            true // Battery optimization doesn't exist on Android < 6.0
         }
     }
 
-    /**
-     * Request to disable battery optimization for this app
-     */
+    fun isBatteryOptimizationSupported(): Boolean {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+    }
+
+    fun checkBatteryOptimizationStatus(): BatteryOptimizationStatus {
+        val newStatus = when {
+            !isBatteryOptimizationSupported() -> BatteryOptimizationStatus.NOT_SUPPORTED
+            isBatteryOptimizationDisabled() -> BatteryOptimizationStatus.DISABLED
+            else -> BatteryOptimizationStatus.ENABLED
+        }
+        _status.value = newStatus
+        return newStatus
+    }
+
     fun requestDisableBatteryOptimization() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            try {
-                Log.d(TAG, "Requesting to disable battery optimization")
-                
-                val intent = Intent().apply {
-                    action = Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
-                    data = Uri.parse("package:${context.packageName}")
-                }
-                
-                // Check if the intent can be resolved
-                if (intent.resolveActivity(context.packageManager) != null) {
-                    batteryOptimizationLauncher?.launch(intent)
-                } else {
-                    Log.w(TAG, "Battery optimization settings not available, opening general settings")
-                    openBatteryOptimizationSettings()
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error requesting battery optimization disable", e)
-                onBatteryOptimizationFailed("Unable to open battery optimization settings: ${e.message}")
+        Log.d(TAG, "Requesting user to disable battery optimization")
+        
+        if (!isBatteryOptimizationSupported()) {
+            Log.d(TAG, "Battery optimization not supported on this device")
+            _status.value = BatteryOptimizationStatus.NOT_SUPPORTED
+            return
+        }
+        
+        if (isBatteryOptimizationDisabled()) {
+            Log.d(TAG, "Battery optimization already disabled")
+            _status.value = BatteryOptimizationStatus.DISABLED
+            return
+        }
+        
+        try {
+            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = Uri.parse("package:${application.packageName}")
             }
-        } else {
-            Log.d(TAG, "Battery optimization not applicable for Android < 6.0")
-            onBatteryOptimizationDisabled()
+            batteryOptimizationLauncher?.launch(intent)
+            Log.d(TAG, "Launched battery optimization settings")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to launch battery optimization settings", e)
+            _status.value = BatteryOptimizationStatus.ENABLED
         }
     }
 
@@ -116,7 +104,7 @@ class BatteryOptimizationManager(
                 action = Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS
             }
             
-            if (intent.resolveActivity(context.packageManager) != null) {
+            if (intent.resolveActivity(application.packageManager) != null) {
                 batteryOptimizationLauncher?.launch(intent)
             } else {
                 // Fallback to general application settings
@@ -124,7 +112,6 @@ class BatteryOptimizationManager(
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error opening battery optimization settings", e)
-            onBatteryOptimizationFailed("Unable to open settings: ${e.message}")
         }
     }
 
@@ -135,30 +122,11 @@ class BatteryOptimizationManager(
         try {
             val intent = Intent().apply {
                 action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
-                data = Uri.fromParts("package", context.packageName, null)
+                data = Uri.fromParts("package", application.packageName, null)
             }
             batteryOptimizationLauncher?.launch(intent)
         } catch (e: Exception) {
             Log.e(TAG, "Error opening app settings", e)
-            onBatteryOptimizationFailed("Unable to open app settings: ${e.message}")
-        }
-    }
-
-    /**
-     * Check if battery optimization is supported on this device
-     */
-    fun isBatteryOptimizationSupported(): Boolean {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
-    }
-
-    /**
-     * Get battery optimization status for logging
-     */
-    fun getBatteryOptimizationStatus(): String {
-        return when {
-            !isBatteryOptimizationSupported() -> "Not supported (Android < 6.0)"
-            isBatteryOptimizationDisabled() -> "Disabled (app is whitelisted)"
-            else -> "Enabled (app is being optimized)"
         }
     }
 
@@ -166,7 +134,7 @@ class BatteryOptimizationManager(
      * Log battery optimization status for debugging
      */
     fun logBatteryOptimizationStatus() {
-        Log.d(TAG, "Battery optimization status: ${getBatteryOptimizationStatus()}")
+        Log.d(TAG, "Battery optimization status: ${status.value}")
     }
 }
 

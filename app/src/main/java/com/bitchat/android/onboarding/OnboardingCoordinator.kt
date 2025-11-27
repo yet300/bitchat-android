@@ -1,25 +1,21 @@
 package com.bitchat.android.onboarding
 
-import android.app.Activity
-import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
+import org.koin.core.annotation.Factory
 
 /**
  * Coordinates the complete onboarding flow including permission explanation,
  * permission requests, and initialization of the mesh service
  */
+@Factory
 class OnboardingCoordinator(
     private val activity: ComponentActivity,
-    private val permissionManager: PermissionManager,
-    private val onOnboardingComplete: () -> Unit,
-    private val onOnboardingFailed: (String) -> Unit
+    private val permissionManager: PermissionManager
 ) {
 
     companion object {
@@ -51,8 +47,8 @@ class OnboardingCoordinator(
         permissionManager.logPermissionStatus()
 
         if (permissionManager.areAllPermissionsGranted()) {
-            Log.d(TAG, "All permissions already granted, completing onboarding")
-            completeOnboarding()
+            Log.d(TAG, "All permissions already granted")
+            permissionManager.markOnboardingComplete()
         } else {
             Log.d(TAG, "Missing permissions, need to start explanation flow")
             // The explanation screen will be shown by the calling activity
@@ -76,7 +72,7 @@ class OnboardingCoordinator(
         val missingPermissions = (missingRequired + optionalToRequest).distinct()
 
         if (missingPermissions.isEmpty()) {
-            completeOnboarding()
+            permissionManager.markOnboardingComplete()
             return
         }
 
@@ -100,7 +96,7 @@ class OnboardingCoordinator(
         when {
             allGranted -> {
                 Log.d(TAG, "All permissions granted successfully")
-                completeOnboarding()
+                permissionManager.markOnboardingComplete()
             }
             criticalGranted -> {
                 Log.d(TAG, "Critical permissions granted, can proceed with limited functionality")
@@ -141,7 +137,7 @@ class OnboardingCoordinator(
         
         // For now, we'll proceed anyway and let the user experience the limitations
         // In a production app, you might want to show a dialog explaining the limitations
-        completeOnboarding()
+        permissionManager.markOnboardingComplete()
     }
 
     /**
@@ -160,31 +156,11 @@ class OnboardingCoordinator(
             }
             
             Log.e(TAG, "Critical permissions denied: $deniedCritical")
-            onOnboardingFailed(message)
-        } else {
-            // Shouldn't happen given our logic above, but handle gracefully
-            completeOnboarding()
+            // Component will handle this via state observation
         }
     }
 
-    /**
-     * Complete the onboarding process and initialize the app
-     */
-    private fun completeOnboarding() {
-        Log.d(TAG, "Completing onboarding process")
-        
-        // Mark onboarding as complete
-        permissionManager.markOnboardingComplete()
-        
-        // Log final permission status
-        permissionManager.logPermissionStatus()
-        
-        // Notify completion with a small delay to ensure everything is ready
-        activity.lifecycleScope.launch {
-            kotlinx.coroutines.delay(100) // Small delay for UI state to settle
-            onOnboardingComplete()
-        }
-    }
+
 
     /**
      * Open app settings for manual permission management
