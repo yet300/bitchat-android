@@ -1,69 +1,26 @@
 package com.bitchat.android.ui.screens.onboarding
 
-import android.util.Log
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import com.bitchat.android.MainViewModel
+import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.bitchat.android.feature.onboarding.OnboardingComponent
-import com.bitchat.android.onboarding.*
-import org.koin.androidx.compose.koinViewModel
+import com.bitchat.android.onboarding.BatteryOptimizationScreen
+import com.bitchat.android.onboarding.BluetoothCheckScreen
+import com.bitchat.android.onboarding.InitializationErrorScreen
+import com.bitchat.android.onboarding.InitializingScreen
+import com.bitchat.android.onboarding.LocationCheckScreen
+import com.bitchat.android.onboarding.OnboardingState
+import com.bitchat.android.onboarding.PermissionExplanationScreen
 
 @Composable
 fun OnboardingFlowScreen(
     component: OnboardingComponent,
-    bluetoothStatusManager: BluetoothStatusManager,
-    locationStatusManager: LocationStatusManager,
-    batteryOptimizationManager: BatteryOptimizationManager,
-    onboardingCoordinator: OnboardingCoordinator,
-    permissionManager: PermissionManager,
     modifier: Modifier = Modifier
 ) {
-    val mainViewModel: MainViewModel = koinViewModel()
-    val context = LocalContext.current
-    
-    val onboardingState by mainViewModel.onboardingState.collectAsState()
-    val bluetoothStatus by mainViewModel.bluetoothStatus.collectAsState()
-    val locationStatus by mainViewModel.locationStatus.collectAsState()
-    val batteryOptimizationStatus by mainViewModel.batteryOptimizationStatus.collectAsState()
-    val errorMessage by mainViewModel.errorMessage.collectAsState()
-    val isBluetoothLoading by mainViewModel.isBluetoothLoading.collectAsState()
-    val isLocationLoading by mainViewModel.isLocationLoading.collectAsState()
-    val isBatteryOptimizationLoading by mainViewModel.isBatteryOptimizationLoading.collectAsState()
+    val state by component.model.subscribeAsState()
 
-    // Trigger initial check
-    LaunchedEffect(Unit) {
-        if (onboardingState == OnboardingState.CHECKING) {
-            component.onRetryInitialization()
-        }
-    }
-
-    DisposableEffect(context, bluetoothStatusManager) {
-        val receiver = bluetoothStatusManager.monitorBluetoothState(
-            context = context,
-            bluetoothStatusManager = bluetoothStatusManager,
-            onBluetoothStateChanged = { status ->
-                if (status == BluetoothStatus.ENABLED && onboardingState == OnboardingState.BLUETOOTH_CHECK) {
-                    component.onRetryBluetooth()
-                }
-            }
-        )
-
-        onDispose {
-            try {
-                context.unregisterReceiver(receiver)
-                Log.d("BluetoothStatusUI", "BroadcastReceiver unregistered")
-            } catch (e: IllegalStateException) {
-                Log.w("BluetoothStatusUI", "Receiver was not registered")
-            }
-        }
-    }
-
-    when (onboardingState) {
+    when (state.onboardingState) {
         OnboardingState.PERMISSION_REQUESTING -> {
             InitializingScreen(modifier)
         }
@@ -71,55 +28,39 @@ fun OnboardingFlowScreen(
         OnboardingState.BLUETOOTH_CHECK -> {
             BluetoothCheckScreen(
                 modifier = modifier,
-                status = bluetoothStatus,
-                onEnableBluetooth = {
-                    component.onEnableBluetooth()
-                },
-                onRetry = {
-                    component.onRetryBluetooth()
-                },
-                isLoading = isBluetoothLoading
+                status = state.bluetoothStatus,
+                onEnableBluetooth = component::onEnableBluetooth,
+                onRetry = component::onRetryBluetooth,
+                isLoading = state.isBluetoothLoading
             )
         }
         
         OnboardingState.LOCATION_CHECK -> {
             LocationCheckScreen(
                 modifier = modifier,
-                status = locationStatus,
-                onEnableLocation = {
-                    component.onEnableLocation()
-                },
-                onRetry = {
-                    component.onRetryLocation()
-                },
-                isLoading = isLocationLoading
+                status = state.locationStatus,
+                onEnableLocation = component::onEnableLocation,
+                onRetry = component::onRetryLocation,
+                isLoading = state.isLocationLoading
             )
         }
         
         OnboardingState.BATTERY_OPTIMIZATION_CHECK -> {
             BatteryOptimizationScreen(
                 modifier = modifier,
-                status = batteryOptimizationStatus,
-                onDisableBatteryOptimization = {
-                    component.onDisableBatteryOptimization()
-                },
-                onRetry = {
-                    component.onRetryBatteryOptimization()
-                },
-                onSkip = {
-                    component.onSkipBatteryOptimization()
-                },
-                isLoading = isBatteryOptimizationLoading
+                status = state.batteryStatus,
+                onDisableBatteryOptimization = component::onDisableBatteryOptimization,
+                onRetry = component::onRetryBatteryOptimization,
+                onSkip = component::onSkipBatteryOptimization,
+                isLoading = state.isBatteryLoading
             )
         }
         
         OnboardingState.PERMISSION_EXPLANATION -> {
             PermissionExplanationScreen(
                 modifier = modifier,
-                permissionCategories = permissionManager.getCategorizedPermissions(),
-                onContinue = {
-                    component.onRequestPermissions()
-                }
+                permissionCategories = state.permissionCategories,
+                onContinue = component::onRequestPermissions
             )
         }
 
@@ -134,13 +75,9 @@ fun OnboardingFlowScreen(
         OnboardingState.ERROR -> {
             InitializationErrorScreen(
                 modifier = modifier,
-                errorMessage = errorMessage,
-                onRetry = {
-                    component.onRetryInitialization()
-                },
-                onOpenSettings = {
-                    component.onOpenSettings()
-                }
+                errorMessage = state.errorMessage,
+                onRetry = component::onRetryInitialization,
+                onOpenSettings = component::onOpenSettings
             )
         }
     }
