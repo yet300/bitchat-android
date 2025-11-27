@@ -1,6 +1,8 @@
 package com.bitchat.android.ui.theme
 
 import android.content.Context
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -21,20 +23,25 @@ enum class ThemePreference {
  * Simple SharedPreferences-backed manager for theme preference with a StateFlow.
  * Avoids adding DataStore dependency for now.
  */
-object ThemePreferenceManager {
-    private const val PREFS_NAME = "bitchat_settings"
-    private const val KEY_THEME = "theme_preference"
+@Singleton
+class ThemePreferenceManager @Inject constructor(
+    private val context: Context
+)  {
+    companion object{
+        private const val PREFS_NAME = "bitchat_settings"
+        private const val KEY_THEME = "theme_preference"
+    }
 
     private val _themeFlow = MutableStateFlow(ThemePreference.System)
     val themeFlow: StateFlow<ThemePreference> = _themeFlow
 
-    fun init(context: Context) {
+    fun init() {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val saved = prefs.getString(KEY_THEME, ThemePreference.System.name)
         _themeFlow.value = runCatching { ThemePreference.valueOf(saved!!) }.getOrDefault(ThemePreference.System)
     }
 
-    fun set(context: Context, preference: ThemePreference) {
+    fun set(preference: ThemePreference) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putString(KEY_THEME, preference.name).apply()
         _themeFlow.value = preference

@@ -52,7 +52,8 @@ class ChatViewModel @Inject constructor(
     val favoritesService: FavoritesPersistenceService,
     private val locationNotesManager: LocationNotesManager,
     private val torManager: TorManager,
-    private val torPreferenceManager: TorPreferenceManager
+    private val torPreferenceManager: TorPreferenceManager,
+    private val themePreferenceManager: ThemePreferenceManager,
 ) : AndroidViewModel(application), BluetoothMeshDelegate {
 
     companion object {
@@ -974,10 +975,10 @@ class ChatViewModel @Inject constructor(
     }
     
     // Theme
-    val themePreference = ThemePreferenceManager.themeFlow
+    val themePreference = themePreferenceManager.themeFlow
     
     fun setTheme(preference: ThemePreference) {
-        ThemePreferenceManager.set(getApplication(), preference)
+        themePreferenceManager.set(preference)
     }
 
     // Expose favorites service functionality for UI components

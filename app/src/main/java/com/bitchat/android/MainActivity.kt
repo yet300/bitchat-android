@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import com.arkivanov.decompose.defaultComponentContext
+import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.bitchat.android.feature.root.DefaultRootComponent
 import com.bitchat.android.feature.root.DeepLinkData
 import com.bitchat.android.feature.root.RootComponent
@@ -83,7 +85,10 @@ class MainActivity : OrientationAwareActivity() {
         )
 
         setContent {
-            BitchatTheme {
+            val model by root.model.subscribeAsState()
+            BitchatTheme(
+                themePref = model.theme
+            ) {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     containerColor = MaterialTheme.colorScheme.background

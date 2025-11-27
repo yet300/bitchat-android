@@ -10,8 +10,6 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
@@ -46,10 +44,10 @@ private val LightColorScheme = lightColorScheme(
 @Composable
 fun BitchatTheme(
     darkTheme: Boolean? = null,
+    themePref: ThemePreference = ThemePreference.System,
     content: @Composable () -> Unit
 ) {
-    // App-level override from ThemePreferenceManager
-    val themePref by ThemePreferenceManager.themeFlow.collectAsState(initial = ThemePreference.System)
+    // App-level override from parameter
     val shouldUseDark = when (darkTheme) {
         true -> true
         false -> false
