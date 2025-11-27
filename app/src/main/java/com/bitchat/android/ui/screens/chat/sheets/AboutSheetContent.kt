@@ -15,7 +15,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -23,31 +22,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.bitchat.android.R
+import com.bitchat.android.feature.about.AboutComponent
 import com.bitchat.android.net.TorMode
 import com.bitchat.android.nostr.NostrProofOfWork
-import com.bitchat.android.ui.ChatViewModel
 import com.bitchat.android.ui.theme.ThemePreference
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AboutSheetContent(
     modifier: Modifier = Modifier,
-    viewModel: ChatViewModel,
+    component: AboutComponent,
     lazyListState: LazyListState,
     onShowDebug: (() -> Unit)? = null,
 ) {
-    val context = LocalContext.current
-    
-    // Get version name from package info
-    val versionName = remember {
-        try {
-            context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        } catch (e: Exception) {
-            "1.0.0" // fallback version
-        }
-    }
-    
+    val model by component.model.subscribeAsState()
+
     // Color scheme matching LocationChannelsSheet
     val colorScheme = MaterialTheme.colorScheme
     val isDark = colorScheme.background.red + colorScheme.background.green + colorScheme.background.blue < 1.5f
@@ -82,7 +73,7 @@ fun AboutSheetContent(
                         )
 
                         Text(
-                            text = stringResource(R.string.version_prefix, versionName?:""),
+                            text = stringResource(R.string.version_prefix, model.versionName),
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
                             color = colorScheme.onBackground.copy(alpha = 0.5f),
@@ -209,24 +200,24 @@ fun AboutSheetContent(
                         .padding(horizontal = 24.dp)
                         .padding(top = 24.dp, bottom = 8.dp)
                 )
-                val themePref by viewModel.themePreference.collectAsState()
+                val themePref = model.themePreference
                 Row(
                     modifier = Modifier.padding(horizontal = 24.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     FilterChip(
                         selected = themePref.isSystem,
-                        onClick = { viewModel.setTheme(ThemePreference.System) },
+                        onClick = { component.onThemeChanged(ThemePreference.System) },
                         label = { Text(stringResource(R.string.about_system), fontFamily = FontFamily.Monospace) }
                     )
                     FilterChip(
                         selected = themePref.isLight,
-                        onClick = { viewModel.setTheme(ThemePreference.Light) },
+                        onClick = { component.onThemeChanged(ThemePreference.Light) },
                         label = { Text(stringResource(R.string.about_light), fontFamily = FontFamily.Monospace) }
                     )
                     FilterChip(
                         selected = themePref.isDark,
-                        onClick = { viewModel.setTheme(ThemePreference.Dark) },
+                        onClick = { component.onThemeChanged(ThemePreference.Dark) },
                         label = { Text(stringResource(R.string.about_dark), fontFamily = FontFamily.Monospace) }
                     )
                 }
@@ -242,9 +233,8 @@ fun AboutSheetContent(
                         .padding(top = 24.dp, bottom = 8.dp)
                 )
                 
-                
-                val powEnabled by viewModel.powEnabled.collectAsState()
-                val powDifficulty by viewModel.powDifficulty.collectAsState()
+                val powEnabled = model.powEnabled
+                val powDifficulty = model.powDifficulty
 
                 Column(
                     modifier = Modifier.padding(horizontal = 24.dp),
@@ -256,12 +246,12 @@ fun AboutSheetContent(
                     ) {
                         FilterChip(
                             selected = !powEnabled,
-                            onClick = { viewModel.setPowEnabled(false) },
+                            onClick = { component.onPowEnabledChanged(false) },
                             label = { Text(stringResource(R.string.about_pow_off), fontFamily = FontFamily.Monospace) }
                         )
                         FilterChip(
                             selected = powEnabled,
-                            onClick = { viewModel.setPowEnabled(true) },
+                            onClick = { component.onPowEnabledChanged(true) },
                             label = {
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -301,7 +291,7 @@ fun AboutSheetContent(
 
                             Slider(
                                 value = powDifficulty.toFloat(),
-                                onValueChange = { viewModel.setPowDifficulty(it.toInt()) },
+                                onValueChange = { component.onPowDifficultyChanged(it.toInt()) },
                                 valueRange = 0f..32f,
                                 steps = 33,
                                 colors = SliderDefaults.colors(
@@ -349,7 +339,7 @@ fun AboutSheetContent(
 
             // Network (Tor) section
             item(key = "network_section") {
-                val torStatus by viewModel.torStatus.collectAsState()
+                val torStatus = model.torStatus
                 val torMode = torStatus.mode
                 
                 Text(
@@ -368,14 +358,14 @@ fun AboutSheetContent(
                         FilterChip(
                             selected = torMode == TorMode.OFF,
                             onClick = {
-                                viewModel.setTorMode(TorMode.OFF)
+                                component.onTorModeChanged(false)
                             },
                             label = { Text("tor off", fontFamily = FontFamily.Monospace) }
                         )
                         FilterChip(
                             selected = torMode == TorMode.ON,
                             onClick = {
-                                viewModel.setTorMode(TorMode.ON)
+                                component.onTorModeChanged(true)
                             },
                             label = {
                                 Row(
