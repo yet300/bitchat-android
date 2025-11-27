@@ -44,6 +44,7 @@ internal class OnboardingStoreFactory(
                     val categories = permissionManager.getCategorizedPermissions()
                     dispatch(OnboardingStore.Msg.PermissionCategoriesLoaded(categories))
                     
+                    // Subscribe to manager status changes
                     scope.launch {
                         bluetoothStatusManager.status.collect { status ->
                             dispatch(OnboardingStore.Msg.BluetoothStatusChanged(status))
@@ -62,7 +63,7 @@ internal class OnboardingStoreFactory(
                             checkState()
                         }
                     }
-                    // Initial check
+                    // Initial state check
                     checkState()
                 }
             }
@@ -86,8 +87,10 @@ internal class OnboardingStoreFactory(
                 }
 
                 OnboardingStore.Intent.SkipBatteryOptimization -> {
-                    // Logic to skip battery optimization check
-                    // For now, just proceed to permissions
+                    // User chose to skip battery optimization
+                    // Mark battery as "handled" by setting loading to false
+                    dispatch(OnboardingStore.Msg.LoadingChanged(battery = false))
+                    // Proceed to next step (permissions)
                     proceedToPermissions()
                 }
 
@@ -97,7 +100,15 @@ internal class OnboardingStoreFactory(
                 }
 
                 OnboardingStore.Intent.Retry -> {
+                    // Clear any error message
                     dispatch(OnboardingStore.Msg.Error(""))
+                    // Reset loading states
+                    dispatch(OnboardingStore.Msg.LoadingChanged(
+                        bluetooth = false,
+                        location = false,
+                        battery = false
+                    ))
+                    // Re-check the current state to determine next step
                     checkState()
                 }
 
@@ -106,14 +117,19 @@ internal class OnboardingStoreFactory(
                 }
 
                 OnboardingStore.Intent.CheckStatus -> {
+                    // Re-evaluate the onboarding state (e.g., after permissions change)
                     checkState()
                 }
             }
         }
 
+        /**
+         * Determines the next onboarding state based on current manager statuses
+         */
         private fun checkState() {
             val state = state()
 
+            // If this is first time launch, skip hardware checks and go straight to permissions
             if (permissionManager.isFirstTimeLaunch()) {
                 if (state.onboardingState == OnboardingState.CHECKING) {
                     proceedToPermissions()
@@ -121,32 +137,41 @@ internal class OnboardingStoreFactory(
                 return
             }
 
+            // Check Bluetooth status
             if (state.bluetoothStatus != BluetoothStatus.ENABLED) {
                 dispatch(OnboardingStore.Msg.OnboardingStateChanged(OnboardingState.BLUETOOTH_CHECK))
                 dispatch(OnboardingStore.Msg.LoadingChanged(bluetooth = false))
                 return
             }
 
+            // Check Location status
             if (state.locationStatus != LocationStatus.ENABLED) {
                 dispatch(OnboardingStore.Msg.OnboardingStateChanged(OnboardingState.LOCATION_CHECK))
                 dispatch(OnboardingStore.Msg.LoadingChanged(location = false))
                 return
             }
 
+            // Check Battery Optimization status (optional, can be skipped)
             if (state.batteryStatus == BatteryOptimizationStatus.ENABLED) {
                 dispatch(OnboardingStore.Msg.OnboardingStateChanged(OnboardingState.BATTERY_OPTIMIZATION_CHECK))
                 dispatch(OnboardingStore.Msg.LoadingChanged(battery = false))
                 return
             }
 
+            // All hardware checks passed, proceed to permissions
             proceedToPermissions()
         }
 
+        /**
+         * Proceeds to permission check or completes onboarding
+         */
         private fun proceedToPermissions() {
             if (permissionManager.areAllPermissionsGranted()) {
+                // All permissions granted, complete onboarding
                 dispatch(OnboardingStore.Msg.OnboardingStateChanged(OnboardingState.INITIALIZING))
                 publish(OnboardingStore.Label.OnboardingComplete)
             } else {
+                // Show permission explanation screen
                 dispatch(OnboardingStore.Msg.OnboardingStateChanged(OnboardingState.PERMISSION_EXPLANATION))
             }
         }
