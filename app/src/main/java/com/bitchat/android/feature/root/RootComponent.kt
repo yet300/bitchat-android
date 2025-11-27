@@ -7,6 +7,8 @@ import com.bitchat.android.feature.chat.ChatComponent
 
 interface RootComponent {
     val childStack: Value<ChildStack<*, Child>>
+    
+    fun onDeepLink(deepLink: DeepLinkData)
 
     sealed class Child {
         class Onboarding(val component: OnboardingComponent) : Child()
