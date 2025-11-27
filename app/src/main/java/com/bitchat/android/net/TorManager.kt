@@ -31,7 +31,8 @@ import java.util.concurrent.atomic.AtomicLong
  */
 @Singleton
 class TorManager  @Inject constructor(
-    private val application: Application
+    private val application: Application,
+    private val torPreferenceManager: TorPreferenceManager
 ) {
 
     companion object{
@@ -91,10 +92,10 @@ class TorManager  @Inject constructor(
             if (initialized) return
             initialized = true
             // currentApplication = application
-            TorPreferenceManager.init(application)
+            torPreferenceManager.init()
 
             // Apply saved mode at startup. If ON, set planned SOCKS immediately to avoid any leak.
-            val savedMode = TorPreferenceManager.get(application)
+            val savedMode = torPreferenceManager.get()
             if (savedMode == TorMode.ON) {
                 if (currentSocksPort < DEFAULT_SOCKS_PORT) {
                     currentSocksPort = DEFAULT_SOCKS_PORT
@@ -109,7 +110,7 @@ class TorManager  @Inject constructor(
 
             // Observe changes
             appScope.launch {
-                TorPreferenceManager.modeFlow.collect { mode ->
+                torPreferenceManager.modeFlow.collect { mode ->
                     applyMode(application, mode)
                 }
             }

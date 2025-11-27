@@ -52,6 +52,7 @@ class ChatViewModel @Inject constructor(
     val favoritesService: FavoritesPersistenceService,
     private val locationNotesManager: LocationNotesManager,
     private val torManager: TorManager,
+    private val torPreferenceManager: TorPreferenceManager
 ) : AndroidViewModel(application), BluetoothMeshDelegate {
 
     companion object {
@@ -961,7 +962,7 @@ class ChatViewModel @Inject constructor(
     fun resolveGeohashNameIfNeeded(geohash: String) = geohashBookmarksStore.resolveNameIfNeeded(geohash)
 
     fun setTorMode(mode: TorMode) {
-        TorPreferenceManager.set(getApplication(), mode)
+        torPreferenceManager.set(mode)
     }
 
     fun setPowEnabled(enabled: Boolean) {
