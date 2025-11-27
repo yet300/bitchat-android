@@ -499,7 +499,7 @@ private fun ChatSheets(
                 is com.bitchat.android.feature.chat.ChatComponent.SheetChild.AppInfo -> {
                     var showDebugSheet by remember { mutableStateOf(false) }
                     AboutSheetContent(
-                        viewModel = viewModel,
+                        component = child.component,
                         lazyListState = listState,
                         onShowDebug = { showDebugSheet = true }
                     )
