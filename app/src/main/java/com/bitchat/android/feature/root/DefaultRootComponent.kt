@@ -7,12 +7,19 @@ import com.arkivanov.decompose.router.stack.StackNavigation
 import com.arkivanov.decompose.router.stack.childStack
 import com.arkivanov.decompose.router.stack.replaceCurrent
 import com.arkivanov.decompose.value.Value
+import com.arkivanov.decompose.value.operator.map
 import com.arkivanov.essenty.lifecycle.doOnCreate
 import com.arkivanov.essenty.lifecycle.doOnDestroy
 import com.arkivanov.essenty.lifecycle.doOnPause
 import com.arkivanov.essenty.lifecycle.doOnResume
+import com.arkivanov.mvikotlin.core.instancekeeper.getStore
+import com.arkivanov.mvikotlin.core.store.StoreFactory
+import com.bitchat.android.core.common.asValue
+import com.bitchat.android.feature.chat.ChatComponent
 import com.bitchat.android.feature.chat.DefaultChatComponent
 import com.bitchat.android.feature.onboarding.DefaultOnboardingComponent
+import com.bitchat.android.feature.root.integration.stateToModel
+import com.bitchat.android.feature.root.store.RootStoreFactory
 import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.onboarding.BatteryOptimizationManager
 import com.bitchat.android.onboarding.BluetoothStatusManager
@@ -27,6 +34,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 
 class DefaultRootComponent(
     componentContext: ComponentContext,
@@ -38,7 +47,15 @@ class DefaultRootComponent(
     private val meshService: BluetoothMeshService,
     private val chatViewModel: ChatViewModel,
     initialDeepLink: DeepLinkData? = null
-) : RootComponent, ComponentContext by componentContext {
+) : RootComponent, ComponentContext by componentContext, KoinComponent {
+
+    private val storeFactory: StoreFactory by inject()
+
+    private val store = instanceKeeper.getStore {
+        RootStoreFactory(storeFactory).create()
+    }
+
+    override val model: Value<RootComponent.Model> = store.asValue().map(stateToModel)
 
     private val navigation = StackNavigation<Config>()
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -96,14 +113,16 @@ class DefaultRootComponent(
                 )
             )
             is Config.Chat -> {
-                // Handle deep link if present in config
-                if (config.deepLink != null) {
-                    handleDeepLink(config.deepLink)
+                val startupConfig = when (config.deepLink) {
+                    is DeepLinkData.PrivateChat -> ChatComponent.ChatStartupConfig.PrivateChat(config.deepLink.peerID)
+                    is DeepLinkData.GeohashChat -> ChatComponent.ChatStartupConfig.GeohashChat(config.deepLink.geohash)
+                    null -> ChatComponent.ChatStartupConfig.Default
                 }
-                
+
                 RootComponent.Child.Chat(
                     DefaultChatComponent(
-                        componentContext = componentContext
+                        componentContext = componentContext,
+                        startupConfig = startupConfig
                     )
                 )
             }
@@ -159,38 +178,7 @@ class DefaultRootComponent(
         navigation.replaceCurrent(Config.Chat(deepLink = deepLink))
     }
 
-    private fun handleDeepLink(deepLink: DeepLinkData) {
-        Log.d(TAG, "Handling deep link: $deepLink")
-        
-        when (deepLink) {
-            is DeepLinkData.PrivateChat -> {
-                Log.d(
-                    TAG,
-                    "Opening private chat with ${deepLink.senderNickname} (peerID: ${deepLink.peerID})"
-                )
-                chatViewModel.startPrivateChat(deepLink.peerID)
-                chatViewModel.clearNotificationsForSender(deepLink.peerID)
-            }
-            is DeepLinkData.GeohashChat -> {
-                Log.d(TAG, "Opening geohash chat #${deepLink.geohash}")
-                
-                val level = when (deepLink.geohash.length) {
-                    7 -> com.bitchat.android.geohash.GeohashChannelLevel.BLOCK
-                    6 -> com.bitchat.android.geohash.GeohashChannelLevel.NEIGHBORHOOD
-                    5 -> com.bitchat.android.geohash.GeohashChannelLevel.CITY
-                    4 -> com.bitchat.android.geohash.GeohashChannelLevel.PROVINCE
-                    2 -> com.bitchat.android.geohash.GeohashChannelLevel.REGION
-                    else -> com.bitchat.android.geohash.GeohashChannelLevel.CITY
-                }
-                
-                val geohashChannel = com.bitchat.android.geohash.GeohashChannel(level, deepLink.geohash)
-                val channelId = com.bitchat.android.geohash.ChannelID.Location(geohashChannel)
-                chatViewModel.selectLocationChannel(channelId)
-                chatViewModel.setCurrentGeohash(deepLink.geohash)
-                chatViewModel.clearNotificationsForGeohash(deepLink.geohash)
-            }
-        }
-    }
+
 
     private fun handleAppResume() {
         Log.d(TAG, "Handling app resume")

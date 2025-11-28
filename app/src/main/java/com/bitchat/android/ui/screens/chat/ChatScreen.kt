@@ -527,17 +527,9 @@ private fun ChatSheets(
                 }
                 
                 is com.bitchat.android.feature.chat.ChatComponent.SheetChild.UserSheet -> {
-                    // Find the message if messageId is provided
-                    val selectedMessage = child.messageId?.let { messageId ->
-                        viewModel.messages.value?.find { it.id == messageId }
-                    }
-                    
                     ChatUserSheetContent(
-                        targetNickname = child.nickname,
-                        selectedMessage = selectedMessage,
-                        viewModel = viewModel,
-                        lazyListState = listState,
-                        onDismiss = component::onDismissSheet
+                        component = child.component,
+                        lazyListState = listState
                     )
                 }
             }

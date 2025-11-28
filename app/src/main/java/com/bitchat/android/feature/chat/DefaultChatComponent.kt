@@ -1,5 +1,11 @@
 package com.bitchat.android.feature.chat
 
+import com.bitchat.android.feature.about.DefaultAboutComponent
+import com.bitchat.android.feature.chat.locationchannels.DefaultLocationChannelsComponent
+import com.bitchat.android.feature.chat.locationnotes.DefaultLocationNotesComponent
+import com.bitchat.android.feature.chat.usersheet.DefaultUserSheetComponent
+import com.bitchat.android.feature.chat.passwordprompt.DefaultPasswordPromptComponent
+
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.router.slot.ChildSlot
 import com.arkivanov.decompose.router.slot.SlotNavigation
@@ -8,11 +14,43 @@ import com.arkivanov.decompose.router.slot.childSlot
 import com.arkivanov.decompose.router.slot.dismiss
 import com.arkivanov.decompose.value.Value
 import kotlinx.serialization.Serializable
+import com.bitchat.android.ui.ChatViewModel
 import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 
 class DefaultChatComponent(
-    componentContext: ComponentContext
+    componentContext: ComponentContext,
+    startupConfig: ChatComponent.ChatStartupConfig
 ) : ChatComponent, ComponentContext by componentContext, KoinComponent {
+
+    private val chatViewModel: ChatViewModel by inject()
+
+    init {
+        when (startupConfig) {
+            is ChatComponent.ChatStartupConfig.PrivateChat -> {
+                chatViewModel.startPrivateChat(startupConfig.peerId)
+                chatViewModel.clearNotificationsForSender(startupConfig.peerId)
+            }
+            is ChatComponent.ChatStartupConfig.GeohashChat -> {
+                val geohash = startupConfig.geohash
+                val level = when (geohash.length) {
+                    7 -> com.bitchat.android.geohash.GeohashChannelLevel.BLOCK
+                    6 -> com.bitchat.android.geohash.GeohashChannelLevel.NEIGHBORHOOD
+                    5 -> com.bitchat.android.geohash.GeohashChannelLevel.CITY
+                    4 -> com.bitchat.android.geohash.GeohashChannelLevel.PROVINCE
+                    2 -> com.bitchat.android.geohash.GeohashChannelLevel.REGION
+                    else -> com.bitchat.android.geohash.GeohashChannelLevel.CITY
+                }
+                
+                val geohashChannel = com.bitchat.android.geohash.GeohashChannel(level, geohash)
+                val channelId = com.bitchat.android.geohash.ChannelID.Location(geohashChannel)
+                chatViewModel.selectLocationChannel(channelId)
+                chatViewModel.setCurrentGeohash(geohash)
+                chatViewModel.clearNotificationsForGeohash(geohash)
+            }
+            ChatComponent.ChatStartupConfig.Default -> {}
+        }
+    }
 
     private val sheetNavigation = SlotNavigation<SheetConfig>()
     private val dialogNavigation = SlotNavigation<DialogConfig>()
@@ -68,13 +106,38 @@ class DefaultChatComponent(
         componentContext: ComponentContext
     ): ChatComponent.SheetChild =
         when (config) {
-            is SheetConfig.AppInfo -> ChatComponent.SheetChild.AppInfo
-            is SheetConfig.LocationChannels -> ChatComponent.SheetChild.LocationChannels
-            is SheetConfig.LocationNotes -> ChatComponent.SheetChild.LocationNotes
-            is SheetConfig.UserSheet -> ChatComponent.SheetChild.UserSheet(
-                nickname = config.nickname,
-                messageId = config.messageId
+            is SheetConfig.AppInfo -> ChatComponent.SheetChild.AppInfo(
+                component = DefaultAboutComponent(
+                    componentContext = componentContext,
+                    onDismissCallback = ::onDismissSheet
+                )
             )
+            is SheetConfig.LocationChannels -> ChatComponent.SheetChild.LocationChannels(
+                component = DefaultLocationChannelsComponent(
+                    componentContext = componentContext,
+                    onDismissCallback = ::onDismissSheet
+                )
+            )
+            is SheetConfig.LocationNotes -> ChatComponent.SheetChild.LocationNotes(
+                component = DefaultLocationNotesComponent(
+                    componentContext = componentContext
+                )
+            )
+            is SheetConfig.UserSheet -> {
+                val selectedMessage = config.messageId?.let { messageId ->
+                    chatViewModel.messages.value?.find { it.id == messageId }
+                }
+
+                ChatComponent.SheetChild.UserSheet(
+                    component = DefaultUserSheetComponent(
+                        componentContext = componentContext,
+                        targetNickname = config.nickname,
+                        selectedMessage = selectedMessage,
+                        chatViewModel = chatViewModel,
+                        onDismissCallback = ::onDismissSheet
+                    )
+                )
+            }
         }
 
     private fun createDialogChild(
@@ -83,7 +146,12 @@ class DefaultChatComponent(
     ): ChatComponent.DialogChild =
         when (config) {
             is DialogConfig.PasswordPrompt -> ChatComponent.DialogChild.PasswordPrompt(
-                channelName = config.channelName
+                component = DefaultPasswordPromptComponent(
+                    componentContext = componentContext,
+                    channelName = config.channelName,
+                    chatViewModel = chatViewModel,
+                    onDismissCallback = ::onDismissDialog
+                )
             )
         }
 

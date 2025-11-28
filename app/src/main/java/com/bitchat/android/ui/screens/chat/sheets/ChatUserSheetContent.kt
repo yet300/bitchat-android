@@ -16,18 +16,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bitchat.android.R
 import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.ui.ChatViewModel
 import com.bitchat.android.ui.theme.BASE_FONT_SIZE
+import com.arkivanov.decompose.extensions.compose.subscribeAsState
+import com.bitchat.android.feature.chat.usersheet.UserSheetComponent
 
 @Composable
 fun ChatUserSheetContent(
+    component: UserSheetComponent,
     modifier: Modifier = Modifier,
-    targetNickname: String,
-    selectedMessage: BitchatMessage? = null,
-    viewModel: ChatViewModel,
     lazyListState: LazyListState,
-    onDismiss: () -> Unit,
 ) {
+    val model by component.model.subscribeAsState()
     val clipboardManager = LocalClipboardManager.current
     
     // iOS system colors (matches LocationChannelsSheet exactly)
@@ -46,7 +45,7 @@ fun ChatUserSheetContent(
     ) {
         // Header
         Text(
-            text = stringResource(R.string.at_nickname, targetNickname),
+            text = stringResource(R.string.at_nickname, model.targetNickname),
             fontSize = 18.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Bold,
@@ -54,7 +53,7 @@ fun ChatUserSheetContent(
         )
         
         Text(
-            text = if (selectedMessage != null) stringResource(R.string.choose_action_message_or_user) else stringResource(R.string.choose_action_user),
+            text = if (model.selectedMessage != null) stringResource(R.string.choose_action_message_or_user) else stringResource(R.string.choose_action_user),
             fontSize = 12.sp,
             fontFamily = FontFamily.Monospace,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
@@ -66,7 +65,7 @@ fun ChatUserSheetContent(
             modifier = Modifier.fillMaxWidth().weight(1f, fill = false) // Allow it to take available space but not force full height if not needed
         ) {
             // Copy message action (only show if we have a message)
-            selectedMessage?.let { message ->
+            model.selectedMessage?.let { message ->
                 item {
                     UserActionRow(
                         title = stringResource(R.string.action_copy_message_title),
@@ -75,24 +74,22 @@ fun ChatUserSheetContent(
                         onClick = {
                             // Copy the message content to clipboard
                             clipboardManager.setText(AnnotatedString(message.content))
-                            onDismiss()
+                            component.onDismiss()
                         }
                     )
                 }
             }
             
             // Only show user actions for other users' messages or when no message is selected
-            if (selectedMessage?.sender != viewModel.nickname.value) {
+            if (!model.isSelf) {
                 // Slap action
                 item {
                     UserActionRow(
-                        title = stringResource(R.string.action_slap_title, targetNickname),
+                        title = stringResource(R.string.action_slap_title, model.targetNickname),
                         subtitle = stringResource(R.string.action_slap_subtitle),
                         titleColor = standardBlue,
                         onClick = {
-                            // Send slap command
-                            viewModel.sendMessage("/slap $targetNickname")
-                            onDismiss()
+                            component.onSlap()
                         }
                     )
                 }
@@ -100,13 +97,11 @@ fun ChatUserSheetContent(
                 // Hug action  
                 item {
                     UserActionRow(
-                        title = stringResource(R.string.action_hug_title, targetNickname),
+                        title = stringResource(R.string.action_hug_title, model.targetNickname),
                         subtitle = stringResource(R.string.action_hug_subtitle),
                         titleColor = standardGreen,
                         onClick = {
-                            // Send hug command
-                            viewModel.sendMessage("/hug $targetNickname")
-                            onDismiss()
+                            component.onHug()
                         }
                     )
                 }
@@ -114,20 +109,11 @@ fun ChatUserSheetContent(
                 // Block action
                 item {
                     UserActionRow(
-                        title = stringResource(R.string.action_block_title, targetNickname),
+                        title = stringResource(R.string.action_block_title, model.targetNickname),
                         subtitle = stringResource(R.string.action_block_subtitle),
                         titleColor = standardRed,
                         onClick = {
-                            // Check if we're in a geohash channel
-                            val selectedLocationChannel = viewModel.selectedLocationChannel.value
-                            if (selectedLocationChannel is com.bitchat.android.geohash.ChannelID.Location) {
-                                // Get user's nostr public key and add to geohash block list
-                                viewModel.blockUserInGeohash(targetNickname)
-                            } else {
-                                // Regular mesh blocking
-                                viewModel.sendMessage("/block $targetNickname")
-                            }
-                            onDismiss()
+                            component.onBlock()
                         }
                     )
                 }
@@ -136,7 +122,7 @@ fun ChatUserSheetContent(
         
         // Cancel button (iOS-style)
         Button(
-            onClick = onDismiss,
+            onClick = component::onDismiss,
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f),
                 contentColor = MaterialTheme.colorScheme.onSurface
