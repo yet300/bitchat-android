@@ -360,7 +360,6 @@ fun ChatScreen(
     // Dialogs (using Decompose slot)
     ChatDialogs(
         component = component,
-        viewModel = viewModel
     )
 
     // Decompose-managed sheets
@@ -540,33 +539,21 @@ private fun ChatSheets(
 @Composable
 private fun ChatDialogs(
     component: com.bitchat.android.feature.chat.ChatComponent,
-    viewModel: ChatViewModel
 ) {
     val dialogSlot by component.dialogSlot.subscribeAsState()
     
     dialogSlot.child?.instance?.let { child ->
         when (child) {
             is com.bitchat.android.feature.chat.ChatComponent.DialogChild.PasswordPrompt -> {
-                var passwordInput by remember { mutableStateOf("") }
+                val model by child.component.model.subscribeAsState()
                 
                 PasswordPromptDialog(
                     show = true,
-                    channelName = child.channelName,
-                    passwordInput = passwordInput,
-                    onPasswordChange = { passwordInput = it },
-                    onConfirm = {
-                        if (passwordInput.isNotEmpty()) {
-                            val success = viewModel.joinChannel(child.channelName, passwordInput)
-                            if (success) {
-                                component.onDismissDialog()
-                                passwordInput = ""
-                            }
-                        }
-                    },
-                    onDismiss = {
-                        component.onDismissDialog()
-                        passwordInput = ""
-                    }
+                    channelName = model.channelName,
+                    passwordInput = model.passwordInput,
+                    onPasswordChange = child.component::onPasswordChange,
+                    onConfirm = child.component::onConfirm,
+                    onDismiss = child.component::onDismiss
                 )
             }
         }
