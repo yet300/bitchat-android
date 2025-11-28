@@ -12,7 +12,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -22,55 +21,42 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.bitchat.android.R
+import com.bitchat.android.feature.chat.locationnotes.LocationNotesComponent
 import com.bitchat.android.geohash.GeohashChannelLevel
 import com.bitchat.android.nostr.LocationNotesManager
-import com.bitchat.android.ui.ChatViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LocationNotesSheetContent(
-    geohash: String,
-    locationName: String?,
-    nickname: String?,
-    viewModel: ChatViewModel,
+    component: LocationNotesComponent,
     lazyListState: LazyListState,
     modifier: Modifier = Modifier
 ) {
+    val model by component.model.subscribeAsState()
     val isDark = isSystemInDarkTheme()
     
     // iOS color scheme
     val accentGreen = if (isDark) Color.Green else Color(0xFF008000) // dark: green, light: dark green (0, 0.5, 0)
 
-    // State
-    val notes by viewModel.locationNotes.observeAsState(emptyList())
-    val state by viewModel.locationNotesState.observeAsState(LocationNotesManager.State.IDLE)
-    val errorMessage by viewModel.locationNotesErrorMessage.observeAsState()
-    val initialLoadComplete by viewModel.locationNotesInitialLoadComplete.observeAsState(false)
-    
     // SIMPLIFIED: Get count directly from notes list (no separate counter needed)
-    val count = notes.size
+    val count = model.notes.size
     
     // Get location name (building or block) - matches iOS locationNames lookup
-    val locationNames by viewModel.locationNames.observeAsState(emptyMap())
-    val displayLocationName = locationNames[GeohashChannelLevel.BUILDING]?.takeIf { it.isNotEmpty() }
-        ?: locationNames[GeohashChannelLevel.BLOCK]?.takeIf { it.isNotEmpty() }
+    val displayLocationName = model.locationNames[GeohashChannelLevel.BUILDING]?.takeIf { it.isNotEmpty() }
+        ?: model.locationNames[GeohashChannelLevel.BLOCK]?.takeIf { it.isNotEmpty() }
     
     // Input field state
     var draft by remember { mutableStateOf("") }
-    val sendButtonEnabled = draft.trim().isNotEmpty() && state != LocationNotesManager.State.NO_RELAYS
-    
-    // Effect to set geohash when sheet opens
-    LaunchedEffect(geohash) {
-        viewModel.setLocationNotesGeohash(geohash)
-    }
+    val sendButtonEnabled = draft.trim().isNotEmpty() && model.state != LocationNotesManager.State.NO_RELAYS
     
     // Cleanup when sheet closes
     DisposableEffect(Unit) {
         onDispose {
-            viewModel.cancelLocationNotes()
+            component.onCancel()
         }
     }
     
@@ -93,34 +79,34 @@ fun LocationNotesSheetContent(
                 // Header section (matches iOS headerSection)
                 item {
                     LocationNotesHeader(
-                        geohash = geohash,
+                        geohash = model.geohash ?: "",
                         count = count,
                         locationName = displayLocationName,
-                        state = state,
+                        state = model.state,
                         accentGreen = accentGreen
                     )
                 }
                 // Notes content (matches iOS notesContent)
                 when {
-                    state == LocationNotesManager.State.NO_RELAYS -> {
+                    model.state == LocationNotesManager.State.NO_RELAYS -> {
                         item {
                             NoRelaysRow(
-                                onRetry = { viewModel.refreshLocationNotes() }
+                                onRetry = { component.onRefresh() }
                             )
                         }
                     }
-                    state == LocationNotesManager.State.LOADING && !initialLoadComplete -> {
+                    model.state == LocationNotesManager.State.LOADING && !model.initialLoadComplete -> {
                         item {
                             LoadingRow()
                         }
                     }
-                    notes.isEmpty() -> {
+                    model.notes.isEmpty() -> {
                         item {
                             EmptyRow()
                         }
                     }
                     else -> {
-                        items(notes, key = { it.id }) { note ->
+                        items(model.notes, key = { it.id }) { note ->
                             NoteRow(note = note)
                             Spacer(modifier = Modifier.height(12.dp))
                         }
@@ -128,12 +114,12 @@ fun LocationNotesSheetContent(
                 }
                 
                 // Error row (matches iOS errorRow)
-                errorMessage?.let { error ->
-                    if (state != LocationNotesManager.State.NO_RELAYS) {
+                model.errorMessage?.let { error ->
+                    if (model.state != LocationNotesManager.State.NO_RELAYS) {
                         item {
                             ErrorRow(
                                 message = error,
-                                onDismiss = { viewModel.clearLocationNotesError() }
+                                onDismiss = { component.onClearError() }
                             )
                         }
                     }
@@ -157,7 +143,7 @@ fun LocationNotesSheetContent(
             onSend = {
                 val content = draft.trim()
                 if (content.isNotEmpty()) {
-                    viewModel.sendLocationNote(content, nickname)
+                    component.onSendNote(content, model.nickname)
                     draft = ""
                 }
             }

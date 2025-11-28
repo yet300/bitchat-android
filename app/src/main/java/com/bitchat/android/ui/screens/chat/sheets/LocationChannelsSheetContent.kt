@@ -5,7 +5,15 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -16,26 +24,42 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.PinDrop
 import androidx.compose.material.icons.outlined.BookmarkBorder
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.bitchat.android.R
+import com.bitchat.android.feature.chat.locationchannels.LocationChannelsComponent
 import com.bitchat.android.geohash.ChannelID
-import com.bitchat.android.geohash.GeohashBookmarksStore
 import com.bitchat.android.geohash.GeohashChannel
 import com.bitchat.android.geohash.GeohashChannelLevel
 import com.bitchat.android.geohash.LocationChannelManager
-import com.bitchat.android.ui.ChatViewModel
 import com.bitchat.android.ui.GeohashPickerActivity
 import com.bitchat.android.ui.theme.BASE_FONT_SIZE
 import kotlinx.coroutines.launch
@@ -43,26 +67,18 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LocationChannelsSheetContent(
-    viewModel: ChatViewModel,
+    component: LocationChannelsComponent,
     lazyListState: LazyListState,
-    onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val model by component.model.subscribeAsState()
 
-    // Observe location manager state
-    val permissionState by viewModel.locationPermissionState.observeAsState()
-    val availableChannels by viewModel.availableLocationChannels.observeAsState(emptyList())
-    val selectedChannel by viewModel.selectedLocationChannel.observeAsState()
-    val locationNames by viewModel.locationNames.observeAsState(emptyMap())
-    val locationServicesEnabled by viewModel.locationServicesEnabled.observeAsState(false)
-
-    // Observe bookmarks state
-    val bookmarks by viewModel.geohashBookmarks.observeAsState(emptyList())
-    val bookmarkNames by viewModel.geohashBookmarkNames.observeAsState(emptyMap())
-
-    // Observe reactive participant counts
-    val geohashParticipantCounts by viewModel.geohashParticipantCounts.observeAsState(emptyMap())
+    // Observe reactive participant counts from model
+    val geohashParticipantCounts = model.geohashParticipantCounts
+    val permissionState = model.permissionState
+    val bookmarkNames = model.bookmarkNames
+    val availableChannels = model.availableChannels
 
     // UI state
     var customGeohash by remember { mutableStateOf("") }
@@ -122,7 +138,7 @@ fun LocationChannelsSheetContent(
             }
 
             // Permission controls if services enabled
-            if (locationServicesEnabled) {
+            if (model.locationServicesEnabled) {
                 item(key = "permissions") {
                     Column(
                         modifier = Modifier
@@ -134,7 +150,7 @@ fun LocationChannelsSheetContent(
                         when (permissionState) {
                             LocationChannelManager.PermissionState.NOT_DETERMINED -> {
                                 Button(
-                                    onClick = { viewModel.enableLocationChannels() },
+                                    onClick = { component.onRequestLocationPermission() },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = standardGreen.copy(alpha = 0.12f),
                                         contentColor = standardGreen
@@ -203,39 +219,39 @@ fun LocationChannelsSheetContent(
             // Mesh option first
             item(key = "mesh") {
                 ChannelRow(
-                    title = meshTitleWithCount(viewModel),
+                    title = meshTitleWithCount(model),
                     subtitle = stringResource(R.string.location_bluetooth_subtitle, bluetoothRangeString()),
-                    isSelected = selectedChannel is ChannelID.Mesh,
+                    isSelected = model.selectedChannel is ChannelID.Mesh,
                     titleColor = standardBlue,
-                    titleBold = meshCount(viewModel) > 0,
+                    titleBold = meshCount(model) > 0,
                     trailingContent = null,
                     onClick = {
-                        viewModel.selectLocationChannel(ChannelID.Mesh)
-                        onDismiss()
+                        component.onSelectChannel(ChannelID.Mesh)
+                        component.onDismiss()
                     }
                 )
             }
 
             // Nearby options (only show if location services are enabled)
-            if (availableChannels.isNotEmpty() && locationServicesEnabled) {
-                val nearbyChannels = availableChannels.filter { it.level != GeohashChannelLevel.BUILDING }
+            if (model.availableChannels.isNotEmpty() && model.locationServicesEnabled) {
+                val nearbyChannels = model.availableChannels.filter { it.level != GeohashChannelLevel.BUILDING }
                 items(nearbyChannels) { channel ->
                     val coverage = coverageString(channel.geohash.length)
-                    val nameBase = locationNames[channel.level]
+                    val nameBase = model.locationNames[channel.level]
                     val namePart = nameBase?.let { formattedNamePrefix(channel.level) + it }
                     val subtitlePrefix = "#${channel.geohash} • $coverage"
                     val participantCount = geohashParticipantCounts[channel.geohash] ?: 0
                     val highlight = participantCount > 0
-                    val isBookmarked = viewModel.isGeohashBookmarked(channel.geohash)
+                    val isBookmarked = model.bookmarkedGeohashes.contains(channel.geohash)
 
                     ChannelRow(
                         title = geohashTitleWithCount(channel, participantCount),
                         subtitle = subtitlePrefix + (namePart?.let { " • $it" } ?: ""),
-                        isSelected = isChannelSelected(channel, selectedChannel),
+                        isSelected = isChannelSelected(channel, model.selectedChannel),
                         titleColor = standardGreen,
                         titleBold = highlight,
                         trailingContent = {
-                            IconButton(onClick = { viewModel.toggleGeohashBookmark(channel.geohash) }) {
+                            IconButton(onClick = { component.onToggleBookmark(channel.geohash) }) {
                                 Icon(
                                     imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
                                     contentDescription = if (isBookmarked) stringResource(R.string.cd_remove_bookmark) else stringResource(R.string.cd_add_bookmark),
@@ -245,13 +261,14 @@ fun LocationChannelsSheetContent(
                         },
                         onClick = {
                             // Selecting a suggested nearby channel is not a teleport
-                            viewModel.setTeleported(false)
-                            viewModel.selectLocationChannel(ChannelID.Location(channel))
-                            onDismiss()
+                            // Note: Store handles teleport logic, but we might need to be explicit if logic is complex
+                            // The store logic for SelectChannel calls LocationChannelManager.select which handles teleport logic
+                            component.onSelectChannel(ChannelID.Location(channel))
+                            component.onDismiss()
                         }
                     )
                 }
-            } else if (permissionState == LocationChannelManager.PermissionState.AUTHORIZED && locationServicesEnabled) {
+            } else if (model.hasLocationPermission && model.locationServicesEnabled) {
                 item {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -268,7 +285,7 @@ fun LocationChannelsSheetContent(
             }
 
             // Bookmarked geohashes
-            if (bookmarks.isNotEmpty()) {
+            if (model.bookmarkedGeohashes.isNotEmpty()) {
                 item(key = "bookmarked_header") {
                     Text(
                         text = stringResource(R.string.bookmarked),
@@ -281,7 +298,7 @@ fun LocationChannelsSheetContent(
                             .padding(top = 8.dp, bottom = 4.dp)
                     )
                 }
-                items(bookmarks) { gh ->
+                items(model.bookmarkedGeohashes) { gh ->
                     val level = levelForLength(gh.length)
                     val channel = GeohashChannel(level = level, geohash = gh)
                     val coverage = coverageString(gh.length)
@@ -294,11 +311,11 @@ fun LocationChannelsSheetContent(
                     ChannelRow(
                         title = title,
                         subtitle = subtitle,
-                        isSelected = isChannelSelected(channel, selectedChannel),
+                        isSelected = isChannelSelected(channel, model.selectedChannel),
                         titleColor = null,
                         titleBold = participantCount > 0,
                         trailingContent = {
-                            IconButton(onClick = { viewModel.toggleGeohashBookmark(gh) }) {
+                            IconButton(onClick = { component.onToggleBookmark(gh) }) {
                                 Icon(
                                     imageVector = Icons.Filled.Bookmark,
                                     contentDescription = stringResource(R.string.cd_remove_bookmark),
@@ -307,18 +324,10 @@ fun LocationChannelsSheetContent(
                             }
                         },
                         onClick = {
-                            // For bookmarked selection, mark teleported based on regional membership
-                            val inRegional = availableChannels.any { it.geohash == gh }
-                            if (!inRegional && availableChannels.isNotEmpty()) {
-                                viewModel.setTeleported(true)
-                            } else {
-                                viewModel.setTeleported(false)
-                            }
-                            viewModel.selectLocationChannel(ChannelID.Location(channel))
-                            onDismiss()
+                            // LocationChannelManager.select() handles teleport logic internally
+                            component.onSelectChannel(ChannelID.Location(channel))
                         }
                     )
-                    LaunchedEffect(gh) { viewModel.resolveGeohashNameIfNeeded(gh) }
                 }
             }
 
@@ -397,7 +406,7 @@ fun LocationChannelsSheetContent(
                         IconButton(onClick = {
                             val initial = when {
                                 normalized.isNotBlank() -> normalized
-                                selectedChannel is ChannelID.Location -> (selectedChannel as ChannelID.Location).channel.geohash
+                                model.selectedChannel is ChannelID.Location -> (model.selectedChannel as ChannelID.Location).channel.geohash
                                 else -> ""
                             }
                             val intent = Intent(context, GeohashPickerActivity::class.java).apply {
@@ -420,10 +429,8 @@ fun LocationChannelsSheetContent(
                                 if (isValid) {
                                     val level = levelForLength(normalized.length)
                                     val channel = GeohashChannel(level = level, geohash = normalized)
-                                    // Mark this selection as a manual teleport
-                                    viewModel.setTeleported(true)
-                                    viewModel.selectLocationChannel(ChannelID.Location(channel))
-                                    onDismiss()
+                                    component.onSelectChannel(ChannelID.Location(channel))
+                                    component.onDismiss()
                                 } else {
                                     customError = context.getString(R.string.invalid_geohash)
                                 }
@@ -480,19 +487,19 @@ fun LocationChannelsSheetContent(
                 ) {
                     Button(
                         onClick = {
-                            if (locationServicesEnabled) {
-                                viewModel.disableLocationServices()
+                            if (model.locationServicesEnabled) {
+                                component.onDisableLocationServices()
                             } else {
-                                viewModel.enableLocationServices()
+                                component.onEnableLocationServices()
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (locationServicesEnabled) {
+                            containerColor = if (model.locationServicesEnabled) {
                                 Color.Red.copy(alpha = 0.08f)
                             } else {
                                 standardGreen.copy(alpha = 0.12f)
                             },
-                            contentColor = if (locationServicesEnabled) {
+                            contentColor = if (model.locationServicesEnabled) {
                                 Color(0xFFBF1A1A)
                             } else {
                                 standardGreen
@@ -501,7 +508,7 @@ fun LocationChannelsSheetContent(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = if (locationServicesEnabled) stringResource(R.string.disable_location_services) else stringResource(R.string.enable_location_services),
+                            text = if (model.locationServicesEnabled) stringResource(R.string.disable_location_services) else stringResource(R.string.enable_location_services),
                             fontSize = 12.sp,
                             fontFamily = FontFamily.Monospace
                         )
@@ -512,33 +519,33 @@ fun LocationChannelsSheetContent(
     }
 
     // Lifecycle management: when presented, sample both nearby and bookmarked geohashes
-    LaunchedEffect(availableChannels, bookmarks) {
-        if (permissionState == LocationChannelManager.PermissionState.AUTHORIZED && locationServicesEnabled) {
-            viewModel.refreshLocationChannels()
-            viewModel.beginLiveRefresh()
+    LaunchedEffect(model.availableChannels, model.bookmarkedGeohashes) {
+        if (model.hasLocationPermission && model.locationServicesEnabled) {
+            component.onRefreshChannels()
+            component.onBeginLiveRefresh()
         }
-        val geohashes = (availableChannels.map { it.geohash } + bookmarks).toSet().toList()
-        viewModel.beginGeohashSampling(geohashes)
+        val geohashes = (model.availableChannels.map { it.geohash } + model.bookmarkedGeohashes).toSet().toList()
+        component.onBeginGeohashSampling(geohashes)
     }
     
     DisposableEffect(Unit) {
         onDispose {
-            viewModel.endLiveRefresh()
-            viewModel.endGeohashSampling()
+            component.onEndLiveRefresh()
+            component.onEndGeohashSampling()
         }
     }
 
     // React to permission changes
-    LaunchedEffect(permissionState) {
-        if (permissionState == LocationChannelManager.PermissionState.AUTHORIZED && locationServicesEnabled) {
-            viewModel.refreshLocationChannels()
+    LaunchedEffect(model.hasLocationPermission) {
+        if (model.hasLocationPermission && model.locationServicesEnabled) {
+            component.onRefreshChannels()
         }
     }
 
     // React to location services enable/disable
-    LaunchedEffect(locationServicesEnabled) {
-        if (locationServicesEnabled && permissionState == LocationChannelManager.PermissionState.AUTHORIZED) {
-            viewModel.refreshLocationChannels()
+    LaunchedEffect(model.locationServicesEnabled) {
+        if (model.locationServicesEnabled && model.hasLocationPermission) {
+            component.onRefreshChannels()
         }
     }
 }
@@ -639,40 +646,37 @@ private fun splitTitleAndCount(title: String): Pair<String, String?> {
 }
 
 @Composable
-private fun meshTitleWithCount(viewModel: ChatViewModel): String {
-    val meshCount = meshCount(viewModel)
-    val ctx = androidx.compose.ui.platform.LocalContext.current
-    val peopleText = ctx.resources.getQuantityString(com.bitchat.android.R.plurals.people_count, meshCount, meshCount)
-    val meshLabel = stringResource(com.bitchat.android.R.string.mesh_label)
+private fun meshTitleWithCount(model: LocationChannelsComponent.Model): String {
+    val meshCount = meshCount(model)
+    val peopleText = pluralStringResource(R.plurals.people_count, meshCount, meshCount)
+    val meshLabel = stringResource(R.string.mesh_label)
     return "$meshLabel [$peopleText]"
 }
 
-private fun meshCount(viewModel: ChatViewModel): Int {
-    val myID = viewModel.myPeerID
-    return viewModel.connectedPeers.value?.count { peerID ->
+private fun meshCount(model: LocationChannelsComponent.Model): Int {
+    val myID = model.myPeerID
+    return model.connectedPeers.count { peerID ->
         peerID != myID
-    } ?: 0
+    }
 }
 
 @Composable
 private fun geohashTitleWithCount(channel: GeohashChannel, participantCount: Int): String {
-    val ctx = androidx.compose.ui.platform.LocalContext.current
-    val peopleText = ctx.resources.getQuantityString(com.bitchat.android.R.plurals.people_count, participantCount, participantCount)
+    val peopleText = pluralStringResource(R.plurals.people_count, participantCount, participantCount)
     val levelName = when (channel.level) {
-        com.bitchat.android.geohash.GeohashChannelLevel.BUILDING -> "Building" // iOS: precision 8 for location notes
-        com.bitchat.android.geohash.GeohashChannelLevel.BLOCK -> stringResource(com.bitchat.android.R.string.location_level_block)
-        com.bitchat.android.geohash.GeohashChannelLevel.NEIGHBORHOOD -> stringResource(com.bitchat.android.R.string.location_level_neighborhood)
-        com.bitchat.android.geohash.GeohashChannelLevel.CITY -> stringResource(com.bitchat.android.R.string.location_level_city)
-        com.bitchat.android.geohash.GeohashChannelLevel.PROVINCE -> stringResource(com.bitchat.android.R.string.location_level_province)
-        com.bitchat.android.geohash.GeohashChannelLevel.REGION -> stringResource(com.bitchat.android.R.string.location_level_region)
+        GeohashChannelLevel.BUILDING -> "Building" // iOS: precision 8 for location notes
+        GeohashChannelLevel.BLOCK -> stringResource(R.string.location_level_block)
+        GeohashChannelLevel.NEIGHBORHOOD -> stringResource(R.string.location_level_neighborhood)
+        GeohashChannelLevel.CITY -> stringResource(R.string.location_level_city)
+        GeohashChannelLevel.PROVINCE -> stringResource(com.bitchat.android.R.string.location_level_province)
+        GeohashChannelLevel.REGION -> stringResource(com.bitchat.android.R.string.location_level_region)
     }
     return "$levelName [$peopleText]"
 }
 
 @Composable
 private fun geohashHashTitleWithCount(geohash: String, participantCount: Int): String {
-    val ctx = androidx.compose.ui.platform.LocalContext.current
-    val peopleText = ctx.resources.getQuantityString(com.bitchat.android.R.plurals.people_count, participantCount, participantCount)
+    val peopleText = pluralStringResource(R.plurals.people_count, participantCount, participantCount)
     return "#$geohash [$peopleText]"
 }
 

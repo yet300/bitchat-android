@@ -1,17 +1,16 @@
 package com.bitchat.android.ui.screens.chat.sheets
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.bitchat.android.ui.ChatViewModel
+import com.bitchat.android.feature.chat.locationnotes.LocationNotesComponent
 
 @Composable
 fun LocationNotesErrorSheetContent(
-    viewModel: ChatViewModel,
+    component: LocationNotesComponent,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -34,10 +33,10 @@ fun LocationNotesErrorSheetContent(
         Spacer(modifier = Modifier.height(24.dp))
         Button(onClick = {
             // UNIFIED FIX: Enable location services first (user toggle)
-            viewModel.enableLocationServices()
+            component.onEnableLocationServices()
             // Then request location channels (which will also request permission if needed)
-            viewModel.enableLocationChannels()
-            viewModel.refreshLocationChannels()
+            component.onRequestLocationPermission()
+            component.onRefreshLocationChannels()
         }) {
             Text("Enable Location")
         }
