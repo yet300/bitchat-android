@@ -17,6 +17,8 @@ import com.bitchat.android.nostr.PoWPreferenceManager
 import jakarta.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.koin.android.annotation.KoinViewModel
 import java.util.Date
@@ -83,13 +85,16 @@ class GeohashViewModel @Inject constructor(
             )
         }
         try {
-            locationChannelManager.selectedChannel.observeForever { channel ->
-                state.setSelectedLocationChannel(channel)
-                switchLocationChannel(channel)
-            }
-            locationChannelManager.teleported.observeForever { teleported ->
+            locationChannelManager.selectedChannel
+                .onEach { channel ->
+                    state.setSelectedLocationChannel(channel)
+                    switchLocationChannel(channel)
+                }.launchIn(viewModelScope)
+
+            locationChannelManager.teleported
+                .onEach { teleported ->
                 state.setIsTeleported(teleported)
-            }
+            }.launchIn(viewModelScope)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize location channel state: ${e.message}")
             state.setSelectedLocationChannel(com.bitchat.android.geohash.ChannelID.Mesh)

@@ -3,14 +3,14 @@ package com.bitchat.android.nostr
 import android.content.Context
 import android.util.Log
 import androidx.annotation.MainThread
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import jakarta.inject.Singleton
 
 /**
  * Manages location notes (kind=1 text notes with geohash tags)
- * iOS-compatible implementation with LiveData for Android UI binding
+ * iOS-compatible implementation with StateFlow for reactive state management
  */
 @MainThread
 @Singleton
@@ -61,21 +61,21 @@ class LocationNotesManager(
         NO_RELAYS
     }
     
-    // Published state (LiveData for Android)
-    private val _notes = MutableLiveData<List<Note>>(emptyList())
-    val notes: LiveData<List<Note>> = _notes
+    // Published state (StateFlow for reactive state management)
+    private val _notes = MutableStateFlow<List<Note>>(emptyList())
+    val notes: StateFlow<List<Note>> = _notes
     
-    private val _geohash = MutableLiveData<String?>(null)
-    val geohash: LiveData<String?> = _geohash
+    private val _geohash = MutableStateFlow<String?>(null)
+    val geohash: StateFlow<String?> = _geohash
     
-    private val _initialLoadComplete = MutableLiveData(false)
-    val initialLoadComplete: LiveData<Boolean> = _initialLoadComplete
+    private val _initialLoadComplete = MutableStateFlow(false)
+    val initialLoadComplete: StateFlow<Boolean> = _initialLoadComplete
     
-    private val _state = MutableLiveData(State.IDLE)
-    val state: LiveData<State> = _state
+    private val _state = MutableStateFlow(State.IDLE)
+    val state: StateFlow<State> = _state
     
-    private val _errorMessage = MutableLiveData<String?>(null)
-    val errorMessage: LiveData<String?> = _errorMessage
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage
     
     // Private state
     private var subscriptionIDs: MutableMap<String, String> = mutableMapOf()
@@ -369,7 +369,7 @@ class LocationNotesManager(
         
         val trimmed = currentNotes.sortedByDescending { it.createdAt }.take(MAX_NOTES_IN_MEMORY)
         _notes.value = trimmed
-        
+
         // Update note IDs set
         noteIDs.clear()
         noteIDs.addAll(trimmed.map { it.id })

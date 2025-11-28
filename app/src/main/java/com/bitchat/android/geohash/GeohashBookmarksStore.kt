@@ -5,8 +5,6 @@ import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
 import android.util.Log
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
@@ -17,6 +15,8 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Stores a user-maintained list of bookmarked geohash channels.
@@ -44,16 +44,18 @@ class GeohashBookmarksStore @Inject constructor(private val context: Context) {
 
     private val membership = mutableSetOf<String>()
 
-    private val _bookmarks = MutableLiveData<List<String>>(emptyList())
-    val bookmarks: LiveData<List<String>> = _bookmarks
+    private val _bookmarks = MutableStateFlow<List<String>>(emptyList())
+    val bookmarks: StateFlow<List<String>> = _bookmarks
 
-    private val _bookmarkNames = MutableLiveData<Map<String, String>>(emptyMap())
-    val bookmarkNames: LiveData<Map<String, String>> = _bookmarkNames
+    private val _bookmarkNames = MutableStateFlow<Map<String, String>>(emptyMap())
+    val bookmarkNames: StateFlow<Map<String, String>> = _bookmarkNames
 
     // For throttling / preventing duplicate geocode lookups
     private val resolving = mutableSetOf<String>()
 
     init { load() }
+
+    fun getBookmarks(): List<String> = _bookmarks.value
 
     fun isBookmarked(geohash: String): Boolean = membership.contains(normalize(geohash))
 
@@ -66,8 +68,8 @@ class GeohashBookmarksStore @Inject constructor(private val context: Context) {
         val gh = normalize(geohash)
         if (gh.isEmpty() || membership.contains(gh)) return
         membership.add(gh)
-        val updated = listOf(gh) + (_bookmarks.value ?: emptyList())
-        _bookmarks.postValue(updated)
+        val updated = listOf(gh) + _bookmarks.value
+        _bookmarks.value = updated
         persist(updated)
         // Resolve friendly name asynchronously
         resolveNameIfNeeded(gh)
@@ -77,12 +79,12 @@ class GeohashBookmarksStore @Inject constructor(private val context: Context) {
         val gh = normalize(geohash)
         if (!membership.contains(gh)) return
         membership.remove(gh)
-        val updated = (_bookmarks.value ?: emptyList()).filterNot { it == gh }
-        _bookmarks.postValue(updated)
+        val updated = _bookmarks.value.filterNot { it == gh }
+        _bookmarks.value = updated
         // Remove stored name to avoid stale cache growth
-        val names = _bookmarkNames.value?.toMutableMap() ?: mutableMapOf()
+        val names = _bookmarkNames.value.toMutableMap()
         if (names.remove(gh) != null) {
-            _bookmarkNames.postValue(names)
+            _bookmarkNames.value = names
             persistNames(names)
         }
         persist(updated)
@@ -106,7 +108,7 @@ class GeohashBookmarksStore @Inject constructor(private val context: Context) {
                     }
                     }
                     membership.clear(); membership.addAll(seen)
-                    _bookmarks.postValue(ordered)
+                    _bookmarks.value = ordered
                 }
             }
         } catch (e: Exception) {
@@ -117,7 +119,7 @@ class GeohashBookmarksStore @Inject constructor(private val context: Context) {
             if (!namesJson.isNullOrEmpty()) {
                 val dict = JsonUtil.fromJsonOrNull(MapSerializer(String.serializer(), String.serializer()), namesJson)
                 if (dict != null) {
-                    _bookmarkNames.postValue(dict)
+                    _bookmarkNames.value = dict
                 }
             }
         } catch (e: Exception) {
@@ -127,14 +129,14 @@ class GeohashBookmarksStore @Inject constructor(private val context: Context) {
 
     private fun persist() {
         try {
-            val json = JsonUtil.toJson(ListSerializer(String.serializer()), _bookmarks.value ?: emptyList<String>())
+            val json = JsonUtil.toJson(ListSerializer(String.serializer()), _bookmarks.value)
             prefs.edit().putString(STORE_KEY, json).apply()
         } catch (_: Exception) {}
     }
 
     private fun persistNames() {
         try {
-            val json = JsonUtil.toJson(MapSerializer(String.serializer(), String.serializer()), _bookmarkNames.value ?: emptyMap<String, String>())
+            val json = JsonUtil.toJson(MapSerializer(String.serializer(), String.serializer()), _bookmarkNames.value)
             prefs.edit().putString(NAMES_STORE_KEY, json).apply()
         } catch (_: Exception) {}
     }
@@ -144,8 +146,8 @@ class GeohashBookmarksStore @Inject constructor(private val context: Context) {
     fun clearAll() {
         try {
             membership.clear()
-            _bookmarks.postValue(emptyList())
-            _bookmarkNames.postValue(emptyMap())
+            _bookmarks.value = emptyList()
+            _bookmarkNames.value = emptyMap()
             prefs.edit()
                 .remove(STORE_KEY)
                 .remove(NAMES_STORE_KEY)
@@ -209,9 +211,9 @@ class GeohashBookmarksStore @Inject constructor(private val context: Context) {
                 }
 
                 if (!name.isNullOrEmpty()) {
-                    val current = _bookmarkNames.value?.toMutableMap() ?: mutableMapOf()
+                    val current = _bookmarkNames.value.toMutableMap()
                     current[gh] = name
-                    _bookmarkNames.postValue(current)
+                    _bookmarkNames.value = current
                     persistNames(current)
                 }
             } catch (e: Exception) {

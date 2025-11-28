@@ -27,6 +27,7 @@ import com.bitchat.android.ui.theme.ThemePreferenceManager
 import com.bitchat.android.util.NotificationIntervalManager
 import jakarta.inject.Inject
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.koin.android.annotation.KoinViewModel
 import java.util.Date
@@ -188,8 +189,8 @@ class ChatViewModel @Inject constructor(
     val geohashParticipantCounts: LiveData<Map<String, Int>> = state.geohashParticipantCounts
 
     // Location Notes
-    val locationNotes: LiveData<List<LocationNotesManager.Note>> = locationNotesManager.notes
-    val locationNotesState: LiveData<LocationNotesManager.State> = locationNotesManager.state
+    val locationNotes: StateFlow<List<LocationNotesManager.Note>> = locationNotesManager.notes
+    val locationNotesState: StateFlow<LocationNotesManager.State> = locationNotesManager.state
     val locationNotesErrorMessage = locationNotesManager.errorMessage
     val locationNotesInitialLoadComplete = locationNotesManager.initialLoadComplete
 
@@ -200,8 +201,8 @@ class ChatViewModel @Inject constructor(
     val locationNames = locationChannelManager.locationNames
 
     // Bookmarks
-    val geohashBookmarks: LiveData<List<String>> = geohashBookmarksStore.bookmarks
-    val geohashBookmarkNames: LiveData<Map<String, String>> = geohashBookmarksStore.bookmarkNames
+    val geohashBookmarks: StateFlow<List<String>> = geohashBookmarksStore.bookmarks
+    val geohashBookmarkNames: StateFlow<Map<String, String>> = geohashBookmarksStore.bookmarkNames
 
     // Tor
     val torStatus = torManager.statusFlow

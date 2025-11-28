@@ -533,7 +533,7 @@ private fun MainHeader(
     val geohashPeople by viewModel.geohashPeople.observeAsState(emptyList())
 
     // Bookmarks store for current geohash toggle (iOS parity)
-    val bookmarks by viewModel.geohashBookmarks.observeAsState(emptyList())
+    val bookmarks by viewModel.geohashBookmarks.collectAsState(emptySet())
 
     Row(
         modifier = Modifier.fillMaxWidth(),
