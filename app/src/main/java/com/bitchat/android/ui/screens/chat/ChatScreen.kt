@@ -514,15 +514,14 @@ private fun ChatSheets(
                 
                 is com.bitchat.android.feature.chat.ChatComponent.SheetChild.LocationChannels -> {
                     LocationChannelsSheetContent(
-                        viewModel = viewModel,
+                        component = child.component,
                         lazyListState = listState,
-                        onDismiss = component::onDismissSheet
                     )
                 }
                 
                 is com.bitchat.android.feature.chat.ChatComponent.SheetChild.LocationNotes -> {
                     LocationNotesSheetPresenterContent(
-                        viewModel = viewModel,
+                        component = child.component,
                         lazyListState = listState,
                     )
                 }
