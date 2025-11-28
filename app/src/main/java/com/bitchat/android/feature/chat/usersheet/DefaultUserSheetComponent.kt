@@ -4,7 +4,6 @@ import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.value.Value
 import com.arkivanov.decompose.value.operator.map
 import com.arkivanov.mvikotlin.core.instancekeeper.getStore
-import com.arkivanov.mvikotlin.core.store.StoreFactory
 import com.arkivanov.mvikotlin.extensions.coroutines.labels
 import com.bitchat.android.core.common.asValue
 import com.bitchat.android.core.common.coroutineScope
@@ -12,28 +11,24 @@ import com.bitchat.android.feature.chat.usersheet.integration.stateToModel
 import com.bitchat.android.feature.chat.usersheet.store.UserSheetStore
 import com.bitchat.android.feature.chat.usersheet.store.UserSheetStoreFactory
 import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.ui.ChatViewModel
 import kotlinx.coroutines.launch
-import org.koin.core.component.KoinComponent
-import org.koin.core.component.inject
 
 class DefaultUserSheetComponent(
     componentContext: ComponentContext,
     private val targetNickname: String,
     private val selectedMessage: BitchatMessage?,
-    private val chatViewModel: ChatViewModel, // Temporary dependency
+    private val currentNickname: String,
+    private val isGeohashChannel: Boolean,
     private val onDismissCallback: () -> Unit
-) : UserSheetComponent, ComponentContext by componentContext, KoinComponent {
-
-    private val storeFactory: StoreFactory by inject()
+) : UserSheetComponent, ComponentContext by componentContext {
 
     private val store = instanceKeeper.getStore {
-        UserSheetStoreFactory(
-            storeFactory = storeFactory,
+        UserSheetStoreFactory().create(
             targetNickname = targetNickname,
             selectedMessage = selectedMessage,
-            chatViewModel = chatViewModel
-        ).create()
+            currentNickname = currentNickname,
+            isGeohashChannel = isGeohashChannel
+        )
     }
 
     init {

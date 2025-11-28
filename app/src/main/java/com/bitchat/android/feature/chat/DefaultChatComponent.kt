@@ -133,7 +133,8 @@ class DefaultChatComponent(
                         componentContext = componentContext,
                         targetNickname = config.nickname,
                         selectedMessage = selectedMessage,
-                        chatViewModel = chatViewModel,
+                        currentNickname = chatViewModel.nickname.value ?: "",
+                        isGeohashChannel = chatViewModel.selectedLocationChannel.value is com.bitchat.android.geohash.ChannelID.Location,
                         onDismissCallback = ::onDismissSheet
                     )
                 )
@@ -149,7 +150,6 @@ class DefaultChatComponent(
                 component = DefaultPasswordPromptComponent(
                     componentContext = componentContext,
                     channelName = config.channelName,
-                    chatViewModel = chatViewModel,
                     onDismissCallback = ::onDismissDialog
                 )
             )

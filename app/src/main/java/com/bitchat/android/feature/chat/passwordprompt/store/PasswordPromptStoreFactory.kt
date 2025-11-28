@@ -5,16 +5,18 @@ import com.arkivanov.mvikotlin.core.store.SimpleBootstrapper
 import com.arkivanov.mvikotlin.core.store.Store
 import com.arkivanov.mvikotlin.core.store.StoreFactory
 import com.arkivanov.mvikotlin.extensions.coroutines.CoroutineExecutor
-import com.bitchat.android.ui.ChatViewModel
+import com.bitchat.android.mesh.BluetoothMeshService
+import com.bitchat.android.ui.ChannelManager
 import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 
-internal class PasswordPromptStoreFactory(
-    private val storeFactory: StoreFactory,
-    private val channelName: String,
-    private val chatViewModel: ChatViewModel // Temporary dependency
-) : KoinComponent {
+internal class PasswordPromptStoreFactory : KoinComponent {
 
-    fun create(): PasswordPromptStore =
+    private val storeFactory: StoreFactory by inject()
+    private val channelManager: ChannelManager by inject()
+    private val meshService: BluetoothMeshService by inject()
+
+    fun create(channelName: String): PasswordPromptStore =
         object : PasswordPromptStore,
             Store<PasswordPromptStore.Intent, PasswordPromptStore.State, PasswordPromptStore.Label> by storeFactory.create(
                 name = "PasswordPromptStore",
@@ -42,7 +44,11 @@ internal class PasswordPromptStoreFactory(
                 PasswordPromptStore.Intent.Confirm -> {
                     val state = state()
                     if (state.passwordInput.isNotEmpty()) {
-                        val success = chatViewModel.joinChannel(state.channelName, state.passwordInput)
+                        val success = channelManager.joinChannel(
+                            state.channelName,
+                            state.passwordInput,
+                            meshService.myPeerID
+                        )
                         if (success) {
                             publish(PasswordPromptStore.Label.Dismiss)
                         } else {
