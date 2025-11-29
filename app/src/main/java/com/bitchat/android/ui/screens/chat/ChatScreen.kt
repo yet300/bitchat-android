@@ -27,14 +27,21 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.zIndex
+import com.bitchat.android.R
+import com.bitchat.android.feature.chat.ChatComponent
+import com.bitchat.android.geohash.ChannelID
 import com.bitchat.android.ui.*
 import com.bitchat.android.ui.components.ModalBottomSheet
+import com.bitchat.android.ui.debug.*
+import com.bitchat.android.ui.events.FileShareDispatcher
 import com.bitchat.android.ui.screens.chat.dialogs.PasswordPromptDialog
 import com.bitchat.android.ui.screens.chat.sheets.AboutSheetContent
 import com.bitchat.android.ui.screens.chat.sheets.ChatUserSheetContent
 import com.bitchat.android.ui.screens.chat.sheets.LocationChannelsSheetContent
 import com.bitchat.android.ui.screens.chat.sheets.LocationNotesSheetPresenterContent
 import com.bitchat.android.ui.media.FullScreenImageViewer
+import com.bitchat.android.ui.screens.chat.sheets.MeshPeerListSheetContent
+import kotlin.collections.get
 
 /**
  * Main ChatScreen - REFACTORED to use component-based architecture
@@ -48,7 +55,7 @@ import com.bitchat.android.ui.media.FullScreenImageViewer
  */
 @Composable
 fun ChatScreen(
-    component: com.bitchat.android.feature.chat.ChatComponent,
+    component: ChatComponent,
     viewModel: ChatViewModel
 ) {
     val colorScheme = MaterialTheme.colorScheme
@@ -62,7 +69,6 @@ fun ChatScreen(
     val hasUnreadPrivateMessages by viewModel.unreadPrivateMessages.observeAsState(emptySet())
     val privateChats by viewModel.privateChats.observeAsState(emptyMap())
     val channelMessages by viewModel.channelMessages.observeAsState(emptyMap())
-    val showSidebar by viewModel.showSidebar.observeAsState(false)
     val showCommandSuggestions by viewModel.showCommandSuggestions.observeAsState(false)
     val commandSuggestions by viewModel.commandSuggestions.observeAsState(emptyList())
     val showMentionSuggestions by viewModel.showMentionSuggestions.observeAsState(false)
@@ -70,7 +76,7 @@ fun ChatScreen(
     val showAppInfo by viewModel.showAppInfo.observeAsState(false)
 
     // Handle back press
-    val isBackHandlerEnabled = showSidebar || selectedPrivatePeer != null || currentChannel != null
+    val isBackHandlerEnabled = selectedPrivatePeer != null || currentChannel != null
     BackHandler(enabled = isBackHandlerEnabled) {
         viewModel.handleBackPressed()
     }
@@ -101,7 +107,7 @@ fun ChatScreen(
         currentChannel != null -> channelMessages[currentChannel] ?: emptyList()
         else -> {
             val locationChannel = selectedLocationChannel
-            if (locationChannel is com.bitchat.android.geohash.ChannelID.Location) {
+            if (locationChannel is ChannelID.Location) {
                 val geokey = "geo:${locationChannel.channel.geohash}"
                 channelMessages[geokey] ?: emptyList()
             } else {
@@ -114,7 +120,7 @@ fun ChatScreen(
     val showMediaButtons = when {
         selectedPrivatePeer != null -> true
         currentChannel != null -> true
-        else -> selectedLocationChannel !is com.bitchat.android.geohash.ChannelID.Location
+        else -> selectedLocationChannel !is ChannelID.Location
     }
 
     // Use WindowInsets to handle keyboard properly
@@ -156,7 +162,7 @@ fun ChatScreen(
                     
                     // Check if we're in a geohash channel to include hash suffix
                     val selectedLocationChannel = viewModel.selectedLocationChannel.value
-                    val mentionText = if (selectedLocationChannel is com.bitchat.android.geohash.ChannelID.Location && hashSuffix.isNotEmpty()) {
+                    val mentionText = if (selectedLocationChannel is ChannelID.Location && hashSuffix.isNotEmpty()) {
                         // In geohash chat - include the hash suffix from the full display name
                         "@$baseName$hashSuffix"
                     } else {
@@ -195,11 +201,11 @@ fun ChatScreen(
             )
             // Input area - stays at bottom
         // Bridge file share from lower-level input to ViewModel
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        com.bitchat.android.ui.events.FileShareDispatcher.setHandler { peer, channel, path ->
-            viewModel.sendFileNote(peer, channel, path)
-        }
-    }
+            LaunchedEffect(Unit) {
+                FileShareDispatcher.setHandler { peer, channel, path ->
+                    viewModel.sendFileNote(peer, channel, path)
+                }
+            }
 
     ChatInputSection(
         messageText = messageText,
@@ -259,7 +265,7 @@ fun ChatScreen(
             nickname = nickname,
             viewModel = viewModel,
             colorScheme = colorScheme,
-            onSidebarToggle = { viewModel.showSidebar() },
+            onSidebarToggle = component::onShowMeshPeerList,
             onShowAppInfo = { component.onShowAppInfo() },
             onPanicClear = { viewModel.panicClearAllData() },
             onLocationChannelsClick = { component.onShowLocationChannels() },
@@ -280,28 +286,9 @@ fun ChatScreen(
             color = colorScheme.outline.copy(alpha = 0.3f)
         )
 
-        val alpha by animateFloatAsState(
-            targetValue = if (showSidebar) 0.5f else 0f,
-            animationSpec = tween(
-                durationMillis = 300,
-                easing = EaseOutCubic
-            ), label = "overlayAlpha"
-        )
-
-        // Only render the background if it's visible
-        if (alpha > 0f) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = alpha))
-                    .clickable { viewModel.hideSidebar() }
-                    .zIndex(1f)
-            )
-        }
-
         // Scroll-to-bottom floating button
         AnimatedVisibility(
-            visible = isScrolledUp && !showSidebar,
+            visible = isScrolledUp,
             enter = slideInVertically(initialOffsetY = { it / 2 }) + fadeIn(),
             exit = slideOutVertically(targetOffsetY = { it / 2 }) + fadeOut(),
             modifier = Modifier
@@ -321,30 +308,11 @@ fun ChatScreen(
                 IconButton(onClick = { forceScrollToBottom = !forceScrollToBottom }) {
                     Icon(
                         imageVector = Icons.Filled.ArrowDownward,
-                        contentDescription = stringResource(com.bitchat.android.R.string.cd_scroll_to_bottom),
+                        contentDescription = stringResource(R.string.cd_scroll_to_bottom),
                         tint = Color(0xFF00C851)
                     )
                 }
             }
-        }
-
-        AnimatedVisibility(
-            visible = showSidebar,
-            enter = slideInHorizontally(
-                initialOffsetX = { it },
-                animationSpec = tween(300, easing = EaseOutCubic)
-            ) + fadeIn(animationSpec = tween(300)),
-            exit = slideOutHorizontally(
-                targetOffsetX = { it },
-                animationSpec = tween(250, easing = EaseInCubic)
-            ) + fadeOut(animationSpec = tween(250)),
-            modifier = Modifier.zIndex(2f)
-        ) {
-            SidebarOverlay(
-                viewModel = viewModel,
-                onDismiss = { viewModel.hideSidebar() },
-                modifier = Modifier.fillMaxSize()
-            )
         }
     }
 
@@ -370,7 +338,7 @@ fun ChatScreen(
 }
 
 @Composable
-private fun ChatInputSection(
+fun ChatInputSection(
     messageText: TextFieldValue,
     onMessageTextChange: (TextFieldValue) -> Unit,
     onSend: () -> Unit,
@@ -485,7 +453,7 @@ private fun ChatFloatingHeader(
 
 @Composable
 private fun ChatSheets(
-    component: com.bitchat.android.feature.chat.ChatComponent,
+    component: ChatComponent,
     viewModel: ChatViewModel
 ) {
     val sheetSlot by component.sheetSlot.subscribeAsState()
@@ -495,7 +463,7 @@ private fun ChatSheets(
             onDismiss = component::onDismissSheet
         ) { listState ->
             when (child) {
-                is com.bitchat.android.feature.chat.ChatComponent.SheetChild.AppInfo -> {
+                is ChatComponent.SheetChild.AppInfo -> {
                     var showDebugSheet by remember { mutableStateOf(false) }
                     AboutSheetContent(
                         component = child.component,
@@ -503,7 +471,7 @@ private fun ChatSheets(
                         onShowDebug = { showDebugSheet = true }
                     )
                     if (showDebugSheet) {
-                        com.bitchat.android.ui.debug.DebugSettingsSheet(
+                        DebugSettingsSheet(
                             isPresented = showDebugSheet,
                             onDismiss = { showDebugSheet = false },
                             viewModel = viewModel
@@ -511,26 +479,32 @@ private fun ChatSheets(
                     }
                 }
                 
-                is com.bitchat.android.feature.chat.ChatComponent.SheetChild.LocationChannels -> {
+                is ChatComponent.SheetChild.LocationChannels -> {
                     LocationChannelsSheetContent(
                         component = child.component,
                         lazyListState = listState,
                     )
                 }
                 
-                is com.bitchat.android.feature.chat.ChatComponent.SheetChild.LocationNotes -> {
+                is ChatComponent.SheetChild.LocationNotes -> {
                     LocationNotesSheetPresenterContent(
                         component = child.component,
                         lazyListState = listState,
                     )
                 }
                 
-                is com.bitchat.android.feature.chat.ChatComponent.SheetChild.UserSheet -> {
+                is ChatComponent.SheetChild.UserSheet -> {
                     ChatUserSheetContent(
                         component = child.component,
                         lazyListState = listState
                     )
                 }
+
+                is ChatComponent.SheetChild.MeshPeerList -> MeshPeerListSheetContent(
+                    viewModel = viewModel,
+                    lazyListState = listState,
+                    onDismiss = component::onDismissSheet
+                )
             }
         }
     }
@@ -538,13 +512,13 @@ private fun ChatSheets(
 
 @Composable
 private fun ChatDialogs(
-    component: com.bitchat.android.feature.chat.ChatComponent,
+    component: ChatComponent,
 ) {
     val dialogSlot by component.dialogSlot.subscribeAsState()
     
     dialogSlot.child?.instance?.let { child ->
         when (child) {
-            is com.bitchat.android.feature.chat.ChatComponent.DialogChild.PasswordPrompt -> {
+            is ChatComponent.DialogChild.PasswordPrompt -> {
                 val model by child.component.model.subscribeAsState()
                 
                 PasswordPromptDialog(
