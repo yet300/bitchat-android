@@ -5,6 +5,7 @@ import com.arkivanov.decompose.value.Value
 import com.bitchat.android.feature.about.AboutComponent
 import com.bitchat.android.feature.chat.locationchannels.LocationChannelsComponent
 import com.bitchat.android.feature.chat.locationnotes.LocationNotesComponent
+import com.bitchat.android.feature.chat.meshpeerlist.MeshPeerListComponent
 
 interface ChatComponent {
     val sheetSlot: Value<ChildSlot<*, SheetChild>>
@@ -15,7 +16,7 @@ interface ChatComponent {
     fun onShowLocationChannels()
     fun onShowLocationNotes()
     fun onShowUserSheet(nickname: String, messageId: String?)
-    
+    fun onShowMeshPeerList()
     fun onDismissDialog()
     fun onShowPasswordPrompt(channelName: String)
 
@@ -30,6 +31,7 @@ interface ChatComponent {
         data class LocationChannels(val component: LocationChannelsComponent) : SheetChild
         data class LocationNotes(val component: LocationNotesComponent) : SheetChild
         data class UserSheet(val component: com.bitchat.android.feature.chat.usersheet.UserSheetComponent) : SheetChild
+        data class MeshPeerList(val component: MeshPeerListComponent) : SheetChild
     }
     
     sealed interface DialogChild {

@@ -13,6 +13,7 @@ import com.arkivanov.decompose.router.slot.activate
 import com.arkivanov.decompose.router.slot.childSlot
 import com.arkivanov.decompose.router.slot.dismiss
 import com.arkivanov.decompose.value.Value
+import com.bitchat.android.feature.chat.meshpeerlist.DefaultMeshPeerListComponent
 import kotlinx.serialization.Serializable
 import com.bitchat.android.ui.ChatViewModel
 import org.koin.core.component.KoinComponent
@@ -93,6 +94,10 @@ class DefaultChatComponent(
         sheetNavigation.activate(SheetConfig.UserSheet(nickname, messageId))
     }
 
+    override fun onShowMeshPeerList() {
+        sheetNavigation.activate(SheetConfig.MeshPeerList)
+    }
+
     override fun onDismissDialog() {
         dialogNavigation.dismiss()
     }
@@ -139,6 +144,12 @@ class DefaultChatComponent(
                     )
                 )
             }
+            is SheetConfig.MeshPeerList -> ChatComponent.SheetChild.MeshPeerList(
+                component = DefaultMeshPeerListComponent(
+                    componentContext = componentContext,
+                    onDismissCallback = ::onDismissSheet
+                )
+            )
         }
 
     private fun createDialogChild(
@@ -171,6 +182,9 @@ class DefaultChatComponent(
             val nickname: String,
             val messageId: String?
         ) : SheetConfig
+
+        @Serializable
+        data object MeshPeerList : SheetConfig
     }
 
     @Serializable
