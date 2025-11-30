@@ -41,6 +41,7 @@ internal class ChatStoreFactory(
     private val geohashViewModel: GeohashViewModel by inject()
     private val torManager: com.bitchat.android.net.TorManager by inject()
     private val powPreferenceManager: com.bitchat.android.nostr.PoWPreferenceManager by inject()
+    private val applicationContext: android.content.Context by inject()
     
     // Legacy ChatViewModel - kept for gradual migration
     // TODO: Remove once all functionality is migrated
@@ -150,8 +151,20 @@ internal class ChatStoreFactory(
             val cmd = parts.first().lowercase()
             
             return when (cmd) {
+                "/help", "/?" -> {
+                    handleHelpCommand()
+                    true
+                }
+                "/nick" -> {
+                    handleNickCommand(parts)
+                    true
+                }
                 "/j", "/join" -> {
                     handleJoinCommand(parts)
+                    true
+                }
+                "/leave", "/part" -> {
+                    handleLeaveCommand(parts)
                     true
                 }
                 "/clear" -> {
@@ -186,7 +199,38 @@ internal class ChatStoreFactory(
                     handleActionCommand(parts, "slaps", "around a bit with a large trout 🐟")
                     true
                 }
-                else -> false // Not handled, delegate to ChatViewModel
+                else -> false // Unknown command
+            }
+        }
+        
+        private fun handleHelpCommand() {
+            val helpText = """
+                |available commands:
+                |  /help - show this help
+                |  /nick <name> - set your nickname
+                |  /join <channel> - join or create a channel
+                |  /leave [channel] - leave current or specified channel
+                |  /msg <user> [message] - start private chat
+                |  /who - show online peers
+                |  /channels - show all channels
+                |  /block [user] - block user or list blocked
+                |  /unblock <user> - unblock user
+                |  /clear - clear messages
+                |  /hug <user> - send a hug
+                |  /slap <user> - slap with a trout
+            """.trimMargin()
+            addSystemMessage(helpText)
+        }
+        
+        private fun handleNickCommand(parts: List<String>) {
+            if (parts.size > 1) {
+                val newNick = parts.drop(1).joinToString(" ")
+                dataManager.saveNickname(newNick)
+                dispatch(ChatStore.Msg.NicknameChanged(newNick))
+                addSystemMessage("nickname changed to $newNick")
+            } else {
+                val currentNick = state().nickname ?: meshService.myPeerID
+                addSystemMessage("current nickname: $currentNick. usage: /nick <name>")
             }
         }
         
@@ -201,6 +245,22 @@ internal class ChatStoreFactory(
                 }
             } else {
                 addSystemMessage("usage: /join <channel>")
+            }
+        }
+        
+        private fun handleLeaveCommand(parts: List<String>) {
+            val channel = if (parts.size > 1) {
+                val channelName = parts[1]
+                if (channelName.startsWith("#")) channelName else "#$channelName"
+            } else {
+                state().currentChannel
+            }
+            
+            if (channel != null) {
+                leaveChannel(channel)
+                addSystemMessage("left channel $channel")
+            } else {
+                addSystemMessage("not in a channel. usage: /leave [channel]")
             }
         }
         
@@ -622,166 +682,80 @@ internal class ChatStoreFactory(
                 }
             }
             
-            // === TODO: Still using ChatViewModel - migrate when services are ready ===
+            // === State now managed by Store directly ===
+            // Messages: handled by MeshEventBus.messageReceived -> handleIncomingMessage()
+            // Joined channels: managed by joinChannel()/leaveChannel() in Store
+            // Current channel: managed by switchToChannel() in Store
+            // Channel messages: managed by addChannelMessage() in Store
+            // Private chats: managed by startPrivateChat()/addPrivateMessage() in Store
+            // Selected private chat peer: managed by startPrivateChat()/endPrivateChat() in Store
+            // Unread counts: managed by Store when adding messages
             
-            // Messages (needs MessageManager service)
+            // Initialize nickname from DataManager
             scope.launch {
-                chatViewModel.messages.collectLatest { messages ->
-                    dispatch(ChatStore.Msg.MessagesUpdated(messages))
-                }
+                val savedNickname = dataManager.loadNickname()
+                dispatch(ChatStore.Msg.NicknameChanged(savedNickname))
             }
             
-            // Nickname
+            // Initialize joined channels from DataManager
             scope.launch {
-                chatViewModel.nickname.collectLatest { nick ->
-                    dispatch(ChatStore.Msg.NicknameChanged(nick))
-                }
+                val (channels, passwordProtected) = dataManager.loadChannelData()
+                dispatch(ChatStore.Msg.JoinedChannelsUpdated(channels))
+                dispatch(ChatStore.Msg.PasswordProtectedChannelsUpdated(passwordProtected))
             }
             
-            // Joined channels
+            // Initialize favorite peers from DataManager
             scope.launch {
-                chatViewModel.joinedChannels.collectLatest { channels ->
-                    dispatch(ChatStore.Msg.JoinedChannelsUpdated(channels))
-                }
+                dataManager.loadFavorites()
+                dispatch(ChatStore.Msg.FavoritePeersUpdated(dataManager.favoritePeers))
             }
             
-            // Current channel
-            scope.launch {
-                chatViewModel.currentChannel.collectLatest { channel ->
-                    dispatch(ChatStore.Msg.CurrentChannelChanged(channel))
-                }
-            }
-            
-            // Channel messages
-            scope.launch {
-                chatViewModel.channelMessages.collectLatest { messages ->
-                    dispatch(ChatStore.Msg.ChannelMessagesUpdated(messages))
-                }
-            }
-            
-            // Private chats
-            scope.launch {
-                chatViewModel.privateChats.collectLatest { chats ->
-                    dispatch(ChatStore.Msg.PrivateChatsUpdated(chats))
-                }
-            }
-            
-            // Selected private chat peer
-            scope.launch {
-                chatViewModel.selectedPrivateChatPeer.collectLatest { peer ->
-                    dispatch(ChatStore.Msg.SelectedPrivateChatPeerChanged(peer))
-                }
-            }
-            
-            // Unread private messages
-            scope.launch {
-                chatViewModel.unreadPrivateMessages.collectLatest { unread ->
-                    dispatch(ChatStore.Msg.UnreadPrivateMessagesUpdated(unread))
-                }
-            }
-            
-            // Unread channel messages
-            scope.launch {
-                chatViewModel.unreadChannelMessages.collectLatest { unread ->
-                    dispatch(ChatStore.Msg.UnreadChannelMessagesUpdated(unread))
-                }
-            }
-            
-            // Favorite peers
-            scope.launch {
-                chatViewModel.favoritePeers.collectLatest { favorites ->
-                    dispatch(ChatStore.Msg.FavoritePeersUpdated(favorites))
-                }
-            }
-            
-            // Peer nicknames
-            scope.launch {
-                chatViewModel.peerNicknames.collectLatest { nicknames ->
-                    dispatch(ChatStore.Msg.PeerNicknamesUpdated(nicknames))
-                }
-            }
-            
-            // Teleported geo
+            // Teleported geo - still need from ChatViewModel for now (managed by GeohashRepository)
             scope.launch {
                 chatViewModel.teleportedGeo.collectLatest { geo ->
                     dispatch(ChatStore.Msg.TeleportedGeoUpdated(geo))
                 }
             }
             
-            // Password protected channels
+            // Peer info polling - get from BluetoothMeshService periodically
             scope.launch {
-                chatViewModel.passwordProtectedChannels.collectLatest { channels ->
-                    dispatch(ChatStore.Msg.PasswordProtectedChannelsUpdated(channels))
-                }
-            }
-            
-            // Peer session states
-            scope.launch {
-                chatViewModel.peerSessionStates.collectLatest { states ->
-                    dispatch(ChatStore.Msg.PeerSessionStatesUpdated(states))
-                }
-            }
-            
-            // Peer fingerprints
-            scope.launch {
-                chatViewModel.peerFingerprints.collectLatest { fingerprints ->
-                    dispatch(ChatStore.Msg.PeerFingerprintsUpdated(fingerprints))
-                }
-            }
-            
-            // Peer RSSI
-            scope.launch {
-                chatViewModel.peerRSSI.collectLatest { rssi ->
-                    dispatch(ChatStore.Msg.PeerRSSIUpdated(rssi))
-                }
-            }
-            
-            // Peer direct connection status
-            scope.launch {
-                chatViewModel.peerDirect.collectLatest { direct ->
-                    dispatch(ChatStore.Msg.PeerDirectUpdated(direct))
-                }
-            }
-            
-            // Command suggestions
-            scope.launch {
-                chatViewModel.showCommandSuggestions.collectLatest { show ->
-                    dispatch(ChatStore.Msg.CommandSuggestionsUpdated(show, chatViewModel.commandSuggestions.value))
-                }
-            }
-            scope.launch {
-                chatViewModel.commandSuggestions.collectLatest { suggestions ->
-                    dispatch(ChatStore.Msg.CommandSuggestionsUpdated(chatViewModel.showCommandSuggestions.value, suggestions))
-                }
-            }
-            
-            // Mention suggestions
-            scope.launch {
-                chatViewModel.showMentionSuggestions.collectLatest { show ->
-                    dispatch(ChatStore.Msg.MentionSuggestionsUpdated(show, chatViewModel.mentionSuggestions.value))
-                }
-            }
-            scope.launch {
-                chatViewModel.mentionSuggestions.collectLatest { suggestions ->
-                    dispatch(ChatStore.Msg.MentionSuggestionsUpdated(chatViewModel.showMentionSuggestions.value, suggestions))
-                }
-            }
-            
-            // Password prompt state
-            scope.launch {
-                chatViewModel.showPasswordPrompt.collectLatest { show ->
-                    dispatch(ChatStore.Msg.PasswordPromptStateChanged(show, chatViewModel.passwordPromptChannel.value))
-                }
-            }
-            scope.launch {
-                chatViewModel.passwordPromptChannel.collectLatest { channel ->
-                    dispatch(ChatStore.Msg.PasswordPromptStateChanged(chatViewModel.showPasswordPrompt.value, channel))
-                    // Publish label to trigger dialog in component
-                    if (channel != null && chatViewModel.showPasswordPrompt.value) {
-                        publish(ChatStore.Label.ShowPasswordPrompt(channel))
+                while (true) {
+                    try {
+                        // Get peer nicknames
+                        val nicknames = meshService.getPeerNicknames()
+                        dispatch(ChatStore.Msg.PeerNicknamesUpdated(nicknames))
+                        
+                        // Get RSSI values
+                        val rssi = meshService.getPeerRSSI()
+                        dispatch(ChatStore.Msg.PeerRSSIUpdated(rssi))
+                        
+                        // Get session states and fingerprints for each connected peer
+                        val connectedPeers = state().connectedPeers
+                        val sessionStates = mutableMapOf<String, String>()
+                        val fingerprints = mutableMapOf<String, String>()
+                        val directConnections = mutableMapOf<String, Boolean>()
+                        
+                        connectedPeers.forEach { peerID ->
+                            sessionStates[peerID] = meshService.getSessionState(peerID).toString()
+                            meshService.getPeerFingerprint(peerID)?.let { fp ->
+                                fingerprints[peerID] = fp
+                            }
+                            // Direct connection status from connection manager
+                            directConnections[peerID] = meshService.getDeviceAddressForPeer(peerID) != null
+                        }
+                        
+                        dispatch(ChatStore.Msg.PeerSessionStatesUpdated(sessionStates))
+                        dispatch(ChatStore.Msg.PeerFingerprintsUpdated(fingerprints))
+                        dispatch(ChatStore.Msg.PeerDirectUpdated(directConnections))
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to get peer info", e)
                     }
+                    kotlinx.coroutines.delay(2000)
                 }
             }
+            
+            // Command/mention suggestions - managed by Store directly via updateCommandSuggestions/updateMentionSuggestions
+            // Password prompt state - managed by Store directly via joinChannel()
             
             // Network state - using services directly
             scope.launch {
@@ -810,9 +784,9 @@ internal class ChatStoreFactory(
             when (startupConfig) {
                 is ChatComponent.ChatStartupConfig.PrivateChat -> {
                     scope.launch {
-                        // Start private chat with the specified peer
-                        chatViewModel.startPrivateChat(startupConfig.peerId)
-                        chatViewModel.clearNotificationsForSender(startupConfig.peerId)
+                        // Start private chat with the specified peer - use Store method directly
+                        startPrivateChat(startupConfig.peerId)
+                        // TODO: Implement notification clearing when notification service is available
                     }
                 }
                 is ChatComponent.ChatStartupConfig.GeohashChat -> {
@@ -829,9 +803,9 @@ internal class ChatStoreFactory(
                         }
                         val geohashChannel = com.bitchat.android.geohash.GeohashChannel(level, geohash)
                         val channelID = com.bitchat.android.geohash.ChannelID.Location(geohashChannel)
-                        chatViewModel.selectLocationChannel(channelID)
-                        chatViewModel.setCurrentGeohash(geohash)
-                        chatViewModel.clearNotificationsForGeohash(geohash)
+                        // Use LocationChannelManager which handles geohash switching internally
+                        locationChannelManager.select(channelID)
+                        // TODO: Implement notification clearing when notification service is available
                     }
                 }
                 ChatComponent.ChatStartupConfig.Default -> {
@@ -908,8 +882,8 @@ internal class ChatStoreFactory(
                     if (content.startsWith("/")) {
                         val handled = processCommand(content)
                         if (!handled) {
-                            // Delegate complex commands to ChatViewModel
-                            chatViewModel.sendMessage(content)
+                            // Unknown command - show help
+                            addSystemMessage("unknown command. type /help for available commands")
                         }
                         dispatch(ChatStore.Msg.SendingMessageChanged(false))
                         return@launch
@@ -944,8 +918,13 @@ internal class ChatStoreFactory(
                         // Check if we're in a location channel
                         val selectedLocationChannel = state().selectedLocationChannel
                         if (selectedLocationChannel is com.bitchat.android.geohash.ChannelID.Location) {
-                            // Send to geohash channel via ChatViewModel's GeohashViewModel
-                            chatViewModel.sendMessage(content)
+                            // Send to geohash channel via GeohashViewModel directly
+                            geohashViewModel.sendGeohashMessage(
+                                content = content,
+                                channel = selectedLocationChannel.channel,
+                                myPeerID = meshService.myPeerID,
+                                nickname = state().nickname
+                            )
                         } else {
                             // Send public/channel message via mesh
                             val message = com.bitchat.android.model.BitchatMessage(
@@ -1093,8 +1072,7 @@ internal class ChatStoreFactory(
                 dispatch(ChatStore.Msg.UnreadChannelMessagesUpdated(currentUnread))
             }
             
-            // Also update ChatViewModel for backward compatibility
-            chatViewModel.switchToChannel(channel)
+            // Store is now the source of truth - no ChatViewModel sync needed
         }
 
         private fun leaveChannel(channel: String) {
@@ -1116,8 +1094,7 @@ internal class ChatStoreFactory(
             // Save to persistence
             dataManager.saveChannelData(updatedChannels, state().passwordProtectedChannels)
             
-            // Also update ChatViewModel for backward compatibility
-            chatViewModel.leaveChannel(channel)
+            // Store is now the source of truth - no ChatViewModel sync needed
             publish(ChatStore.Label.ChannelLeft(channel))
         }
 
@@ -1160,9 +1137,7 @@ internal class ChatStoreFactory(
                         dispatch(ChatStore.Msg.PrivateChatsUpdated(updatedChats))
                     }
                     
-                    // Also update ChatViewModel for backward compatibility
-                    chatViewModel.startPrivateChat(peerID)
-                    
+                    // Store is now the source of truth - no ChatViewModel sync needed
                     publish(ChatStore.Label.PrivateChatStarted(peerID))
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to start private chat", e)
@@ -1175,14 +1150,18 @@ internal class ChatStoreFactory(
             // Update store state
             dispatch(ChatStore.Msg.SelectedPrivateChatPeerChanged(null))
             
-            // Also update ChatViewModel for backward compatibility
-            chatViewModel.endPrivateChat()
-            
+            // Store is now the source of truth - no ChatViewModel sync needed
             publish(ChatStore.Label.PrivateChatEnded)
         }
 
         private fun openLatestUnreadPrivateChat() {
-            chatViewModel.openLatestUnreadPrivateChat()
+            // Find the first peer with unread messages
+            val unreadPeers = state().unreadPrivateMessages
+            if (unreadPeers.isEmpty()) return
+            
+            // Get the first unread peer (Set doesn't have ordering, so just pick first)
+            val peerID = unreadPeers.firstOrNull() ?: return
+            startPrivateChat(peerID)
         }
         
         private fun startGeohashDM(nostrPubkey: String) {
@@ -1270,7 +1249,7 @@ internal class ChatStoreFactory(
                             // Send favorite notification via mesh or Nostr
                             try {
                                 val myNostr = com.bitchat.android.nostr.NostrIdentityBridge.getCurrentNostrIdentity(
-                                    chatViewModel.getApplication()
+                                    applicationContext
                                 )
                                 val announcementContent = if (!wasFavorite) "[FAVORITED]:${myNostr?.npub ?: ""}" else "[UNFAVORITED]:${myNostr?.npub ?: ""}"
                                 
@@ -1298,8 +1277,7 @@ internal class ChatStoreFactory(
             dataManager.saveNickname(nickname)
             // Update store state
             dispatch(ChatStore.Msg.NicknameChanged(nickname))
-            // Also update ChatViewModel for backward compatibility with managers
-            chatViewModel.setNickname(nickname)
+            // Store is now the source of truth for nickname
         }
 
         // Password prompt
@@ -1316,25 +1294,54 @@ internal class ChatStoreFactory(
 
         // App lifecycle
         private fun setAppBackgroundState(isBackground: Boolean) {
-            chatViewModel.setAppBackgroundState(isBackground)
+            meshService.connectionManager.setAppBackgroundState(isBackground)
         }
         
-        // Notification management
+        // Notification management - TODO: Implement notification service
         private fun clearNotificationsForSender(senderID: String) {
-            chatViewModel.clearNotificationsForSender(senderID)
+            Log.d(TAG, "Clear notifications for sender: $senderID")
         }
         
         private fun clearNotificationsForGeohash(geohash: String) {
-            chatViewModel.clearNotificationsForGeohash(geohash)
+            Log.d(TAG, "Clear notifications for geohash: $geohash")
         }
         
-        // Command/Mention suggestions
+        // Command/Mention suggestions - implemented in Store
         private fun updateCommandSuggestions(input: String) {
-            chatViewModel.updateCommandSuggestions(input)
+            val suggestions = if (input.startsWith("/")) {
+                val query = input.lowercase()
+                listOf(
+                    CommandSuggestion("/help", listOf("/?"), null, "show available commands"),
+                    CommandSuggestion("/nick", emptyList(), "<name>", "set your nickname"),
+                    CommandSuggestion("/join", listOf("/j"), "<channel>", "join or create a channel"),
+                    CommandSuggestion("/leave", listOf("/part"), "[channel]", "leave current or specified channel"),
+                    CommandSuggestion("/msg", listOf("/m"), "<user> [message]", "start private chat"),
+                    CommandSuggestion("/who", listOf("/w"), null, "show online peers"),
+                    CommandSuggestion("/channels", emptyList(), null, "show all channels"),
+                    CommandSuggestion("/block", emptyList(), "[user]", "block user or list blocked"),
+                    CommandSuggestion("/unblock", emptyList(), "<user>", "unblock user"),
+                    CommandSuggestion("/clear", emptyList(), null, "clear messages"),
+                    CommandSuggestion("/hug", emptyList(), "<user>", "send a hug"),
+                    CommandSuggestion("/slap", emptyList(), "<user>", "slap with a trout")
+                ).filter { it.command.startsWith(query) || it.aliases.any { alias -> alias.startsWith(query) } }
+            } else {
+                emptyList()
+            }
+            dispatch(ChatStore.Msg.CommandSuggestionsUpdated(suggestions.isNotEmpty(), suggestions))
         }
         
         private fun updateMentionSuggestions(input: String) {
-            chatViewModel.updateMentionSuggestions(input)
+            val lastWord = input.substringAfterLast(" ")
+            val suggestions = if (lastWord.startsWith("@") && lastWord.length > 1) {
+                val query = lastWord.substring(1).lowercase()
+                state().connectedPeers.mapNotNull { peerID ->
+                    val nickname = state().peerNicknames[peerID] ?: peerID
+                    if (nickname.lowercase().contains(query)) nickname else null
+                }.take(5)
+            } else {
+                emptyList()
+            }
+            dispatch(ChatStore.Msg.MentionSuggestionsUpdated(suggestions.isNotEmpty(), suggestions))
         }
         
         // Geohash actions
@@ -1440,9 +1447,9 @@ internal class ChatStoreFactory(
         
         // Debug
         private fun getDebugStatus() {
-            // This is a query operation, delegate to ChatViewModel
-            // In the future, this could return via a Label
-            chatViewModel.getDebugStatus()
+            // Get debug status from mesh service directly
+            val status = meshService.getDebugStatus()
+            Log.d(TAG, status)
         }
         
         // Emergency actions
@@ -1465,9 +1472,7 @@ internal class ChatStoreFactory(
             dispatch(ChatStore.Msg.FavoritePeersUpdated(emptySet()))
             dispatch(ChatStore.Msg.GeohashBookmarksUpdated(emptyList()))
             
-            // Also clear via ChatViewModel for backward compatibility with managers
-            chatViewModel.panicClearAllData()
-            
+            // Store is now the source of truth - no ChatViewModel sync needed
             Log.w(TAG, "🚨 PANIC CLEAR COMPLETE")
         }
     }
