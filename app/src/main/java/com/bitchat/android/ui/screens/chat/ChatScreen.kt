@@ -1,13 +1,8 @@
 package com.bitchat.android.ui.screens.chat
-// [Goose] Bridge file share events to ViewModel via dispatcher is installed in ChatScreen composition
-
-// [Goose] Installing FileShareDispatcher handler in ChatScreen to forward file sends to ViewModel
-
 
 import androidx.activity.compose.BackHandler
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import androidx.compose.animation.*
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -31,7 +26,6 @@ import com.bitchat.android.feature.chat.ChatComponent
 import com.bitchat.android.geohash.ChannelID
 import com.bitchat.android.ui.*
 import com.bitchat.android.ui.components.ModalBottomSheet
-import com.bitchat.android.ui.debug.*
 import com.bitchat.android.ui.events.FileShareDispatcher
 import com.bitchat.android.ui.screens.chat.dialogs.PasswordPromptDialog
 import com.bitchat.android.ui.screens.chat.sheets.AboutSheetContent
@@ -39,8 +33,8 @@ import com.bitchat.android.ui.screens.chat.sheets.ChatUserSheetContent
 import com.bitchat.android.ui.screens.chat.sheets.LocationChannelsSheetContent
 import com.bitchat.android.ui.screens.chat.sheets.LocationNotesSheetPresenterContent
 import com.bitchat.android.ui.media.FullScreenImageViewer
+import com.bitchat.android.ui.screens.chat.sheets.DebugSettingsSheetContent
 import com.bitchat.android.ui.screens.chat.sheets.MeshPeerListSheetContent
-import kotlin.collections.get
 
 /**
  * Main ChatScreen - REFACTORED to use component-based architecture
@@ -54,30 +48,34 @@ import kotlin.collections.get
  */
 @Composable
 fun ChatScreen(
-    component: ChatComponent,
-    viewModel: ChatViewModel
+    component: ChatComponent
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val messages by viewModel.messages.collectAsState()
-    val connectedPeers by viewModel.connectedPeers.collectAsState()
-    val nickname by viewModel.nickname.collectAsState()
-    val selectedPrivatePeer by viewModel.selectedPrivateChatPeer.collectAsState()
-    val currentChannel by viewModel.currentChannel.collectAsState()
-    val joinedChannels by viewModel.joinedChannels.collectAsState()
-    val hasUnreadChannels by viewModel.unreadChannelMessages.collectAsState()
-    val hasUnreadPrivateMessages by viewModel.unreadPrivateMessages.collectAsState()
-    val privateChats by viewModel.privateChats.collectAsState()
-    val channelMessages by viewModel.channelMessages.collectAsState()
-    val showCommandSuggestions by viewModel.showCommandSuggestions.collectAsState()
-    val commandSuggestions by viewModel.commandSuggestions.collectAsState()
-    val showMentionSuggestions by viewModel.showMentionSuggestions.collectAsState()
-    val mentionSuggestions by viewModel.mentionSuggestions.collectAsState()
-    val showAppInfo by viewModel.showAppInfo.collectAsState()
-
+    
+    // Use component model for state (MVI pattern)
+    val model by component.model.subscribeAsState()
+    
+    // Extract state from model
+    val messages = model.messages
+    val connectedPeers = model.connectedPeers
+    val nickname = model.nickname
+    val selectedPrivatePeer = model.selectedPrivateChatPeer
+    val currentChannel = model.currentChannel
+    val joinedChannels = model.joinedChannels
+    val privateChats = model.privateChats
+    val channelMessages = model.channelMessages
+    val showCommandSuggestions = model.showCommandSuggestions
+    val commandSuggestions = model.commandSuggestions
+    val showMentionSuggestions = model.showMentionSuggestions
+    val mentionSuggestions = model.mentionSuggestions
+    
     // Handle back press
     val isBackHandlerEnabled = selectedPrivatePeer != null || currentChannel != null
     BackHandler(enabled = isBackHandlerEnabled) {
-        viewModel.handleBackPressed()
+        when {
+            selectedPrivatePeer != null -> component.onEndPrivateChat()
+            currentChannel != null -> component.onSwitchToChannel(null)
+        }
     }
 
     var messageText by remember { mutableStateOf(TextFieldValue("")) }
@@ -87,18 +85,8 @@ fun ChatScreen(
     var forceScrollToBottom by remember { mutableStateOf(false) }
     var isScrolledUp by remember { mutableStateOf(false) }
 
-    val isConnected by viewModel.isConnected.collectAsState(false)
-    val passwordPromptChannel by viewModel.passwordPromptChannel.collectAsState(null)
-
-    // Trigger password dialog through component when ViewModel requests it
-    LaunchedEffect(passwordPromptChannel) {
-        passwordPromptChannel?.let { channel ->
-            component.onShowPasswordPrompt(channel)
-        }
-    }
-
-    // Get location channel info for timeline switching
-    val selectedLocationChannel by viewModel.selectedLocationChannel.collectAsState()
+    val isConnected = model.isConnected
+    val selectedLocationChannel = model.selectedLocationChannel
 
     // Determine what messages to show based on current context (unified timelines)
     val displayMessages = when {
@@ -148,7 +136,7 @@ fun ChatScreen(
             MessagesList(
                 messages = displayMessages,
                 currentUserNickname = nickname,
-                myPeerID = viewModel.myPeerID,
+                myPeerID = model.myPeerID,
                 modifier = Modifier.weight(1f),
                 forceScrollToBottom = forceScrollToBottom,
                 onScrolledUpChanged = { isUp -> isScrolledUp = isUp },
@@ -160,8 +148,8 @@ fun ChatScreen(
                     val (baseName, hashSuffix) = splitSuffix(fullSenderName)
                     
                     // Check if we're in a geohash channel to include hash suffix
-                    val selectedLocationChannel = viewModel.selectedLocationChannel.value
-                    val mentionText = if (selectedLocationChannel is ChannelID.Location && hashSuffix.isNotEmpty()) {
+                    val currentLocationChannel = model.selectedLocationChannel
+                    val mentionText = if (currentLocationChannel is ChannelID.Location && hashSuffix.isNotEmpty()) {
                         // In geohash chat - include the hash suffix from the full display name
                         "@$baseName$hashSuffix"
                     } else {
@@ -187,7 +175,7 @@ fun ChatScreen(
                     component.onShowUserSheet(baseName, message.id)
                 },
                 onCancelTransfer = { msg ->
-                    viewModel.cancelMediaSend(msg.id)
+                    component.onCancelMediaSend(msg.id)
                 },
                 onImageClick = { currentPath, allImagePaths, initialIndex ->
                     viewerImagePaths = allImagePaths
@@ -195,14 +183,14 @@ fun ChatScreen(
                     showFullScreenImageViewer = true
                 },
                 onGeohashClick = { geohash ->
-                    viewModel.teleportToGeohash(geohash)
+                    component.onTeleportToGeohash(geohash)
                 }
             )
             // Input area - stays at bottom
-        // Bridge file share from lower-level input to ViewModel
+        // Bridge file share from lower-level input to component
             LaunchedEffect(Unit) {
                 FileShareDispatcher.setHandler { peer, channel, path ->
-                    viewModel.sendFileNote(peer, channel, path)
+                    component.onSendFileNote(peer, channel, path)
                 }
             }
 
@@ -210,24 +198,24 @@ fun ChatScreen(
         messageText = messageText,
         onMessageTextChange = { newText: TextFieldValue ->
             messageText = newText
-            viewModel.updateCommandSuggestions(newText.text)
-            viewModel.updateMentionSuggestions(newText.text)
+            component.onUpdateCommandSuggestions(newText.text)
+            component.onUpdateMentionSuggestions(newText.text)
         },
         onSend = {
             if (messageText.text.trim().isNotEmpty()) {
-                viewModel.sendMessage(messageText.text.trim())
+                component.onSendMessage(messageText.text.trim())
                 messageText = TextFieldValue("")
                 forceScrollToBottom = !forceScrollToBottom // Toggle to trigger scroll
             }
         },
         onSendVoiceNote = { peer, onionOrChannel, path ->
-            viewModel.sendVoiceNote(peer, onionOrChannel, path)
+            component.onSendVoiceNote(peer, onionOrChannel, path)
         },
         onSendImageNote = { peer, onionOrChannel, path ->
-            viewModel.sendImageNote(peer, onionOrChannel, path)
+            component.onSendImageNote(peer, onionOrChannel, path)
         },
         onSendFileNote = { peer, onionOrChannel, path ->
-            viewModel.sendFileNote(peer, onionOrChannel, path)
+            component.onSendFileNote(peer, onionOrChannel, path)
         },
         
         showCommandSuggestions = showCommandSuggestions,
@@ -235,14 +223,14 @@ fun ChatScreen(
         showMentionSuggestions = showMentionSuggestions,
         mentionSuggestions = mentionSuggestions,
         onCommandSuggestionClick = { suggestion: CommandSuggestion ->
-                    val commandText = viewModel.selectCommandSuggestion(suggestion)
+                    val commandText = component.onSelectCommandSuggestion(suggestion)
                     messageText = TextFieldValue(
                         text = commandText,
                         selection = TextRange(commandText.length)
                     )
                 },
                 onMentionSuggestionClick = { mention: String ->
-                    val mentionText = viewModel.selectMentionSuggestion(mention, messageText.text)
+                    val mentionText = component.onSelectMentionSuggestion(mention, messageText.text)
                     messageText = TextFieldValue(
                         text = mentionText,
                         selection = TextRange(mentionText.length)
@@ -262,15 +250,16 @@ fun ChatScreen(
             selectedPrivatePeer = selectedPrivatePeer,
             currentChannel = currentChannel,
             nickname = nickname,
-            viewModel = viewModel,
+            model = model,
+            component = component,
             colorScheme = colorScheme,
             onSidebarToggle = component::onShowMeshPeerList,
             onShowAppInfo = { component.onShowAppInfo() },
-            onPanicClear = { viewModel.panicClearAllData() },
+            onPanicClear = { component.onPanicClearAllData() },
             onLocationChannelsClick = { component.onShowLocationChannels() },
             onLocationNotesClick = {
                 // Ensure location is loaded before showing sheet
-                viewModel.refreshLocationChannels()
+                component.onRefreshLocationChannels()
                 component.onShowLocationNotes()
             }
         )
@@ -332,7 +321,7 @@ fun ChatScreen(
     // Decompose-managed sheets
     ChatSheets(
         component = component,
-        viewModel = viewModel
+        model = model
     )
 }
 
@@ -403,7 +392,8 @@ private fun ChatFloatingHeader(
     selectedPrivatePeer: String?,
     currentChannel: String?,
     nickname: String,
-    viewModel: ChatViewModel,
+    model: ChatComponent.Model,
+    component: ChatComponent,
     colorScheme: ColorScheme,
     onSidebarToggle: () -> Unit,
     onShowAppInfo: () -> Unit,
@@ -411,6 +401,29 @@ private fun ChatFloatingHeader(
     onLocationChannelsClick: () -> Unit,
     onLocationNotesClick: () -> Unit
 ) {
+    // Use state from model (MVI pattern) instead of viewModel
+    val myPeerID = model.myPeerID
+    val connectedPeers = model.connectedPeers
+    val joinedChannels = model.joinedChannels
+    val hasUnreadChannels = model.unreadChannelMessages
+    val hasUnreadPrivateMessages = model.unreadPrivateMessages
+    val isConnected = model.isConnected
+    val selectedLocationChannel = model.selectedLocationChannel
+    val geohashPeople = model.geohashPeople
+    val isTeleported = model.isTeleported
+    val torStatus = model.torStatus
+    val powEnabled = model.powEnabled
+    val powDifficulty = model.powDifficulty
+    val isMining = model.isMining
+    val permissionState = model.locationPermissionState
+    val locationServicesEnabled = model.locationServicesEnabled
+    val locationNotes = model.locationNotes
+    val bookmarks = model.geohashBookmarks.toSet()
+    val favoritePeers = model.favoritePeers
+    val peerFingerprints = model.peerFingerprints
+    val peerSessionStates = model.peerSessionStates
+    val peerNicknames = model.peerNicknames
+    
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -424,22 +437,44 @@ private fun ChatFloatingHeader(
                     selectedPrivatePeer = selectedPrivatePeer,
                     currentChannel = currentChannel,
                     nickname = nickname,
-                    viewModel = viewModel,
+                    myPeerID = myPeerID,
+                    connectedPeers = connectedPeers,
+                    joinedChannels = joinedChannels.toSet(),
+                    hasUnreadChannels = hasUnreadChannels,
+                    hasUnreadPrivateMessages = hasUnreadPrivateMessages,
+                    isConnected = isConnected,
+                    selectedLocationChannel = selectedLocationChannel,
+                    geohashPeople = geohashPeople,
+                    isTeleported = isTeleported,
+                    torStatus = torStatus,
+                    powEnabled = powEnabled,
+                    powDifficulty = powDifficulty,
+                    isMining = isMining,
+                    permissionState = permissionState,
+                    locationServicesEnabled = locationServicesEnabled,
+                    locationNotes = locationNotes,
+                    bookmarks = bookmarks.toSet(),
+                    favoritePeers = favoritePeers,
+                    peerFingerprints = peerFingerprints,
+                    peerSessionStates = peerSessionStates,
+                    peerNicknames = peerNicknames,
                     onBackClick = {
                         when {
-                            selectedPrivatePeer != null -> viewModel.endPrivateChat()
-                            currentChannel != null -> viewModel.switchToChannel(null)
+                            selectedPrivatePeer != null -> component.onEndPrivateChat()
+                            currentChannel != null -> component.onSwitchToChannel(null)
                         }
                     },
                     onSidebarClick = onSidebarToggle,
                     onTripleClick = onPanicClear,
                     onShowAppInfo = onShowAppInfo,
                     onLocationChannelsClick = onLocationChannelsClick,
-                    onLocationNotesClick = {
-                        // Ensure location is loaded before showing sheet
-                        viewModel.refreshLocationChannels()
-                        onLocationNotesClick()
-                    }
+                    onLocationNotesClick = onLocationNotesClick,
+                    onNicknameChange = component::onSetNickname,
+                    onToggleFavorite = component::onToggleFavorite,
+                    onLeaveChannel = component::onLeaveChannel,
+                    onOpenLatestUnreadPrivateChat = component::onOpenLatestUnreadPrivateChat,
+                    onToggleGeohashBookmark = component::onToggleGeohashBookmark,
+                    onGetFavoriteStatus = component::getFavoriteStatus
                 )
             },
             colors = TopAppBarDefaults.topAppBarColors(
@@ -453,7 +488,7 @@ private fun ChatFloatingHeader(
 @Composable
 private fun ChatSheets(
     component: ChatComponent,
-    viewModel: ChatViewModel
+    model: ChatComponent.Model
 ) {
     val sheetSlot by component.sheetSlot.subscribeAsState()
 
@@ -463,19 +498,11 @@ private fun ChatSheets(
         ) { listState ->
             when (child) {
                 is ChatComponent.SheetChild.AppInfo -> {
-                    var showDebugSheet by remember { mutableStateOf(false) }
                     AboutSheetContent(
                         component = child.component,
                         lazyListState = listState,
-                        onShowDebug = { showDebugSheet = true }
+                        onShowDebug = { component.onShowDebugSettings() }
                     )
-                    if (showDebugSheet) {
-                        DebugSettingsSheet(
-                            isPresented = showDebugSheet,
-                            onDismiss = { showDebugSheet = false },
-                            viewModel = viewModel
-                        )
-                    }
                 }
 
                 is ChatComponent.SheetChild.LocationChannels -> {
@@ -499,11 +526,19 @@ private fun ChatSheets(
                     )
                 }
 
-                is ChatComponent.SheetChild.MeshPeerList -> MeshPeerListSheetContent(
-                    viewModel = viewModel,
-                    lazyListState = listState,
-                    onDismiss = component::onDismissSheet
-                )
+                is ChatComponent.SheetChild.MeshPeerList -> {
+                    MeshPeerListSheetContent(
+                        component = child.component,
+                        lazyListState = listState
+                    )
+                }
+                
+                is ChatComponent.SheetChild.DebugSettings -> {
+                    DebugSettingsSheetContent(
+                        component = child.component,
+                        lazyListState = listState
+                    )
+                }
             }
         }
     }

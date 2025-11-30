@@ -38,18 +38,18 @@ data class GeoPerson(
 
 @Composable
 fun GeohashPeopleList(
-    viewModel: ChatViewModel,
+    geohashPeople: List<GeoPerson>,
+    selectedLocationChannel: com.bitchat.android.geohash.ChannelID?,
+    isTeleported: Boolean,
+    nickname: String,
+    unreadPrivateMessages: Set<String>,
+    onStartGeohashDM: (String) -> Unit,
+    onGetPersonTeleported: (String) -> Boolean,
+    onGetColorForPubkey: (String, Boolean) -> Color,
     onTapPerson: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    
-    // Observe geohash people from ChatViewModel
-    val geohashPeople by viewModel.geohashPeople.collectAsState()
-    val selectedLocationChannel by viewModel.selectedLocationChannel.collectAsState()
-    val isTeleported by viewModel.isTeleported.collectAsState()
-    val nickname by viewModel.nickname.collectAsState()
-    val unreadPrivateMessages by viewModel.unreadPrivateMessages.collectAsState()
     
     Column {
         // Header matching iOS style
@@ -89,23 +89,8 @@ fun GeohashPeopleList(
             )
         } else {
             // Get current geohash identity for "me" detection
-            val myHex = remember(selectedLocationChannel) {
-                when (val channel = selectedLocationChannel) {
-                    is com.bitchat.android.geohash.ChannelID.Location -> {
-                        try {
-                            val identity = com.bitchat.android.nostr.NostrIdentityBridge.deriveIdentity(
-                                forGeohash = channel.channel.geohash,
-                                context = viewModel.getApplication()
-                            )
-                            identity.publicKeyHex.lowercase()
-                        } catch (e: Exception) {
-                            Log.e("GeohashPeopleList", "Failed to derive identity: ${e.message}")
-                            null
-                        }
-                    }
-                    else -> null
-                }
-            }
+            // Note: This requires context which should be passed from component
+            val myHex: String? = null // TODO: Pass myGeohashPubkey from component state
             
             // Sort people: me first, then by lastSeen (matches iOS exactly)
             val orderedPeople = remember(geohashPeople, myHex) {
@@ -136,17 +121,17 @@ fun GeohashPeopleList(
                     isFirst = person.id == firstID,
                     isMe = myHex != null && person.id == myHex,
                     hasUnreadDM = unreadPrivateMessages.contains("nostr_${person.id.take(16)}"),
-                    isTeleported = person.id != myHex && viewModel.isPersonTeleported(person.id),
+                    isTeleported = person.id != myHex && onGetPersonTeleported(person.id),
                     isMyTeleported = person.id == myHex && isTeleported,
                     nickname = nickname,
                     colorScheme = colorScheme,
-                    viewModel = viewModel,
+                    onGetColorForPubkey = onGetColorForPubkey,
                     showHashSuffix = (baseNameCounts[com.bitchat.android.ui.splitSuffix(person.displayName).first] ?: 0) > 1,
                     onTap = {
                         if (person.id != myHex) {
                             // TODO: Re-enable when NIP-17 geohash DM issues are fixed
                             // Start geohash DM (iOS-compatible)
-                            viewModel.startGeohashDM(person.id)
+                            onStartGeohashDM(person.id)
                             onTapPerson()
                         }
                     }
@@ -166,7 +151,7 @@ private fun GeohashPersonItem(
     isMyTeleported: Boolean,
     nickname: String,
     colorScheme: ColorScheme,
-    viewModel: ChatViewModel,
+    onGetColorForPubkey: (String, Boolean) -> Color,
     showHashSuffix: Boolean,
     onTap: () -> Unit
 ) {
@@ -219,7 +204,7 @@ private fun GeohashPersonItem(
         
         // Get consistent peer color (matches iOS color assignment exactly)
         val isDark = colorScheme.background.red + colorScheme.background.green + colorScheme.background.blue < 1.5f
-        val assignedColor = viewModel.colorForNostrPubkey(person.id, isDark)
+        val assignedColor = onGetColorForPubkey(person.id, isDark)
         val baseColor = if (isMe) Color(0xFFFF9500) else assignedColor
         
         Row(

@@ -1,6 +1,5 @@
 package com.bitchat.android.feature.chat.locationchannels.store
 
-import androidx.lifecycle.asFlow
 import com.arkivanov.mvikotlin.core.store.Reducer
 import com.arkivanov.mvikotlin.core.store.SimpleBootstrapper
 import com.arkivanov.mvikotlin.core.store.Store
@@ -9,7 +8,8 @@ import com.arkivanov.mvikotlin.extensions.coroutines.CoroutineExecutor
 import com.bitchat.android.geohash.GeohashBookmarksStore
 import com.bitchat.android.geohash.LocationChannelManager
 import com.bitchat.android.mesh.BluetoothMeshService
-import com.bitchat.android.ui.ChatViewModel
+import com.bitchat.android.mesh.MeshEventBus
+import com.bitchat.android.ui.GeohashViewModel
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -20,8 +20,9 @@ internal class LocationChannelsStoreFactory(
 
     private val locationChannelManager: LocationChannelManager by inject()
     private val bookmarksStore: GeohashBookmarksStore by inject()
-    private val chatViewModel: ChatViewModel by inject()
     private val meshService: BluetoothMeshService by inject()
+    private val meshEventBus: MeshEventBus by inject()
+    private val geohashViewModel: GeohashViewModel by inject()
 
     fun create(): LocationChannelsStore =
         object : LocationChannelsStore,
@@ -36,8 +37,8 @@ internal class LocationChannelsStoreFactory(
                     permissionState = locationChannelManager.permissionState.value,
                     locationNames = locationChannelManager.locationNames.value,
                     locationServicesEnabled = locationChannelManager.locationServicesEnabled.value,
-                    geohashParticipantCounts = chatViewModel.geohashParticipantCounts.value ?: emptyMap(),
-                    connectedPeers = chatViewModel.connectedPeers.value ?: emptyList(),
+                    geohashParticipantCounts = geohashViewModel.geohashParticipantCounts.value,
+                    connectedPeers = meshEventBus.connectedPeers.value,
                     myPeerID = meshService.myPeerID,
                     bookmarkNames = bookmarksStore.bookmarkNames.value
                 ),
@@ -109,17 +110,17 @@ internal class LocationChannelsStoreFactory(
                         }
                     }
 
-                    // Subscribe to geohash participant counts (from ChatViewModel LiveData)
+                    // Subscribe to geohash participant counts (from GeohashViewModel)
                     scope.launch {
-                        chatViewModel.geohashParticipantCounts.collect { counts ->
-                            dispatch(LocationChannelsStore.Msg.GeohashParticipantCountsChanged(counts ?: emptyMap()))
+                        geohashViewModel.geohashParticipantCounts.collect { counts ->
+                            dispatch(LocationChannelsStore.Msg.GeohashParticipantCountsChanged(counts))
                         }
                     }
 
-                    // Subscribe to connected peers (from ChatViewModel LiveData)
+                    // Subscribe to connected peers (from MeshEventBus)
                     scope.launch {
-                        chatViewModel.connectedPeers.collect { peers ->
-                            dispatch(LocationChannelsStore.Msg.ConnectedPeersChanged(peers ?: emptyList()))
+                        meshEventBus.connectedPeers.collect { peers ->
+                            dispatch(LocationChannelsStore.Msg.ConnectedPeersChanged(peers))
                         }
                     }
 
@@ -162,10 +163,10 @@ internal class LocationChannelsStoreFactory(
                     locationChannelManager.endLiveRefresh()
                 }
                 is LocationChannelsStore.Intent.BeginGeohashSampling -> {
-                    chatViewModel.beginGeohashSampling(intent.geohashes)
+                    geohashViewModel.beginGeohashSampling(intent.geohashes)
                 }
                 LocationChannelsStore.Intent.EndGeohashSampling -> {
-                    chatViewModel.endGeohashSampling()
+                    geohashViewModel.endGeohashSampling()
                 }
             }
         }

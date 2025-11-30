@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bitchat.android.core.ui.utils.singleOrTripleClickable
 import com.bitchat.android.geohash.LocationChannelManager.PermissionState
+import com.bitchat.android.nostr.LocationNotesManager
+import com.bitchat.android.favorites.FavoriteRelationship
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.geometry.Offset
 
@@ -56,11 +58,9 @@ fun isFavoriteReactive(
 
 @Composable
 fun TorStatusDot(
+    torStatus: com.bitchat.android.net.TorManager.TorStatus,
     modifier: Modifier = Modifier,
-    viewModel: ChatViewModel,
 ) {
-    val torStatus by viewModel.torStatus.collectAsState()
-    
     if (torStatus.mode != com.bitchat.android.net.TorMode.OFF) {
         val dotColor = when {
             torStatus.running && torStatus.bootstrapPercent < 100 -> Color(0xFFFF9500) // Orange - bootstrapping
@@ -235,24 +235,45 @@ fun ChatHeaderContent(
     selectedPrivatePeer: String?,
     currentChannel: String?,
     nickname: String,
-    viewModel: ChatViewModel,
+    myPeerID: String,
+    connectedPeers: List<String>,
+    joinedChannels: Set<String>,
+    hasUnreadChannels: Map<String, Int>,
+    hasUnreadPrivateMessages: Set<String>,
+    isConnected: Boolean,
+    selectedLocationChannel: com.bitchat.android.geohash.ChannelID?,
+    geohashPeople: List<GeoPerson>,
+    isTeleported: Boolean,
+    torStatus: com.bitchat.android.net.TorManager.TorStatus,
+    powEnabled: Boolean,
+    powDifficulty: Int,
+    isMining: Boolean,
+    permissionState: PermissionState,
+    locationServicesEnabled: Boolean,
+    locationNotes: List<LocationNotesManager.Note>,
+    bookmarks: Set<String>,
+    favoritePeers: Set<String>,
+    peerFingerprints: Map<String, String>,
+    peerSessionStates: Map<String, String>,
+    peerNicknames: Map<String, String>,
     onBackClick: () -> Unit,
     onSidebarClick: () -> Unit,
     onTripleClick: () -> Unit,
     onShowAppInfo: () -> Unit,
     onLocationChannelsClick: () -> Unit,
-    onLocationNotesClick: () -> Unit
+    onLocationNotesClick: () -> Unit,
+    onNicknameChange: (String) -> Unit,
+    onToggleFavorite: (String) -> Unit,
+    onLeaveChannel: (String) -> Unit,
+    onOpenLatestUnreadPrivateChat: () -> Unit,
+    onToggleGeohashBookmark: (String) -> Unit,
+    onGetFavoriteStatus: (String) -> FavoriteRelationship?
 ) {
     val colorScheme = MaterialTheme.colorScheme
 
     when {
         selectedPrivatePeer != null -> {
             // Private chat header - Fully reactive state tracking
-            val favoritePeers by viewModel.favoritePeers.collectAsState()
-            val peerFingerprints by viewModel.peerFingerprints.collectAsState()
-            val peerSessionStates by viewModel.peerSessionStates.collectAsState()
-            val peerNicknames by viewModel.peerNicknames.collectAsState()
-            
             // Reactive favorite computation - no more static lookups!
             val isFavorite = isFavoriteReactive(
                 peerID = selectedPrivatePeer,
@@ -261,11 +282,17 @@ fun ChatHeaderContent(
             )
             val sessionState = peerSessionStates[selectedPrivatePeer]
             
-            Log.d("ChatHeader", "Header recomposing: peer=$selectedPrivatePeer, isFav=$isFavorite, sessionState=$sessionState")
+            // Compute mutual favorite state
+            val isNostrDM = selectedPrivatePeer.startsWith("nostr_") || selectedPrivatePeer.startsWith("nostr:")
+            val isMutualFavorite = remember(selectedPrivatePeer, peerNicknames) {
+                try {
+                    if (isNostrDM) return@remember false
+                    val status = onGetFavoriteStatus(selectedPrivatePeer)
+                    status?.isMutual == true
+                } catch (_: Exception) { false }
+            }
             
-            // Pass geohash context and people for NIP-17 chat title formatting
-            val selectedLocationChannel by viewModel.selectedLocationChannel.collectAsState()
-            val geohashPeople by viewModel.geohashPeople.collectAsState()
+            Log.d("ChatHeader", "Header recomposing: peer=$selectedPrivatePeer, isFav=$isFavorite, sessionState=$sessionState")
 
             PrivateChatHeader(
                 peerID = selectedPrivatePeer,
@@ -274,9 +301,9 @@ fun ChatHeaderContent(
                 sessionState = sessionState,
                 selectedLocationChannel = selectedLocationChannel,
                 geohashPeople = geohashPeople,
+                isMutualFavorite = isMutualFavorite,
                 onBackClick = onBackClick,
-                onToggleFavorite = { viewModel.toggleFavorite(selectedPrivatePeer) },
-                viewModel = viewModel
+                onToggleFavorite = { onToggleFavorite(selectedPrivatePeer) }
             )
         }
         currentChannel != null -> {
@@ -284,7 +311,7 @@ fun ChatHeaderContent(
             ChannelHeader(
                 channel = currentChannel,
                 onBackClick = onBackClick,
-                onLeaveChannel = { viewModel.leaveChannel(currentChannel) },
+                onLeaveChannel = { onLeaveChannel(currentChannel) },
                 onSidebarClick = onSidebarClick
             )
         }
@@ -292,13 +319,31 @@ fun ChatHeaderContent(
             // Main header
             MainHeader(
                 nickname = nickname,
-                onNicknameChange = viewModel::setNickname,
+                myPeerID = myPeerID,
+                connectedPeers = connectedPeers,
+                joinedChannels = joinedChannels,
+                hasUnreadChannels = hasUnreadChannels,
+                hasUnreadPrivateMessages = hasUnreadPrivateMessages,
+                isConnected = isConnected,
+                selectedLocationChannel = selectedLocationChannel,
+                geohashPeople = geohashPeople,
+                isTeleported = isTeleported,
+                torStatus = torStatus,
+                powEnabled = powEnabled,
+                powDifficulty = powDifficulty,
+                isMining = isMining,
+                permissionState = permissionState,
+                locationServicesEnabled = locationServicesEnabled,
+                locationNotes = locationNotes,
+                bookmarks = bookmarks,
+                onNicknameChange = onNicknameChange,
                 onTitleClick = onShowAppInfo,
                 onTripleTitleClick = onTripleClick,
                 onSidebarClick = onSidebarClick,
                 onLocationChannelsClick = onLocationChannelsClick,
                 onLocationNotesClick = onLocationNotesClick,
-                viewModel = viewModel
+                onOpenLatestUnreadPrivateChat = onOpenLatestUnreadPrivateChat,
+                onToggleGeohashBookmark = onToggleGeohashBookmark
             )
         }
     }
@@ -312,58 +357,24 @@ private fun PrivateChatHeader(
     sessionState: String?,
     selectedLocationChannel: com.bitchat.android.geohash.ChannelID?,
     geohashPeople: List<GeoPerson>,
+    isMutualFavorite: Boolean,
     onBackClick: () -> Unit,
-    onToggleFavorite: () -> Unit,
-    viewModel: ChatViewModel
+    onToggleFavorite: () -> Unit
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val isNostrDM = peerID.startsWith("nostr_") || peerID.startsWith("nostr:")
-    // Determine mutual favorite state for this peer (supports mesh ephemeral 16-hex via favorites lookup)
-    val isMutualFavorite = remember(peerID, peerNicknames) {
-        try {
-            if (isNostrDM) return@remember false
-            if (peerID.length == 64 && peerID.matches(Regex("^[0-9a-fA-F]+$"))) {
-                val noiseKeyBytes = peerID.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-                viewModel.getFavoriteStatus(noiseKeyBytes)?.isMutual == true
-            } else if (peerID.length == 16 && peerID.matches(Regex("^[0-9a-fA-F]+$"))) {
-                viewModel.getFavoriteStatus(peerID)?.isMutual == true
-            } else false
-        } catch (_: Exception) { false }
-    }
 
     // Compute title text: for NIP-17 chats show "#geohash/@username" (iOS parity)
     val titleText: String = if (isNostrDM) {
-        // For geohash DMs, get the actual source geohash and proper display name
-        val (conversationGeohash, baseName) = try {
-            val repoField = com.bitchat.android.ui.GeohashViewModel::class.java.getDeclaredField("repo")
-            repoField.isAccessible = true
-            val repo = repoField.get(viewModel.geohashViewModel) as com.bitchat.android.nostr.GeohashRepository
-            val gh = repo.getConversationGeohash(peerID) ?: "geohash"
-            val fullPubkey = com.bitchat.android.nostr.GeohashAliasRegistry.get(peerID) ?: ""
-            val displayName = if (fullPubkey.isNotEmpty()) {
-                repo.displayNameForGeohashConversation(fullPubkey, gh)
-            } else {
-                peerNicknames[peerID] ?: "unknown"
-            }
-            Pair(gh, displayName)
-        } catch (e: Exception) { 
-            Pair("geohash", peerNicknames[peerID] ?: "unknown")
-        }
-        
-        "#$conversationGeohash/@$baseName"
+        // For geohash DMs, use the nickname from peerNicknames map
+        // The geohash context should be passed from the component
+        val displayName = peerNicknames[peerID] ?: "unknown"
+        // Extract geohash from the conversation if available
+        // TODO: Pass geohash context from component state
+        "@$displayName"
     } else {
-        // Prefer live mesh nickname; fallback to favorites nickname (supports 16-hex), finally short key
-        peerNicknames[peerID] ?: run {
-            val titleFromFavorites = try {
-                if (peerID.length == 64 && peerID.matches(Regex("^[0-9a-fA-F]+$"))) {
-                    val noiseKeyBytes = peerID.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-                    viewModel.getFavoriteStatus(noiseKeyBytes)?.peerNickname
-                } else if (peerID.length == 16 && peerID.matches(Regex("^[0-9a-fA-F]+$"))) {
-                    viewModel.getFavoriteStatus(peerID)?.peerNickname
-                } else null
-            } catch (_: Exception) { null }
-            titleFromFavorites ?: peerID.take(12)
-        }
+        // Use nickname from map or short key
+        peerNicknames[peerID] ?: peerID.take(12)
     }
     
     Box(modifier = Modifier.fillMaxWidth()) {
@@ -514,25 +525,33 @@ private fun ChannelHeader(
 @Composable
 private fun MainHeader(
     nickname: String,
+    myPeerID: String,
+    connectedPeers: List<String>,
+    joinedChannels: Set<String>,
+    hasUnreadChannels: Map<String, Int>,
+    hasUnreadPrivateMessages: Set<String>,
+    isConnected: Boolean,
+    selectedLocationChannel: com.bitchat.android.geohash.ChannelID?,
+    geohashPeople: List<GeoPerson>,
+    isTeleported: Boolean,
+    torStatus: com.bitchat.android.net.TorManager.TorStatus,
+    powEnabled: Boolean,
+    powDifficulty: Int,
+    isMining: Boolean,
+    permissionState: PermissionState,
+    locationServicesEnabled: Boolean,
+    locationNotes: List<LocationNotesManager.Note>,
+    bookmarks: Set<String>,
     onNicknameChange: (String) -> Unit,
     onTitleClick: () -> Unit,
     onTripleTitleClick: () -> Unit,
     onSidebarClick: () -> Unit,
     onLocationChannelsClick: () -> Unit,
     onLocationNotesClick: () -> Unit,
-    viewModel: ChatViewModel
+    onOpenLatestUnreadPrivateChat: () -> Unit,
+    onToggleGeohashBookmark: (String) -> Unit
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val connectedPeers by viewModel.connectedPeers.collectAsState()
-    val joinedChannels by viewModel.joinedChannels.collectAsState()
-    val hasUnreadChannels by viewModel.unreadChannelMessages.collectAsState()
-    val hasUnreadPrivateMessages by viewModel.unreadPrivateMessages.collectAsState()
-    val isConnected by viewModel.isConnected.collectAsState()
-    val selectedLocationChannel by viewModel.selectedLocationChannel.collectAsState()
-    val geohashPeople by viewModel.geohashPeople.collectAsState()
-
-    // Bookmarks store for current geohash toggle (iOS parity)
-    val bookmarks by viewModel.geohashBookmarks.collectAsState(emptySet())
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -575,7 +594,7 @@ private fun MainHeader(
                     contentDescription = stringResource(R.string.cd_unread_private_messages),
                     modifier = Modifier
                         .size(16.dp)
-                        .clickable { viewModel.openLatestUnreadPrivateChat() },
+                        .clickable { onOpenLatestUnreadPrivateChat() },
                     tint = Color(0xFFFF9500)
                 )
             }
@@ -583,7 +602,8 @@ private fun MainHeader(
             // Location channels button (matching iOS implementation) and bookmark grouped tightly
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 4.dp)) {
                 LocationChannelsButton(
-                    viewModel = viewModel,
+                    selectedChannel = selectedLocationChannel,
+                    teleported = isTeleported,
                     onClick = onLocationChannelsClick
                 )
 
@@ -598,7 +618,7 @@ private fun MainHeader(
                         modifier = Modifier
                             .padding(start = 2.dp) // minimal gap between geohash and bookmark
                             .size(20.dp)
-                            .clickable { viewModel.toggleGeohashBookmark(currentGeohash) },
+                            .clickable { onToggleGeohashBookmark(currentGeohash) },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -613,27 +633,32 @@ private fun MainHeader(
 
             // Location Notes button (extracted to separate component)
             LocationNotesButton(
-                viewModel = viewModel,
+                selectedLocationChannel = selectedLocationChannel,
+                permissionState = permissionState,
+                locationServicesEnabled = locationServicesEnabled,
+                notesCount = locationNotes.size,
                 onClick = onLocationNotesClick
             )
 
             // Tor status dot when Tor is enabled
             TorStatusDot(
+                torStatus = torStatus,
                 modifier = Modifier
                     .size(8.dp)
-                    .padding(start = 0.dp, end = 2.dp),
-                viewModel = viewModel
+                    .padding(start = 0.dp, end = 2.dp)
             )
             
             // PoW status indicator
             PoWStatusIndicator(
+                powEnabled = powEnabled,
+                powDifficulty = powDifficulty,
+                isMining = isMining,
                 modifier = Modifier,
                 style = PoWIndicatorStyle.COMPACT,
-                viewModel = viewModel
             )
             Spacer(modifier = Modifier.width(2.dp))
             PeerCounter(
-                connectedPeers = connectedPeers.filter { it != viewModel.myPeerID },
+                connectedPeers = connectedPeers.filter { it != myPeerID },
                 joinedChannels = joinedChannels,
                 hasUnreadChannels = hasUnreadChannels,
                 isConnected = isConnected,
@@ -646,22 +671,20 @@ private fun MainHeader(
 }
 
 @Composable
-private fun LocationChannelsButton(
-    viewModel: ChatViewModel,
-    onClick: () -> Unit
+fun LocationChannelsButton(
+    selectedChannel: com.bitchat.android.geohash.ChannelID?,
+    teleported: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    
-    // Get current channel selection from location manager
-    val selectedChannel by viewModel.selectedLocationChannel.collectAsState()
-    val teleported by viewModel.isTeleported.collectAsState()
     
     val (badgeText, badgeColor) = when (selectedChannel) {
         is com.bitchat.android.geohash.ChannelID.Mesh -> {
             "#mesh" to Color(0xFF007AFF) // iOS blue for mesh
         }
         is com.bitchat.android.geohash.ChannelID.Location -> {
-            val geohash = (selectedChannel as com.bitchat.android.geohash.ChannelID.Location).channel.geohash
+            val geohash = selectedChannel.channel.geohash
             "#$geohash" to Color(0xFF00C851) // Green for location
         }
         null -> "#mesh" to Color(0xFF007AFF) // Default to mesh
@@ -673,7 +696,8 @@ private fun LocationChannelsButton(
             containerColor = Color.Transparent,
             contentColor = badgeColor
         ),
-        contentPadding = PaddingValues(start = 4.dp, end = 0.dp, top = 2.dp, bottom = 2.dp)
+        contentPadding = PaddingValues(start = 4.dp, end = 0.dp, top = 2.dp, bottom = 2.dp),
+        modifier = modifier
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(

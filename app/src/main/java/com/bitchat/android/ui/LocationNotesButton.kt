@@ -7,9 +7,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -25,24 +22,18 @@ import com.bitchat.android.geohash.LocationChannelManager
  */
 @Composable
 fun LocationNotesButton(
-    viewModel: ChatViewModel,
+    selectedLocationChannel: ChannelID?,
+    permissionState: LocationChannelManager.PermissionState,
+    locationServicesEnabled: Boolean,
+    notesCount: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colorScheme = MaterialTheme.colorScheme
 
-    // Get channel and permission state
-    val selectedLocationChannel by viewModel.selectedLocationChannel.collectAsState()
-    val permissionState by viewModel.locationPermissionState.collectAsState()
-    val locationServicesEnabled by viewModel.locationServicesEnabled.collectAsState(false)
-
     // Check both permission AND location services enabled
     val locationPermissionGranted = permissionState == LocationChannelManager.PermissionState.AUTHORIZED
     val locationEnabled = locationPermissionGranted && locationServicesEnabled
-    
-    // Get notes count from LocationNotesManager
-    val notes by viewModel.locationNotes.collectAsState()
-    val notesCount = notes.size
 
     // Only show in mesh mode when location is authorized (iOS pattern)
     if (selectedLocationChannel is ChannelID.Mesh && locationEnabled) {

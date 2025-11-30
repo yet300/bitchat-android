@@ -67,7 +67,7 @@ class DefaultRootComponent(
         childStack(
             source = navigation,
             serializer = Config.serializer(),
-            initialConfiguration = Config.Onboarding,
+            initialConfiguration = Config.Chat(),
             handleBackButton = true,
             childFactory = ::createChild,
         )

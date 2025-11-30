@@ -12,7 +12,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
 /**
- * Centralized state definitions and data classes for the chat system
+ * Centralized state definitions and data classes for the chat system.
+ * 
+ * NOTE: This is legacy MVVM state. For MVI architecture, use Store.State instead.
+ * This class is being phased out - new code should use ChatStore.State.
  */
 
 // Command suggestion data class
@@ -24,7 +27,7 @@ data class CommandSuggestion(
 )
 
 /**
- * Contains all the observable state for the chat system
+ * @deprecated Use ChatStore.State for MVI architecture
  */
 class ChatState {
     

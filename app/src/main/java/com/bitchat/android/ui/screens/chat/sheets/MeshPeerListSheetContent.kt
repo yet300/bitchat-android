@@ -7,20 +7,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Email
@@ -31,18 +27,12 @@ import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.outlined.SettingsInputAntenna
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,19 +44,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.bitchat.android.R
-import com.bitchat.android.core.ui.component.button.CloseButton
+import com.bitchat.android.feature.chat.meshpeerlist.MeshPeerListComponent
 import com.bitchat.android.geohash.ChannelID
 import com.bitchat.android.nostr.Bech32
-import com.bitchat.android.ui.ChatViewModel
 import com.bitchat.android.ui.GeohashPeopleList
-import com.bitchat.android.ui.MessagesList
-import com.bitchat.android.ui.NoiseSessionIcon
-import com.bitchat.android.ui.screens.chat.ChatInputSection
 import com.bitchat.android.ui.splitSuffix
 import com.bitchat.android.ui.theme.BASE_FONT_SIZE
 import com.bitchat.android.ui.truncateNickname
@@ -76,25 +62,14 @@ import com.bitchat.android.ui.truncateNickname
  * Sheet components for ChatScreen
  * Extracted from ChatScreen.kt for better organization
  */
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MeshPeerListSheetContent(
-    viewModel: ChatViewModel,
+    component: MeshPeerListComponent,
     lazyListState: LazyListState,
-    onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val model by component.model.subscribeAsState()
     val colorScheme = MaterialTheme.colorScheme
-
-    val connectedPeers by viewModel.connectedPeers.collectAsState()
-    val joinedChannels by viewModel.joinedChannels.collectAsState()
-    val currentChannel by viewModel.currentChannel.collectAsState()
-    val selectedPrivatePeer by viewModel.selectedPrivateChatPeer.collectAsState()
-    val nickname by viewModel.nickname.collectAsState("")
-    val unreadChannelMessages by viewModel.unreadChannelMessages.collectAsState()
-    val peerNicknames by viewModel.peerNicknames.collectAsState()
-    val peerRSSI by viewModel.peerRSSI.collectAsState()
 
     // Track nested private chat sheet state
     var showPrivateChatSheet by remember { mutableStateOf(false) }
@@ -125,7 +100,7 @@ fun MeshPeerListSheetContent(
                 }
             }
             // Channels section
-            if (joinedChannels.isNotEmpty()) {
+            if (model.joinedChannels.isNotEmpty()) {
                 item(key = "channels_header") {
                     Text(
                         text = stringResource(id = R.string.channels).uppercase(),
@@ -140,11 +115,11 @@ fun MeshPeerListSheetContent(
                 }
 
                 items(
-                    items = joinedChannels.toList(),
+                    items = model.joinedChannels.toList(),
                     key = { "channel_$it" }
                 ) { channel ->
-                    val isSelected = channel == currentChannel
-                    val unreadCount = unreadChannelMessages[channel] ?: 0
+                    val isSelected = channel == model.currentChannel
+                    val unreadCount = model.unreadChannelMessages[channel] ?: 0
 
                     ChannelRow(
                         channel = channel,
@@ -156,51 +131,46 @@ fun MeshPeerListSheetContent(
                             if (channel.startsWith("@")) {
                                 // Extract peer name and find the peer ID
                                 val peerName = channel.removePrefix("@")
-                                val peerID =
-                                    peerNicknames.entries.firstOrNull { it.value == peerName }?.key
+                                val peerID = model.peerNicknames.entries.firstOrNull { it.value == peerName }?.key
                                 if (peerID != null) {
                                     privateChatPeerID = peerID
                                     showPrivateChatSheet = true
                                 }
                             } else {
-                                // Regular channel switch
-                                viewModel.switchToChannel(channel)
-                                onDismiss()
+                                component.onSwitchToChannel(channel)
                             }
                         },
-                        onLeaveChannel = {
-                            viewModel.leaveChannel(channel)
-                        }
+                        onLeaveChannel = { component.onLeaveChannel(channel) }
                     )
                 }
             }
 
             // People section - switch between mesh and geohash lists (iOS-compatible)
             item(key = "people_section") {
-                val selectedLocationChannel by viewModel.selectedLocationChannel.collectAsState()
-
-                when (selectedLocationChannel) {
+                when (model.selectedLocationChannel) {
                     is ChannelID.Location -> {
                         // Show geohash people list when in location channel
                         GeohashPeopleList(
-                            viewModel = viewModel,
-                            onTapPerson = onDismiss
+                            geohashPeople = model.geohashPeople,
+                            selectedLocationChannel = model.selectedLocationChannel,
+                            isTeleported = model.isTeleported,
+                            nickname = model.nickname,
+                            unreadPrivateMessages = model.unreadPrivateMessages,
+                            onStartGeohashDM = component::onStartGeohashDM,
+                            onGetPersonTeleported = component::isPersonTeleported,
+                            onGetColorForPubkey = component::colorForNostrPubkey,
+                            onTapPerson = component::onDismiss
                         )
                     }
 
                     else -> {
                         // Show mesh peer list when in mesh channel (default)
                         PeopleSection(
-                            modifier = Modifier.padding(top = if (joinedChannels.isNotEmpty()) 16.dp else 0.dp),
-                            connectedPeers = connectedPeers,
-                            peerNicknames = peerNicknames,
-                            peerRSSI = peerRSSI,
-                            nickname = nickname,
+                            model = model,
+                            component = component,
                             colorScheme = colorScheme,
-                            selectedPrivatePeer = selectedPrivatePeer,
-                            viewModel = viewModel,
                             onPrivateChatStart = { peerID ->
-                                viewModel.startPrivateChat(peerID)
+                                component.onStartPrivateChat(peerID)
                                 privateChatPeerID = peerID
                                 showPrivateChatSheet = true
                             }
@@ -209,20 +179,6 @@ fun MeshPeerListSheetContent(
                 }
             }
         }
-    }
-
-    // Nested Private Chat Sheet (iOS-style)
-    if (showPrivateChatSheet && privateChatPeerID != null) {
-        PrivateChatSheet(
-            isPresented = showPrivateChatSheet,
-            peerID = privateChatPeerID!!,
-            viewModel = viewModel,
-            onDismiss = {
-                showPrivateChatSheet = false
-                privateChatPeerID = null
-                viewModel.endPrivateChat()
-            }
-        )
     }
 }
 
@@ -237,11 +193,7 @@ private fun ChannelRow(
 ) {
     Surface(
         onClick = onChannelClick,
-        color = if (isSelected) {
-            colorScheme.primaryContainer.copy(alpha = 0.15f)
-        } else {
-            Color.Transparent
-        },
+        color = if (isSelected) colorScheme.primaryContainer.copy(alpha = 0.15f) else Color.Transparent,
         shape = MaterialTheme.shapes.medium,
         modifier = Modifier
             .fillMaxWidth()
@@ -261,10 +213,7 @@ private fun ChannelRow(
             ) {
                 // Unread badge
                 if (unreadCount > 0) {
-                    UnreadBadge(
-                        count = unreadCount,
-                        colorScheme = colorScheme
-                    )
+                    UnreadBadge(count = unreadCount, colorScheme = colorScheme)
                 }
 
                 Text(
@@ -291,12 +240,7 @@ private fun ChannelRow(
                         modifier = Modifier.size(20.dp)
                     )
                 }
-
-                // Leave channel button
-                IconButton(
-                    onClick = onLeaveChannel,
-                    modifier = Modifier.size(32.dp)
-                ) {
+                IconButton(onClick = onLeaveChannel, modifier = Modifier.size(32.dp)) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = stringResource(R.string.cd_leave_channel),
@@ -311,17 +255,14 @@ private fun ChannelRow(
 
 
 @Composable
-fun PeopleSection(
-    modifier: Modifier = Modifier,
-    connectedPeers: List<String>,
-    peerNicknames: Map<String, String>,
-    peerRSSI: Map<String, Int>,
-    nickname: String,
+private fun PeopleSection(
+    model: MeshPeerListComponent.Model,
+    component: MeshPeerListComponent,
     colorScheme: ColorScheme,
-    selectedPrivatePeer: String?,
-    viewModel: ChatViewModel,
     onPrivateChatStart: (String) -> Unit
 ) {
+    val modifier = Modifier.padding(top = if (model.joinedChannels.isNotEmpty()) 16.dp else 0.dp)
+    
     Column(modifier = modifier) {
         Text(
             text = stringResource(id = R.string.people).uppercase(),
@@ -334,7 +275,7 @@ fun PeopleSection(
                 .padding(top = 8.dp, bottom = 4.dp)
         )
 
-        if (connectedPeers.isEmpty()) {
+        if (model.connectedPeers.isEmpty()) {
             Text(
                 text = stringResource(id = R.string.no_one_connected),
                 style = MaterialTheme.typography.bodyMedium.copy(
@@ -348,136 +289,87 @@ fun PeopleSection(
             )
         }
 
-        // Observe reactive state for favorites and fingerprints
-        val hasUnreadPrivateMessages by viewModel.unreadPrivateMessages.collectAsState()
-        val privateChats by viewModel.privateChats.collectAsState()
-        val favoritePeers by viewModel.favoritePeers.collectAsState()
-        val peerFingerprints by viewModel.peerFingerprints.collectAsState()
-
-        // Reactive favorite computation for all peers
-        val peerFavoriteStates = remember(favoritePeers, peerFingerprints, connectedPeers) {
-            connectedPeers.associateWith { peerID ->
-                // Reactive favorite computation - same as ChatHeader
-                val fingerprint = peerFingerprints[peerID]
-                fingerprint != null && favoritePeers.contains(fingerprint)
+        // Reactive favorite computation
+        val peerFavoriteStates = remember(model.favoritePeers, model.peerFingerprints, model.connectedPeers) {
+            model.connectedPeers.associateWith { peerID ->
+                val fingerprint = model.peerFingerprints[peerID]
+                fingerprint != null && model.favoritePeers.contains(fingerprint)
             }
         }
 
-        // Build mapping of connected peerID -> noise key hex to unify with offline favorites
-        val noiseHexByPeerID: Map<String, String> = connectedPeers.associateWith { pid ->
-            viewModel.getPeerNoisePublicKeyHex(pid)
+        // Build noise hex mapping
+        val noiseHexByPeerID: Map<String, String> = model.connectedPeers.associateWith { pid ->
+            component.getPeerNoisePublicKeyHex(pid)
         }.filterValues { it != null }.mapValues { it.value!! }
 
-        Log.d(
-            "SidebarComponents",
-            "Recomposing with ${favoritePeers.size} favorites, peer states: $peerFavoriteStates"
+        // Smart sorting
+        val sortedPeers = model.connectedPeers.sortedWith(
+            compareBy<String> { !model.unreadPrivateMessages.contains(it) }
+                .thenByDescending { model.privateChats[it]?.maxByOrNull { msg -> msg.timestamp }?.timestamp?.time ?: 0L }
+                .thenBy { !(peerFavoriteStates[it] ?: false) }
+                .thenBy { (if (it == model.nickname) "You" else (model.peerNicknames[it] ?: it)).lowercase() }
         )
 
-        // Smart sorting: unread DMs first, then by most recent DM, then favorites, then alphabetical
-        val sortedPeers = connectedPeers.sortedWith(
-            compareBy<String> { !hasUnreadPrivateMessages.contains(it) } // Unread DM senders first
-                .thenByDescending {
-                    privateChats[it]?.maxByOrNull { msg -> msg.timestamp }?.timestamp?.time ?: 0L
-                } // Most recent DM (convert Date to Long)
-                .thenBy { !(peerFavoriteStates[it] ?: false) } // Favorites first
-                .thenBy {
-                    (if (it == nickname) "You" else (peerNicknames[it] ?: it)).lowercase()
-                } // Alphabetical
-        )
-
-        // Build a map of base name counts across all people shown in the list (connected + offline + nostr)
+        // Build base name counts
         val hex64Regex = Regex("^[0-9a-fA-F]{64}$")
-
-        // Helper to compute display name used for a given key
-        fun computeDisplayNameForPeerId(key: String): String {
-            return if (key == nickname) "You" else (peerNicknames[key]
-                ?: (privateChats[key]?.lastOrNull()?.sender ?: key.take(12)))
+        fun computeDisplayName(key: String): String {
+            return if (key == model.nickname) "You" else (model.peerNicknames[key] ?: (model.privateChats[key]?.lastOrNull()?.sender ?: key.take(12)))
         }
 
         val baseNameCounts = mutableMapOf<String, Int>()
 
         // Connected peers
         sortedPeers.forEach { pid ->
-            val dn = computeDisplayNameForPeerId(pid)
-            val (b, _) = splitSuffix(dn)
+            val (b, _) = splitSuffix(computeDisplayName(pid))
             if (b != "You") baseNameCounts[b] = (baseNameCounts[b] ?: 0) + 1
         }
 
-        // Offline favorites (exclude ones mapped to connected)
-        val offlineFavorites = viewModel.getOfflineFavorites()
+        val offlineFavorites = component.getOfflineFavorites()
         offlineFavorites.forEach { fav ->
             val favPeerID = fav.peerNoisePublicKey.joinToString("") { b -> "%02x".format(b) }
             val isMappedToConnected = noiseHexByPeerID.values.any { it.equals(favPeerID, ignoreCase = true) }
             if (!isMappedToConnected) {
-                val dn = peerNicknames[favPeerID] ?: fav.peerNickname
+                val dn = model.peerNicknames[favPeerID] ?: fav.peerNickname
                 val (b, _) = splitSuffix(dn)
                 if (b != "You") baseNameCounts[b] = (baseNameCounts[b] ?: 0) + 1
             }
         }
 
-        // Nostr-only conversations
-        val connectedIds = sortedPeers.toSet()
-        val appendedOfflineIds = mutableSetOf<String>()
-        privateChats.keys
-            .filter { key ->
-                (key.startsWith("nostr_") || hex64Regex.matches(key)) &&
-                        !connectedIds.contains(key) &&
-                        !noiseHexByPeerID.values.any { it.equals(key, ignoreCase = true) }
-            }
-            .forEach { convKey ->
-                val dn = peerNicknames[convKey] ?: (privateChats[convKey]?.lastOrNull()?.sender
-                    ?: convKey.take(12))
-                val (b, _) = splitSuffix(dn)
-                if (b != "You") baseNameCounts[b] = (baseNameCounts[b] ?: 0) + 1
-            }
-
+        // Render connected peers
         sortedPeers.forEach { peerID ->
             val isFavorite = peerFavoriteStates[peerID] ?: false
-            // fingerprint and favorite relationship resolution not needed here; UI will show Nostr globe for appended offline favorites below
-
             val noiseHex = noiseHexByPeerID[peerID]
-            val meshUnread = hasUnreadPrivateMessages.contains(peerID)
-            val nostrUnread =
-                if (noiseHex != null) hasUnreadPrivateMessages.contains(noiseHex) else false
+            val meshUnread = model.unreadPrivateMessages.contains(peerID)
+            val nostrUnread = if (noiseHex != null) model.unreadPrivateMessages.contains(noiseHex) else false
             val combinedHasUnread = meshUnread || nostrUnread
-            val combinedUnreadCount = (
-                    privateChats[peerID]?.count { msg -> msg.sender != nickname && meshUnread } ?: 0
-                    ) + (
-                    if (noiseHex != null) privateChats[noiseHex]?.count { msg -> msg.sender != nickname && nostrUnread }
-                        ?: 0 else 0
-                    )
+            val combinedUnreadCount = (model.privateChats[peerID]?.count { msg -> msg.sender != model.nickname && meshUnread } ?: 0) +
+                    (if (noiseHex != null) model.privateChats[noiseHex]?.count { msg -> msg.sender != model.nickname && nostrUnread } ?: 0 else 0)
 
-            val displayName = if (peerID == nickname) "You" else (peerNicknames[peerID]
-                ?: (privateChats[peerID]?.lastOrNull()?.sender ?: peerID.take(12)))
+            val displayName = computeDisplayName(peerID)
             val (bName, _) = splitSuffix(displayName)
             val showHash = (baseNameCounts[bName] ?: 0) > 1
+            val isDirectLive = model.peerDirect[peerID] ?: component.isPeerDirectConnection(peerID)
 
-            val directMap by viewModel.peerDirect.collectAsState()
-            val isDirectLive = directMap[peerID] ?: viewModel.isPeerDirectConnection(peerID)
             PeerItem(
                 peerID = peerID,
                 displayName = displayName,
                 isDirect = isDirectLive,
-                isSelected = peerID == selectedPrivatePeer,
+                isSelected = peerID == model.selectedPrivatePeer,
                 isFavorite = isFavorite,
                 hasUnreadDM = combinedHasUnread,
                 colorScheme = colorScheme,
-                viewModel = viewModel,
+                nickname = model.nickname,
+                onColorForMeshPeer = component::colorForMeshPeer,
                 onItemClick = { onPrivateChatStart(peerID) },
-                onToggleFavorite = {
-                    Log.d(
-                        "SidebarComponents",
-                        "Sidebar toggle favorite: peerID=$peerID, currentFavorite=$isFavorite"
-                    )
-                    viewModel.toggleFavorite(peerID)
-                },
+                onToggleFavorite = { component.onToggleFavorite(peerID) },
                 unreadCount = if (combinedUnreadCount > 0) combinedUnreadCount else if (combinedHasUnread) 1 else 0,
                 showNostrGlobe = false,
                 showHashSuffix = showHash
             )
         }
 
-        // Append offline favorites we actively favorite (and not currently connected)
+        // Render offline favorites
+        val appendedOfflineIds = mutableSetOf<String>()
         offlineFavorites.forEach { fav ->
             val favPeerID = fav.peerNoisePublicKey.joinToString("") { b -> "%02x".format(b) }
             // If any connected peer maps to this noise key, skip showing the offline entry
@@ -487,67 +379,39 @@ fun PeopleSection(
 
             // Resolve potential Nostr conversation key for this favorite (for unread detection)
             val nostrConvKey: String? = try {
-                val npubOrHex = viewModel.findNostrPubkey(fav.peerNoisePublicKey)
+                val npubOrHex = component.findNostrPubkey(fav.peerNoisePublicKey)
                 if (npubOrHex != null) {
                     val hex = if (npubOrHex.startsWith("npub")) {
                         val (hrp, data) = Bech32.decode(npubOrHex)
                         if (hrp == "npub") data.joinToString("") { "%02x".format(it) } else null
-                    } else {
-                        npubOrHex.lowercase()
-                    }
+                    } else npubOrHex.lowercase()
                     hex?.let { "nostr_${it.take(16)}" }
                 } else null
             } catch (_: Exception) { null }
 
-            val hasUnread =
-                hasUnreadPrivateMessages.contains(favPeerID) || (nostrConvKey != null && hasUnreadPrivateMessages.contains(
-                    nostrConvKey
-                ))
+            val hasUnread = model.unreadPrivateMessages.contains(favPeerID) || 
+                    (nostrConvKey != null && model.unreadPrivateMessages.contains(nostrConvKey))
 
-            // If user clicks an offline favorite and the mapped peer is currently connected under a different ID,
-            // open chat with the connected peerID instead of the noise hex for a seamless window
-            val mappedConnectedPeerID = noiseHexByPeerID.entries.firstOrNull {
-                it.value.equals(
-                    favPeerID,
-                    ignoreCase = true
-                )
-            }?.key
-            val dn = peerNicknames[favPeerID] ?: fav.peerNickname
+            val mappedConnectedPeerID = noiseHexByPeerID.entries.firstOrNull { it.value.equals(favPeerID, ignoreCase = true) }?.key
+            val dn = model.peerNicknames[favPeerID] ?: fav.peerNickname
             val (bName, _) = splitSuffix(dn)
             val showHash = (baseNameCounts[bName] ?: 0) > 1
 
-            // Compute unreadCount from either noise conversation or Nostr conversation
-            val unreadCount = (
-                    privateChats[favPeerID]?.count { msg ->
-                        msg.sender != nickname && hasUnreadPrivateMessages.contains(
-                            favPeerID
-                        )
-                    } ?: 0
-                    ) + (
-                    if (nostrConvKey != null) privateChats[nostrConvKey]?.count { msg ->
-                        msg.sender != nickname && hasUnreadPrivateMessages.contains(
-                            nostrConvKey
-                        )
-                    } ?: 0 else 0
-                    )
+            val unreadCount = (model.privateChats[favPeerID]?.count { msg -> msg.sender != model.nickname && model.unreadPrivateMessages.contains(favPeerID) } ?: 0) +
+                    (if (nostrConvKey != null) model.privateChats[nostrConvKey]?.count { msg -> msg.sender != model.nickname && model.unreadPrivateMessages.contains(nostrConvKey) } ?: 0 else 0)
 
             PeerItem(
                 peerID = favPeerID,
                 displayName = dn,
                 isDirect = false,
-                isSelected = (mappedConnectedPeerID ?: favPeerID) == selectedPrivatePeer,
+                isSelected = (mappedConnectedPeerID ?: favPeerID) == model.selectedPrivatePeer,
                 isFavorite = true,
                 hasUnreadDM = hasUnread,
                 colorScheme = colorScheme,
-                viewModel = viewModel,
+                nickname = model.nickname,
+                onColorForMeshPeer = component::colorForMeshPeer,
                 onItemClick = { onPrivateChatStart(mappedConnectedPeerID ?: favPeerID) },
-                onToggleFavorite = {
-                    Log.d(
-                        "SidebarComponents",
-                        "Sidebar toggle favorite (offline): peerID=$favPeerID"
-                    )
-                    viewModel.toggleFavorite(favPeerID)
-                },
+                onToggleFavorite = { component.onToggleFavorite(favPeerID) },
                 unreadCount = if (unreadCount > 0) unreadCount else if (hasUnread) 1 else 0,
                 showNostrGlobe = (fav.isMutual && fav.peerNostrPublicKey != null),
                 showHashSuffix = showHash
@@ -609,7 +473,8 @@ private fun PeerItem(
     isFavorite: Boolean,
     hasUnreadDM: Boolean,
     colorScheme: ColorScheme,
-    viewModel: ChatViewModel,
+    nickname: String,
+    onColorForMeshPeer: (String, Boolean) -> Color,
     onItemClick: () -> Unit,
     onToggleFavorite: () -> Unit,
     unreadCount: Int = 0,
@@ -620,21 +485,15 @@ private fun PeerItem(
     val (baseNameRaw, suffixRaw) = splitSuffix(displayName)
     val baseName = truncateNickname(baseNameRaw)
     val suffix = if (showHashSuffix) suffixRaw else ""
-    val isMe = displayName == "You" || peerID == viewModel.nickname.value
+    val isMe = displayName == "You" || peerID == nickname
 
-    // Get consistent peer color (iOS-compatible)
-    val isDark =
-        colorScheme.background.red + colorScheme.background.green + colorScheme.background.blue < 1.5f
-    val assignedColor = viewModel.colorForMeshPeer(peerID, isDark)
+    val isDark = colorScheme.background.red + colorScheme.background.green + colorScheme.background.blue < 1.5f
+    val assignedColor = onColorForMeshPeer(peerID, isDark)
     val baseColor = if (isMe) Color(0xFFFF9500) else assignedColor
 
     Surface(
         onClick = onItemClick,
-        color = if (isSelected) {
-            colorScheme.primaryContainer.copy(alpha = 0.15f)
-        } else {
-            Color.Transparent
-        },
+        color = if (isSelected) colorScheme.primaryContainer.copy(alpha = 0.15f) else Color.Transparent,
         shape = MaterialTheme.shapes.medium,
         modifier = Modifier
             .fillMaxWidth()
@@ -652,37 +511,16 @@ private fun PeerItem(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Connection/status indicator
-                if (hasUnreadDM) {
-                    // Show mail icon for unread DMs (iOS orange)
-                    Icon(
-                        imageVector = Icons.Filled.Email,
-                        contentDescription = stringResource(R.string.cd_unread_message),
-                        modifier = Modifier.size(16.dp),
-                        tint = Color(0xFFFF9500) // iOS orange
-                    )
-                } else if (showNostrGlobe) {
-                    // Purple globe to indicate Nostr availability
-                    Icon(
-                        imageVector = Icons.Filled.Public,
-                        contentDescription = stringResource(R.string.cd_reachable_via_nostr),
-                        modifier = Modifier.size(16.dp),
-                        tint = Color(0xFF9C27B0) // Purple
-                    )
-                } else if (!isDirect && isFavorite) {
-                    // Offline favorited user: show outlined circle icon
-                    Icon(
-                        imageVector = Icons.Outlined.Circle,
-                        contentDescription = stringResource(R.string.cd_offline_favorite),
-                        modifier = Modifier.size(16.dp),
-                        tint = Color.Gray
-                    )
-                } else {
-                    Icon(
-                        imageVector = if (isDirect) Icons.Outlined.SettingsInputAntenna else Icons.Filled.Route,
-                        contentDescription = if (isDirect) "Direct Bluetooth" else "Routed",
-                        modifier = Modifier.size(16.dp),
-                        tint = colorScheme.onSurface.copy(alpha = 0.6f)
+                // Status icon
+                when {
+                    hasUnreadDM -> Icon(Icons.Filled.Email, stringResource(R.string.cd_unread_message), Modifier.size(16.dp), Color(0xFFFF9500))
+                    showNostrGlobe -> Icon(Icons.Filled.Public, stringResource(R.string.cd_reachable_via_nostr), Modifier.size(16.dp), Color(0xFF9C27B0))
+                    !isDirect && isFavorite -> Icon(Icons.Outlined.Circle, stringResource(R.string.cd_offline_favorite), Modifier.size(16.dp), Color.Gray)
+                    else -> Icon(
+                        if (isDirect) Icons.Outlined.SettingsInputAntenna else Icons.Filled.Route,
+                        if (isDirect) "Direct Bluetooth" else "Routed",
+                        Modifier.size(16.dp),
+                        colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                 }
 
@@ -768,266 +606,9 @@ private fun UnreadBadge(
         ) {
             Text(
                 text = if (count > 99) "99+" else count.toString(),
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                ),
-                color = Color.Black // Black text on yellow background
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace),
+                color = Color.Black
             )
-        }
-    }
-}
-
-/**
- * Convert RSSI value (dBm) to signal strength percentage (0-100)
- * RSSI typically ranges from -30 (excellent) to -100 (very poor)
- * Maps to 0-100 scale where:
- * - 0-32: No signal (0 bars)
- * - 33-65: Weak (1 bar)
- * - 66-98: Good (2 bars)
- * - 99-100: Excellent (3 bars)
- */
-private fun convertRSSIToSignalStrength(rssi: Int?): Int {
-    if (rssi == null) return 0
-
-    return when {
-        rssi >= -40 -> 100  // Excellent signal
-        rssi >= -55 -> 85   // Very good signal  
-        rssi >= -70 -> 70   // Good signal
-        rssi >= -85 -> 50   // Fair signal
-        rssi >= -100 -> 25  // Poor signal
-        else -> 0           // Very poor or no signal
-    }
-}
-
-/**
- * Nested Private Chat Sheet - iOS-style nested bottom sheet
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun PrivateChatSheet(
-    isPresented: Boolean,
-    peerID: String,
-    viewModel: ChatViewModel,
-    onDismiss: () -> Unit
-) {
-    val colorScheme = MaterialTheme.colorScheme
-    val privateChats by viewModel.privateChats.collectAsState()
-    val peerNicknames by viewModel.peerNicknames.collectAsState()
-    val nickname by viewModel.nickname.collectAsState()
-    val connectedPeers by viewModel.connectedPeers.collectAsState()
-    val peerDirectMap by viewModel.peerDirect.collectAsState()
-    val peerSessionStates by viewModel.peerSessionStates.collectAsState()
-    val favoritePeers by viewModel.favoritePeers.collectAsState()
-    val peerFingerprints by viewModel.peerFingerprints.collectAsState()
-
-    // Start private chat when screen opens
-    LaunchedEffect(peerID) {
-        viewModel.startPrivateChat(peerID)
-    }
-
-    val displayName = peerNicknames[peerID] ?: peerID.take(12)
-    val messages = privateChats[peerID] ?: emptyList()
-    val isDirect = peerDirectMap[peerID] == true
-    val isConnected = connectedPeers.contains(peerID) || isDirect
-    val isNostrPeer = peerID.startsWith("nostr_") || peerID.startsWith("nostr:")
-    val sessionState = peerSessionStates[peerID]
-    val fingerprint = peerFingerprints[peerID]
-    val isFavorite = remember(favoritePeers, fingerprint) {
-        if (fingerprint != null) favoritePeers.contains(fingerprint) else viewModel.isFavorite(
-            peerID
-        )
-    }
-
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true
-    )
-
-    if (isPresented) {
-        ModalBottomSheet(
-            modifier = Modifier.statusBarsPadding(),
-            onDismissRequest = onDismiss,
-            sheetState = sheetState,
-            containerColor = colorScheme.background,
-            dragHandle = null
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                Column(
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Spacer(modifier = Modifier.height(64.dp))
-
-                    HorizontalDivider(color = colorScheme.outline.copy(alpha = 0.3f))
-
-                    // Messages list
-                    var forceScrollToBottom by remember { mutableStateOf(false) }
-                    var isScrolledUp by remember { mutableStateOf(false) }
-
-                    MessagesList(
-                        messages = messages,
-                        currentUserNickname = nickname,
-                        modifier = Modifier.weight(1f),
-                        forceScrollToBottom = forceScrollToBottom,
-                        onScrolledUpChanged = { isUp -> isScrolledUp = isUp },
-                        onNicknameClick = { /* handle mention */ },
-                        onMessageLongPress = { /* handle long press */ },
-                        onCancelTransfer = { msg -> viewModel.cancelMediaSend(msg.id) },
-                        onImageClick = { _, _, _ -> /* handle image click */ },
-                        myPeerID = viewModel.myPeerID,
-                        onGeohashClick = { geohash ->
-                            viewModel.teleportToGeohash(geohash)
-                        }
-                    )
-
-                    HorizontalDivider(color = colorScheme.outline.copy(alpha = 0.3f))
-
-                    // Input section
-                    var messageText by remember {
-                        mutableStateOf(
-                            TextFieldValue(
-                                ""
-                            )
-                        )
-                    }
-
-                    ChatInputSection(
-                        messageText = messageText,
-                        onMessageTextChange = { newText ->
-                            messageText = newText
-                            viewModel.updateMentionSuggestions(newText.text)
-                        },
-                        onSend = {
-                            if (messageText.text.trim().isNotEmpty()) {
-                                viewModel.sendMessage(messageText.text.trim())
-                                messageText = TextFieldValue("")
-                                forceScrollToBottom = !forceScrollToBottom
-                            }
-                        },
-                        onSendVoiceNote = { peer, channel, path ->
-                            viewModel.sendVoiceNote(peer, channel, path)
-                        },
-                        onSendImageNote = { peer, channel, path ->
-                            viewModel.sendImageNote(peer, channel, path)
-                        },
-                        onSendFileNote = { peer, channel, path ->
-                            viewModel.sendFileNote(peer, channel, path)
-                        },
-                        showCommandSuggestions = false,
-                        commandSuggestions = emptyList(),
-                        showMentionSuggestions = false,
-                        mentionSuggestions = emptyList(),
-                        onCommandSuggestionClick = { },
-                        onMentionSuggestionClick = { },
-                        selectedPrivatePeer = peerID,
-                        currentChannel = null,
-                        nickname = nickname,
-                        colorScheme = colorScheme,
-                        showMediaButtons = true
-                    )
-                }
-
-                // TopBar (fixed at top, iOS-style)
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .fillMaxWidth()
-                        .height(64.dp)
-                        .background(colorScheme.background),
-                    contentAlignment = Alignment.Center
-                ) {
-                    // Back button
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .padding(start = 16.dp)
-                            .size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.chat_back),
-                            tint = colorScheme.onSurface
-                        )
-                    }
-
-                    // Center content: connection status + name + encryption
-                    Row(
-                        modifier = Modifier.align(Alignment.Center),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        when {
-                            isDirect -> {
-                                Icon(
-                                    imageVector = Icons.Outlined.SettingsInputAntenna,
-                                    contentDescription = stringResource(R.string.cd_connected_peers),
-                                    modifier = Modifier.size(14.dp),
-                                    tint = colorScheme.onSurface.copy(alpha = 0.6f)
-                                )
-                            }
-
-                            isConnected -> {
-                                Icon(
-                                    imageVector = Icons.Filled.Route,
-                                    contentDescription = stringResource(R.string.cd_ready_for_handshake),
-                                    modifier = Modifier.size(14.dp),
-                                    tint = colorScheme.onSurface.copy(alpha = 0.6f)
-                                )
-                            }
-
-                            isNostrPeer -> {
-                                Icon(
-                                    imageVector = Icons.Filled.Public,
-                                    contentDescription = stringResource(R.string.cd_nostr_reachable),
-                                    modifier = Modifier.size(14.dp),
-                                    tint = Color(0xFF9C27B0)
-                                )
-                            }
-                        }
-
-                        Text(
-                            text = displayName,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace
-                            ),
-                            color = colorScheme.onSurface
-                        )
-
-                        if (!isNostrPeer) {
-                            NoiseSessionIcon(
-                                sessionState = sessionState,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-
-                        IconButton(
-                            onClick = { viewModel.toggleFavorite(peerID) },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.Star,
-                                contentDescription = if (isFavorite) stringResource(R.string.cd_remove_favorite) else stringResource(
-                                    R.string.cd_add_favorite
-                                ),
-                                modifier = Modifier.size(16.dp),
-                                tint = if (isFavorite) Color(0xFFFFD700) else colorScheme.onSurface.copy(
-                                    alpha = 0.6f
-                                )
-                            )
-                        }
-                    }
-
-                    CloseButton(
-                        onClick = onDismiss,
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .padding(horizontal = 16.dp)
-                    )
-
-                }
-            }
         }
     }
 }

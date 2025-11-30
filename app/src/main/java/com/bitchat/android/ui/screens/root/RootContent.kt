@@ -9,7 +9,6 @@ import com.arkivanov.decompose.extensions.compose.stack.animation.stackAnimation
 import com.bitchat.android.feature.root.RootComponent
 import com.bitchat.android.ui.screens.chat.ChatScreen
 import com.bitchat.android.ui.screens.onboarding.OnboardingFlowScreen
-import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun RootContent(
@@ -29,8 +28,7 @@ fun RootContent(
             }
             is RootComponent.Child.Chat -> {
                 ChatScreen(
-                    component = child.component,
-                    viewModel = koinViewModel()
+                    component = child.component
                 )
             }
         }
