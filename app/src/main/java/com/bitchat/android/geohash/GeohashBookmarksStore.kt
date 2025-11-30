@@ -12,11 +12,12 @@ import com.bitchat.android.util.JsonUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.Locale
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Stores a user-maintained list of bookmarked geohash channels.
@@ -45,10 +46,10 @@ class GeohashBookmarksStore @Inject constructor(private val context: Context) {
     private val membership = mutableSetOf<String>()
 
     private val _bookmarks = MutableStateFlow<List<String>>(emptyList())
-    val bookmarks: StateFlow<List<String>> = _bookmarks
+    val bookmarks: StateFlow<List<String>> = _bookmarks.asStateFlow()
 
     private val _bookmarkNames = MutableStateFlow<Map<String, String>>(emptyMap())
-    val bookmarkNames: StateFlow<Map<String, String>> = _bookmarkNames
+    val bookmarkNames: StateFlow<Map<String, String>> = _bookmarkNames.asStateFlow()
 
     // For throttling / preventing duplicate geocode lookups
     private val resolving = mutableSetOf<String>()
@@ -68,7 +69,7 @@ class GeohashBookmarksStore @Inject constructor(private val context: Context) {
         val gh = normalize(geohash)
         if (gh.isEmpty() || membership.contains(gh)) return
         membership.add(gh)
-        val updated = listOf(gh) + _bookmarks.value
+        val updated = listOf(gh) + (_bookmarks.value)
         _bookmarks.value = updated
         persist(updated)
         // Resolve friendly name asynchronously
@@ -79,7 +80,7 @@ class GeohashBookmarksStore @Inject constructor(private val context: Context) {
         val gh = normalize(geohash)
         if (!membership.contains(gh)) return
         membership.remove(gh)
-        val updated = _bookmarks.value.filterNot { it == gh }
+        val updated = (_bookmarks.value).filterNot { it == gh }
         _bookmarks.value = updated
         // Remove stored name to avoid stale cache growth
         val names = _bookmarkNames.value.toMutableMap()

@@ -3,7 +3,6 @@ package com.bitchat.android.ui
 import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.LiveData
 import androidx.lifecycle.viewModelScope
 import com.bitchat.android.nostr.GeohashMessageHandler
 import com.bitchat.android.nostr.GeohashRepository
@@ -17,6 +16,7 @@ import com.bitchat.android.nostr.PoWPreferenceManager
 import jakarta.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -68,9 +68,9 @@ class GeohashViewModel @Inject constructor(
     private var currentDmSubId: String? = null
     private var geoTimer: Job? = null
 
-    val geohashPeople: LiveData<List<GeoPerson>> = state.geohashPeople
-    val geohashParticipantCounts: LiveData<Map<String, Int>> = state.geohashParticipantCounts
-    val selectedLocationChannel: LiveData<com.bitchat.android.geohash.ChannelID?> = state.selectedLocationChannel
+    val geohashPeople: StateFlow<List<GeoPerson>> = state.geohashPeople
+    val geohashParticipantCounts: StateFlow<Map<String, Int>> = state.geohashParticipantCounts
+    val selectedLocationChannel: StateFlow<com.bitchat.android.geohash.ChannelID?> = state.selectedLocationChannel
 
     fun initialize() {
         subscriptionManager.connect()
@@ -93,8 +93,8 @@ class GeohashViewModel @Inject constructor(
 
             locationChannelManager.teleported
                 .onEach { teleported ->
-                state.setIsTeleported(teleported)
-            }.launchIn(viewModelScope)
+                    state.setIsTeleported(teleported)
+                }.launchIn(viewModelScope)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize location channel state: ${e.message}")
             state.setSelectedLocationChannel(com.bitchat.android.geohash.ChannelID.Mesh)
@@ -241,7 +241,7 @@ class GeohashViewModel @Inject constructor(
                 try {
                     val identity = NostrIdentityBridge.deriveIdentity(channel.channel.geohash, getApplication())
                     repo.updateParticipant(channel.channel.geohash, identity.publicKeyHex, Date())
-                    val teleported = state.isTeleported.value ?: false
+                    val teleported = state.isTeleported.value
                     if (teleported) repo.markTeleported(identity.publicKeyHex)
                 } catch (e: Exception) { Log.w(TAG, "Failed identity setup: ${e.message}") }
 

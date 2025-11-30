@@ -9,7 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -32,7 +32,7 @@ fun LocationNotesButton(
     val colorScheme = MaterialTheme.colorScheme
 
     // Get channel and permission state
-    val selectedLocationChannel by viewModel.selectedLocationChannel.observeAsState()
+    val selectedLocationChannel by viewModel.selectedLocationChannel.collectAsState()
     val permissionState by viewModel.locationPermissionState.collectAsState()
     val locationServicesEnabled by viewModel.locationServicesEnabled.collectAsState(false)
 

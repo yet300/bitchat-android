@@ -112,7 +112,7 @@ fun LocationNotesSheetContent(
                         }
                     }
                 }
-                
+
                 // Error row (matches iOS errorRow)
                 model.errorMessage?.let { error ->
                     if (model.state != LocationNotesManager.State.NO_RELAYS) {
@@ -126,14 +126,14 @@ fun LocationNotesSheetContent(
                 }
             }
         }
-        
+
         // Divider before input (matches iOS overlay)
         HorizontalDivider(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
             thickness = 1.dp
         )
-        
+
         // Input section (matches iOS inputSection)
         LocationNotesInputSection(
             draft = draft,

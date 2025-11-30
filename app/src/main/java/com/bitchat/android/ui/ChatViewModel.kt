@@ -1,11 +1,9 @@
 package com.bitchat.android.ui
 
-
 import android.app.Application
 import android.util.Log
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.LiveData
 import androidx.lifecycle.viewModelScope
 import com.bitchat.android.favorites.FavoritesPersistenceService
 import com.bitchat.android.geohash.ChannelID
@@ -137,55 +135,40 @@ class ChatViewModel @Inject constructor(
 
 
 
-    // Expose state through LiveData (maintaining the same interface)
-    val messages: LiveData<List<BitchatMessage>> = state.messages
-    
-    // Expose myPeerID for UI components (avoids passing meshService to UI layer)
+    // Expose state through StateFlow (maintaining the same interface)
+    val messages: StateFlow<List<BitchatMessage>> = state.messages
     val myPeerID: String get() = meshService.myPeerID
-    
-    // Expose peer info methods for UI components (avoids passing meshService to UI layer)
-    fun getPeerNoisePublicKeyHex(peerID: String): String? {
-        return try {
-            meshService.getPeerInfo(peerID)?.noisePublicKey?.joinToString("") { b -> "%02x".format(b) }
-        } catch (_: Exception) { null }
-    }
-    
-    fun isPeerDirectConnection(peerID: String): Boolean {
-        return try {
-            meshService.getPeerInfo(peerID)?.isDirectConnection == true
-        } catch (_: Exception) { false }
-    }
-    val connectedPeers: LiveData<List<String>> = state.connectedPeers
-    val nickname: LiveData<String> = state.nickname
-    val isConnected: LiveData<Boolean> = state.isConnected
-    val privateChats: LiveData<Map<String, List<BitchatMessage>>> = state.privateChats
-    val selectedPrivateChatPeer: LiveData<String?> = state.selectedPrivateChatPeer
-    val unreadPrivateMessages: LiveData<Set<String>> = state.unreadPrivateMessages
-    val joinedChannels: LiveData<Set<String>> = state.joinedChannels
-    val currentChannel: LiveData<String?> = state.currentChannel
-    val channelMessages: LiveData<Map<String, List<BitchatMessage>>> = state.channelMessages
-    val unreadChannelMessages: LiveData<Map<String, Int>> = state.unreadChannelMessages
-    val passwordProtectedChannels: LiveData<Set<String>> = state.passwordProtectedChannels
-    val showPasswordPrompt: LiveData<Boolean> = state.showPasswordPrompt
-    val passwordPromptChannel: LiveData<String?> = state.passwordPromptChannel
+    val connectedPeers: StateFlow<List<String>> = state.connectedPeers
+    val nickname: StateFlow<String> = state.nickname
+    val isConnected: StateFlow<Boolean> = state.isConnected
+    val privateChats: StateFlow<Map<String, List<BitchatMessage>>> = state.privateChats
+    val selectedPrivateChatPeer: StateFlow<String?> = state.selectedPrivateChatPeer
+    val unreadPrivateMessages: StateFlow<Set<String>> = state.unreadPrivateMessages
+    val joinedChannels: StateFlow<Set<String>> = state.joinedChannels
+    val currentChannel: StateFlow<String?> = state.currentChannel
+    val channelMessages: StateFlow<Map<String, List<BitchatMessage>>> = state.channelMessages
+    val unreadChannelMessages: StateFlow<Map<String, Int>> = state.unreadChannelMessages
+    val passwordProtectedChannels: StateFlow<Set<String>> = state.passwordProtectedChannels
+    val showPasswordPrompt: StateFlow<Boolean> = state.showPasswordPrompt
+    val passwordPromptChannel: StateFlow<String?> = state.passwordPromptChannel
     val hasUnreadChannels = state.hasUnreadChannels
     val hasUnreadPrivateMessages = state.hasUnreadPrivateMessages
-    val showCommandSuggestions: LiveData<Boolean> = state.showCommandSuggestions
-    val commandSuggestions: LiveData<List<CommandSuggestion>> = state.commandSuggestions
-    val showMentionSuggestions: LiveData<Boolean> = state.showMentionSuggestions
-    val mentionSuggestions: LiveData<List<String>> = state.mentionSuggestions
-    val favoritePeers: LiveData<Set<String>> = state.favoritePeers
-    val peerSessionStates: LiveData<Map<String, String>> = state.peerSessionStates
-    val peerFingerprints: LiveData<Map<String, String>> = state.peerFingerprints
-    val peerNicknames: LiveData<Map<String, String>> = state.peerNicknames
-    val peerRSSI: LiveData<Map<String, Int>> = state.peerRSSI
-    val peerDirect: LiveData<Map<String, Boolean>> = state.peerDirect
-    val showAppInfo: LiveData<Boolean> = state.showAppInfo
-    val selectedLocationChannel: LiveData<com.bitchat.android.geohash.ChannelID?> = state.selectedLocationChannel
-    val isTeleported: LiveData<Boolean> = state.isTeleported
-    val geohashPeople: LiveData<List<GeoPerson>> = state.geohashPeople
-    val teleportedGeo: LiveData<Set<String>> = state.teleportedGeo
-    val geohashParticipantCounts: LiveData<Map<String, Int>> = state.geohashParticipantCounts
+    val showCommandSuggestions: StateFlow<Boolean> = state.showCommandSuggestions
+    val commandSuggestions: StateFlow<List<CommandSuggestion>> = state.commandSuggestions
+    val showMentionSuggestions: StateFlow<Boolean> = state.showMentionSuggestions
+    val mentionSuggestions: StateFlow<List<String>> = state.mentionSuggestions
+    val favoritePeers: StateFlow<Set<String>> = state.favoritePeers
+    val peerSessionStates: StateFlow<Map<String, String>> = state.peerSessionStates
+    val peerFingerprints: StateFlow<Map<String, String>> = state.peerFingerprints
+    val peerNicknames: StateFlow<Map<String, String>> = state.peerNicknames
+    val peerRSSI: StateFlow<Map<String, Int>> = state.peerRSSI
+    val peerDirect: StateFlow<Map<String, Boolean>> = state.peerDirect
+    val showAppInfo: StateFlow<Boolean> = state.showAppInfo
+    val selectedLocationChannel: StateFlow<com.bitchat.android.geohash.ChannelID?> = state.selectedLocationChannel
+    val isTeleported: StateFlow<Boolean> = state.isTeleported
+    val geohashPeople: StateFlow<List<GeoPerson>> = state.geohashPeople
+    val teleportedGeo: StateFlow<Set<String>> = state.teleportedGeo
+    val geohashParticipantCounts: StateFlow<Map<String, Int>> = state.geohashParticipantCounts
 
     // Location Notes
     val locationNotes: StateFlow<List<LocationNotesManager.Note>> = locationNotesManager.notes
@@ -222,6 +205,20 @@ class ChatViewModel @Inject constructor(
         }
         
         // Removed background location notes subscription. Notes now load only when sheet opens.
+    }
+
+
+    // Expose peer info methods for UI components (avoids passing meshService to UI layer)
+    fun getPeerNoisePublicKeyHex(peerID: String): String? {
+        return try {
+            meshService.getPeerInfo(peerID)?.noisePublicKey?.joinToString("") { b -> "%02x".format(b) }
+        } catch (_: Exception) { null }
+    }
+
+    fun isPeerDirectConnection(peerID: String): Boolean {
+        return try {
+            meshService.getPeerInfo(peerID)?.isDirectConnection == true
+        } catch (_: Exception) { false }
     }
 
     fun cancelMediaSend(messageId: String) {
@@ -629,7 +626,7 @@ class ChatViewModel @Inject constructor(
     
     private fun logCurrentFavoriteState() {
         Log.i("ChatViewModel", "=== CURRENT FAVORITE STATE ===")
-        Log.i("ChatViewModel", "LiveData favorite peers: ${favoritePeers.value}")
+        Log.i("ChatViewModel", "StateFlow favorite peers: ${favoritePeers.value}")
         Log.i("ChatViewModel", "DataManager favorite peers: ${dataManager.favoritePeers}")
         Log.i("ChatViewModel", "Peer fingerprints: ${privateChatManager.getAllPeerFingerprints()}")
         Log.i("ChatViewModel", "==============================")
@@ -853,7 +850,7 @@ class ChatViewModel @Inject constructor(
             null
         }
     }
-    
+
     // MARK: - Emergency Clear
     
     fun panicClearAllData() {
@@ -912,11 +909,11 @@ class ChatViewModel @Inject constructor(
     }
 
     // MARK: - Location & Network Management
-    
+
     fun refreshLocationChannels() {
         locationChannelManager.refreshChannels()
     }
-    
+
     fun enableLocationChannels() = locationChannelManager.enableLocationChannels()
     fun enableLocationServices() = locationChannelManager.enableLocationServices()
     fun disableLocationServices() = locationChannelManager.disableLocationServices()
@@ -968,10 +965,10 @@ class ChatViewModel @Inject constructor(
     fun setPowDifficulty(difficulty: Int) {
         poWPreferenceManager.setPowDifficulty(difficulty)
     }
-    
+
     // Theme
     val themePreference = themePreferenceManager.themeFlow
-    
+
     fun setTheme(preference: ThemePreference) {
         themePreferenceManager.set(preference)
     }
@@ -981,7 +978,7 @@ class ChatViewModel @Inject constructor(
     fun findNostrPubkey(noiseKey: ByteArray) = favoritesService.findNostrPubkey(noiseKey)
     fun getFavoriteStatus(noiseKey: ByteArray) = favoritesService.getFavoriteStatus(noiseKey)
     fun getFavoriteStatus(peerID: String) = favoritesService.getFavoriteStatus(peerID)
-    
+
     /**
      * Clear all cryptographic data including persistent identity
      */
@@ -1051,7 +1048,7 @@ class ChatViewModel @Inject constructor(
             startPrivateChat(convKey)
         }
     }
-    
+
     /**
      * Block a user in geohash channels by their nickname
      */
@@ -1068,7 +1065,7 @@ class ChatViewModel @Inject constructor(
     fun hideAppInfo() {
         state.setShowAppInfo(false)
     }
-    
+
     /**
      * Handle Android back navigation
      * Returns true if the back press was handled, false if it should be passed to the system

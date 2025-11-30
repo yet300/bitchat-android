@@ -6,11 +6,12 @@ import androidx.annotation.MainThread
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import jakarta.inject.Singleton
 
 /**
  * Manages location notes (kind=1 text notes with geohash tags)
- * iOS-compatible implementation with StateFlow for reactive state management
+ * iOS-compatible implementation with StateFlow for Android UI binding
  */
 @MainThread
 @Singleton
@@ -61,30 +62,30 @@ class LocationNotesManager(
         NO_RELAYS
     }
     
-    // Published state (StateFlow for reactive state management)
+    // Published state (StateFlow for Android)
     private val _notes = MutableStateFlow<List<Note>>(emptyList())
-    val notes: StateFlow<List<Note>> = _notes
+    val notes: StateFlow<List<Note>> = _notes.asStateFlow()
     
     private val _geohash = MutableStateFlow<String?>(null)
-    val geohash: StateFlow<String?> = _geohash
+    val geohash: StateFlow<String?> = _geohash.asStateFlow()
     
     private val _initialLoadComplete = MutableStateFlow(false)
-    val initialLoadComplete: StateFlow<Boolean> = _initialLoadComplete
+    val initialLoadComplete: StateFlow<Boolean> = _initialLoadComplete.asStateFlow()
     
     private val _state = MutableStateFlow(State.IDLE)
-    val state: StateFlow<State> = _state
+    val state: StateFlow<State> = _state.asStateFlow()
     
     private val _errorMessage = MutableStateFlow<String?>(null)
-    val errorMessage: StateFlow<String?> = _errorMessage
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
     
     // Private state
     private var subscriptionIDs: MutableMap<String, String> = mutableMapOf()
     private val noteIDs = mutableSetOf<String>() // For deduplication
     private var subscribedGeohashes: Set<String> = emptySet()
-    
+
     // Coroutine scope for background operations
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-    
+
     /**
      * Set geohash and start subscription
      * iOS: Validates building-level precision (8 characters)

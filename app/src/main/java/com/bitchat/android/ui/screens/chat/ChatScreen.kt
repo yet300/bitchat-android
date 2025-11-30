@@ -12,7 +12,6 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
@@ -59,21 +58,21 @@ fun ChatScreen(
     viewModel: ChatViewModel
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val messages by viewModel.messages.observeAsState(emptyList())
-    val connectedPeers by viewModel.connectedPeers.observeAsState(emptyList())
-    val nickname by viewModel.nickname.observeAsState("")
-    val selectedPrivatePeer by viewModel.selectedPrivateChatPeer.observeAsState()
-    val currentChannel by viewModel.currentChannel.observeAsState()
-    val joinedChannels by viewModel.joinedChannels.observeAsState(emptySet())
-    val hasUnreadChannels by viewModel.unreadChannelMessages.observeAsState(emptyMap())
-    val hasUnreadPrivateMessages by viewModel.unreadPrivateMessages.observeAsState(emptySet())
-    val privateChats by viewModel.privateChats.observeAsState(emptyMap())
-    val channelMessages by viewModel.channelMessages.observeAsState(emptyMap())
-    val showCommandSuggestions by viewModel.showCommandSuggestions.observeAsState(false)
-    val commandSuggestions by viewModel.commandSuggestions.observeAsState(emptyList())
-    val showMentionSuggestions by viewModel.showMentionSuggestions.observeAsState(false)
-    val mentionSuggestions by viewModel.mentionSuggestions.observeAsState(emptyList())
-    val showAppInfo by viewModel.showAppInfo.observeAsState(false)
+    val messages by viewModel.messages.collectAsState()
+    val connectedPeers by viewModel.connectedPeers.collectAsState()
+    val nickname by viewModel.nickname.collectAsState()
+    val selectedPrivatePeer by viewModel.selectedPrivateChatPeer.collectAsState()
+    val currentChannel by viewModel.currentChannel.collectAsState()
+    val joinedChannels by viewModel.joinedChannels.collectAsState()
+    val hasUnreadChannels by viewModel.unreadChannelMessages.collectAsState()
+    val hasUnreadPrivateMessages by viewModel.unreadPrivateMessages.collectAsState()
+    val privateChats by viewModel.privateChats.collectAsState()
+    val channelMessages by viewModel.channelMessages.collectAsState()
+    val showCommandSuggestions by viewModel.showCommandSuggestions.collectAsState()
+    val commandSuggestions by viewModel.commandSuggestions.collectAsState()
+    val showMentionSuggestions by viewModel.showMentionSuggestions.collectAsState()
+    val mentionSuggestions by viewModel.mentionSuggestions.collectAsState()
+    val showAppInfo by viewModel.showAppInfo.collectAsState()
 
     // Handle back press
     val isBackHandlerEnabled = selectedPrivatePeer != null || currentChannel != null
@@ -88,9 +87,9 @@ fun ChatScreen(
     var forceScrollToBottom by remember { mutableStateOf(false) }
     var isScrolledUp by remember { mutableStateOf(false) }
 
-    val isConnected by viewModel.isConnected.observeAsState(false)
-    val passwordPromptChannel by viewModel.passwordPromptChannel.observeAsState(null)
-    
+    val isConnected by viewModel.isConnected.collectAsState(false)
+    val passwordPromptChannel by viewModel.passwordPromptChannel.collectAsState(null)
+
     // Trigger password dialog through component when ViewModel requests it
     LaunchedEffect(passwordPromptChannel) {
         passwordPromptChannel?.let { channel ->
@@ -99,7 +98,7 @@ fun ChatScreen(
     }
 
     // Get location channel info for timeline switching
-    val selectedLocationChannel by viewModel.selectedLocationChannel.observeAsState()
+    val selectedLocationChannel by viewModel.selectedLocationChannel.collectAsState()
 
     // Determine what messages to show based on current context (unified timelines)
     val displayMessages = when {
@@ -457,7 +456,7 @@ private fun ChatSheets(
     viewModel: ChatViewModel
 ) {
     val sheetSlot by component.sheetSlot.subscribeAsState()
-    
+
     sheetSlot.child?.instance?.let { child ->
         ModalBottomSheet(
             onDismiss = component::onDismissSheet
@@ -478,21 +477,21 @@ private fun ChatSheets(
                         )
                     }
                 }
-                
+
                 is ChatComponent.SheetChild.LocationChannels -> {
                     LocationChannelsSheetContent(
                         component = child.component,
                         lazyListState = listState,
                     )
                 }
-                
+
                 is ChatComponent.SheetChild.LocationNotes -> {
                     LocationNotesSheetPresenterContent(
                         component = child.component,
                         lazyListState = listState,
                     )
                 }
-                
+
                 is ChatComponent.SheetChild.UserSheet -> {
                     ChatUserSheetContent(
                         component = child.component,
@@ -515,12 +514,12 @@ private fun ChatDialogs(
     component: ChatComponent,
 ) {
     val dialogSlot by component.dialogSlot.subscribeAsState()
-    
+
     dialogSlot.child?.instance?.let { child ->
         when (child) {
             is ChatComponent.DialogChild.PasswordPrompt -> {
                 val model by child.component.model.subscribeAsState()
-                
+
                 PasswordPromptDialog(
                     show = true,
                     channelName = model.channelName,

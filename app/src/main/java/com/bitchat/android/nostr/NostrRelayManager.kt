@@ -1,8 +1,9 @@
 package com.bitchat.android.nostr
 
 import android.util.Log
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import com.bitchat.android.net.OkHttpProvider
 import com.bitchat.android.net.TorManager
 import kotlinx.serialization.json.*
@@ -30,7 +31,7 @@ class NostrRelayManager @Inject constructor(
     
     companion object {
         private const val TAG = "NostrRelayManager"
-        
+
         // Default relay list (same as iOS)
         private val DEFAULT_RELAYS = listOf(
             "wss://relay.damus.io",
@@ -47,10 +48,10 @@ class NostrRelayManager @Inject constructor(
         
         fun defaultRelays(): List<String> = DEFAULT_RELAYS
     }
-    
+
     // Track gift-wraps we initiated for logging
     private val pendingGiftWrapIDs = ConcurrentHashMap.newKeySet<String>()
-    
+
     fun registerPendingGiftWrap(id: String) {
         pendingGiftWrapIDs.add(id)
     }
@@ -71,11 +72,11 @@ class NostrRelayManager @Inject constructor(
     )
     
     // Published state
-    private val _relays = MutableLiveData<List<Relay>>()
-    val relays: LiveData<List<Relay>> = _relays
+    private val _relays = MutableStateFlow<List<Relay>>(emptyList())
+    val relays: StateFlow<List<Relay>> = _relays.asStateFlow()
     
-    private val _isConnected = MutableLiveData<Boolean>()
-    val isConnected: LiveData<Boolean> = _isConnected
+    private val _isConnected = MutableStateFlow<Boolean>(false)
+    val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
     
     // Internal state
     private val relaysList = mutableListOf<Relay>()
@@ -97,7 +98,7 @@ class NostrRelayManager @Inject constructor(
         val createdAt: Long = System.currentTimeMillis(),
         val originGeohash: String? = null // used for logging and grouping
     )
-    
+
     // Message queue for reliability
     private val messageQueue = mutableListOf<Pair<NostrEvent, List<String>>>()
     private val messageQueueLock = Any()
@@ -222,30 +223,30 @@ class NostrRelayManager @Inject constructor(
                 "wss://nostr21.com"
             )
             relaysList.addAll(defaultRelayUrls.map { Relay(it) })
-            _relays.postValue(relaysList.toList())
+            _relays.value = relaysList.toList()
             updateConnectionStatus()
             Log.d(TAG, "✅ NostrRelayManager initialized with ${relaysList.size} default relays")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize NostrRelayManager: ${e.message}", e)
             // Initialize with empty list as fallback
-            _relays.postValue(emptyList())
-            _isConnected.postValue(false)
+            _relays.value = emptyList()
+            _isConnected.value = false
         }
 
         // Observe Tor status to reset connections when network changes
         scope.launch {
             var lastMode = com.bitchat.android.net.TorMode.OFF
             var lastRunning = false
-            
+
             torManager.statusFlow.collect { status ->
                 val modeChanged = status.mode != lastMode
                 val runningChanged = status.running != lastRunning
-                
+
                 if (modeChanged || (runningChanged && status.running)) {
                     Log.i(TAG, "Tor status changed (mode=$modeChanged, running=$runningChanged), resetting connections")
                     resetAllConnections()
                 }
-                
+
                 lastMode = status.mode
                 lastRunning = status.running
             }
@@ -812,12 +813,12 @@ class NostrRelayManager @Inject constructor(
     }
     
     private fun updateRelaysList() {
-        _relays.postValue(relaysList.toList())
+        _relays.value = relaysList.toList()
     }
     
     private fun updateConnectionStatus() {
         val connected = relaysList.any { it.isConnected }
-        _isConnected.postValue(connected)
+        _isConnected.value = connected
     }
     
     private fun generateSubscriptionId(): String {

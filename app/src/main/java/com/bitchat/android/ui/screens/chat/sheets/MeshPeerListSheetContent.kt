@@ -42,8 +42,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -87,14 +87,14 @@ fun MeshPeerListSheetContent(
 ) {
     val colorScheme = MaterialTheme.colorScheme
 
-    val connectedPeers by viewModel.connectedPeers.observeAsState(emptyList())
-    val joinedChannels by viewModel.joinedChannels.observeAsState(emptyList())
-    val currentChannel by viewModel.currentChannel.observeAsState()
-    val selectedPrivatePeer by viewModel.selectedPrivateChatPeer.observeAsState()
-    val nickname by viewModel.nickname.observeAsState("")
-    val unreadChannelMessages by viewModel.unreadChannelMessages.observeAsState(emptyMap())
-    val peerNicknames by viewModel.peerNicknames.observeAsState(emptyMap())
-    val peerRSSI by viewModel.peerRSSI.observeAsState(emptyMap())
+    val connectedPeers by viewModel.connectedPeers.collectAsState()
+    val joinedChannels by viewModel.joinedChannels.collectAsState()
+    val currentChannel by viewModel.currentChannel.collectAsState()
+    val selectedPrivatePeer by viewModel.selectedPrivateChatPeer.collectAsState()
+    val nickname by viewModel.nickname.collectAsState("")
+    val unreadChannelMessages by viewModel.unreadChannelMessages.collectAsState()
+    val peerNicknames by viewModel.peerNicknames.collectAsState()
+    val peerRSSI by viewModel.peerRSSI.collectAsState()
 
     // Track nested private chat sheet state
     var showPrivateChatSheet by remember { mutableStateOf(false) }
@@ -177,7 +177,7 @@ fun MeshPeerListSheetContent(
 
             // People section - switch between mesh and geohash lists (iOS-compatible)
             item(key = "people_section") {
-                val selectedLocationChannel by viewModel.selectedLocationChannel.observeAsState()
+                val selectedLocationChannel by viewModel.selectedLocationChannel.collectAsState()
 
                 when (selectedLocationChannel) {
                     is ChannelID.Location -> {
@@ -349,10 +349,10 @@ fun PeopleSection(
         }
 
         // Observe reactive state for favorites and fingerprints
-        val hasUnreadPrivateMessages by viewModel.unreadPrivateMessages.observeAsState(emptySet())
-        val privateChats by viewModel.privateChats.observeAsState(emptyMap())
-        val favoritePeers by viewModel.favoritePeers.observeAsState(emptySet())
-        val peerFingerprints by viewModel.peerFingerprints.observeAsState(emptyMap())
+        val hasUnreadPrivateMessages by viewModel.unreadPrivateMessages.collectAsState()
+        val privateChats by viewModel.privateChats.collectAsState()
+        val favoritePeers by viewModel.favoritePeers.collectAsState()
+        val peerFingerprints by viewModel.peerFingerprints.collectAsState()
 
         // Reactive favorite computation for all peers
         val peerFavoriteStates = remember(favoritePeers, peerFingerprints, connectedPeers) {
@@ -452,7 +452,7 @@ fun PeopleSection(
             val (bName, _) = splitSuffix(displayName)
             val showHash = (baseNameCounts[bName] ?: 0) > 1
 
-            val directMap by viewModel.peerDirect.observeAsState(emptyMap())
+            val directMap by viewModel.peerDirect.collectAsState()
             val isDirectLive = directMap[peerID] ?: viewModel.isPeerDirectConnection(peerID)
             PeerItem(
                 peerID = peerID,
@@ -813,14 +813,14 @@ private fun PrivateChatSheet(
     onDismiss: () -> Unit
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val privateChats by viewModel.privateChats.observeAsState(emptyMap())
-    val peerNicknames by viewModel.peerNicknames.observeAsState(emptyMap())
-    val nickname by viewModel.nickname.observeAsState("")
-    val connectedPeers by viewModel.connectedPeers.observeAsState(emptyList())
-    val peerDirectMap by viewModel.peerDirect.observeAsState(emptyMap())
-    val peerSessionStates by viewModel.peerSessionStates.observeAsState(emptyMap())
-    val favoritePeers by viewModel.favoritePeers.observeAsState(emptySet())
-    val peerFingerprints by viewModel.peerFingerprints.observeAsState(emptyMap())
+    val privateChats by viewModel.privateChats.collectAsState()
+    val peerNicknames by viewModel.peerNicknames.collectAsState()
+    val nickname by viewModel.nickname.collectAsState()
+    val connectedPeers by viewModel.connectedPeers.collectAsState()
+    val peerDirectMap by viewModel.peerDirect.collectAsState()
+    val peerSessionStates by viewModel.peerSessionStates.collectAsState()
+    val favoritePeers by viewModel.favoritePeers.collectAsState()
+    val peerFingerprints by viewModel.peerFingerprints.collectAsState()
 
     // Start private chat when screen opens
     LaunchedEffect(peerID) {

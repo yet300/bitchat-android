@@ -111,14 +111,14 @@ internal class LocationChannelsStoreFactory(
 
                     // Subscribe to geohash participant counts (from ChatViewModel LiveData)
                     scope.launch {
-                        chatViewModel.geohashParticipantCounts.asFlow().collect { counts ->
+                        chatViewModel.geohashParticipantCounts.collect { counts ->
                             dispatch(LocationChannelsStore.Msg.GeohashParticipantCountsChanged(counts ?: emptyMap()))
                         }
                     }
 
                     // Subscribe to connected peers (from ChatViewModel LiveData)
                     scope.launch {
-                        chatViewModel.connectedPeers.asFlow().collect { peers ->
+                        chatViewModel.connectedPeers.collect { peers ->
                             dispatch(LocationChannelsStore.Msg.ConnectedPeersChanged(peers ?: emptyList()))
                         }
                     }
