@@ -171,6 +171,7 @@ class DefaultChatComponent(
             is SheetConfig.MeshPeerList -> ChatComponent.SheetChild.MeshPeerList(
                 component = DefaultMeshPeerListComponent(
                     componentContext = componentContext,
+                    parentStore = store,
                     onDismissCallback = ::onDismissSheet
                 )
             )

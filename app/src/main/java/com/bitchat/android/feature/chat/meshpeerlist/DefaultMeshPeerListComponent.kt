@@ -17,8 +17,9 @@ import com.bitchat.android.ui.colorForPeerSeed
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
-class DefaultMeshPeerListComponent(
+internal class DefaultMeshPeerListComponent(
     componentContext: ComponentContext,
+    private val parentStore: com.bitchat.android.feature.chat.store.ChatStore,
     private val onDismissCallback: () -> Unit
 ) : MeshPeerListComponent, ComponentContext by componentContext, KoinComponent {
 
@@ -27,7 +28,7 @@ class DefaultMeshPeerListComponent(
     private val favoritesService: FavoritesPersistenceService by inject()
 
     private val store = instanceKeeper.getStore {
-        MeshPeerListStoreFactory(storeFactory).create()
+        MeshPeerListStoreFactory(storeFactory, parentStore).create()
     }
 
     override val model: Value<MeshPeerListComponent.Model> = store.asValue().map(stateToModel)

@@ -5,11 +5,11 @@ import com.arkivanov.mvikotlin.core.store.Store
 import com.arkivanov.mvikotlin.core.store.StoreFactory
 import com.arkivanov.mvikotlin.extensions.coroutines.CoroutineBootstrapper
 import com.arkivanov.mvikotlin.extensions.coroutines.CoroutineExecutor
+import com.arkivanov.mvikotlin.extensions.coroutines.stateFlow
 import com.bitchat.android.favorites.FavoritesPersistenceService
 import com.bitchat.android.geohash.LocationChannelManager
 import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.mesh.MeshEventBus
-import com.bitchat.android.ui.ChatViewModel
 import com.bitchat.android.ui.GeohashViewModel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -17,16 +17,17 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
 internal class MeshPeerListStoreFactory(
-    private val storeFactory: StoreFactory
+    private val storeFactory: StoreFactory,
+    private val parentStore: com.bitchat.android.feature.chat.store.ChatStore
 ) : KoinComponent {
 
-    // TODO: Remove ChatViewModel once all state is migrated to services
-    private val chatViewModel: ChatViewModel by inject()
     private val meshService: BluetoothMeshService by inject()
     private val favoritesService: FavoritesPersistenceService by inject()
     private val meshEventBus: MeshEventBus by inject()
     private val locationChannelManager: LocationChannelManager by inject()
     private val geohashViewModel: GeohashViewModel by inject()
+    private val dataManager: com.bitchat.android.ui.DataManager by inject()
+    private val fingerprintManager: com.bitchat.android.mesh.PeerFingerprintManager by inject()
 
     fun create(): MeshPeerListStore =
         object : MeshPeerListStore, Store<MeshPeerListStore.Intent, MeshPeerListStore.State, MeshPeerListStore.Label>
@@ -60,24 +61,25 @@ internal class MeshPeerListStoreFactory(
         override fun executeIntent(intent: MeshPeerListStore.Intent) {
             when (intent) {
                 is MeshPeerListStore.Intent.SwitchToChannel -> {
-                    chatViewModel.switchToChannel(intent.channel)
+                    // Delegate to parent ChatStore
+                    parentStore.accept(com.bitchat.android.feature.chat.store.ChatStore.Intent.SwitchToChannel(intent.channel))
                     publish(MeshPeerListStore.Label.ChannelSwitched(intent.channel))
                 }
                 is MeshPeerListStore.Intent.LeaveChannel -> {
-                    chatViewModel.leaveChannel(intent.channel)
+                    parentStore.accept(com.bitchat.android.feature.chat.store.ChatStore.Intent.LeaveChannel(intent.channel))
                 }
                 is MeshPeerListStore.Intent.StartPrivateChat -> {
-                    chatViewModel.startPrivateChat(intent.peerID)
+                    parentStore.accept(com.bitchat.android.feature.chat.store.ChatStore.Intent.StartPrivateChat(intent.peerID))
                     publish(MeshPeerListStore.Label.PrivateChatStarted(intent.peerID))
                 }
                 MeshPeerListStore.Intent.EndPrivateChat -> {
-                    chatViewModel.endPrivateChat()
+                    parentStore.accept(com.bitchat.android.feature.chat.store.ChatStore.Intent.EndPrivateChat)
                 }
                 is MeshPeerListStore.Intent.StartGeohashDM -> {
-                    chatViewModel.startGeohashDM(intent.nostrPubkey)
+                    parentStore.accept(com.bitchat.android.feature.chat.store.ChatStore.Intent.StartGeohashDM(intent.nostrPubkey))
                 }
                 is MeshPeerListStore.Intent.ToggleFavorite -> {
-                    chatViewModel.toggleFavorite(intent.peerID)
+                    parentStore.accept(com.bitchat.android.feature.chat.store.ChatStore.Intent.ToggleFavorite(intent.peerID))
                 }
             }
         }
@@ -109,75 +111,23 @@ internal class MeshPeerListStoreFactory(
                 }
             }
             
-            // TODO: These still need ChatViewModel - migrate when ChatState is refactored
+            // Subscribe to parent ChatStore state changes
             scope.launch {
-                chatViewModel.joinedChannels.collectLatest { channels ->
-                    dispatch(MeshPeerListStore.Msg.JoinedChannelsUpdated(channels))
-                }
-            }
-            scope.launch {
-                chatViewModel.currentChannel.collectLatest { channel ->
-                    dispatch(MeshPeerListStore.Msg.CurrentChannelChanged(channel))
-                }
-            }
-            scope.launch {
-                chatViewModel.unreadChannelMessages.collectLatest { unread ->
-                    dispatch(MeshPeerListStore.Msg.UnreadChannelMessagesUpdated(unread))
-                }
-            }
-            scope.launch {
-                chatViewModel.selectedPrivateChatPeer.collectLatest { peer ->
-                    dispatch(MeshPeerListStore.Msg.SelectedPrivatePeerChanged(peer))
-                }
-            }
-            scope.launch {
-                chatViewModel.unreadPrivateMessages.collectLatest { unread ->
-                    dispatch(MeshPeerListStore.Msg.UnreadPrivateMessagesUpdated(unread))
-                }
-            }
-            scope.launch {
-                chatViewModel.privateChats.collectLatest { chats ->
-                    dispatch(MeshPeerListStore.Msg.PrivateChatsUpdated(chats))
-                }
-            }
-            scope.launch {
-                chatViewModel.teleportedGeo.collectLatest { geo ->
-                    dispatch(MeshPeerListStore.Msg.TeleportedGeoUpdated(geo))
-                }
-            }
-            scope.launch {
-                chatViewModel.peerNicknames.collectLatest { nicknames ->
-                    dispatch(MeshPeerListStore.Msg.PeerNicknamesUpdated(nicknames))
-                }
-            }
-            scope.launch {
-                chatViewModel.peerRSSI.collectLatest { rssi ->
-                    dispatch(MeshPeerListStore.Msg.PeerRSSIUpdated(rssi))
-                }
-            }
-            scope.launch {
-                chatViewModel.peerDirect.collectLatest { direct ->
-                    dispatch(MeshPeerListStore.Msg.PeerDirectUpdated(direct))
-                }
-            }
-            scope.launch {
-                chatViewModel.peerFingerprints.collectLatest { fingerprints ->
-                    dispatch(MeshPeerListStore.Msg.PeerFingerprintsUpdated(fingerprints))
-                }
-            }
-            scope.launch {
-                chatViewModel.peerSessionStates.collectLatest { states ->
-                    dispatch(MeshPeerListStore.Msg.PeerSessionStatesUpdated(states))
-                }
-            }
-            scope.launch {
-                chatViewModel.favoritePeers.collectLatest { favorites ->
-                    dispatch(MeshPeerListStore.Msg.FavoritePeersUpdated(favorites))
-                }
-            }
-            scope.launch {
-                chatViewModel.nickname.collectLatest { nick ->
-                    dispatch(MeshPeerListStore.Msg.NicknameChanged(nick))
+                parentStore.stateFlow.collectLatest { parentState ->
+                    dispatch(MeshPeerListStore.Msg.JoinedChannelsUpdated(parentState.joinedChannels))
+                    dispatch(MeshPeerListStore.Msg.CurrentChannelChanged(parentState.currentChannel))
+                    dispatch(MeshPeerListStore.Msg.UnreadChannelMessagesUpdated(parentState.unreadChannelMessages))
+                    dispatch(MeshPeerListStore.Msg.SelectedPrivatePeerChanged(parentState.selectedPrivateChatPeer))
+                    dispatch(MeshPeerListStore.Msg.UnreadPrivateMessagesUpdated(parentState.unreadPrivateMessages))
+                    dispatch(MeshPeerListStore.Msg.PrivateChatsUpdated(parentState.privateChats))
+                    dispatch(MeshPeerListStore.Msg.TeleportedGeoUpdated(parentState.teleportedGeo))
+                    dispatch(MeshPeerListStore.Msg.PeerNicknamesUpdated(parentState.peerNicknames))
+                    dispatch(MeshPeerListStore.Msg.PeerRSSIUpdated(parentState.peerRSSI))
+                    dispatch(MeshPeerListStore.Msg.PeerDirectUpdated(parentState.peerDirect))
+                    dispatch(MeshPeerListStore.Msg.PeerFingerprintsUpdated(parentState.peerFingerprints))
+                    dispatch(MeshPeerListStore.Msg.PeerSessionStatesUpdated(parentState.peerSessionStates))
+                    dispatch(MeshPeerListStore.Msg.FavoritePeersUpdated(parentState.favoritePeers))
+                    dispatch(MeshPeerListStore.Msg.NicknameChanged(parentState.nickname))
                 }
             }
             // Load offline favorites
