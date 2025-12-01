@@ -2,8 +2,10 @@ package com.bitchat.android.feature.chat.store
 
 import com.arkivanov.mvikotlin.core.store.Store
 import com.bitchat.android.geohash.ChannelID
+import com.bitchat.android.geohash.LocationChannelManager
 import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.model.CommandSuggestion
+import com.bitchat.android.nostr.LocationNotesManager
 import com.bitchat.android.ui.GeoPerson
 
 /**
@@ -42,9 +44,9 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
         val geohashParticipantCounts: Map<String, Int> = emptyMap(),
         val geohashBookmarks: List<String> = emptyList(),
         val geohashBookmarkNames: Map<String, String> = emptyMap(),
-        val locationPermissionState: com.bitchat.android.geohash.LocationChannelManager.PermissionState = com.bitchat.android.geohash.LocationChannelManager.PermissionState.NOT_DETERMINED,
+        val locationPermissionState: LocationChannelManager.PermissionState = LocationChannelManager.PermissionState.NOT_DETERMINED,
         val locationServicesEnabled: Boolean = false,
-        val locationNotes: List<com.bitchat.android.nostr.LocationNotesManager.Note> = emptyList(),
+        val locationNotes: List<LocationNotesManager.Note> = emptyList(),
         
         // Peer info
         val peerSessionStates: Map<String, String> = emptyMap(),
@@ -193,7 +195,7 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
         data class FavoritePeersUpdated(val favorites: Set<String>) : Msg()
         
         // Location permissions
-        data class LocationPermissionStateChanged(val state: com.bitchat.android.geohash.LocationChannelManager.PermissionState) : Msg()
+        data class LocationPermissionStateChanged(val state: LocationChannelManager.PermissionState) : Msg()
         data class LocationServicesEnabledChanged(val enabled: Boolean) : Msg()
         
         // Network state

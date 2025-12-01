@@ -7,17 +7,28 @@ import com.arkivanov.mvikotlin.core.store.Store
 import com.arkivanov.mvikotlin.core.store.StoreFactory
 import com.arkivanov.mvikotlin.extensions.coroutines.CoroutineExecutor
 import com.bitchat.android.domain.event.ChatEventBus
+import com.bitchat.android.favorites.FavoritesPersistenceService
 import com.bitchat.android.feature.chat.ChatComponent
 import com.bitchat.android.geohash.GeohashBookmarksStore
+import com.bitchat.android.geohash.GeohashChannel
 import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.geohash.LocationChannelManager
 import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.mesh.MeshEventBus
-import com.bitchat.android.services.MessageRouter
+import com.bitchat.android.mesh.PeerFingerprintManager
 import com.bitchat.android.model.CommandSuggestion
+import com.bitchat.android.net.TorManager
+import com.bitchat.android.nostr.GeohashConversationRegistry
 import com.bitchat.android.ui.DataManager
 import com.bitchat.android.ui.MediaSendingManager
 import com.bitchat.android.nostr.GeohashRepository
+import com.bitchat.android.nostr.NostrIdentityBridge
+import com.bitchat.android.nostr.NostrProtocol
+import com.bitchat.android.nostr.NostrRelayManager
+import com.bitchat.android.nostr.NostrTransport
+import com.bitchat.android.nostr.PoWPreferenceManager
+import com.bitchat.android.services.MessageRouter
+import com.bitchat.android.services.SeenMessageStore
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
@@ -33,15 +44,15 @@ internal class ChatStoreFactory(
     private val dataManager: DataManager by inject()
     private val geohashBookmarksStore: GeohashBookmarksStore by inject()
     private val locationChannelManager: LocationChannelManager by inject()
-    private val fingerprintManager: com.bitchat.android.mesh.PeerFingerprintManager by inject()
-    private val favoritesService: com.bitchat.android.favorites.FavoritesPersistenceService by inject()
-    private val seenStore: com.bitchat.android.services.SeenMessageStore by inject()
-    private val nostrRelayManager: com.bitchat.android.nostr.NostrRelayManager by inject()
-    private val nostrTransport: com.bitchat.android.nostr.NostrTransport by inject()
+    private val fingerprintManager: PeerFingerprintManager by inject()
+    private val favoritesService: FavoritesPersistenceService by inject()
+    private val seenStore: SeenMessageStore by inject()
+    private val nostrRelayManager: NostrRelayManager by inject()
+    private val nostrTransport: NostrTransport by inject()
     private val meshEventBus: MeshEventBus by inject()
     private val geohashRepository: GeohashRepository by inject()
-    private val torManager: com.bitchat.android.net.TorManager by inject()
-    private val powPreferenceManager: com.bitchat.android.nostr.PoWPreferenceManager by inject()
+    private val torManager: TorManager by inject()
+    private val powPreferenceManager: PoWPreferenceManager by inject()
     private val applicationContext: android.content.Context by inject()
     private val mediaSendingManager: MediaSendingManager by inject()
 
@@ -67,14 +78,14 @@ internal class ChatStoreFactory(
         private val channelPasswords = mutableMapOf<String, String>()
         
         // Helper methods for message management
-        private fun addMessage(message: com.bitchat.android.model.BitchatMessage) {
+        private fun addMessage(message: BitchatMessage) {
             val currentMessages = state().messages.toMutableList()
             currentMessages.add(message)
             dispatch(ChatStore.Msg.MessagesUpdated(currentMessages))
         }
         
         private fun addSystemMessage(text: String) {
-            val sys = com.bitchat.android.model.BitchatMessage(
+            val sys = BitchatMessage(
                 sender = "system",
                 content = text,
                 timestamp = java.util.Date(),
@@ -83,7 +94,7 @@ internal class ChatStoreFactory(
             addMessage(sys)
         }
         
-        private fun addChannelMessage(channel: String, message: com.bitchat.android.model.BitchatMessage) {
+        private fun addChannelMessage(channel: String, message: BitchatMessage) {
             val currentChannelMessages = state().channelMessages.toMutableMap()
             if (!currentChannelMessages.containsKey(channel)) {
                 currentChannelMessages[channel] = mutableListOf()
@@ -111,7 +122,7 @@ internal class ChatStoreFactory(
             }
         }
         
-        private fun addPrivateMessage(peerID: String, message: com.bitchat.android.model.BitchatMessage) {
+        private fun addPrivateMessage(peerID: String, message: BitchatMessage) {
             val currentPrivateChats = state().privateChats.toMutableMap()
             if (!currentPrivateChats.containsKey(peerID)) {
                 currentPrivateChats[peerID] = mutableListOf()
@@ -1013,8 +1024,8 @@ internal class ChatStoreFactory(
                     if (selectedPeer != null) {
                         // Send private message
                         val recipientNickname = meshService.getPeerNicknames()[selectedPeer]
-                        val message = com.bitchat.android.model.BitchatMessage(
-                            sender = state().nickname ?: meshService.myPeerID,
+                        val message = BitchatMessage(
+                            sender = state().nickname,
                             content = content,
                             timestamp = java.util.Date(),
                             isRelay = false,
@@ -1040,7 +1051,7 @@ internal class ChatStoreFactory(
                         } else {
                             // Send public/channel message via mesh
                             val message = com.bitchat.android.model.BitchatMessage(
-                                sender = state().nickname ?: meshService.myPeerID,
+                                sender = state().nickname,
                                 content = content,
                                 timestamp = java.util.Date(),
                                 isRelay = false,
@@ -1086,15 +1097,15 @@ internal class ChatStoreFactory(
         }
 
         // Geohash message sending - direct implementation without GeohashViewModel
-        private fun sendGeohashMessage(content: String, channel: com.bitchat.android.geohash.GeohashChannel) {
+        private fun sendGeohashMessage(content: String, channel: GeohashChannel) {
             scope.launch {
                 try {
                     val tempId = "temp_${System.currentTimeMillis()}_${kotlin.random.Random.nextInt(1000)}"
                     val pow = powPreferenceManager.getCurrentSettings()
                     val nickname = state().nickname
-                    val localMsg = com.bitchat.android.model.BitchatMessage(
+                    val localMsg = BitchatMessage(
                         id = tempId,
-                        sender = nickname ?: meshService.myPeerID,
+                        sender = nickname,
                         content = content,
                         timestamp = java.util.Date(),
                         isRelay = false,
@@ -1109,12 +1120,12 @@ internal class ChatStoreFactory(
                         com.bitchat.android.ui.PoWMiningTracker.startMiningMessage(tempId)
                     }
                     try {
-                        val identity = com.bitchat.android.nostr.NostrIdentityBridge.deriveIdentity(
+                        val identity = NostrIdentityBridge.deriveIdentity(
                             forGeohash = channel.geohash, 
                             context = applicationContext
                         )
                         val teleported = state().isTeleported
-                        val event = com.bitchat.android.nostr.NostrProtocol.createEphemeralGeohashEvent(
+                        val event = NostrProtocol.createEphemeralGeohashEvent(
                             content, channel.geohash, identity, nickname, teleported, powPreferenceManager
                         )
                         nostrRelayManager.sendEventToGeohash(event, channel.geohash, includeDefaults = false, nRelays = 5)
@@ -1330,7 +1341,7 @@ internal class ChatStoreFactory(
             val gh = (current as? com.bitchat.android.geohash.ChannelID.Location)?.channel?.geohash
             if (!gh.isNullOrEmpty()) {
                 geohashRepository.setConversationGeohash(convKey, gh)
-                com.bitchat.android.nostr.GeohashConversationRegistry.set(convKey, gh)
+                GeohashConversationRegistry.set(convKey, gh)
             }
             
             startPrivateChat(convKey)
@@ -1415,7 +1426,7 @@ internal class ChatStoreFactory(
                             
                             // Send favorite notification via mesh or Nostr
                             try {
-                                val myNostr = com.bitchat.android.nostr.NostrIdentityBridge.getCurrentNostrIdentity(
+                                val myNostr = NostrIdentityBridge.getCurrentNostrIdentity(
                                     applicationContext
                                 )
                                 val announcementContent = if (!wasFavorite) "[FAVORITED]:${myNostr?.npub ?: ""}" else "[UNFAVORITED]:${myNostr?.npub ?: ""}"

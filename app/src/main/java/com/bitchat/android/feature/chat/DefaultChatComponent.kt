@@ -268,11 +268,6 @@ class DefaultChatComponent(
         return store.state.teleportedGeo.contains(nostrPubkey.lowercase())
     }
     
-    override fun colorForNostrPubkey(pubkey: String, isDark: Boolean): androidx.compose.ui.graphics.Color {
-        val seed = "nostr:${pubkey.lowercase()}"
-        return colorForPeerSeed(seed, isDark)
-    }
-    
     override fun getPeerNoisePublicKeyHex(peerID: String): String? {
         return try {
             meshService.getPeerInfo(peerID)?.noisePublicKey?.joinToString("") { b -> "%02x".format(b) }
@@ -291,11 +286,6 @@ class DefaultChatComponent(
         return try {
             meshService.getPeerInfo(peerID)?.isDirectConnection == true
         } catch (_: Exception) { false }
-    }
-    
-    override fun colorForMeshPeer(peerID: String, isDark: Boolean): androidx.compose.ui.graphics.Color {
-        val seed = "noise:${peerID.lowercase()}"
-        return com.bitchat.android.ui.colorForPeerSeed(seed, isDark)
     }
     
     override fun getFavoriteStatus(peerID: String): com.bitchat.android.favorites.FavoriteRelationship? {

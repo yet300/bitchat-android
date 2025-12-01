@@ -8,8 +8,14 @@ import com.bitchat.android.geohash.ChannelID
 import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.model.CommandSuggestion
 import com.bitchat.android.ui.GeoPerson
-import androidx.compose.ui.graphics.Color
+import com.bitchat.android.feature.chat.sheet.locationchannels.LocationChannelsComponent
+import com.bitchat.android.feature.chat.sheet.locationnotes.LocationNotesComponent
+import com.bitchat.android.feature.chat.sheet.meshpeerlist.MeshPeerListComponent
+import com.bitchat.android.feature.chat.sheet.passwordprompt.PasswordPromptComponent
 import com.bitchat.android.feature.chat.sheet.usersheet.UserSheetComponent
+import com.bitchat.android.geohash.LocationChannelManager
+import com.bitchat.android.net.TorManager
+import com.bitchat.android.nostr.LocationNotesManager
 
 interface ChatComponent {
     val model: Value<Model>
@@ -35,7 +41,7 @@ interface ChatComponent {
     fun onCancelMediaSend(messageId: String)
     
     // Channel actions
-    fun onJoinChannel(channel: String, password: String? = null)
+    fun onJoinChannel(channel: String, password: String?)
     fun onSwitchToChannel(channel: String?)
     fun onLeaveChannel(channel: String)
     
@@ -54,12 +60,12 @@ interface ChatComponent {
     
     // Peer info queries (for UI callbacks)
     fun isPersonTeleported(nostrPubkey: String): Boolean
-    fun colorForNostrPubkey(pubkey: String, isDark: Boolean): Color
+
     fun getPeerNoisePublicKeyHex(peerID: String): String?
     fun getOfflineFavorites(): List<com.bitchat.android.favorites.FavoriteRelationship>
     fun findNostrPubkey(noiseKey: ByteArray): String?
     fun isPeerDirectConnection(peerID: String): Boolean
-    fun colorForMeshPeer(peerID: String, isDark: Boolean): Color
+
     fun getFavoriteStatus(peerID: String): com.bitchat.android.favorites.FavoriteRelationship?
     
     // Password prompt
@@ -91,65 +97,65 @@ interface ChatComponent {
      */
     data class Model(
         // Messages
-        val messages: List<BitchatMessage> = emptyList(),
-        val channelMessages: Map<String, List<BitchatMessage>> = emptyMap(),
-        val privateChats: Map<String, List<BitchatMessage>> = emptyMap(),
+        val messages: List<BitchatMessage>,
+        val channelMessages: Map<String, List<BitchatMessage>>,
+        val privateChats: Map<String, List<BitchatMessage>>,
         
         // Connection state
-        val isConnected: Boolean = false,
-        val connectedPeers: List<String> = emptyList(),
+        val isConnected: Boolean,
+        val connectedPeers: List<String>,
         val myPeerID: String = "",
         val nickname: String = "",
         
         // Channel state
-        val joinedChannels: Set<String> = emptySet(),
-        val currentChannel: String? = null,
-        val passwordProtectedChannels: Set<String> = emptySet(),
-        val unreadChannelMessages: Map<String, Int> = emptyMap(),
-        val hasUnreadChannels: Boolean = false,
+        val joinedChannels: Set<String>,
+        val currentChannel: String?,
+        val passwordProtectedChannels: Set<String>,
+        val unreadChannelMessages: Map<String, Int>,
+        val hasUnreadChannels: Boolean,
         
         // Private chat state
-        val selectedPrivateChatPeer: String? = null,
-        val unreadPrivateMessages: Set<String> = emptySet(),
-        val hasUnreadPrivateMessages: Boolean = false,
+        val selectedPrivateChatPeer: String?,
+        val unreadPrivateMessages: Set<String>,
+        val hasUnreadPrivateMessages: Boolean,
         
         // Location/Geohash state
-        val selectedLocationChannel: ChannelID? = null,
-        val isTeleported: Boolean = false,
-        val geohashPeople: List<GeoPerson> = emptyList(),
-        val teleportedGeo: Set<String> = emptySet(),
-        val geohashParticipantCounts: Map<String, Int> = emptyMap(),
-        val geohashBookmarks: List<String> = emptyList(),
-        val geohashBookmarkNames: Map<String, String> = emptyMap(),
+        val selectedLocationChannel: ChannelID?,
+        val isTeleported: Boolean,
+        val geohashPeople: List<GeoPerson>,
+        val teleportedGeo: Set<String>,
+        val geohashParticipantCounts: Map<String, Int>,
+        val geohashBookmarks: List<String>,
+        val geohashBookmarkNames: Map<String, String>,
         
         // Peer info
-        val peerSessionStates: Map<String, String> = emptyMap(),
-        val peerFingerprints: Map<String, String> = emptyMap(),
-        val peerNicknames: Map<String, String> = emptyMap(),
-        val peerRSSI: Map<String, Int> = emptyMap(),
-        val peerDirect: Map<String, Boolean> = emptyMap(),
-        val favoritePeers: Set<String> = emptySet(),
+        val peerSessionStates: Map<String, String>,
+        val peerFingerprints: Map<String, String>,
+        val peerNicknames: Map<String, String>,
+        val peerRSSI: Map<String, Int>,
+        val peerDirect: Map<String, Boolean>,
+        val favoritePeers: Set<String>,
         
         // UI state
-        val showCommandSuggestions: Boolean = false,
-        val commandSuggestions: List<CommandSuggestion> = emptyList(),
-        val showMentionSuggestions: Boolean = false,
-        val mentionSuggestions: List<String> = emptyList(),
+        val showCommandSuggestions: Boolean,
+        val commandSuggestions: List<CommandSuggestion>,
+        val showMentionSuggestions: Boolean,
+        val mentionSuggestions: List<String>,
         
         // Loading states
-        val isLoading: Boolean = true,
-        val isSendingMessage: Boolean = false,
+        val isLoading: Boolean,
+        val isSendingMessage: Boolean,
         
         // Network state
-        val torStatus: com.bitchat.android.net.TorManager.TorStatus = com.bitchat.android.net.TorManager.TorStatus(),
-        val powEnabled: Boolean = false,
-        val powDifficulty: Int = 0,
-        val isMining: Boolean = false,
+        val torStatus: TorManager.TorStatus,
+        val powEnabled: Boolean,
+        val powDifficulty: Int,
+        val isMining: Boolean,
         
         // Location state
-        val locationPermissionState: com.bitchat.android.geohash.LocationChannelManager.PermissionState = com.bitchat.android.geohash.LocationChannelManager.PermissionState.NOT_DETERMINED,
-        val locationServicesEnabled: Boolean = false,
-        val locationNotes: List<com.bitchat.android.nostr.LocationNotesManager.Note> = emptyList()
+        val locationPermissionState: LocationChannelManager.PermissionState,
+        val locationServicesEnabled: Boolean,
+        val locationNotes: List<LocationNotesManager.Note>
     )
 
     sealed interface ChatStartupConfig {
@@ -160,14 +166,14 @@ interface ChatComponent {
     
     sealed interface SheetChild {
         data class AppInfo(val component: AboutComponent) : SheetChild
-        data class LocationChannels(val component: com.bitchat.android.feature.chat.sheet.locationchannels.LocationChannelsComponent) : SheetChild
-        data class LocationNotes(val component: com.bitchat.android.feature.chat.sheet.locationnotes.LocationNotesComponent) : SheetChild
+        data class LocationChannels(val component: LocationChannelsComponent) : SheetChild
+        data class LocationNotes(val component: LocationNotesComponent) : SheetChild
         data class UserSheet(val component: UserSheetComponent) : SheetChild
-        data class MeshPeerList(val component: com.bitchat.android.feature.chat.sheet.meshpeerlist.MeshPeerListComponent) : SheetChild
+        data class MeshPeerList(val component: MeshPeerListComponent) : SheetChild
         data class DebugSettings(val component: DebugComponent) : SheetChild
     }
     
     sealed interface DialogChild {
-        data class PasswordPrompt(val component: com.bitchat.android.feature.chat.sheet.passwordprompt.PasswordPromptComponent) : DialogChild
+        data class PasswordPrompt(val component: PasswordPromptComponent) : DialogChild
     }
 }
