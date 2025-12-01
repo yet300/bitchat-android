@@ -6,7 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.bitchat.android.feature.chat.locationnotes.LocationNotesComponent
+import com.bitchat.android.feature.chat.sheet.locationnotes.LocationNotesComponent
 
 @Composable
 fun LocationNotesErrorSheetContent(

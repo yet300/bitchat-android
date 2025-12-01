@@ -9,9 +9,9 @@ import com.arkivanov.mvikotlin.core.store.StoreFactory
 import com.bitchat.android.core.common.asValue
 import com.bitchat.android.favorites.FavoriteRelationship
 import com.bitchat.android.favorites.FavoritesPersistenceService
-import com.bitchat.android.feature.chat.meshpeerlist.integration.stateToModel
-import com.bitchat.android.feature.chat.meshpeerlist.store.MeshPeerListStore
-import com.bitchat.android.feature.chat.meshpeerlist.store.MeshPeerListStoreFactory
+import com.bitchat.android.feature.chat.sheet.meshpeerlist.integration.stateToModel
+import com.bitchat.android.feature.chat.sheet.meshpeerlist.store.MeshPeerListStore
+import com.bitchat.android.feature.chat.sheet.meshpeerlist.store.MeshPeerListStoreFactory
 import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.ui.colorForPeerSeed
 import org.koin.core.component.KoinComponent

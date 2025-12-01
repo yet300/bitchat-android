@@ -1,7 +1,7 @@
 package com.bitchat.android.feature.chat.sheet.meshpeerlist.integration
 
-import com.bitchat.android.feature.chat.meshpeerlist.MeshPeerListComponent
-import com.bitchat.android.feature.chat.meshpeerlist.store.MeshPeerListStore
+import com.bitchat.android.feature.chat.sheet.meshpeerlist.MeshPeerListComponent
+import com.bitchat.android.feature.chat.sheet.meshpeerlist.store.MeshPeerListStore
 
 internal val stateToModel: (MeshPeerListStore.State) -> MeshPeerListComponent.Model = { state ->
     MeshPeerListComponent.Model(

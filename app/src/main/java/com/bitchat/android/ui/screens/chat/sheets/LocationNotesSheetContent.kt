@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.bitchat.android.R
-import com.bitchat.android.feature.chat.locationnotes.LocationNotesComponent
+import com.bitchat.android.feature.chat.sheet.locationnotes.LocationNotesComponent
 import com.bitchat.android.geohash.GeohashChannelLevel
 import com.bitchat.android.nostr.LocationNotesManager
 import java.text.SimpleDateFormat

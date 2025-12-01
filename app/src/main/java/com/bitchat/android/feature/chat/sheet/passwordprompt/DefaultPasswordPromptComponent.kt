@@ -7,9 +7,9 @@ import com.arkivanov.mvikotlin.core.instancekeeper.getStore
 import com.arkivanov.mvikotlin.extensions.coroutines.labels
 import com.bitchat.android.core.common.asValue
 import com.bitchat.android.core.common.coroutineScope
-import com.bitchat.android.feature.chat.passwordprompt.integration.stateToModel
-import com.bitchat.android.feature.chat.passwordprompt.store.PasswordPromptStore
-import com.bitchat.android.feature.chat.passwordprompt.store.PasswordPromptStoreFactory
+import com.bitchat.android.feature.chat.sheet.passwordprompt.integration.stateToModel
+import com.bitchat.android.feature.chat.sheet.passwordprompt.store.PasswordPromptStore
+import com.bitchat.android.feature.chat.sheet.passwordprompt.store.PasswordPromptStoreFactory
 import kotlinx.coroutines.launch
 
 class DefaultPasswordPromptComponent(

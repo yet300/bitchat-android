@@ -1,7 +1,7 @@
 package com.bitchat.android.feature.chat.sheet.locationchannels.integration
 
-import com.bitchat.android.feature.chat.locationchannels.LocationChannelsComponent
-import com.bitchat.android.feature.chat.locationchannels.store.LocationChannelsStore
+import com.bitchat.android.feature.chat.sheet.locationchannels.LocationChannelsComponent
+import com.bitchat.android.feature.chat.sheet.locationchannels.store.LocationChannelsStore
 
 internal val stateToModel: (LocationChannelsStore.State) -> LocationChannelsComponent.Model = { state ->
     LocationChannelsComponent.Model(

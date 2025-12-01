@@ -49,7 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.bitchat.android.R
-import com.bitchat.android.feature.chat.meshpeerlist.MeshPeerListComponent
+import com.bitchat.android.feature.chat.sheet.meshpeerlist.MeshPeerListComponent
 import com.bitchat.android.geohash.ChannelID
 import com.bitchat.android.nostr.Bech32
 import com.bitchat.android.ui.GeohashPeopleList

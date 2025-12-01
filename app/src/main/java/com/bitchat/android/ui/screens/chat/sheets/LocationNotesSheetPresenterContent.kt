@@ -6,7 +6,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
-import com.bitchat.android.feature.chat.locationnotes.LocationNotesComponent
+import com.bitchat.android.feature.chat.sheet.locationnotes.LocationNotesComponent
 import com.bitchat.android.geohash.GeohashChannelLevel
 
 @Composable

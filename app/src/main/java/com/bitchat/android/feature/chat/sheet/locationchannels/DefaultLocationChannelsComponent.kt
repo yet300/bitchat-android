@@ -6,9 +6,9 @@ import com.arkivanov.decompose.value.operator.map
 import com.arkivanov.mvikotlin.core.instancekeeper.getStore
 import com.arkivanov.mvikotlin.core.store.StoreFactory
 import com.bitchat.android.core.common.asValue
-import com.bitchat.android.feature.chat.locationchannels.integration.stateToModel
-import com.bitchat.android.feature.chat.locationchannels.store.LocationChannelsStore
-import com.bitchat.android.feature.chat.locationchannels.store.LocationChannelsStoreFactory
+import com.bitchat.android.feature.chat.sheet.locationchannels.integration.stateToModel
+import com.bitchat.android.feature.chat.sheet.locationchannels.store.LocationChannelsStore
+import com.bitchat.android.feature.chat.sheet.locationchannels.store.LocationChannelsStoreFactory
 import com.bitchat.android.geohash.ChannelID
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject

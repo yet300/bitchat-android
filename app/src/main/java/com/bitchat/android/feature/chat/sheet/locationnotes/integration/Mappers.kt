@@ -1,7 +1,7 @@
 package com.bitchat.android.feature.chat.sheet.locationnotes.integration
 
-import com.bitchat.android.feature.chat.locationnotes.LocationNotesComponent
-import com.bitchat.android.feature.chat.locationnotes.store.LocationNotesStore
+import com.bitchat.android.feature.chat.sheet.locationnotes.LocationNotesComponent
+import com.bitchat.android.feature.chat.sheet.locationnotes.store.LocationNotesStore
 
 internal val stateToModel: (LocationNotesStore.State) -> LocationNotesComponent.Model = { state ->
     LocationNotesComponent.Model(
