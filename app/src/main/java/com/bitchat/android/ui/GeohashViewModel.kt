@@ -42,7 +42,7 @@ class GeohashViewModel @Inject constructor(
     companion object { private const val TAG = "GeohashViewModel" }
 
     private val repo = GeohashRepository(application, dataManager)
-    private val subscriptionManager = NostrSubscriptionManager(nostrRelayManager, viewModelScope)
+    private val subscriptionManager = NostrSubscriptionManager(nostrRelayManager)
     private val geohashMessageHandler = GeohashMessageHandler(
         application = application,
         state = state,
