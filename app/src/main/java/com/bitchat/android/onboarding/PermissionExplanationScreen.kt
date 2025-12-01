@@ -40,124 +40,116 @@ fun PermissionExplanationScreen(
     val colorScheme = MaterialTheme.colorScheme
     val scrollState = rememberScrollState()
 
-    Box(
-        modifier = modifier
-    ) {
-        // Scrollable content
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 88.dp) // Leave space for the fixed button
-                .verticalScroll(scrollState),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            // Header Section - matching AboutSheet style
+    Scaffold(
+        content = { innerPadding ->
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = 24.dp)
+                    .verticalScroll(scrollState),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.Bottom,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = stringResource(R.string.app_name),
-                        style = MaterialTheme.typography.headlineLarge.copy(
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 32.sp
-                        ),
-                        color = colorScheme.onBackground
-                    )
-                }
+                Spacer(modifier = Modifier.height(24.dp))
 
-                Text(
-                    text = stringResource(R.string.about_tagline),
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = colorScheme.onBackground.copy(alpha = 0.7f)
-                )
-            }
-
-            // Privacy assurance section - matching AboutSheet card style
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = colorScheme.surfaceVariant.copy(alpha = 0.25f),
-                shape = RoundedCornerShape(12.dp)
-            ) {
+                // Header Section - matching AboutSheet style
                 Column(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Row(
-                        verticalAlignment = Alignment.Top,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.Bottom,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Security,
-                            contentDescription = stringResource(R.string.cd_privacy_protected),
-                            tint = colorScheme.primary,
-                            modifier = Modifier
-                                .padding(top = 2.dp)
-                                .size(20.dp)
-                        )
-                        Column {
-                            Text(
-                                text = stringResource(R.string.privacy_protected),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Medium,
-                                color = colorScheme.onBackground
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = stringResource(R.string.privacy_bullets),
-                                style = MaterialTheme.typography.bodySmall,
+                        Text(
+                            text = stringResource(R.string.app_name),
+                            style = MaterialTheme.typography.headlineLarge.copy(
                                 fontFamily = FontFamily.Monospace,
-                                color = colorScheme.onBackground.copy(alpha = 0.8f)
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 32.sp
+                            ),
+                            color = colorScheme.onBackground
+                        )
+                    }
+
+                    Text(
+                        text = stringResource(R.string.about_tagline),
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = colorScheme.onBackground.copy(alpha = 0.7f)
+                    )
+                }
+
+                // Privacy assurance section - matching AboutSheet card style
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.Top,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Security,
+                                contentDescription = stringResource(R.string.cd_privacy_protected),
+                                tint = colorScheme.primary,
+                                modifier = Modifier
+                                    .padding(top = 2.dp)
+                                    .size(20.dp)
                             )
+                            Column {
+                                Text(
+                                    text = stringResource(R.string.privacy_protected),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = colorScheme.onBackground
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = stringResource(R.string.privacy_bullets),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = colorScheme.onBackground.copy(alpha = 0.8f)
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            // Section header
-            Text(
-                text = stringResource(R.string.permissions_header),
-                style = MaterialTheme.typography.labelLarge,
-                color = colorScheme.onBackground.copy(alpha = 0.7f),
-                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
-            )
-
-            // Permission categories
-            permissionCategories.forEach { category ->
-                PermissionCategoryCard(
-                    category = category,
-                    colorScheme = colorScheme
+                // Section header
+                Text(
+                    text = stringResource(R.string.permissions_header),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = colorScheme.onBackground.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
                 )
+
+                // Permission categories
+                permissionCategories.forEach { category ->
+                    PermissionCategoryCard(
+                        category = category,
+                        colorScheme = colorScheme
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-        }
-
-        // Fixed button at bottom
-        Surface(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth(),
-            color = colorScheme.surface,
-            shadowElevation = 8.dp
-        ) {
+        },
+        bottomBar = {
             Button(
                 onClick = onContinue,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
+                    .navigationBarsPadding(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = colorScheme.primary
                 )
@@ -172,7 +164,7 @@ fun PermissionExplanationScreen(
                 )
             }
         }
-    }
+    )
 }
 
 @Composable

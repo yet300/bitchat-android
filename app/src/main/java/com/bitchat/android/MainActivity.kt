@@ -38,9 +38,6 @@ class MainActivity : OrientationAwareActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Enable edge-to-edge display for modern Android look
-        enableEdgeToEdge()
-
         // Set up ActivityResultLaunchers for the managers
         bluetoothStatusManager.setLauncher(
             registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -76,22 +73,8 @@ class MainActivity : OrientationAwareActivity() {
         )
 
         setContent {
-            val model by root.model.subscribeAsState()
-            BitchatTheme(
-                themePref = model.theme
-            ) {
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    containerColor = MaterialTheme.colorScheme.background
-                ) { innerPadding ->
-                    RootContent(
-                        component = root,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding)
-                    )
-                }
-            }
+            enableEdgeToEdge()
+            App(component = root)
         }
     }
 
@@ -129,12 +112,14 @@ class MainActivity : OrientationAwareActivity() {
                 )
                 DeepLinkData.PrivateChat(peerID, senderNickname)
             }
+
             shouldOpenGeohashChat -> {
                 val geohash = intent.getStringExtra(
                     com.bitchat.android.ui.NotificationManager.EXTRA_GEOHASH
                 ) ?: return null
                 DeepLinkData.GeohashChat(geohash)
             }
+
             else -> null
         }
     }
