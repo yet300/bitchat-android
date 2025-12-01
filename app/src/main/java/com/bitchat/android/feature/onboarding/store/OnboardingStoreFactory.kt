@@ -131,7 +131,13 @@ internal class OnboardingStoreFactory(
 
             // If this is first time launch, skip hardware checks and go straight to permissions
             if (permissionManager.isFirstTimeLaunch()) {
+                // On first launch, we need permissions before we can check hardware status
+                // (Bluetooth check requires BLUETOOTH_CONNECT permission on Android 12+)
                 if (state.onboardingState == OnboardingState.CHECKING) {
+                    proceedToPermissions()
+                } else if (state.onboardingState == OnboardingState.PERMISSION_REQUESTING ||
+                           state.onboardingState == OnboardingState.PERMISSION_EXPLANATION) {
+                    // Re-check if permissions are now granted (called after permission results)
                     proceedToPermissions()
                 }
                 return
@@ -167,7 +173,6 @@ internal class OnboardingStoreFactory(
          */
         private fun proceedToPermissions() {
             if (permissionManager.areAllPermissionsGranted()) {
-                // All permissions granted, mark onboarding complete and navigate to chat
                 permissionManager.markOnboardingComplete()
                 dispatch(OnboardingStore.Msg.OnboardingStateChanged(OnboardingState.INITIALIZING))
                 publish(OnboardingStore.Label.OnboardingComplete)

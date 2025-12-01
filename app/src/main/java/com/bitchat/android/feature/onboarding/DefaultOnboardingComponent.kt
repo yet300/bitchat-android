@@ -53,6 +53,11 @@ class DefaultOnboardingComponent(
     // it's best if the Activity sets the launchers on the Managers.
     
     init {
+        // Set up callback to re-check state after permissions are handled
+        onboardingCoordinator.onPermissionsHandled = {
+            store.accept(OnboardingStore.Intent.CheckStatus)
+        }
+        
         coroutineScope().launch {
             store.labels.collect { label ->
                 when (label) {

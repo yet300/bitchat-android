@@ -21,6 +21,9 @@ class OnboardingCoordinator(
     }
 
     private var permissionLauncher: ActivityResultLauncher<Array<String>>? = null
+    
+    /** Callback invoked after permission results are handled */
+    var onPermissionsHandled: (() -> Unit)? = null
 
     init {
         setupPermissionLauncher()
@@ -105,6 +108,9 @@ class OnboardingCoordinator(
                 handlePermissionDenial(permissions)
             }
         }
+        
+        // Notify listener that permissions have been handled
+        onPermissionsHandled?.invoke()
     }
 
     /**
