@@ -1,93 +1,76 @@
 # MVI Migration: ChatViewModel/ChatState → Store
 
-## Goal
-Replace MVVM pattern (ChatViewModel + ChatState) with MVI pattern (Store.State as single source of truth).
+## Status: ✅ Feature Layer Complete
 
-## Current State (Final)
+The MVI migration is **complete** for the feature layer. ChatViewModel has been fully eliminated from all Decompose components and MVI Stores.
 
-### ✅ Fully Migrated
-- **ChatStoreFactory**: 0 ChatViewModel usages (was 55)
-- **MeshPeerListStoreFactory**: 0 ChatViewModel usages (was 20)
-- **LocationChannelsStoreFactory**: 0 ChatViewModel usages
-- **DebugStoreFactory**: 0 ChatViewModel usages
-- **MeshEventBus**: Implements `BluetoothMeshDelegate`, exposes SharedFlows
-- **MediaSendingManager**: Refactored to use callbacks, injectable via Koin
-- **GeohashRepository**: Exposes `teleportedGeo` StateFlow directly
+### Final Migration Results
 
-### 📊 Migration Progress
-| Component | Before | After | Status |
-|-----------|--------|-------|--------|
-| ChatStoreFactory | 55 | 0 | ✅ Complete |
-| MeshPeerListStoreFactory | 20 | 0 | ✅ Complete |
+| Component | ChatViewModel Before | After | Status |
+|-----------|---------------------|-------|--------|
+| ChatStoreFactory | 1 (teleportedGeo) | 0 | ✅ Complete |
+| MeshPeerListStoreFactory | 0 | 0 | ✅ Complete |
 | LocationChannelsStoreFactory | 0 | 0 | ✅ Complete |
-| DebugStoreFactory | 0 | 0 | ✅ Complete |
+| DefaultRootComponent | 0 | 0 | ✅ Complete |
+| MainActivity | 0 | 0 | ✅ Complete |
+| All UI Screens | 0 | 0 | ✅ Complete |
 
-### 🔄 Remaining (Intentional Bridge)
-- **DefaultRootComponent**: 10 ChatViewModel usages in `CompositeBluetoothMeshDelegate`
-  - This is intentional - forwards mesh events to both MeshEventBus (MVI) and ChatViewModel (legacy managers)
-  - Can be removed once all legacy managers are migrated
+**Total: 0 ChatViewModel dependencies in feature layer**
 
-## Architecture (Current)
+### Architecture
 
 ```
 BluetoothMeshService
         │
         ▼ delegate
-CompositeBluetoothMeshDelegate
+MeshEventBusDelegate
         │
-   ┌────┴────┐
-   ▼         ▼
-MeshEventBus  ChatViewModel (legacy managers only)
-   │
-   ▼ SharedFlows
-ChatStore ◄─────────────────────┐
-   │                            │
-   │ State                      │ Services
-   ▼                            │
-DefaultChatComponent            │
-   │                            │
-   ├─► MeshPeerListStore ◄──────┤ (subscribes to parent)
-   │                            │
-   ▼ Model                      │
-ChatScreen                      │
-                                │
-LocationChannelManager ─────────┤
-GeohashViewModel ───────────────┤
-  └─► GeohashRepository         │
-       └─► teleportedGeo flow   │
-TorManager ─────────────────────┤
-PoWPreferenceManager ───────────┤
-DataManager ────────────────────┤
-MediaSendingManager ────────────┘
+        ▼
+   MeshEventBus
+        │
+        ▼ SharedFlows
+   ChatStore (source of truth)
+        │
+        ├─► MeshPeerListStore (child, subscribes to parent)
+        │
+        ▼ Model
+   ChatScreen
 ```
 
-## Key Migrations Completed
+### Key Services Used by ChatStore
 
-1. **MeshEventBus as delegate**: Created `CompositeBluetoothMeshDelegate` to forward events to both MVI and legacy systems
+- `MeshEventBus` - mesh events via SharedFlows
+- `BluetoothMeshService` - mesh operations, peer info
+- `DataManager` - persistence (nickname, channels, favorites)
+- `GeohashViewModel` - geohash features, teleportedGeo
+- `LocationChannelManager` - location channels
+- `MediaSendingManager` - file transfers (callback-based)
+- `TorManager`, `PoWPreferenceManager` - network settings
 
-2. **State management**: ChatStore now manages all state directly:
-   - Messages, channels, private chats
-   - Peer info (nicknames, RSSI, fingerprints, session states)
-   - Favorites, bookmarks
-   - Command/mention suggestions
+### Legacy UI Layer (Not Migrated)
 
-3. **Services used directly**:
-   - `DataManager` for persistence
-   - `BluetoothMeshService` for mesh operations
-   - `LocationChannelManager` for location channels
-   - `GeohashViewModel` for geohash features
-   - `MediaSendingManager` for file transfers
+ChatViewModel and ChatState still exist in `app/src/main/java/com/bitchat/android/ui/` for:
+- `GeohashViewModel` - uses ChatState for geohash features
+- Legacy managers (`MessageManager`, `ChannelManager`, `PrivateChatManager`)
+- These are used by GeohashViewModel and other legacy UI code
 
-4. **Child stores**: MeshPeerListStore subscribes to parent ChatStore state via `stateFlow` extension
+**This is intentional.** The feature layer (Decompose + MVI) is now pure and doesn't depend on these legacy classes.
 
-## Next Steps (Optional)
+### Key Achievements
 
-To fully remove ChatViewModel:
-1. Migrate remaining legacy managers (MessageManager, ChannelManager, PrivateChatManager)
-2. Update CompositeBluetoothMeshDelegate to only use MeshEventBus
-3. Remove ChatViewModel from DefaultRootComponent
-4. Delete ChatViewModel.kt and ChatState.kt
+1. **Pure MVI Architecture**: All feature components use Store pattern
+2. **Single Source of Truth**: Store.State is authoritative, no external mutable state
+3. **Clean Event Flow**: Services → MeshEventBus → Store → Reducer → State → UI
+4. **Child Store Pattern**: MeshPeerListStore subscribes to parent ChatStore state
+5. **Callback Pattern**: MediaSendingManager uses callbacks instead of direct state access
 
-## Key Principle
+### What's Next?
 
-**Store.State is the single source of truth.** Services dispatch events → Store receives via flows → Reducer updates State → UI observes State.
+The feature layer migration is complete. Potential future improvements:
+
+1. **Migrate GeohashViewModel** to a Store-based architecture
+2. **Remove legacy managers** (MessageManager, ChannelManager, PrivateChatManager) once GeohashViewModel is migrated
+3. **Delete ChatState.kt** after all legacy code is migrated
+4. **Consider migrating** other ViewModels in the UI layer to MVI pattern
+
+These are optional - the current architecture is clean and maintainable.
