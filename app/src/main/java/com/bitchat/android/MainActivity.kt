@@ -14,6 +14,7 @@ import com.bitchat.android.onboarding.BluetoothStatusManager
 import com.bitchat.android.onboarding.LocationStatusManager
 import com.bitchat.android.onboarding.OnboardingCoordinator
 import com.bitchat.android.onboarding.PermissionManager
+import com.bitchat.android.ui.BitchatNotificationManager
 import com.bitchat.android.ui.OrientationAwareActivity
 import org.koin.android.ext.android.inject
 
@@ -84,29 +85,29 @@ class MainActivity : OrientationAwareActivity() {
      */
     private fun extractDeepLinkFromIntent(intent: Intent): DeepLinkData? {
         val shouldOpenPrivateChat = intent.getBooleanExtra(
-            com.bitchat.android.ui.NotificationManager.EXTRA_OPEN_PRIVATE_CHAT,
+            BitchatNotificationManager.EXTRA_OPEN_PRIVATE_CHAT,
             false
         )
 
         val shouldOpenGeohashChat = intent.getBooleanExtra(
-            com.bitchat.android.ui.NotificationManager.EXTRA_OPEN_GEOHASH_CHAT,
+            BitchatNotificationManager.EXTRA_OPEN_GEOHASH_CHAT,
             false
         )
 
         return when {
             shouldOpenPrivateChat -> {
                 val peerID = intent.getStringExtra(
-                    com.bitchat.android.ui.NotificationManager.EXTRA_PEER_ID
+                    BitchatNotificationManager.EXTRA_PEER_ID
                 ) ?: return null
                 val senderNickname = intent.getStringExtra(
-                    com.bitchat.android.ui.NotificationManager.EXTRA_SENDER_NICKNAME
+                    BitchatNotificationManager.EXTRA_SENDER_NICKNAME
                 )
                 DeepLinkData.PrivateChat(peerID, senderNickname)
             }
 
             shouldOpenGeohashChat -> {
                 val geohash = intent.getStringExtra(
-                    com.bitchat.android.ui.NotificationManager.EXTRA_GEOHASH
+                    BitchatNotificationManager.EXTRA_GEOHASH
                 ) ?: return null
                 DeepLinkData.GeohashChat(geohash)
             }

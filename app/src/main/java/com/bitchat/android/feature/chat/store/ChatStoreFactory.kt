@@ -30,6 +30,7 @@ import com.bitchat.android.nostr.NostrTransport
 import com.bitchat.android.nostr.PoWPreferenceManager
 import com.bitchat.android.services.MessageRouter
 import com.bitchat.android.services.SeenMessageStore
+import com.bitchat.android.ui.BitchatNotificationManager
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
@@ -56,6 +57,7 @@ internal class ChatStoreFactory(
     private val powPreferenceManager: PoWPreferenceManager by inject()
     private val applicationContext: android.content.Context by inject()
     private val mediaSendingManager: MediaSendingManager by inject()
+    private val notificationManager: BitchatNotificationManager by inject()
 
     fun create(): ChatStore =
         object : ChatStore,
@@ -134,11 +136,16 @@ internal class ChatStoreFactory(
             currentPrivateChats[peerID] = chatMessages
             dispatch(ChatStore.Msg.PrivateChatsUpdated(currentPrivateChats))
             
-            // Mark as unread if not currently viewing this chat
-            if (state().selectedPrivateChatPeer != peerID && message.sender != state().nickname) {
+            // Mark as unread if not currently viewing this chat and message is from someone else
+            val isFromOther = message.sender != state().nickname && message.senderPeerID != state().myPeerID
+            if (state().selectedPrivateChatPeer != peerID && isFromOther) {
                 val currentUnread = state().unreadPrivateMessages.toMutableSet()
                 currentUnread.add(peerID)
                 dispatch(ChatStore.Msg.UnreadPrivateMessagesUpdated(currentUnread))
+                
+                // Show notification for incoming private message
+                val senderNickname = message.sender
+                notificationManager.showPrivateMessageNotification(peerID, senderNickname, message.content)
             }
         }
         
@@ -469,31 +476,27 @@ internal class ChatStoreFactory(
         }
 
         private fun initialize() {
+            // Set peer ID immediately (synchronous, fast)
+            dispatch(ChatStore.Msg.MyPeerIDSet(meshService.myPeerID))
+            
+            // Wire up callbacks immediately so messages can be received right away
+            setupMeshEventBusCallbacks()
+            setupMediaSendingManagerCallbacks()
+            
+            // Subscribe to events immediately - this is critical for receiving messages
+            subscribeToMeshEvents()
+            subscribeToChatEventBus()
+            subscribeToServiceFlows()
+            
+            // Load persisted data and handle startup config in background
             scope.launch {
                 try {
                     dispatch(ChatStore.Msg.LoadingChanged(true))
                     
-                    dispatch(ChatStore.Msg.MyPeerIDSet(meshService.myPeerID))
-                    
-                    // Wire up MeshEventBus callbacks
-                    setupMeshEventBusCallbacks()
-                    
-                    // Wire up MediaSendingManager callbacks
-                    setupMediaSendingManagerCallbacks()
-                    
-                    // Subscribe to MeshEventBus for mesh events (MVI pattern)
-                    subscribeToMeshEvents()
-                    
-                    // Subscribe to ChatEventBus for Nostr events (clean architecture)
-                    subscribeToChatEventBus()
-                    
-                    // Load persisted data directly
+                    // Load persisted data
                     loadData()
                     
-                    // Subscribe to service flows for reactive state updates
-                    subscribeToServiceFlows()
-                    
-                    // Handle startup config
+                    // Handle startup config (deep links)
                     handleStartupConfig()
                     
                     dispatch(ChatStore.Msg.LoadingChanged(false))
@@ -826,25 +829,7 @@ internal class ChatStoreFactory(
             // Private chats: managed by startPrivateChat()/addPrivateMessage() in Store
             // Selected private chat peer: managed by startPrivateChat()/endPrivateChat() in Store
             // Unread counts: managed by Store when adding messages
-            
-            // Initialize nickname from DataManager
-            scope.launch {
-                val savedNickname = dataManager.loadNickname()
-                dispatch(ChatStore.Msg.NicknameChanged(savedNickname))
-            }
-            
-            // Initialize joined channels from DataManager
-            scope.launch {
-                val (channels, passwordProtected) = dataManager.loadChannelData()
-                dispatch(ChatStore.Msg.JoinedChannelsUpdated(channels))
-                dispatch(ChatStore.Msg.PasswordProtectedChannelsUpdated(passwordProtected))
-            }
-            
-            // Initialize favorite peers from DataManager
-            scope.launch {
-                dataManager.loadFavorites()
-                dispatch(ChatStore.Msg.FavoritePeersUpdated(dataManager.favoritePeers))
-            }
+            // Note: nickname, channels, favorites are loaded in loadData() - no duplicate loading needed
             
             // Peer info polling - get from BluetoothMeshService periodically
             scope.launch {
@@ -1298,6 +1283,10 @@ internal class ChatStoreFactory(
                     currentUnread.remove(peerID)
                     dispatch(ChatStore.Msg.UnreadPrivateMessagesUpdated(currentUnread))
                     
+                    // Update notification manager and clear notifications for this peer
+                    notificationManager.setCurrentPrivateChatPeer(peerID)
+                    notificationManager.clearNotificationsForSender(peerID)
+                    
                     // Initialize chat if needed
                     if (!state().privateChats.containsKey(peerID)) {
                         val updatedChats = state().privateChats.toMutableMap()
@@ -1317,6 +1306,9 @@ internal class ChatStoreFactory(
         private fun endPrivateChat() {
             // Update store state
             dispatch(ChatStore.Msg.SelectedPrivateChatPeerChanged(null))
+            
+            // Update notification manager
+            notificationManager.setCurrentPrivateChatPeer(null)
             
             // Store is now the source of truth - no ChatViewModel sync needed
             publish(ChatStore.Label.PrivateChatEnded)
@@ -1474,15 +1466,18 @@ internal class ChatStoreFactory(
         // App lifecycle
         private fun setAppBackgroundState(isBackground: Boolean) {
             meshService.connectionManager.setAppBackgroundState(isBackground)
+            notificationManager.setAppBackgroundState(isBackground)
         }
         
-        // Notification management - TODO: Implement notification service
+        // Notification management
         private fun clearNotificationsForSender(senderID: String) {
             Log.d(TAG, "Clear notifications for sender: $senderID")
+            notificationManager.clearNotificationsForSender(senderID)
         }
         
         private fun clearNotificationsForGeohash(geohash: String) {
             Log.d(TAG, "Clear notifications for geohash: $geohash")
+            notificationManager.clearNotificationsForGeohash(geohash)
         }
         
         // Command/Mention suggestions - implemented in Store

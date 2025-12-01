@@ -13,6 +13,8 @@ import androidx.core.app.NotificationManagerCompat
 import com.bitchat.android.MainActivity
 import com.bitchat.android.R
 import com.bitchat.android.util.NotificationIntervalManager
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -25,11 +27,12 @@ import java.util.concurrent.ConcurrentHashMap
  * - Proper notification management and cleanup
  * - Active peers notification
  */
-class NotificationManager(
+@Singleton
+class BitchatNotificationManager @Inject constructor(
   private val context: Context,
-  private val notificationManager: NotificationManagerCompat,
   private val notificationIntervalManager: NotificationIntervalManager
 ) {
+  private val notificationManager: NotificationManagerCompat = NotificationManagerCompat.from(context)
 
     companion object {
         private const val TAG = "NotificationManager"
