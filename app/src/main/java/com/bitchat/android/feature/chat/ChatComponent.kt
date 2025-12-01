@@ -2,16 +2,14 @@ package com.bitchat.android.feature.chat
 
 import com.arkivanov.decompose.router.slot.ChildSlot
 import com.arkivanov.decompose.value.Value
-import com.bitchat.android.feature.about.AboutComponent
-import com.bitchat.android.feature.chat.locationchannels.LocationChannelsComponent
-import com.bitchat.android.feature.chat.locationnotes.LocationNotesComponent
-import com.bitchat.android.feature.chat.meshpeerlist.MeshPeerListComponent
-import com.bitchat.android.feature.debug.DebugComponent
+import com.bitchat.android.feature.chat.sheet.about.AboutComponent
+import com.bitchat.android.feature.chat.sheet.debug.DebugComponent
 import com.bitchat.android.geohash.ChannelID
 import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.ui.CommandSuggestion
 import com.bitchat.android.ui.GeoPerson
 import androidx.compose.ui.graphics.Color
+import com.bitchat.android.feature.chat.sheet.usersheet.UserSheetComponent
 
 interface ChatComponent {
     val model: Value<Model>
@@ -162,14 +160,14 @@ interface ChatComponent {
     
     sealed interface SheetChild {
         data class AppInfo(val component: AboutComponent) : SheetChild
-        data class LocationChannels(val component: LocationChannelsComponent) : SheetChild
-        data class LocationNotes(val component: LocationNotesComponent) : SheetChild
-        data class UserSheet(val component: com.bitchat.android.feature.chat.usersheet.UserSheetComponent) : SheetChild
-        data class MeshPeerList(val component: MeshPeerListComponent) : SheetChild
+        data class LocationChannels(val component: com.bitchat.android.feature.chat.sheet.locationchannels.LocationChannelsComponent) : SheetChild
+        data class LocationNotes(val component: com.bitchat.android.feature.chat.sheet.locationnotes.LocationNotesComponent) : SheetChild
+        data class UserSheet(val component: UserSheetComponent) : SheetChild
+        data class MeshPeerList(val component: com.bitchat.android.feature.chat.sheet.meshpeerlist.MeshPeerListComponent) : SheetChild
         data class DebugSettings(val component: DebugComponent) : SheetChild
     }
     
     sealed interface DialogChild {
-        data class PasswordPrompt(val component: com.bitchat.android.feature.chat.passwordprompt.PasswordPromptComponent) : DialogChild
+        data class PasswordPrompt(val component: com.bitchat.android.feature.chat.sheet.passwordprompt.PasswordPromptComponent) : DialogChild
     }
 }

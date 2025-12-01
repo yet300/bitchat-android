@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.bitchat.android.R
-import com.bitchat.android.feature.about.AboutComponent
+import com.bitchat.android.feature.chat.sheet.about.AboutComponent
 import com.bitchat.android.net.TorMode
 import com.bitchat.android.nostr.NostrProofOfWork
 import com.bitchat.android.ui.theme.ThemePreference

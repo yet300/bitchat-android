@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.bitchat.android.R
-import com.bitchat.android.feature.debug.DebugComponent
+import com.bitchat.android.feature.chat.sheet.debug.DebugComponent
 
 /**
  * Debug Settings sheet content - uses DebugComponent instead of ChatViewModel

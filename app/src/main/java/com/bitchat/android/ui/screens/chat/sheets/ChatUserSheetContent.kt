@@ -15,10 +15,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bitchat.android.R
-import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.ui.theme.BASE_FONT_SIZE
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
-import com.bitchat.android.feature.chat.usersheet.UserSheetComponent
+import com.bitchat.android.feature.chat.sheet.usersheet.UserSheetComponent
 
 @Composable
 fun ChatUserSheetContent(

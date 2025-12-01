@@ -13,16 +13,17 @@ import com.arkivanov.mvikotlin.core.store.StoreFactory
 import com.arkivanov.mvikotlin.extensions.coroutines.labels
 import com.bitchat.android.core.common.asValue
 import com.bitchat.android.core.common.coroutineScope
-import com.bitchat.android.feature.about.DefaultAboutComponent
+import com.bitchat.android.feature.chat.sheet.about.DefaultAboutComponent
 import com.bitchat.android.feature.chat.integration.stateToModel
-import com.bitchat.android.feature.chat.locationchannels.DefaultLocationChannelsComponent
-import com.bitchat.android.feature.chat.locationnotes.DefaultLocationNotesComponent
-import com.bitchat.android.feature.chat.meshpeerlist.DefaultMeshPeerListComponent
-import com.bitchat.android.feature.chat.passwordprompt.DefaultPasswordPromptComponent
+import com.bitchat.android.feature.chat.sheet.locationchannels.DefaultLocationChannelsComponent
+import com.bitchat.android.feature.chat.sheet.locationnotes.DefaultLocationNotesComponent
+import com.bitchat.android.feature.chat.sheet.meshpeerlist.DefaultMeshPeerListComponent
+import com.bitchat.android.feature.chat.sheet.passwordprompt.DefaultPasswordPromptComponent
 import com.bitchat.android.feature.chat.store.ChatStore
 import com.bitchat.android.feature.chat.store.ChatStoreFactory
-import com.bitchat.android.feature.chat.usersheet.DefaultUserSheetComponent
+import com.bitchat.android.feature.chat.sheet.usersheet.DefaultUserSheetComponent
 import com.bitchat.android.favorites.FavoritesPersistenceService
+import com.bitchat.android.feature.chat.sheet.debug.DefaultDebugComponent
 import com.bitchat.android.geohash.ChannelID
 import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.ui.colorForPeerSeed
@@ -163,7 +164,7 @@ class DefaultChatComponent(
                         targetNickname = config.nickname,
                         selectedMessage = selectedMessage,
                         currentNickname = storeState.nickname,
-                        isGeohashChannel = storeState.selectedLocationChannel is com.bitchat.android.geohash.ChannelID.Location,
+                        isGeohashChannel = storeState.selectedLocationChannel is ChannelID.Location,
                         onDismissCallback = ::onDismissSheet
                     )
                 )
@@ -176,7 +177,7 @@ class DefaultChatComponent(
                 )
             )
             is SheetConfig.DebugSettings -> ChatComponent.SheetChild.DebugSettings(
-                component = com.bitchat.android.feature.debug.DefaultDebugComponent(
+                component = DefaultDebugComponent(
                     componentContext = componentContext,
                     onDismissRequest = ::onDismissSheet
                 )
