@@ -1648,6 +1648,59 @@ internal class ChatStoreFactory(
             dataManager.clearAllData()
             geohashBookmarksStore.clearAll()
             
+            // Clear mesh service internal data (connections, device tracking, etc.)
+            try {
+                meshService.clearAllInternalData()
+                Log.d(TAG, "✅ Cleared mesh service data")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error clearing mesh service data: ${e.message}")
+            }
+            
+            // Clear all cryptographic data
+            try {
+                meshService.clearAllEncryptionData()
+                Log.d(TAG, "✅ Cleared encryption data")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error clearing encryption data: ${e.message}")
+            }
+            
+            // Clear Nostr relay subscriptions and state
+            try {
+                nostrRelayManager.clearAllSubscriptions()
+                Log.d(TAG, "✅ Cleared Nostr subscriptions")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error clearing Nostr subscriptions: ${e.message}")
+            }
+            
+            // Clear geohash repository state
+            try {
+                geohashRepository.clearAll()
+                Log.d(TAG, "✅ Cleared geohash repository")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error clearing geohash repository: ${e.message}")
+            }
+            
+            // Clear favorites
+            try {
+                favoritesService.clearAllFavorites()
+                Log.d(TAG, "✅ Cleared favorites")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error clearing favorites: ${e.message}")
+            }
+            
+            // Clear fingerprint mappings
+            try {
+                fingerprintManager.clearAllFingerprints()
+                Log.d(TAG, "✅ Cleared fingerprints")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error clearing fingerprints: ${e.message}")
+            }
+            
+            // Reset nickname to new random one
+            val newNickname = "anon${kotlin.random.Random.nextInt(1000, 9999)}"
+            dataManager.saveNickname(newNickname)
+            dispatch(ChatStore.Msg.NicknameChanged(newNickname))
+            
             // Reset store state to initial
             dispatch(ChatStore.Msg.MessagesUpdated(emptyList()))
             dispatch(ChatStore.Msg.ChannelMessagesUpdated(emptyMap()))
@@ -1660,8 +1713,12 @@ internal class ChatStoreFactory(
             dispatch(ChatStore.Msg.FavoritePeersUpdated(emptySet()))
             dispatch(ChatStore.Msg.GeohashBookmarksUpdated(emptyList()))
             
-            // Store is now the source of truth - no ChatViewModel sync needed
-            Log.w(TAG, "🚨 PANIC CLEAR COMPLETE")
+            // Clear local tracking
+            processedUIMessages.clear()
+            channelKeys.clear()
+            channelPasswords.clear()
+            
+            Log.w(TAG, "🚨 PANIC MODE COMPLETED - All sensitive data cleared")
         }
     }
 
