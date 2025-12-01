@@ -9,7 +9,8 @@ import com.bitchat.android.geohash.GeohashBookmarksStore
 import com.bitchat.android.geohash.LocationChannelManager
 import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.mesh.MeshEventBus
-import com.bitchat.android.ui.GeohashViewModel
+import com.bitchat.android.nostr.GeohashRepository
+import com.bitchat.android.nostr.NostrSubscriptionManager
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -22,7 +23,8 @@ internal class LocationChannelsStoreFactory(
     private val bookmarksStore: GeohashBookmarksStore by inject()
     private val meshService: BluetoothMeshService by inject()
     private val meshEventBus: MeshEventBus by inject()
-    private val geohashViewModel: GeohashViewModel by inject()
+    private val geohashRepository: GeohashRepository by inject()
+    private val subscriptionManager: NostrSubscriptionManager by inject()
 
     fun create(): LocationChannelsStore =
         object : LocationChannelsStore,
@@ -37,7 +39,7 @@ internal class LocationChannelsStoreFactory(
                     permissionState = locationChannelManager.permissionState.value,
                     locationNames = locationChannelManager.locationNames.value,
                     locationServicesEnabled = locationChannelManager.locationServicesEnabled.value,
-                    geohashParticipantCounts = geohashViewModel.geohashParticipantCounts.value,
+                    geohashParticipantCounts = geohashRepository.geohashParticipantCounts.value,
                     connectedPeers = meshEventBus.connectedPeers.value,
                     myPeerID = meshService.myPeerID,
                     bookmarkNames = bookmarksStore.bookmarkNames.value
@@ -110,9 +112,9 @@ internal class LocationChannelsStoreFactory(
                         }
                     }
 
-                    // Subscribe to geohash participant counts (from GeohashViewModel)
+                    // Subscribe to geohash participant counts (from GeohashRepository - direct service access)
                     scope.launch {
-                        geohashViewModel.geohashParticipantCounts.collect { counts ->
+                        geohashRepository.geohashParticipantCounts.collect { counts ->
                             dispatch(LocationChannelsStore.Msg.GeohashParticipantCountsChanged(counts))
                         }
                     }
@@ -163,10 +165,23 @@ internal class LocationChannelsStoreFactory(
                     locationChannelManager.endLiveRefresh()
                 }
                 is LocationChannelsStore.Intent.BeginGeohashSampling -> {
-                    geohashViewModel.beginGeohashSampling(intent.geohashes)
+                    // Direct implementation using NostrSubscriptionManager
+                    if (intent.geohashes.isNotEmpty()) {
+                        scope.launch {
+                            intent.geohashes.forEach { geohash ->
+                                subscriptionManager.subscribeGeohash(
+                                    geohash = geohash,
+                                    sinceMs = System.currentTimeMillis() - 86400000L,
+                                    limit = 200,
+                                    id = "sampling-$geohash",
+                                    handler = { /* Events handled by GeohashMessageHandler via GeohashViewModel */ }
+                                )
+                            }
+                        }
+                    }
                 }
                 LocationChannelsStore.Intent.EndGeohashSampling -> {
-                    geohashViewModel.endGeohashSampling()
+                    // Sampling subscriptions are auto-cleaned by NostrSubscriptionManager
                 }
             }
         }

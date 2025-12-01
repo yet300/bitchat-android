@@ -3,6 +3,8 @@ package com.bitchat.android.nostr
 import android.app.Application
 import android.util.Log
 import com.bitchat.android.ui.GeoPerson
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,8 +14,10 @@ import java.util.Date
  * GeohashRepository
  * - Owns geohash participant tracking and nickname caching
  * - Maintains lightweight state for geohash-related UI
+ * - Injectable singleton service for use by multiple Stores
  */
-class GeohashRepository(
+@Singleton
+class GeohashRepository @Inject constructor(
     private val application: Application,
     private val dataManager: com.bitchat.android.ui.DataManager
 ) {

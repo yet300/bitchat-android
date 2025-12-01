@@ -10,7 +10,7 @@ import com.bitchat.android.favorites.FavoritesPersistenceService
 import com.bitchat.android.geohash.LocationChannelManager
 import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.mesh.MeshEventBus
-import com.bitchat.android.ui.GeohashViewModel
+import com.bitchat.android.nostr.GeohashRepository
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
@@ -25,7 +25,7 @@ internal class MeshPeerListStoreFactory(
     private val favoritesService: FavoritesPersistenceService by inject()
     private val meshEventBus: MeshEventBus by inject()
     private val locationChannelManager: LocationChannelManager by inject()
-    private val geohashViewModel: GeohashViewModel by inject()
+    private val geohashRepository: GeohashRepository by inject()
     private val dataManager: com.bitchat.android.ui.DataManager by inject()
     private val fingerprintManager: com.bitchat.android.mesh.PeerFingerprintManager by inject()
 
@@ -104,9 +104,9 @@ internal class MeshPeerListStoreFactory(
                 }
             }
             
-            // Geohash state from GeohashViewModel
+            // Geohash state from GeohashRepository (direct service access)
             scope.launch {
-                geohashViewModel.geohashPeople.collectLatest { people ->
+                geohashRepository.geohashPeople.collectLatest { people ->
                     dispatch(MeshPeerListStore.Msg.GeohashPeopleUpdated(people))
                 }
             }

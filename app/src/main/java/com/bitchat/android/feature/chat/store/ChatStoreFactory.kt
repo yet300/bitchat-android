@@ -15,8 +15,8 @@ import com.bitchat.android.mesh.MeshEventBus
 import com.bitchat.android.services.MessageRouter
 import com.bitchat.android.ui.CommandSuggestion
 import com.bitchat.android.ui.DataManager
-import com.bitchat.android.ui.GeohashViewModel
 import com.bitchat.android.ui.MediaSendingManager
+import com.bitchat.android.nostr.GeohashRepository
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
@@ -38,7 +38,7 @@ internal class ChatStoreFactory(
     private val nostrRelayManager: com.bitchat.android.nostr.NostrRelayManager by inject()
     private val nostrTransport: com.bitchat.android.nostr.NostrTransport by inject()
     private val meshEventBus: MeshEventBus by inject()
-    private val geohashViewModel: GeohashViewModel by inject()
+    private val geohashRepository: GeohashRepository by inject()
     private val torManager: com.bitchat.android.net.TorManager by inject()
     private val powPreferenceManager: com.bitchat.android.nostr.PoWPreferenceManager by inject()
     private val applicationContext: android.content.Context by inject()
@@ -731,16 +731,16 @@ internal class ChatStoreFactory(
                 }
             }
             
-            // Geohash people from GeohashViewModel
+            // Geohash people from GeohashRepository (direct service access)
             scope.launch {
-                geohashViewModel.geohashPeople.collectLatest { people ->
+                geohashRepository.geohashPeople.collectLatest { people ->
                     dispatch(ChatStore.Msg.GeohashPeopleUpdated(people))
                 }
             }
             
-            // Geohash participant counts from GeohashViewModel
+            // Geohash participant counts from GeohashRepository (direct service access)
             scope.launch {
-                geohashViewModel.geohashParticipantCounts.collectLatest { counts ->
+                geohashRepository.geohashParticipantCounts.collectLatest { counts ->
                     dispatch(ChatStore.Msg.GeohashParticipantCountsUpdated(counts))
                 }
             }
@@ -974,13 +974,8 @@ internal class ChatStoreFactory(
                         // Check if we're in a location channel
                         val selectedLocationChannel = state().selectedLocationChannel
                         if (selectedLocationChannel is com.bitchat.android.geohash.ChannelID.Location) {
-                            // Send to geohash channel via GeohashViewModel directly
-                            geohashViewModel.sendGeohashMessage(
-                                content = content,
-                                channel = selectedLocationChannel.channel,
-                                myPeerID = meshService.myPeerID,
-                                nickname = state().nickname
-                            )
+                            // Send to geohash channel directly using services
+                            sendGeohashMessage(content, selectedLocationChannel.channel)
                         } else {
                             // Send public/channel message via mesh
                             val message = com.bitchat.android.model.BitchatMessage(
@@ -1027,6 +1022,50 @@ internal class ChatStoreFactory(
 
         private fun cancelMediaSend(messageId: String) {
             mediaSendingManager.cancelMediaSend(messageId)
+        }
+
+        // Geohash message sending - direct implementation without GeohashViewModel
+        private fun sendGeohashMessage(content: String, channel: com.bitchat.android.geohash.GeohashChannel) {
+            scope.launch {
+                try {
+                    val tempId = "temp_${System.currentTimeMillis()}_${kotlin.random.Random.nextInt(1000)}"
+                    val pow = powPreferenceManager.getCurrentSettings()
+                    val nickname = state().nickname
+                    val localMsg = com.bitchat.android.model.BitchatMessage(
+                        id = tempId,
+                        sender = nickname ?: meshService.myPeerID,
+                        content = content,
+                        timestamp = java.util.Date(),
+                        isRelay = false,
+                        senderPeerID = "geohash:${channel.geohash}",
+                        channel = "#${channel.geohash}",
+                        powDifficulty = if (pow.enabled) pow.difficulty else null
+                    )
+                    addChannelMessage("geo:${channel.geohash}", localMsg)
+                    
+                    val startedMining = pow.enabled && pow.difficulty > 0
+                    if (startedMining) {
+                        com.bitchat.android.ui.PoWMiningTracker.startMiningMessage(tempId)
+                    }
+                    try {
+                        val identity = com.bitchat.android.nostr.NostrIdentityBridge.deriveIdentity(
+                            forGeohash = channel.geohash, 
+                            context = applicationContext
+                        )
+                        val teleported = state().isTeleported
+                        val event = com.bitchat.android.nostr.NostrProtocol.createEphemeralGeohashEvent(
+                            content, channel.geohash, identity, nickname, teleported, powPreferenceManager
+                        )
+                        nostrRelayManager.sendEventToGeohash(event, channel.geohash, includeDefaults = false, nRelays = 5)
+                    } finally {
+                        if (startedMining) {
+                            com.bitchat.android.ui.PoWMiningTracker.stopMiningMessage(tempId)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to send geohash message: ${e.message}")
+                }
+            }
         }
 
         // Channel actions - now using services directly
@@ -1221,9 +1260,20 @@ internal class ChatStoreFactory(
         }
         
         private fun startGeohashDM(nostrPubkey: String) {
-            geohashViewModel.startGeohashDM(nostrPubkey) { convKey ->
-                startPrivateChat(convKey)
+            // Direct implementation using GeohashRepository
+            val convKey = "nostr_${nostrPubkey.take(16)}"
+            geohashRepository.putNostrKeyMapping(convKey, nostrPubkey)
+            
+            // Record the conversation's geohash using the currently selected location channel
+            val current = state().selectedLocationChannel
+            val gh = (current as? com.bitchat.android.geohash.ChannelID.Location)?.channel?.geohash
+            if (!gh.isNullOrEmpty()) {
+                geohashRepository.setConversationGeohash(convKey, gh)
+                com.bitchat.android.nostr.GeohashConversationRegistry.set(convKey, gh)
             }
+            
+            startPrivateChat(convKey)
+            Log.d(TAG, "🗨️ Started geohash DM with $nostrPubkey -> $convKey (geohash=$gh)")
         }
 
         // Location channel actions
@@ -1464,7 +1514,17 @@ internal class ChatStoreFactory(
         }
         
         private fun blockUserInGeohash(nickname: String) {
-            geohashViewModel.blockUserInGeohash(nickname)
+            // Direct implementation using GeohashRepository
+            val pubkey = geohashRepository.findPubkeyByNickname(nickname)
+            if (pubkey != null) {
+                dataManager.addGeohashBlockedUser(pubkey)
+                // Refresh people list and counts to remove blocked entry immediately
+                geohashRepository.refreshGeohashPeople()
+                geohashRepository.updateReactiveParticipantCounts()
+                addSystemMessage("blocked $nickname in geohash channels")
+            } else {
+                addSystemMessage("user '$nickname' not found in current geohash")
+            }
         }
         
         // Command/Mention selection - clear suggestions state
