@@ -7,6 +7,7 @@ import com.arkivanov.mvikotlin.core.instancekeeper.getStore
 import com.arkivanov.mvikotlin.core.store.StoreFactory
 import com.arkivanov.mvikotlin.extensions.coroutines.labels
 import com.bitchat.android.core.common.asValue
+import com.bitchat.android.core.common.coroutineScope
 import com.bitchat.android.feature.onboarding.mapper.onboardingStoreStateToModel
 import com.bitchat.android.feature.onboarding.store.OnboardingStore
 import com.bitchat.android.feature.onboarding.store.OnboardingStoreFactory
@@ -15,8 +16,6 @@ import com.bitchat.android.onboarding.BluetoothStatusManager
 import com.bitchat.android.onboarding.LocationStatusManager
 import com.bitchat.android.onboarding.OnboardingCoordinator
 import com.bitchat.android.onboarding.PermissionManager
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -32,7 +31,6 @@ class DefaultOnboardingComponent(
 ) : OnboardingComponent, ComponentContext by componentContext, KoinComponent {
 
     private val storeFactory: StoreFactory by inject()
-    private val scope = CoroutineScope(Dispatchers.Main)
 
     private val store = instanceKeeper.getStore {
         OnboardingStoreFactory(
@@ -55,7 +53,7 @@ class DefaultOnboardingComponent(
     // it's best if the Activity sets the launchers on the Managers.
     
     init {
-        scope.launch {
+        coroutineScope().launch {
             store.labels.collect { label ->
                 when (label) {
                     OnboardingStore.Label.RequestEnableBluetooth -> bluetoothStatusManager.requestEnableBluetooth()

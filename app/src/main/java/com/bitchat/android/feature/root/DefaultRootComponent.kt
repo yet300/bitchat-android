@@ -15,6 +15,7 @@ import com.arkivanov.essenty.lifecycle.doOnResume
 import com.arkivanov.mvikotlin.core.instancekeeper.getStore
 import com.arkivanov.mvikotlin.core.store.StoreFactory
 import com.bitchat.android.core.common.asValue
+import com.bitchat.android.core.common.coroutineScope
 import com.bitchat.android.feature.chat.ChatComponent
 import com.bitchat.android.feature.chat.DefaultChatComponent
 import com.bitchat.android.feature.onboarding.DefaultOnboardingComponent
@@ -27,10 +28,6 @@ import com.bitchat.android.onboarding.BluetoothStatusManager
 import com.bitchat.android.onboarding.LocationStatusManager
 import com.bitchat.android.onboarding.OnboardingCoordinator
 import com.bitchat.android.onboarding.PermissionManager
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -99,7 +96,6 @@ class DefaultRootComponent(
     override val model: Value<RootComponent.Model> = store.asValue().map(stateToModel)
 
     private val navigation = StackNavigation<Config>()
-    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     
     private var isAppInitialized = false
     private var pendingDeepLink: DeepLinkData? = initialDeepLink
@@ -170,7 +166,7 @@ class DefaultRootComponent(
         }
 
     private fun onOnboardingComplete() {
-        scope.launch {
+        coroutineScope().launch {
             try {
                 initializeApp()
                 
@@ -261,9 +257,6 @@ class DefaultRootComponent(
                 Log.w(TAG, "Error stopping mesh services: ${e.message}")
             }
         }
-        
-        // Cancel coroutine scope
-        scope.cancel()
     }
 
     @Serializable
