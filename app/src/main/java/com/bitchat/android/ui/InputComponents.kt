@@ -2,6 +2,7 @@ package com.bitchat.android.ui
 // [Goose] TODO: Replace inline file attachment stub with FilePickerButton abstraction that dispatches via FileShareDispatcher
 
 
+import com.bitchat.android.model.CommandSuggestion
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape

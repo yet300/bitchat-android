@@ -2,29 +2,31 @@ package com.bitchat.android.nostr
 
 import android.app.Application
 import android.util.Log
+import com.bitchat.android.domain.event.ChatEventBus
 import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.model.DeliveryStatus
 import com.bitchat.android.protocol.BitchatPacket
 import com.bitchat.android.services.SeenMessageStore
-import com.bitchat.android.ui.ChatState
-import com.bitchat.android.ui.MeshDelegateHandler
-import com.bitchat.android.ui.PrivateChatManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.util.Date
 
+/**
+ * NostrDirectMessageHandler
+ * - Processes gift-wrapped Nostr DMs
+ * - Emits events to ChatEventBus (NOT directly to UI state)
+ * 
+ * Clean Architecture: This handler emits events, Store consumes them.
+ */
 class NostrDirectMessageHandler(
     private val application: Application,
-    private val state: ChatState,
-    private val privateChatManager: PrivateChatManager,
-    private val meshDelegateHandler: MeshDelegateHandler,
     private val scope: CoroutineScope,
     private val repo: GeohashRepository,
     private val dataManager: com.bitchat.android.ui.DataManager,
     private val nostrTransport: NostrTransport,
-    private val seenStore: SeenMessageStore
+    private val seenStore: SeenMessageStore,
+    private val nicknameProvider: () -> String?
 ) {
     companion object { private const val TAG = "NostrDirectMessageHandler" }
 
@@ -60,8 +62,7 @@ class NostrDirectMessageHandler(
 
                 val (content, senderPubkey, rumorTimestamp) = decryptResult
 
-                // If sender is blocked for geohash contexts, drop any events from this pubkey
-                // Applies to both geohash DMs (geohash != "") and account DMs (geohash == "")
+                // Blocked users check
                 if (dataManager.isGeohashUserBlocked(senderPubkey)) return@launch
                 if (!content.startsWith("bitchat1:")) return@launch
 
@@ -74,17 +75,16 @@ class NostrDirectMessageHandler(
                 val noisePayload = com.bitchat.android.model.NoisePayload.decode(packet.payload) ?: return@launch
                 val messageTimestamp = Date(giftWrap.createdAt * 1000L)
                 val convKey = "nostr_${senderPubkey.take(16)}"
+                
+                // Update repository mappings
                 repo.putNostrKeyMapping(convKey, senderPubkey)
-                com.bitchat.android.nostr.GeohashAliasRegistry.put(convKey, senderPubkey)
+                GeohashAliasRegistry.put(convKey, senderPubkey)
+                
                 if (geohash.isNotEmpty()) {
-                    // Remember which geohash this conversation belongs to so we can subscribe on-demand
                     repo.setConversationGeohash(convKey, geohash)
                     GeohashConversationRegistry.set(convKey, geohash)
-                }
-
-                // Ensure sender appears in geohash people list even if they haven't posted publicly yet
-                if (geohash.isNotEmpty()) {
-                    // Cache a best-effort nickname and mark as participant
+                    
+                    // Ensure sender appears in geohash people list
                     val cached = repo.getCachedNickname(senderPubkey)
                     if (cached == null) {
                         val base = repo.displayNameForNostrPubkeyUI(senderPubkey).substringBefore("#")
@@ -103,6 +103,7 @@ class NostrDirectMessageHandler(
         }
     }
 
+
     private suspend fun processNoisePayload(
         payload: com.bitchat.android.model.NoisePayload,
         convKey: String,
@@ -114,9 +115,8 @@ class NostrDirectMessageHandler(
         when (payload.type) {
             com.bitchat.android.model.NoisePayloadType.PRIVATE_MESSAGE -> {
                 val pm = com.bitchat.android.model.PrivateMessagePacket.decode(payload.data) ?: return
-                val existingMessages = state.getPrivateChatsValue()[convKey] ?: emptyList()
-                if (existingMessages.any { it.id == pm.messageID }) return
-
+                
+                val myNickname = nicknameProvider() ?: "Unknown"
                 val message = BitchatMessage(
                     id = pm.messageID,
                     sender = senderNickname,
@@ -124,46 +124,65 @@ class NostrDirectMessageHandler(
                     timestamp = timestamp,
                     isRelay = false,
                     isPrivate = true,
-                    recipientNickname = state.getNicknameValue(),
+                    recipientNickname = myNickname,
                     senderPeerID = convKey,
-                    deliveryStatus = DeliveryStatus.Delivered(to = state.getNicknameValue() ?: "Unknown", at = Date())
+                    deliveryStatus = DeliveryStatus.Delivered(to = myNickname, at = Date())
                 )
 
-                val isViewing = state.getSelectedPrivateChatPeerValue() == convKey
                 val suppressUnread = seenStore.hasRead(pm.messageID)
 
-                withContext(Dispatchers.Main) {
-                    privateChatManager.handleIncomingPrivateMessage(message, suppressUnread)
-                }
+                // Emit private message event (Store will handle state update)
+                ChatEventBus.emitPrivateMessage(
+                    ChatEventBus.PrivateMessageEvent(
+                        conversationKey = convKey,
+                        message = message,
+                        suppressUnread = suppressUnread,
+                        source = ChatEventBus.MessageSource.NOSTR_DM
+                    )
+                )
 
+                // Send delivery ack if not already sent
                 if (!seenStore.hasDelivered(pm.messageID)) {
                     nostrTransport.sendDeliveryAckGeohash(pm.messageID, senderPubkey, recipientIdentity)
                     seenStore.markDelivered(pm.messageID)
                 }
 
-                if (isViewing && !suppressUnread) {
-                    nostrTransport.sendReadReceiptGeohash(pm.messageID, senderPubkey, recipientIdentity)
-                    seenStore.markRead(pm.messageID)
-                }
+                // Note: Read receipt logic moved to Store (it knows if user is viewing this chat)
             }
+            
             com.bitchat.android.model.NoisePayloadType.DELIVERED -> {
                 val messageId = String(payload.data, Charsets.UTF_8)
-                withContext(Dispatchers.Main) {
-                    meshDelegateHandler.didReceiveDeliveryAck(messageId, convKey)
-                }
+                
+                // Emit delivery status event
+                ChatEventBus.emitDeliveryStatus(
+                    ChatEventBus.DeliveryStatusEvent(
+                        messageId = messageId,
+                        status = DeliveryStatus.Delivered(to = senderNickname, at = Date()),
+                        conversationKey = convKey
+                    )
+                )
             }
+            
             com.bitchat.android.model.NoisePayloadType.READ_RECEIPT -> {
                 val messageId = String(payload.data, Charsets.UTF_8)
-                withContext(Dispatchers.Main) {
-                    meshDelegateHandler.didReceiveReadReceipt(messageId, convKey)
-                }
+                
+                // Emit read receipt event
+                ChatEventBus.emitDeliveryStatus(
+                    ChatEventBus.DeliveryStatusEvent(
+                        messageId = messageId,
+                        status = DeliveryStatus.Read(by = senderNickname, at = Date()),
+                        conversationKey = convKey
+                    )
+                )
             }
+            
             com.bitchat.android.model.NoisePayloadType.FILE_TRANSFER -> {
-                // Properly handle encrypted file transfer
                 val file = com.bitchat.android.model.BitchatFilePacket.decode(payload.data)
                 if (file != null) {
                     val uniqueMsgId = java.util.UUID.randomUUID().toString().uppercase()
                     val savedPath = com.bitchat.android.features.file.FileUtils.saveIncomingFile(application, file)
+                    val myNickname = nicknameProvider() ?: "Unknown"
+                    
                     val message = BitchatMessage(
                         id = uniqueMsgId,
                         sender = senderNickname,
@@ -172,13 +191,21 @@ class NostrDirectMessageHandler(
                         timestamp = timestamp,
                         isRelay = false,
                         isPrivate = true,
-                        recipientNickname = state.getNicknameValue(),
+                        recipientNickname = myNickname,
                         senderPeerID = convKey
                     )
+                    
                     Log.d(TAG, "📄 Saved Nostr encrypted incoming file to $savedPath (msgId=$uniqueMsgId)")
-                    withContext(Dispatchers.Main) {
-                        privateChatManager.handleIncomingPrivateMessage(message, suppressUnread = false)
-                    }
+                    
+                    // Emit file message event
+                    ChatEventBus.emitPrivateMessage(
+                        ChatEventBus.PrivateMessageEvent(
+                            conversationKey = convKey,
+                            message = message,
+                            suppressUnread = false,
+                            source = ChatEventBus.MessageSource.NOSTR_DM
+                        )
+                    )
                 } else {
                     Log.w(TAG, "⚠️ Failed to decode Nostr file transfer from $convKey")
                 }

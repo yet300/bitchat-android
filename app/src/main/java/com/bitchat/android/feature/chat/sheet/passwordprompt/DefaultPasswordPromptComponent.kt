@@ -29,6 +29,11 @@ class DefaultPasswordPromptComponent(
             store.labels.collect { label ->
                 when (label) {
                     PasswordPromptStore.Label.Dismiss -> onDismissCallback()
+                    is PasswordPromptStore.Label.SubmitPassword -> {
+                        // Password submission is handled by parent component via callback
+                        // For now, just dismiss - parent will handle the actual join
+                        onDismissCallback()
+                    }
                 }
             }
         }

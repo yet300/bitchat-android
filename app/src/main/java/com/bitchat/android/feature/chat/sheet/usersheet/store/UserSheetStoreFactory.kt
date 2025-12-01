@@ -9,7 +9,6 @@ import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.nostr.GeohashRepository
 import com.bitchat.android.ui.DataManager
-import com.bitchat.android.ui.MessageManager
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.util.Date
@@ -20,7 +19,6 @@ internal class UserSheetStoreFactory : KoinComponent {
     private val meshService: BluetoothMeshService by inject()
     private val geohashRepository: GeohashRepository by inject()
     private val dataManager: DataManager by inject()
-    private val messageManager: MessageManager by inject()
 
     fun create(
         targetNickname: String,
@@ -79,21 +77,9 @@ internal class UserSheetStoreFactory : KoinComponent {
                 // Refresh people list and counts to remove blocked entry immediately
                 geohashRepository.refreshGeohashPeople()
                 geohashRepository.updateReactiveParticipantCounts()
-                val sysMsg = BitchatMessage(
-                    sender = "system",
-                    content = "blocked $targetNickname in geohash channels",
-                    timestamp = Date(),
-                    isRelay = false
-                )
-                messageManager.addMessage(sysMsg)
+                publish(UserSheetStore.Label.ShowSystemMessage("blocked $targetNickname in geohash channels"))
             } else {
-                val sysMsg = BitchatMessage(
-                    sender = "system",
-                    content = "user '$targetNickname' not found in current geohash",
-                    timestamp = Date(),
-                    isRelay = false
-                )
-                messageManager.addMessage(sysMsg)
+                publish(UserSheetStore.Label.ShowSystemMessage("user '$targetNickname' not found in current geohash"))
             }
         }
     }

@@ -26,5 +26,6 @@ interface PasswordPromptStore : Store<PasswordPromptStore.Intent, PasswordPrompt
 
     sealed interface Label {
         data object Dismiss : Label
+        data class SubmitPassword(val channel: String, val password: String) : Label
     }
 }

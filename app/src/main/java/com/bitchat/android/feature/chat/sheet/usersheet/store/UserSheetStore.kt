@@ -28,5 +28,6 @@ interface UserSheetStore : Store<UserSheetStore.Intent, UserSheetStore.State, Us
 
     sealed interface Label {
         data object Dismiss : Label
+        data class ShowSystemMessage(val message: String) : Label
     }
 }

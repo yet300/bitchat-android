@@ -2,13 +2,11 @@ package com.bitchat.android.nostr
 
 import android.app.Application
 import android.util.Log
+import com.bitchat.android.domain.event.ChatEventBus
 import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.ui.ChatState
-import com.bitchat.android.ui.MessageManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.util.Date
 
 /**
@@ -19,8 +17,6 @@ import java.util.Date
  */
 class GeohashMessageHandler(
     private val application: Application,
-    private val state: ChatState,
-    private val messageManager: MessageManager,
     private val repo: GeohashRepository,
     private val scope: CoroutineScope,
     private val dataManager: com.bitchat.android.ui.DataManager,
@@ -58,27 +54,44 @@ class GeohashMessageHandler(
                     if (!NostrProofOfWork.validateDifficulty(event, pow.difficulty)) return@launch
                 }
 
-                // Blocked users check (use injected DataManager which has loaded state)
+                // Blocked users check
                 if (dataManager.isGeohashUserBlocked(event.pubkey)) return@launch
 
                 // Update repository (participants, nickname, teleport)
-                // Update repository on a background-safe path; repository will post updates to LiveData
                 repo.updateParticipant(subscribedGeohash, event.pubkey, Date(event.createdAt * 1000L))
-                event.tags.find { it.size >= 2 && it[0] == "n" }?.let { repo.cacheNickname(event.pubkey, it[1]) }
-                event.tags.find { it.size >= 2 && it[0] == "t" && it[1] == "teleport" }?.let { repo.markTeleported(event.pubkey) }
-                // Register a geohash DM alias for this participant so MessageRouter can route DMs via Nostr
+
+                val nickname = event.tags.find { it.size >= 2 && it[0] == "n" }?.getOrNull(1)
+                nickname?.let { repo.cacheNickname(event.pubkey, it) }
+                
+                val isTeleported = event.tags.any { it.size >= 2 && it[0] == "t" && it[1] == "teleport" }
+                if (isTeleported) {
+                    repo.markTeleported(event.pubkey)
+                }
+                
+                // Register geohash DM alias
                 try {
-                    com.bitchat.android.nostr.GeohashAliasRegistry.put("nostr_${event.pubkey.take(16)}", event.pubkey)
+                    GeohashAliasRegistry.put("nostr_${event.pubkey.take(16)}", event.pubkey)
                 } catch (_: Exception) { }
+
+                // Emit participant update event
+                ChatEventBus.tryEmitGeohashParticipant(
+                    ChatEventBus.GeohashParticipantEvent(
+                        geohash = subscribedGeohash,
+                        pubkey = event.pubkey,
+                        nickname = nickname,
+                        isTeleported = isTeleported
+                    )
+                )
 
                 // Skip our own events for message emission
                 val my = NostrIdentityBridge.deriveIdentity(subscribedGeohash, application)
                 if (my.publicKeyHex.equals(event.pubkey, true)) return@launch
 
-                val isTeleportPresence = event.tags.any { it.size >= 2 && it[0] == "t" && it[1] == "teleport" } &&
-                                         event.content.trim().isEmpty()
+                // Skip teleport presence (empty content with teleport tag)
+                val isTeleportPresence = isTeleported && event.content.trim().isEmpty()
                 if (isTeleportPresence) return@launch
 
+                // Build message
                 val senderName = repo.displayNameForNostrPubkeyUI(event.pubkey)
                 val hasNonce = try { NostrProofOfWork.hasNonce(event) } catch (_: Exception) { false }
                 val msg = BitchatMessage(
@@ -95,7 +108,15 @@ class GeohashMessageHandler(
                         if (hasNonce) NostrProofOfWork.calculateDifficulty(event.id).takeIf { it > 0 } else null
                     } catch (_: Exception) { null }
                 )
-                withContext(Dispatchers.Main) { messageManager.addChannelMessage("geo:$subscribedGeohash", msg) }
+                
+                // Emit channel message event (Store will handle state update)
+                ChatEventBus.tryEmitChannelMessage(
+                    ChatEventBus.ChannelMessageEvent(
+                        channel = "geo:$subscribedGeohash",
+                        message = msg,
+                        source = ChatEventBus.MessageSource.NOSTR_CHANNEL
+                    )
+                )
             } catch (e: Exception) {
                 Log.e(TAG, "onEvent error: ${e.message}")
             }

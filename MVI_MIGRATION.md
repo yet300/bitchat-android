@@ -1,76 +1,110 @@
 # MVI Migration: ChatViewModel/ChatState → Store
 
-## Status: ✅ Feature Layer Complete
+## Status: ✅ Complete
 
-The MVI migration is **complete** for the feature layer. ChatViewModel has been fully eliminated from all Decompose components and MVI Stores.
+The MVI migration is **complete**. All legacy ViewModels and state containers have been removed. The feature layer now uses pure MVI architecture with Stores.
 
-### Final Migration Results
+> **See [docs/CLEAN_ARCHITECTURE.md](docs/CLEAN_ARCHITECTURE.md) for the full target architecture roadmap.**
 
-| Component | ChatViewModel Before | After | Status |
-|-----------|---------------------|-------|--------|
-| ChatStoreFactory | 1 (teleportedGeo) | 0 | ✅ Complete |
-| MeshPeerListStoreFactory | 0 | 0 | ✅ Complete |
-| LocationChannelsStoreFactory | 0 | 0 | ✅ Complete |
-| DefaultRootComponent | 0 | 0 | ✅ Complete |
-| MainActivity | 0 | 0 | ✅ Complete |
-| All UI Screens | 0 | 0 | ✅ Complete |
+## Current State
 
-**Total: 0 ChatViewModel dependencies in feature layer**
+### Architecture ✅ Clean MVI
+- UI layer (`ui/screens/`) uses `ChatComponent` correctly
+- `ChatStore` manages all chat state with proper MVI pattern
+- `MeshEventBus` handles mesh events
+- `ChatEventBus` handles Nostr events
+- Feature layer components use services directly (no ViewModels)
+- All legacy code has been removed
 
-### Architecture
+## Architecture Layers
 
 ```
-BluetoothMeshService
-        │
-        ▼ delegate
-MeshEventBusDelegate
-        │
-        ▼
-   MeshEventBus
-        │
-        ▼ SharedFlows
-   ChatStore (source of truth)
-        │
-        ├─► MeshPeerListStore (child, subscribes to parent)
-        │
-        ▼ Model
-   ChatScreen
+┌─────────────────────────────────────────────────────────────┐
+│  UI Layer (ui/screens/) ✅ Clean                            │
+│  - Only uses ChatComponent interface                        │
+│  - Observes component.model                                 │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+┌─────────────────────▼───────────────────────────────────────┐
+│  Feature Layer (feature/) ✅ Clean MVI                      │
+│  - ChatComponent, ChatStore                                 │
+│  - Uses services directly (no ViewModel bridge)             │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+┌─────────────────────▼───────────────────────────────────────┐
+│  Domain Layer (domain/) ✅ Clean                            │
+│  - ChatEventBus for event-driven communication              │
+│  - Pure domain objects (no DI annotations)                  │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+┌─────────────────────▼───────────────────────────────────────┐
+│  Services Layer (mesh/, nostr/, services/) ✅ Clean         │
+│  - MeshEventBus for mesh events                             │
+│  - GeohashRepository as service                             │
+│  - Handlers emit events to ChatEventBus                     │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### Key Services Used by ChatStore
+## Migration Phases (All Complete)
 
-- `MeshEventBus` - mesh events via SharedFlows
-- `BluetoothMeshService` - mesh operations, peer info
-- `DataManager` - persistence (nickname, channels, favorites)
-- `GeohashViewModel` - geohash features, teleportedGeo
-- `LocationChannelManager` - location channels
-- `MediaSendingManager` - file transfers (callback-based)
-- `TorManager`, `PoWPreferenceManager` - network settings
+### Phase 1: Feature Layer ✅ Complete
+- [x] ChatStore with MVI pattern
+- [x] ChatComponent interface
+- [x] UI uses Component, not ViewModel
+- [x] MeshEventBus for mesh events
 
-### Legacy UI Layer (Not Migrated)
+### Phase 2: Event Bus Expansion ✅ Complete
+- [x] Created `ChatEventBus` as pure domain object
+- [x] `GeohashMessageHandler` emits to ChatEventBus
+- [x] `NostrDirectMessageHandler` emits to ChatEventBus
+- [x] Handlers no longer depend on `ChatState`
 
-ChatViewModel and ChatState still exist in `app/src/main/java/com/bitchat/android/ui/` for:
-- `GeohashViewModel` - uses ChatState for geohash features
-- Legacy managers (`MessageManager`, `ChannelManager`, `PrivateChatManager`)
-- These are used by GeohashViewModel and other legacy UI code
+### Phase 3: Remove Legacy Bridge ✅ Complete
+- [x] ChatStore subscribes to ChatEventBus
+- [x] ChatStore subscribes to service flows directly
+- [x] Renamed `subscribeToViewModelFlows` → `subscribeToServiceFlows`
 
-**This is intentional.** The feature layer (Decompose + MVI) is now pure and doesn't depend on these legacy classes.
+### Phase 4: Delete Legacy Code ✅ Complete
+- [x] Deleted ChatViewModel.kt
+- [x] Deleted ChatState.kt
+- [x] Deleted MessageManager.kt
+- [x] Deleted ChannelManager.kt
+- [x] Deleted PrivateChatManager.kt
+- [x] Deleted MeshDelegateHandler.kt
+- [x] Deleted GeohashViewModel.kt
+- [x] Deleted CommandProcessor.kt
+- [x] Deleted ChatViewModelUtils.kt
+- [x] Deleted ConversationAliasResolver.kt
+- [x] Moved CommandSuggestion to model package
 
-### Key Achievements
+## Key Files
 
-1. **Pure MVI Architecture**: All feature components use Store pattern
-2. **Single Source of Truth**: Store.State is authoritative, no external mutable state
-3. **Clean Event Flow**: Services → MeshEventBus → Store → Reducer → State → UI
-4. **Child Store Pattern**: MeshPeerListStore subscribes to parent ChatStore state
-5. **Callback Pattern**: MediaSendingManager uses callbacks instead of direct state access
+### Feature Layer
+- `feature/chat/ChatComponent.kt` - Component interface
+- `feature/chat/DefaultChatComponent.kt` - Implementation
+- `feature/chat/store/ChatStore.kt` - Store interface
+- `feature/chat/store/ChatStoreFactory.kt` - Store implementation
 
-### What's Next?
+### Domain Layer
+- `domain/event/ChatEventBus.kt` - Event bus for Nostr events
 
-The feature layer migration is complete. Potential future improvements:
+### Services
+- `nostr/GeohashRepository.kt` - Geohash participant service
+- `nostr/GeohashMessageHandler.kt` - Emits to ChatEventBus
+- `nostr/NostrDirectMessageHandler.kt` - Emits to ChatEventBus
+- `mesh/MeshEventBus.kt` - Mesh event handling
 
-1. **Migrate GeohashViewModel** to a Store-based architecture
-2. **Remove legacy managers** (MessageManager, ChannelManager, PrivateChatManager) once GeohashViewModel is migrated
-3. **Delete ChatState.kt** after all legacy code is migrated
-4. **Consider migrating** other ViewModels in the UI layer to MVI pattern
+### Models
+- `model/CommandSuggestion.kt` - Command autocomplete data class
 
-These are optional - the current architecture is clean and maintainable.
+## Deleted Files (Legacy)
+- `ui/ChatViewModel.kt`
+- `ui/ChatState.kt`
+- `ui/MessageManager.kt`
+- `ui/ChannelManager.kt`
+- `ui/PrivateChatManager.kt`
+- `ui/MeshDelegateHandler.kt`
+- `ui/GeohashViewModel.kt`
+- `ui/CommandProcessor.kt`
+- `ui/ChatViewModelUtils.kt`
+- `services/ConversationAliasResolver.kt`

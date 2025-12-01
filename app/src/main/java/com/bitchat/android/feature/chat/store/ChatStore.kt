@@ -3,7 +3,7 @@ package com.bitchat.android.feature.chat.store
 import com.arkivanov.mvikotlin.core.store.Store
 import com.bitchat.android.geohash.ChannelID
 import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.ui.CommandSuggestion
+import com.bitchat.android.model.CommandSuggestion
 import com.bitchat.android.ui.GeoPerson
 
 /**

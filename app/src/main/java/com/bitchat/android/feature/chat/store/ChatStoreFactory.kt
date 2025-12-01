@@ -6,6 +6,7 @@ import com.arkivanov.mvikotlin.core.store.SimpleBootstrapper
 import com.arkivanov.mvikotlin.core.store.Store
 import com.arkivanov.mvikotlin.core.store.StoreFactory
 import com.arkivanov.mvikotlin.extensions.coroutines.CoroutineExecutor
+import com.bitchat.android.domain.event.ChatEventBus
 import com.bitchat.android.feature.chat.ChatComponent
 import com.bitchat.android.geohash.GeohashBookmarksStore
 import com.bitchat.android.model.BitchatMessage
@@ -13,7 +14,7 @@ import com.bitchat.android.geohash.LocationChannelManager
 import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.mesh.MeshEventBus
 import com.bitchat.android.services.MessageRouter
-import com.bitchat.android.ui.CommandSuggestion
+import com.bitchat.android.model.CommandSuggestion
 import com.bitchat.android.ui.DataManager
 import com.bitchat.android.ui.MediaSendingManager
 import com.bitchat.android.nostr.GeohashRepository
@@ -471,11 +472,14 @@ internal class ChatStoreFactory(
                     // Subscribe to MeshEventBus for mesh events (MVI pattern)
                     subscribeToMeshEvents()
                     
+                    // Subscribe to ChatEventBus for Nostr events (clean architecture)
+                    subscribeToChatEventBus()
+                    
                     // Load persisted data directly
                     loadData()
                     
-                    // Subscribe to service flows and ChatViewModel (bridge pattern for remaining state)
-                    subscribeToViewModelFlows()
+                    // Subscribe to service flows for reactive state updates
+                    subscribeToServiceFlows()
                     
                     // Handle startup config
                     handleStartupConfig()
@@ -616,6 +620,62 @@ internal class ChatStoreFactory(
             }
         }
         
+        private fun subscribeToChatEventBus() {
+            // Subscribe to channel messages (from Nostr geohash channels)
+            scope.launch {
+                ChatEventBus.channelMessageReceived.collect { event ->
+                    addChannelMessage(event.channel, event.message)
+                }
+            }
+            
+            // Subscribe to private messages (from Nostr DMs)
+            scope.launch {
+                ChatEventBus.privateMessageReceived.collect { event ->
+                    addPrivateMessageFromEvent(event)
+                }
+            }
+            
+            // Subscribe to delivery status updates
+            scope.launch {
+                ChatEventBus.deliveryStatusUpdated.collect { event ->
+                    updateMessageDeliveryStatus(event.messageId, event.status)
+                }
+            }
+            
+            // Subscribe to geohash participant updates
+            scope.launch {
+                ChatEventBus.geohashParticipantUpdated.collect { event ->
+                    // GeohashRepository handles this, but we could update local state if needed
+                    Log.d(TAG, "Geohash participant update: ${event.pubkey} in ${event.geohash}")
+                }
+            }
+        }
+        
+        private fun addPrivateMessageFromEvent(event: ChatEventBus.PrivateMessageEvent) {
+            val currentPrivateChats = state().privateChats.toMutableMap()
+            val convKey = event.conversationKey
+            
+            if (!currentPrivateChats.containsKey(convKey)) {
+                currentPrivateChats[convKey] = mutableListOf()
+            }
+            
+            // Check for duplicate
+            val existingMessages = currentPrivateChats[convKey] ?: emptyList()
+            if (existingMessages.any { it.id == event.message.id }) return
+            
+            val chatMessages = existingMessages.toMutableList()
+            chatMessages.add(event.message)
+            currentPrivateChats[convKey] = chatMessages
+            dispatch(ChatStore.Msg.PrivateChatsUpdated(currentPrivateChats))
+            
+            // Mark as unread if not suppressed and not currently viewing this chat
+            if (!event.suppressUnread && state().selectedPrivateChatPeer != convKey) {
+                val currentUnread = state().unreadPrivateMessages.toMutableSet()
+                currentUnread.add(convKey)
+                dispatch(ChatStore.Msg.UnreadPrivateMessagesUpdated(currentUnread))
+            }
+        }
+        
         private fun handleIncomingMessage(message: BitchatMessage) {
             // Determine where to add the message based on its properties
             when {
@@ -680,9 +740,10 @@ internal class ChatStoreFactory(
         }
 
         /**
-         * Subscribe to service flows and ChatViewModel flows (bridge pattern for gradual migration)
+         * Subscribe to service flows for reactive state updates.
+         * All subscriptions are to proper services/repositories, not ViewModels.
          */
-        private fun subscribeToViewModelFlows() {
+        private fun subscribeToServiceFlows() {
             // === MIGRATED: Using direct services ===
             
             // Connected peers from MeshEventBus

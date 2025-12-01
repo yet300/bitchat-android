@@ -24,6 +24,7 @@ import androidx.compose.ui.zIndex
 import com.bitchat.android.R
 import com.bitchat.android.feature.chat.ChatComponent
 import com.bitchat.android.geohash.ChannelID
+import com.bitchat.android.model.CommandSuggestion
 import com.bitchat.android.ui.*
 import com.bitchat.android.ui.components.ModalBottomSheet
 import com.bitchat.android.ui.events.FileShareDispatcher

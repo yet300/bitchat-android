@@ -36,6 +36,11 @@ class DefaultUserSheetComponent(
             store.labels.collect { label ->
                 when (label) {
                     UserSheetStore.Label.Dismiss -> onDismissCallback()
+                    is UserSheetStore.Label.ShowSystemMessage -> {
+                        // System message is logged - parent component can handle if needed
+                        android.util.Log.d("UserSheet", "System: ${label.message}")
+                        onDismissCallback()
+                    }
                 }
             }
         }

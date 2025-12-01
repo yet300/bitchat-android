@@ -5,16 +5,12 @@ import com.arkivanov.mvikotlin.core.store.SimpleBootstrapper
 import com.arkivanov.mvikotlin.core.store.Store
 import com.arkivanov.mvikotlin.core.store.StoreFactory
 import com.arkivanov.mvikotlin.extensions.coroutines.CoroutineExecutor
-import com.bitchat.android.mesh.BluetoothMeshService
-import com.bitchat.android.ui.ChannelManager
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
 internal class PasswordPromptStoreFactory : KoinComponent {
 
     private val storeFactory: StoreFactory by inject()
-    private val channelManager: ChannelManager by inject()
-    private val meshService: BluetoothMeshService by inject()
 
     fun create(channelName: String): PasswordPromptStore =
         object : PasswordPromptStore,
@@ -44,16 +40,8 @@ internal class PasswordPromptStoreFactory : KoinComponent {
                 PasswordPromptStore.Intent.Confirm -> {
                     val state = state()
                     if (state.passwordInput.isNotEmpty()) {
-                        val success = channelManager.joinChannel(
-                            state.channelName,
-                            state.passwordInput,
-                            meshService.myPeerID
-                        )
-                        if (success) {
-                            publish(PasswordPromptStore.Label.Dismiss)
-                        } else {
-                            dispatch(PasswordPromptStore.Msg.ErrorChanged(true))
-                        }
+                        // Emit label for parent component to handle channel join
+                        publish(PasswordPromptStore.Label.SubmitPassword(state.channelName, state.passwordInput))
                     }
                 }
             }

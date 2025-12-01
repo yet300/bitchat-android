@@ -326,7 +326,7 @@ class DefaultChatComponent(
         store.accept(ChatStore.Intent.UpdateCommandSuggestions(input))
     }
     
-    override fun onSelectCommandSuggestion(suggestion: com.bitchat.android.ui.CommandSuggestion): String {
+    override fun onSelectCommandSuggestion(suggestion: com.bitchat.android.model.CommandSuggestion): String {
         store.accept(ChatStore.Intent.SelectCommandSuggestion(suggestion))
         return "${suggestion.command} "
     }

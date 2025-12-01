@@ -6,7 +6,7 @@ import com.bitchat.android.feature.chat.sheet.about.AboutComponent
 import com.bitchat.android.feature.chat.sheet.debug.DebugComponent
 import com.bitchat.android.geohash.ChannelID
 import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.ui.CommandSuggestion
+import com.bitchat.android.model.CommandSuggestion
 import com.bitchat.android.ui.GeoPerson
 import androidx.compose.ui.graphics.Color
 import com.bitchat.android.feature.chat.sheet.usersheet.UserSheetComponent
