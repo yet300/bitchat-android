@@ -77,17 +77,17 @@ private class MeshEventBusDelegate(
 
 class DefaultRootComponent(
     componentContext: ComponentContext,
-    private val bluetoothStatusManager: BluetoothStatusManager,
-    private val locationStatusManager: LocationStatusManager,
-    private val batteryOptimizationManager: BatteryOptimizationManager,
     private val onboardingCoordinator: OnboardingCoordinator,
-    private val permissionManager: PermissionManager,
-    private val meshService: BluetoothMeshService,
     initialDeepLink: DeepLinkData? = null
 ) : RootComponent, ComponentContext by componentContext, KoinComponent {
 
     private val storeFactory: StoreFactory by inject()
     private val meshEventBus: MeshEventBus by inject()
+    private val bluetoothStatusManager: BluetoothStatusManager by inject()
+    private val locationStatusManager: LocationStatusManager by inject()
+    private val batteryOptimizationManager: BatteryOptimizationManager by inject()
+    private val permissionManager: PermissionManager by inject()
+    private val meshService: BluetoothMeshService by inject()
 
     private val store = instanceKeeper.getStore {
         RootStoreFactory(storeFactory).create()

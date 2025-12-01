@@ -6,13 +6,11 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
-import org.koin.core.annotation.Factory
 
 /**
  * Coordinates the complete onboarding flow including permission explanation,
  * permission requests, and initialization of the mesh service
  */
-@Factory
 class OnboardingCoordinator(
     private val activity: ComponentActivity,
     private val permissionManager: PermissionManager

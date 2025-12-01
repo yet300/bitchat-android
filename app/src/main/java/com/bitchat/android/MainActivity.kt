@@ -16,7 +16,6 @@ import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.bitchat.android.feature.root.DefaultRootComponent
 import com.bitchat.android.feature.root.DeepLinkData
 import com.bitchat.android.feature.root.RootComponent
-import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.onboarding.BatteryOptimizationManager
 import com.bitchat.android.onboarding.BluetoothStatusManager
 import com.bitchat.android.onboarding.LocationStatusManager
@@ -26,19 +25,13 @@ import com.bitchat.android.ui.OrientationAwareActivity
 import com.bitchat.android.ui.screens.root.RootContent
 import com.bitchat.android.ui.theme.BitchatTheme
 import org.koin.android.ext.android.inject
-import org.koin.androidx.viewmodel.ext.android.viewModel
-import org.koin.core.parameter.parametersOf
 
 class MainActivity : OrientationAwareActivity() {
 
-    // Inject singletons
-    private val permissionManager: PermissionManager by inject()
-    private val meshService: BluetoothMeshService by inject()
     private val bluetoothStatusManager: BluetoothStatusManager by inject()
     private val locationStatusManager: LocationStatusManager by inject()
     private val batteryOptimizationManager: BatteryOptimizationManager by inject()
-    
-    private val onboardingCoordinator: OnboardingCoordinator by inject { parametersOf(this) }
+    private val permissionManager: PermissionManager by inject()
     
     private lateinit var root: RootComponent
 
@@ -67,17 +60,18 @@ class MainActivity : OrientationAwareActivity() {
             }
         )
 
+        // Create OnboardingCoordinator with Activity context (requires Activity for permission launchers)
+        val onboardingCoordinator = OnboardingCoordinator(
+            activity = this,
+            permissionManager = permissionManager
+        )
+
         // Extract initial deep link from intent
         val initialDeepLink = extractDeepLinkFromIntent(intent)
 
         root = DefaultRootComponent(
             componentContext = defaultComponentContext(),
-            bluetoothStatusManager = bluetoothStatusManager,
-            locationStatusManager = locationStatusManager,
-            batteryOptimizationManager = batteryOptimizationManager,
             onboardingCoordinator = onboardingCoordinator,
-            permissionManager = permissionManager,
-            meshService = meshService,
             initialDeepLink = initialDeepLink
         )
 
