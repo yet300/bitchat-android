@@ -41,7 +41,7 @@ class GeohashViewModel @Inject constructor(
 
     companion object { private const val TAG = "GeohashViewModel" }
 
-    private val repo = GeohashRepository(application, state, dataManager)
+    private val repo = GeohashRepository(application, dataManager)
     private val subscriptionManager = NostrSubscriptionManager(nostrRelayManager, viewModelScope)
     private val geohashMessageHandler = GeohashMessageHandler(
         application = application,
@@ -68,12 +68,30 @@ class GeohashViewModel @Inject constructor(
     private var currentDmSubId: String? = null
     private var geoTimer: Job? = null
 
-    val geohashPeople: StateFlow<List<GeoPerson>> = state.geohashPeople
-    val geohashParticipantCounts: StateFlow<Map<String, Int>> = state.geohashParticipantCounts
+    val geohashPeople: StateFlow<List<GeoPerson>> = repo.geohashPeople
+    val geohashParticipantCounts: StateFlow<Map<String, Int>> = repo.geohashParticipantCounts
     val selectedLocationChannel: StateFlow<com.bitchat.android.geohash.ChannelID?> = state.selectedLocationChannel
 
     fun initialize() {
         subscriptionManager.connect()
+        
+        // Bridge repository StateFlows to ChatState for backward compatibility
+        viewModelScope.launch {
+            repo.geohashPeople.collect { people ->
+                state.setGeohashPeople(people)
+            }
+        }
+        viewModelScope.launch {
+            repo.geohashParticipantCounts.collect { counts ->
+                state.setGeohashParticipantCounts(counts)
+            }
+        }
+        viewModelScope.launch {
+            repo.teleportedGeo.collect { teleported ->
+                state.setTeleportedGeo(teleported)
+            }
+        }
+        
         val identity = NostrIdentityBridge.getCurrentNostrIdentity(getApplication())
         if (identity != null) {
             // Use global chat-messages only for full account DMs (mesh context). For geohash DMs, subscribe per-geohash below.
