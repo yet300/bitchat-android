@@ -167,7 +167,8 @@ internal class OnboardingStoreFactory(
          */
         private fun proceedToPermissions() {
             if (permissionManager.areAllPermissionsGranted()) {
-                // All permissions granted, complete onboarding
+                // All permissions granted, mark onboarding complete and navigate to chat
+                permissionManager.markOnboardingComplete()
                 dispatch(OnboardingStore.Msg.OnboardingStateChanged(OnboardingState.INITIALIZING))
                 publish(OnboardingStore.Label.OnboardingComplete)
             } else {

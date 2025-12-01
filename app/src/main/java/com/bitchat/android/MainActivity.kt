@@ -5,16 +5,9 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
 import com.arkivanov.decompose.defaultComponentContext
-import com.arkivanov.decompose.extensions.compose.subscribeAsState
-import com.bitchat.android.feature.root.DefaultRootComponent
 import com.bitchat.android.feature.root.DeepLinkData
+import com.bitchat.android.feature.root.DefaultRootComponent
 import com.bitchat.android.feature.root.RootComponent
 import com.bitchat.android.onboarding.BatteryOptimizationManager
 import com.bitchat.android.onboarding.BluetoothStatusManager
@@ -22,8 +15,6 @@ import com.bitchat.android.onboarding.LocationStatusManager
 import com.bitchat.android.onboarding.OnboardingCoordinator
 import com.bitchat.android.onboarding.PermissionManager
 import com.bitchat.android.ui.OrientationAwareActivity
-import com.bitchat.android.ui.screens.root.RootContent
-import com.bitchat.android.ui.theme.BitchatTheme
 import org.koin.android.ext.android.inject
 
 class MainActivity : OrientationAwareActivity() {
@@ -53,7 +44,7 @@ class MainActivity : OrientationAwareActivity() {
 
         batteryOptimizationManager.setLauncher(
             registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-                // The manager will check status after returning
+                batteryOptimizationManager.checkBatteryOptimizationStatus()
             }
         )
 
