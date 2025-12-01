@@ -3,104 +3,91 @@
 ## Goal
 Replace MVVM pattern (ChatViewModel + ChatState) with MVI pattern (Store.State as single source of truth).
 
-## Current State
+## Current State (Final)
 
-### ✅ Completed
-- **Components**: `DefaultChatComponent`, `DefaultMeshPeerListComponent` - no ViewModel dependencies
-- **LocationChannelsStoreFactory**: Fully migrated, uses services directly
-- **MeshEventBus**: Created, implements `BluetoothMeshDelegate`, exposes SharedFlows
+### ✅ Fully Migrated
+- **ChatStoreFactory**: 0 ChatViewModel usages (was 55)
+- **MeshPeerListStoreFactory**: 0 ChatViewModel usages (was 20)
+- **LocationChannelsStoreFactory**: 0 ChatViewModel usages
+- **DebugStoreFactory**: 0 ChatViewModel usages
+- **MeshEventBus**: Implements `BluetoothMeshDelegate`, exposes SharedFlows
+- **MediaSendingManager**: Refactored to use callbacks, injectable via Koin
+- **GeohashRepository**: Exposes `teleportedGeo` StateFlow directly
 
-### 🔄 Partially Migrated
-- **ChatStoreFactory**: 55 ChatViewModel usages remain
-- **MeshPeerListStoreFactory**: 20 ChatViewModel usages remain
+### 📊 Migration Progress
+| Component | Before | After | Status |
+|-----------|--------|-------|--------|
+| ChatStoreFactory | 55 | 0 | ✅ Complete |
+| MeshPeerListStoreFactory | 20 | 0 | ✅ Complete |
+| LocationChannelsStoreFactory | 0 | 0 | ✅ Complete |
+| DebugStoreFactory | 0 | 0 | ✅ Complete |
 
-## Remaining Work
+### 🔄 Remaining (Intentional Bridge)
+- **DefaultRootComponent**: 10 ChatViewModel usages in `CompositeBluetoothMeshDelegate`
+  - This is intentional - forwards mesh events to both MeshEventBus (MVI) and ChatViewModel (legacy managers)
+  - Can be removed once all legacy managers are migrated
 
-### 1. Wire MeshEventBus as BluetoothMeshService Delegate
-
-**File**: `DefaultRootComponent.kt`
-
-```kotlin
-// Current:
-meshService.delegate = chatViewModel
-
-// Change to:
-meshService.delegate = meshEventBus
-```
-
-This makes MeshEventBus receive all mesh events, which it forwards to Store via SharedFlows.
-
-### 2. Remove ChatViewModel Flow Subscriptions
-
-**File**: `ChatStoreFactory.kt`
-
-Remove subscriptions to ChatViewModel flows that now come from MeshEventBus:
-- `chatViewModel.messages` → Store handles via `MeshEventBus.messageReceived`
-- `chatViewModel.connectedPeers` → Already using `MeshEventBus.connectedPeers`
-- `chatViewModel.privateChats` → Store manages directly
-- `chatViewModel.channelMessages` → Store manages directly
-
-### 3. Migrate Remaining Action Methods
-
-**ChatStoreFactory methods still calling ChatViewModel:**
-
-| Method | Migration Target |
-|--------|-----------------|
-| `sendMessage()` (geohash) | `GeohashViewModel.sendGeohashMessage()` |
-| `sendVoiceNote/ImageNote/FileNote()` | Extract `MediaSendingManager` as service |
-| `startPrivateChat()` | Implement in Store directly |
-| `endPrivateChat()` | Implement in Store directly |
-| `switchToChannel()` | Implement in Store directly |
-| `leaveChannel()` | Implement in Store directly |
-| `setNickname()` | Use `DataManager` directly |
-| `updateCommandSuggestions()` | Implement in Store |
-| `updateMentionSuggestions()` | Implement in Store |
-| `setAppBackgroundState()` | Use `BluetoothMeshService` directly |
-| `clearNotificationsForSender()` | Extract notification logic |
-
-### 4. Remove ChatViewModel from DefaultRootComponent
-
-Once all Store factories use services directly:
-1. Remove `chatViewModel` constructor parameter
-2. Remove ChatViewModel from Koin module
-3. Delete `ChatViewModel.kt` and `ChatState.kt`
-
-## Architecture Target
+## Architecture (Current)
 
 ```
 BluetoothMeshService
         │
         ▼ delegate
-   MeshEventBus ──────────────────┐
-        │                         │
-        ▼ SharedFlows             │
-   ChatStore ◄────────────────────┤
-        │                         │
-        │ State                   │ Services
-        ▼                         │
-DefaultChatComponent              │
-        │                         │
-        ▼ Model                   │
-   ChatScreen                     │
-                                  │
-   LocationChannelManager ────────┤
-   GeohashBookmarksStore ─────────┤
-   GeohashViewModel ──────────────┤
-   TorManager ────────────────────┤
-   PoWPreferenceManager ──────────┤
-   DataManager ───────────────────┘
+CompositeBluetoothMeshDelegate
+        │
+   ┌────┴────┐
+   ▼         ▼
+MeshEventBus  ChatViewModel (legacy managers only)
+   │
+   ▼ SharedFlows
+ChatStore ◄─────────────────────┐
+   │                            │
+   │ State                      │ Services
+   ▼                            │
+DefaultChatComponent            │
+   │                            │
+   ├─► MeshPeerListStore ◄──────┤ (subscribes to parent)
+   │                            │
+   ▼ Model                      │
+ChatScreen                      │
+                                │
+LocationChannelManager ─────────┤
+GeohashViewModel ───────────────┤
+  └─► GeohashRepository         │
+       └─► teleportedGeo flow   │
+TorManager ─────────────────────┤
+PoWPreferenceManager ───────────┤
+DataManager ────────────────────┤
+MediaSendingManager ────────────┘
 ```
 
-## Files to Eventually Delete
+## Key Migrations Completed
 
-- `app/src/main/java/com/bitchat/android/ui/ChatViewModel.kt`
-- `app/src/main/java/com/bitchat/android/ui/ChatState.kt`
-- `app/src/main/java/com/bitchat/android/ui/MessageManager.kt` (merge into Store)
-- `app/src/main/java/com/bitchat/android/ui/ChannelManager.kt` (merge into Store)
-- `app/src/main/java/com/bitchat/android/ui/PrivateChatManager.kt` (merge into Store)
+1. **MeshEventBus as delegate**: Created `CompositeBluetoothMeshDelegate` to forward events to both MVI and legacy systems
+
+2. **State management**: ChatStore now manages all state directly:
+   - Messages, channels, private chats
+   - Peer info (nicknames, RSSI, fingerprints, session states)
+   - Favorites, bookmarks
+   - Command/mention suggestions
+
+3. **Services used directly**:
+   - `DataManager` for persistence
+   - `BluetoothMeshService` for mesh operations
+   - `LocationChannelManager` for location channels
+   - `GeohashViewModel` for geohash features
+   - `MediaSendingManager` for file transfers
+
+4. **Child stores**: MeshPeerListStore subscribes to parent ChatStore state via `stateFlow` extension
+
+## Next Steps (Optional)
+
+To fully remove ChatViewModel:
+1. Migrate remaining legacy managers (MessageManager, ChannelManager, PrivateChatManager)
+2. Update CompositeBluetoothMeshDelegate to only use MeshEventBus
+3. Remove ChatViewModel from DefaultRootComponent
+4. Delete ChatViewModel.kt and ChatState.kt
 
 ## Key Principle
 
 **Store.State is the single source of truth.** Services dispatch events → Store receives via flows → Reducer updates State → UI observes State.
-
-No external mutable state (ChatState). All state lives in Store.State and is updated only through Messages/Reducer.

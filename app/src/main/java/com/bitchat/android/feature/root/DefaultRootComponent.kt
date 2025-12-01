@@ -27,7 +27,6 @@ import com.bitchat.android.onboarding.BluetoothStatusManager
 import com.bitchat.android.onboarding.LocationStatusManager
 import com.bitchat.android.onboarding.OnboardingCoordinator
 import com.bitchat.android.onboarding.PermissionManager
-import com.bitchat.android.ui.ChatViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -39,52 +38,43 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
 /**
- * Composite delegate that forwards mesh events to both MeshEventBus (MVI) and ChatViewModel (legacy)
- * during the migration period. This allows gradual migration without breaking existing functionality.
+ * Delegate that forwards mesh events to MeshEventBus for MVI pattern.
+ * ChatStore subscribes to MeshEventBus flows and manages all state.
  */
-private class CompositeBluetoothMeshDelegate(
-    private val meshEventBus: com.bitchat.android.mesh.BluetoothMeshDelegate,
-    private val chatViewModel: com.bitchat.android.mesh.BluetoothMeshDelegate
+private class MeshEventBusDelegate(
+    private val meshEventBus: MeshEventBus
 ) : com.bitchat.android.mesh.BluetoothMeshDelegate {
     
     override fun didReceiveMessage(message: com.bitchat.android.model.BitchatMessage) {
         meshEventBus.didReceiveMessage(message)
-        chatViewModel.didReceiveMessage(message)
     }
     
     override fun didUpdatePeerList(peers: List<String>) {
         meshEventBus.didUpdatePeerList(peers)
-        chatViewModel.didUpdatePeerList(peers)
     }
     
     override fun didReceiveChannelLeave(channel: String, fromPeer: String) {
         meshEventBus.didReceiveChannelLeave(channel, fromPeer)
-        chatViewModel.didReceiveChannelLeave(channel, fromPeer)
     }
     
     override fun didReceiveDeliveryAck(messageID: String, recipientPeerID: String) {
         meshEventBus.didReceiveDeliveryAck(messageID, recipientPeerID)
-        chatViewModel.didReceiveDeliveryAck(messageID, recipientPeerID)
     }
     
     override fun didReceiveReadReceipt(messageID: String, recipientPeerID: String) {
         meshEventBus.didReceiveReadReceipt(messageID, recipientPeerID)
-        chatViewModel.didReceiveReadReceipt(messageID, recipientPeerID)
     }
     
     override fun decryptChannelMessage(encryptedContent: ByteArray, channel: String): String? {
-        // Use ChatViewModel for decryption (has the channel keys)
-        return chatViewModel.decryptChannelMessage(encryptedContent, channel)
+        return meshEventBus.decryptChannelMessage(encryptedContent, channel)
     }
     
     override fun getNickname(): String? {
-        // Use ChatViewModel for nickname (has the state)
-        return chatViewModel.getNickname()
+        return meshEventBus.getNickname()
     }
     
     override fun isFavorite(peerID: String): Boolean {
-        // Use ChatViewModel for favorites (has the state)
-        return chatViewModel.isFavorite(peerID)
+        return meshEventBus.isFavorite(peerID)
     }
 }
 
@@ -96,7 +86,6 @@ class DefaultRootComponent(
     private val onboardingCoordinator: OnboardingCoordinator,
     private val permissionManager: PermissionManager,
     private val meshService: BluetoothMeshService,
-    private val chatViewModel: ChatViewModel,
     initialDeepLink: DeepLinkData? = null
 ) : RootComponent, ComponentContext by componentContext, KoinComponent {
 
@@ -208,9 +197,9 @@ class DefaultRootComponent(
 
         Log.d(TAG, "Starting app initialization")
 
-        // Set up mesh service delegate - use composite that forwards to both MeshEventBus and ChatViewModel
-        // MeshEventBus handles MVI Store updates, ChatViewModel handles legacy managers during migration
-        meshService.delegate = CompositeBluetoothMeshDelegate(meshEventBus, chatViewModel)
+        // Set up mesh service delegate - MeshEventBus handles all events for MVI pattern
+        // ChatStore subscribes to MeshEventBus flows and manages all state
+        meshService.delegate = MeshEventBusDelegate(meshEventBus)
         meshService.startServices()
 
         isAppInitialized = true
@@ -236,13 +225,13 @@ class DefaultRootComponent(
     private fun handleAppResume() {
         Log.d(TAG, "Handling app resume")
         meshService.connectionManager.setAppBackgroundState(false)
-        chatViewModel.setAppBackgroundState(false)
+        // ChatStore handles notification state via SetAppBackgroundState intent
     }
 
     private fun handleAppPause() {
         Log.d(TAG, "Handling app pause")
         meshService.connectionManager.setAppBackgroundState(true)
-        chatViewModel.setAppBackgroundState(true)
+        // ChatStore handles notification state via SetAppBackgroundState intent
     }
 
     private fun handleCleanup() {

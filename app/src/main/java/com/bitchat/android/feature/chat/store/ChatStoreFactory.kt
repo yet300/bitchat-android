@@ -13,10 +13,10 @@ import com.bitchat.android.geohash.LocationChannelManager
 import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.mesh.MeshEventBus
 import com.bitchat.android.services.MessageRouter
-import com.bitchat.android.ui.ChatViewModel
 import com.bitchat.android.ui.CommandSuggestion
 import com.bitchat.android.ui.DataManager
 import com.bitchat.android.ui.GeohashViewModel
+import com.bitchat.android.ui.MediaSendingManager
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
@@ -42,10 +42,7 @@ internal class ChatStoreFactory(
     private val torManager: com.bitchat.android.net.TorManager by inject()
     private val powPreferenceManager: com.bitchat.android.nostr.PoWPreferenceManager by inject()
     private val applicationContext: android.content.Context by inject()
-    
-    // Legacy ChatViewModel - kept for gradual migration
-    // TODO: Remove once all functionality is migrated
-    private val chatViewModel: ChatViewModel by inject()
+    private val mediaSendingManager: MediaSendingManager by inject()
 
     fun create(): ChatStore =
         object : ChatStore,
@@ -468,6 +465,9 @@ internal class ChatStoreFactory(
                     // Wire up MeshEventBus callbacks
                     setupMeshEventBusCallbacks()
                     
+                    // Wire up MediaSendingManager callbacks
+                    setupMediaSendingManagerCallbacks()
+                    
                     // Subscribe to MeshEventBus for mesh events (MVI pattern)
                     subscribeToMeshEvents()
                     
@@ -514,6 +514,69 @@ internal class ChatStoreFactory(
                     }
                 }
             }
+        }
+        
+        private fun setupMediaSendingManagerCallbacks() {
+            mediaSendingManager.nicknameProvider = { state().nickname }
+            
+            mediaSendingManager.addMessageCallback = { message ->
+                addMessage(message)
+            }
+            
+            mediaSendingManager.addPrivateMessageCallback = { peerID, message ->
+                addPrivateMessage(peerID, message)
+            }
+            
+            mediaSendingManager.addChannelMessageCallback = { channel, message ->
+                addChannelMessage(channel, message)
+            }
+            
+            mediaSendingManager.updateDeliveryStatusCallback = { messageId, status ->
+                updateMessageDeliveryStatus(messageId, status)
+            }
+            
+            mediaSendingManager.removeMessageCallback = { messageId ->
+                removeMessageById(messageId)
+            }
+            
+            mediaSendingManager.findMessagePathCallback = { messageId ->
+                findMessagePathById(messageId)
+            }
+        }
+        
+        private fun findMessagePathById(messageId: String): String? {
+            // Search main timeline
+            state().messages.firstOrNull { it.id == messageId }?.content?.let { return it }
+            // Search private chats
+            state().privateChats.values.forEach { list ->
+                list.firstOrNull { it.id == messageId }?.content?.let { return it }
+            }
+            // Search channel messages
+            state().channelMessages.values.forEach { list ->
+                list.firstOrNull { it.id == messageId }?.content?.let { return it }
+            }
+            return null
+        }
+        
+        private fun removeMessageById(messageId: String) {
+            // Remove from main timeline
+            val updatedMessages = state().messages.filter { it.id != messageId }
+            if (updatedMessages.size != state().messages.size) {
+                dispatch(ChatStore.Msg.MessagesUpdated(updatedMessages))
+                return
+            }
+            
+            // Remove from private chats
+            val updatedPrivateChats = state().privateChats.mapValues { (_, messages) ->
+                messages.filter { it.id != messageId }
+            }
+            dispatch(ChatStore.Msg.PrivateChatsUpdated(updatedPrivateChats))
+            
+            // Remove from channel messages
+            val updatedChannelMessages = state().channelMessages.mapValues { (_, messages) ->
+                messages.filter { it.id != messageId }
+            }
+            dispatch(ChatStore.Msg.ChannelMessagesUpdated(updatedChannelMessages))
         }
         
         private fun subscribeToMeshEvents() {
@@ -708,13 +771,6 @@ internal class ChatStoreFactory(
             scope.launch {
                 dataManager.loadFavorites()
                 dispatch(ChatStore.Msg.FavoritePeersUpdated(dataManager.favoritePeers))
-            }
-            
-            // Teleported geo - still need from ChatViewModel for now (managed by GeohashRepository)
-            scope.launch {
-                chatViewModel.teleportedGeo.collectLatest { geo ->
-                    dispatch(ChatStore.Msg.TeleportedGeoUpdated(geo))
-                }
             }
             
             // Peer info polling - get from BluetoothMeshService periodically
@@ -958,19 +1014,19 @@ internal class ChatStoreFactory(
         }
 
         private fun sendVoiceNote(toPeerID: String?, channel: String?, filePath: String) {
-            chatViewModel.sendVoiceNote(toPeerID, channel, filePath)
+            mediaSendingManager.sendVoiceNote(toPeerID, channel, filePath)
         }
 
         private fun sendImageNote(toPeerID: String?, channel: String?, filePath: String) {
-            chatViewModel.sendImageNote(toPeerID, channel, filePath)
+            mediaSendingManager.sendImageNote(toPeerID, channel, filePath)
         }
 
         private fun sendFileNote(toPeerID: String?, channel: String?, filePath: String) {
-            chatViewModel.sendFileNote(toPeerID, channel, filePath)
+            mediaSendingManager.sendFileNote(toPeerID, channel, filePath)
         }
 
         private fun cancelMediaSend(messageId: String) {
-            chatViewModel.cancelMediaSend(messageId)
+            mediaSendingManager.cancelMediaSend(messageId)
         }
 
         // Channel actions - now using services directly

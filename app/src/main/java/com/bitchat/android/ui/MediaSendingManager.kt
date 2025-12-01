@@ -5,6 +5,7 @@ import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.model.BitchatFilePacket
 import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.model.BitchatMessageType
+import jakarta.inject.Singleton
 import java.util.Date
 import java.security.MessageDigest
 
@@ -12,12 +13,18 @@ import java.security.MessageDigest
  * Handles media file sending operations (voice notes, images, generic files)
  * Separated from ChatViewModel for better separation of concerns
  */
+@Singleton
 class MediaSendingManager(
-    private val state: ChatState,
-    private val messageManager: MessageManager,
-    private val channelManager: ChannelManager,
     private val meshService: BluetoothMeshService
 ) {
+    // Callbacks for state access - set by ChatStoreFactory
+    var nicknameProvider: (() -> String?)? = null
+    var addMessageCallback: ((BitchatMessage) -> Unit)? = null
+    var addPrivateMessageCallback: ((String, BitchatMessage) -> Unit)? = null
+    var addChannelMessageCallback: ((String, BitchatMessage) -> Unit)? = null
+    var updateDeliveryStatusCallback: ((String, com.bitchat.android.model.DeliveryStatus) -> Unit)? = null
+    var removeMessageCallback: ((String) -> Unit)? = null
+    var findMessagePathCallback: ((String) -> String?)? = null
     companion object {
         private const val TAG = "MediaSendingManager"
         private const val MAX_FILE_SIZE = com.bitchat.android.util.AppConstants.Media.MAX_FILE_SIZE_BYTES // 50MB limit
@@ -185,7 +192,7 @@ class MediaSendingManager(
 
         val msg = BitchatMessage(
             id = java.util.UUID.randomUUID().toString().uppercase(), // Generate unique ID for each message
-            sender = state.getNicknameValue() ?: "me",
+            sender = nicknameProvider?.invoke() ?: "me",
             content = filePath,
             type = messageType,
             timestamp = Date(),
@@ -195,7 +202,7 @@ class MediaSendingManager(
             senderPeerID = meshService.myPeerID
         )
         
-        messageManager.addPrivateMessage(toPeerID, msg)
+        addPrivateMessageCallback?.invoke(toPeerID, msg)
         
         synchronized(transferMessageMap) {
             transferMessageMap[transferId] = msg.id
@@ -203,7 +210,7 @@ class MediaSendingManager(
         }
         
         // Seed progress so delivery icons render for media
-        messageManager.updateMessageDeliveryStatus(
+        updateDeliveryStatusCallback?.invoke(
             msg.id,
             com.bitchat.android.model.DeliveryStatus.PartiallyDelivered(0, 100)
         )
@@ -236,7 +243,7 @@ class MediaSendingManager(
 
         val message = BitchatMessage(
             id = java.util.UUID.randomUUID().toString().uppercase(), // Generate unique ID for each message
-            sender = state.getNicknameValue() ?: meshService.myPeerID,
+            sender = nicknameProvider?.invoke() ?: meshService.myPeerID,
             content = filePath,
             type = messageType,
             timestamp = Date(),
@@ -246,9 +253,9 @@ class MediaSendingManager(
         )
         
         if (!channelOrNull.isNullOrBlank()) {
-            channelManager.addChannelMessage(channelOrNull, message, meshService.myPeerID)
+            addChannelMessageCallback?.invoke(channelOrNull, message)
         } else {
-            messageManager.addMessage(message)
+            addMessageCallback?.invoke(message)
         }
         
         synchronized(transferMessageMap) {
@@ -257,7 +264,7 @@ class MediaSendingManager(
         }
         
         // Seed progress so animations start immediately
-        messageManager.updateMessageDeliveryStatus(
+        updateDeliveryStatusCallback?.invoke(
             message.id,
             com.bitchat.android.model.DeliveryStatus.PartiallyDelivered(0, 100)
         )
@@ -276,30 +283,16 @@ class MediaSendingManager(
             val cancelled = meshService.cancelFileTransfer(transferId)
             if (cancelled) {
                 // Try to remove cached local file for this message (if any)
-                runCatching { findMessagePathById(messageId)?.let { java.io.File(it).delete() } }
+                runCatching { findMessagePathCallback?.invoke(messageId)?.let { java.io.File(it).delete() } }
 
                 // Remove the message from chat upon explicit cancel
-                messageManager.removeMessageById(messageId)
+                removeMessageCallback?.invoke(messageId)
                 synchronized(transferMessageMap) {
                     transferMessageMap.remove(transferId)
                     messageTransferMap.remove(messageId)
                 }
             }
         }
-    }
-
-    private fun findMessagePathById(messageId: String): String? {
-        // Search main timeline
-        state.getMessagesValue().firstOrNull { it.id == messageId }?.content?.let { return it }
-        // Search private chats
-        state.getPrivateChatsValue().values.forEach { list ->
-            list.firstOrNull { it.id == messageId }?.content?.let { return it }
-        }
-        // Search channel messages
-        state.getChannelMessagesValue().values.forEach { list ->
-            list.firstOrNull { it.id == messageId }?.content?.let { return it }
-        }
-        return null
     }
 
     /**
@@ -319,7 +312,7 @@ class MediaSendingManager(
         val msgId = synchronized(transferMessageMap) { transferMessageMap[evt.transferId] }
         if (msgId != null) {
             if (evt.completed) {
-                messageManager.updateMessageDeliveryStatus(
+                updateDeliveryStatusCallback?.invoke(
                     msgId,
                     com.bitchat.android.model.DeliveryStatus.Delivered(to = "mesh", at = java.util.Date())
                 )
@@ -328,7 +321,7 @@ class MediaSendingManager(
                     if (msgIdRemoved != null) messageTransferMap.remove(msgIdRemoved)
                 }
             } else {
-                messageManager.updateMessageDeliveryStatus(
+                updateDeliveryStatusCallback?.invoke(
                     msgId,
                     com.bitchat.android.model.DeliveryStatus.PartiallyDelivered(evt.sent, evt.total)
                 )

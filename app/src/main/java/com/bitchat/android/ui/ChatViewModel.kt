@@ -99,7 +99,7 @@ class ChatViewModel @Inject constructor(
     )
 
     // Media file sending manager
-    private val mediaSendingManager = MediaSendingManager(state, messageManager, channelManager, meshService)
+    private val mediaSendingManager = MediaSendingManager(meshService)
     
     // Delegate handler for mesh callbacks
     private val meshDelegateHandler = MeshDelegateHandler(
@@ -196,6 +196,26 @@ class ChatViewModel @Inject constructor(
 
     init {
         // Note: Mesh service delegate is now set by MainActivity
+        
+        // Setup MediaSendingManager callbacks
+        mediaSendingManager.nicknameProvider = { state.getNicknameValue() }
+        mediaSendingManager.addMessageCallback = { message -> messageManager.addMessage(message) }
+        mediaSendingManager.addPrivateMessageCallback = { peerID, message -> 
+            messageManager.addPrivateMessage(peerID, message)
+        }
+        mediaSendingManager.addChannelMessageCallback = { channel, message ->
+            messageManager.addChannelMessage(channel, message)
+        }
+        mediaSendingManager.updateDeliveryStatusCallback = { messageId, status ->
+            messageManager.updateMessageDeliveryStatus(messageId, status)
+        }
+        mediaSendingManager.removeMessageCallback = { messageId ->
+            messageManager.removeMessageById(messageId)
+        }
+        mediaSendingManager.findMessagePathCallback = { messageId ->
+            messageManager.findMessagePathById(messageId)
+        }
+        
         loadAndInitialize()
         // Subscribe to BLE transfer progress and reflect in message deliveryStatus
         viewModelScope.launch {

@@ -22,7 +22,6 @@ import com.bitchat.android.onboarding.BluetoothStatusManager
 import com.bitchat.android.onboarding.LocationStatusManager
 import com.bitchat.android.onboarding.OnboardingCoordinator
 import com.bitchat.android.onboarding.PermissionManager
-import com.bitchat.android.ui.ChatViewModel
 import com.bitchat.android.ui.OrientationAwareActivity
 import com.bitchat.android.ui.screens.root.RootContent
 import com.bitchat.android.ui.theme.BitchatTheme
@@ -35,7 +34,6 @@ class MainActivity : OrientationAwareActivity() {
     // Inject singletons
     private val permissionManager: PermissionManager by inject()
     private val meshService: BluetoothMeshService by inject()
-    private val chatViewModel: ChatViewModel by viewModel()
     private val bluetoothStatusManager: BluetoothStatusManager by inject()
     private val locationStatusManager: LocationStatusManager by inject()
     private val batteryOptimizationManager: BatteryOptimizationManager by inject()
@@ -80,7 +78,6 @@ class MainActivity : OrientationAwareActivity() {
             onboardingCoordinator = onboardingCoordinator,
             permissionManager = permissionManager,
             meshService = meshService,
-            chatViewModel = chatViewModel,
             initialDeepLink = initialDeepLink
         )
 

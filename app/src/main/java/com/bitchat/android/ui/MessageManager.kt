@@ -310,6 +310,21 @@ class MessageManager(private val state: ChatState) {
             .toList()
     }
     
+    // Find message file path by ID (for media messages)
+    fun findMessagePathById(messageID: String): String? {
+        // Search main timeline
+        state.getMessagesValue().firstOrNull { it.id == messageID }?.content?.let { return it }
+        // Search private chats
+        state.getPrivateChatsValue().values.forEach { list ->
+            list.firstOrNull { it.id == messageID }?.content?.let { return it }
+        }
+        // Search channel messages
+        state.getChannelMessagesValue().values.forEach { list ->
+            list.firstOrNull { it.id == messageID }?.content?.let { return it }
+        }
+        return null
+    }
+    
     // MARK: - Emergency Clear
     
     fun clearAllMessages() {
