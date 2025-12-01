@@ -13,6 +13,7 @@ import com.bitchat.android.geohash.GeohashBookmarksStore
 import com.bitchat.android.geohash.GeohashChannel
 import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.geohash.LocationChannelManager
+import com.bitchat.android.identity.SecureIdentityStateManager
 import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.mesh.MeshEventBus
 import com.bitchat.android.mesh.PeerFingerprintManager
@@ -1662,6 +1663,19 @@ internal class ChatStoreFactory(
                 Log.d(TAG, "✅ Cleared encryption data")
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Error clearing encryption data: ${e.message}")
+            }
+            
+            // Clear secure identity state (Ed25519 keys, secure storage)
+            try {
+                val identityManager = SecureIdentityStateManager(applicationContext)
+                identityManager.clearIdentityData()
+                // Also clear secure values used by FavoritesPersistenceService
+                try {
+                    identityManager.clearSecureValues("favorite_relationships", "favorite_peerid_index")
+                } catch (_: Exception) { }
+                Log.d(TAG, "✅ Cleared secure identity state")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error clearing secure identity state: ${e.message}")
             }
             
             // Clear Nostr relay subscriptions and state
