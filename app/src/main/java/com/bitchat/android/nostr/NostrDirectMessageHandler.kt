@@ -7,8 +7,11 @@ import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.model.DeliveryStatus
 import com.bitchat.android.protocol.BitchatPacket
 import com.bitchat.android.services.SeenMessageStore
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.util.Date
 
@@ -19,15 +22,21 @@ import java.util.Date
  * 
  * Clean Architecture: This handler emits events, Store consumes them.
  */
-class NostrDirectMessageHandler(
+@Singleton
+class NostrDirectMessageHandler @Inject constructor(
     private val application: Application,
-    private val scope: CoroutineScope,
     private val repo: GeohashRepository,
     private val dataManager: com.bitchat.android.ui.DataManager,
     private val nostrTransport: NostrTransport,
-    private val seenStore: SeenMessageStore,
-    private val nicknameProvider: () -> String?
+    private val seenStore: SeenMessageStore
 ) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    
+    /**
+     * Provider for the current user's nickname - set by the Store during initialization
+     */
+    var nicknameProvider: (() -> String?) = { null }
+    
     companion object { private const val TAG = "NostrDirectMessageHandler" }
 
     // Simple event deduplication

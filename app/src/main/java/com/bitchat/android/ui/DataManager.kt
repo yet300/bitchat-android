@@ -3,6 +3,8 @@ package com.bitchat.android.ui
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.*
 import com.bitchat.android.util.JsonUtil
 import kotlin.random.Random
@@ -113,7 +115,7 @@ class DataManager @Inject constructor(private val context: Context) {
         prefs.edit().apply {
             putStringSet("joined_channels", joinedChannels)
             putStringSet("password_protected_channels", passwordProtectedChannels)
-            putString("channel_creators", JsonUtil.toJson(_channelCreators))
+            putString("channel_creators", JsonUtil.toJson(MapSerializer(String.serializer(), String.serializer()), _channelCreators.toMap()))
             apply()
         }
     }

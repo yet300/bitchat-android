@@ -9,6 +9,7 @@ import com.arkivanov.mvikotlin.extensions.coroutines.CoroutineExecutor
 import com.bitchat.android.domain.event.ChatEventBus
 import com.bitchat.android.favorites.FavoritesPersistenceService
 import com.bitchat.android.feature.chat.ChatComponent
+import com.bitchat.android.geohash.ChannelID
 import com.bitchat.android.geohash.GeohashBookmarksStore
 import com.bitchat.android.geohash.GeohashChannel
 import com.bitchat.android.model.BitchatMessage
@@ -25,9 +26,12 @@ import com.bitchat.android.ui.MediaSendingManager
 import com.bitchat.android.nostr.GeohashRepository
 import com.bitchat.android.nostr.NostrIdentityBridge
 import com.bitchat.android.nostr.NostrProtocol
+import com.bitchat.android.nostr.NostrDirectMessageHandler
 import com.bitchat.android.nostr.NostrRelayManager
+import com.bitchat.android.nostr.NostrSubscriptionManager
 import com.bitchat.android.nostr.NostrTransport
 import com.bitchat.android.nostr.PoWPreferenceManager
+import com.bitchat.android.nostr.GeohashMessageHandler
 import com.bitchat.android.services.MessageRouter
 import com.bitchat.android.services.SeenMessageStore
 import com.bitchat.android.ui.BitchatNotificationManager
@@ -58,6 +62,7 @@ internal class ChatStoreFactory(
     private val applicationContext: android.content.Context by inject()
     private val mediaSendingManager: MediaSendingManager by inject()
     private val notificationManager: BitchatNotificationManager by inject()
+    private val nostrSubscriptionManager: NostrSubscriptionManager by inject()
 
     fun create(): ChatStore =
         object : ChatStore,
@@ -114,7 +119,7 @@ internal class ChatStoreFactory(
                 if (channel.startsWith("geo:")) {
                     val geo = channel.removePrefix("geo:")
                     val selected = state().selectedLocationChannel
-                    selected is com.bitchat.android.geohash.ChannelID.Location && selected.channel.geohash.equals(geo, ignoreCase = true)
+                    selected is ChannelID.Location && selected.channel.geohash.equals(geo, ignoreCase = true)
                 } else false
             } catch (_: Exception) { false }
 
@@ -338,7 +343,7 @@ internal class ChatStoreFactory(
             val selectedLocationChannel = state().selectedLocationChannel
             
             when (selectedLocationChannel) {
-                is com.bitchat.android.geohash.ChannelID.Mesh, null -> {
+                is ChannelID.Mesh, null -> {
                     // Mesh channel: show Bluetooth-connected peers
                     val connectedPeers = state().connectedPeers
                     if (connectedPeers.isEmpty()) {
@@ -350,7 +355,7 @@ internal class ChatStoreFactory(
                         addSystemMessage("online users: $peerList")
                     }
                 }
-                is com.bitchat.android.geohash.ChannelID.Location -> {
+                is ChannelID.Location -> {
                     // Location channel: show geohash participants
                     val geohashPeople = state().geohashPeople
                     
@@ -487,6 +492,9 @@ internal class ChatStoreFactory(
             subscribeToMeshEvents()
             subscribeToChatEventBus()
             subscribeToServiceFlows()
+            
+            // Initialize Nostr subscriptions for DMs and geohash channels
+            initializeNostrSubscriptions()
             
             // Load persisted data and handle startup config in background
             scope.launch {
@@ -894,6 +902,139 @@ internal class ChatStoreFactory(
             }
         }
 
+        // Nostr subscription state tracking
+        private var currentGeohashSubId: String? = null
+        private var currentDmSubId: String? = null
+        private var geoParticipantsTimerJob: kotlinx.coroutines.Job? = null
+        
+        // Handlers for Nostr events - injected via Koin (they are singletons)
+        private val geohashMessageHandler: GeohashMessageHandler by inject()
+        private val dmHandler: NostrDirectMessageHandler by inject()
+
+        /**
+         * Initialize Nostr subscriptions for DMs and geohash channels.
+         * This is the key initialization that was previously in GeohashViewModel.
+         */
+        private fun initializeNostrSubscriptions() {
+            // Connect to Nostr relays
+            nostrSubscriptionManager.connect()
+            
+            // Set up nickname provider for DM handler
+            dmHandler.nicknameProvider = { state().nickname }
+            
+            // Subscribe to global gift wraps for DMs (account-level DMs)
+            scope.launch {
+                try {
+                    val identity = NostrIdentityBridge.getCurrentNostrIdentity(applicationContext)
+                    if (identity != null) {
+                        nostrSubscriptionManager.subscribeGiftWraps(
+                            pubkey = identity.publicKeyHex,
+                            sinceMs = System.currentTimeMillis() - 172800000L, // 48 hours
+                            id = "chat-messages",
+                            handler = { event -> dmHandler.onGiftWrap(event, "", identity) }
+                        )
+                        Log.d(TAG, "📬 Subscribed to global DMs for ${identity.publicKeyHex.take(8)}...")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to subscribe to global DMs: ${e.message}")
+                }
+            }
+            
+            // Subscribe to location channel changes and handle geohash switching
+            scope.launch {
+                locationChannelManager.selectedChannel.collect { channel ->
+                    switchLocationChannel(channel)
+                }
+            }
+        }
+        
+        /**
+         * Handle location channel switching (manages geohash subscriptions)
+         */
+        private fun switchLocationChannel(channel: com.bitchat.android.geohash.ChannelID?) {
+            // Cancel previous timer
+            geoParticipantsTimerJob?.cancel()
+            geoParticipantsTimerJob = null
+            
+            // Unsubscribe from previous geohash
+            currentGeohashSubId?.let { nostrSubscriptionManager.unsubscribe(it); currentGeohashSubId = null }
+            currentDmSubId?.let { nostrSubscriptionManager.unsubscribe(it); currentDmSubId = null }
+            
+            when (channel) {
+                is ChannelID.Mesh -> {
+                    Log.d(TAG, "📡 Switched to mesh channel")
+                    geohashRepository.setCurrentGeohash(null)
+                    notificationManager.setCurrentGeohash(null)
+                    notificationManager.clearMeshMentionNotifications()
+                    geohashRepository.refreshGeohashPeople(state().nickname)
+                }
+                is ChannelID.Location -> {
+                    val geohash = channel.channel.geohash
+                    Log.d(TAG, "📍 Switching to geohash channel: $geohash")
+                    geohashRepository.setCurrentGeohash(geohash)
+                    notificationManager.setCurrentGeohash(geohash)
+                    notificationManager.clearNotificationsForGeohash(geohash)
+                    
+                    // Update self as participant
+                    try {
+                        val identity = NostrIdentityBridge.deriveIdentity(geohash, applicationContext)
+                        geohashRepository.updateParticipant(geohash, identity.publicKeyHex, java.util.Date())
+                        if (state().isTeleported) geohashRepository.markTeleported(identity.publicKeyHex)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed identity setup: ${e.message}")
+                    }
+                    
+                    // Start periodic refresh of participants
+                    startGeoParticipantsTimer()
+                    
+                    // Subscribe to geohash channel messages
+                    scope.launch {
+                        val subId = "geohash-$geohash"
+                        currentGeohashSubId = subId
+                        nostrSubscriptionManager.subscribeGeohash(
+                            geohash = geohash,
+                            sinceMs = System.currentTimeMillis() - 3600000L, // 1 hour
+                            limit = 200,
+                            id = subId,
+                            handler = { event -> geohashMessageHandler.onEvent(event, geohash) }
+                        )
+                        
+                        // Subscribe to geohash-specific DMs
+                        val dmIdentity = NostrIdentityBridge.deriveIdentity(geohash, applicationContext)
+                        val dmSubId = "geo-dm-$geohash"
+                        currentDmSubId = dmSubId
+                        nostrSubscriptionManager.subscribeGiftWraps(
+                            pubkey = dmIdentity.publicKeyHex,
+                            sinceMs = System.currentTimeMillis() - 172800000L, // 48 hours
+                            id = dmSubId,
+                            handler = { event -> dmHandler.onGiftWrap(event, geohash, dmIdentity) }
+                        )
+                        
+                        // Register alias for routing
+                        com.bitchat.android.nostr.GeohashAliasRegistry.put(
+                            "nostr_${dmIdentity.publicKeyHex.take(16)}", 
+                            dmIdentity.publicKeyHex
+                        )
+                        Log.d(TAG, "📬 Subscribed to geohash DMs for $geohash")
+                    }
+                }
+                null -> {
+                    Log.d(TAG, "📡 No channel selected")
+                    geohashRepository.setCurrentGeohash(null)
+                    geohashRepository.refreshGeohashPeople(state().nickname)
+                }
+            }
+        }
+        
+        private fun startGeoParticipantsTimer() {
+            geoParticipantsTimerJob = scope.launch {
+                while (geohashRepository.getCurrentGeohash() != null) {
+                    kotlinx.coroutines.delay(30000)
+                    geohashRepository.refreshGeohashPeople(state().nickname)
+                }
+            }
+        }
+
         private fun handleStartupConfig() {
             when (startupConfig) {
                 is ChatComponent.ChatStartupConfig.PrivateChat -> {
@@ -1031,7 +1172,7 @@ internal class ChatStoreFactory(
                     } else {
                         // Check if we're in a location channel
                         val selectedLocationChannel = state().selectedLocationChannel
-                        if (selectedLocationChannel is com.bitchat.android.geohash.ChannelID.Location) {
+                        if (selectedLocationChannel is ChannelID.Location) {
                             // Send to geohash channel directly using services
                             sendGeohashMessage(content, selectedLocationChannel.channel)
                         } else {

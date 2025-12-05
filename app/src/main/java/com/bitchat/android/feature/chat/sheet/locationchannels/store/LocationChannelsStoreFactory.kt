@@ -1,5 +1,6 @@
 package com.bitchat.android.feature.chat.sheet.locationchannels.store
 
+import android.util.Log
 import com.arkivanov.mvikotlin.core.store.Reducer
 import com.arkivanov.mvikotlin.core.store.SimpleBootstrapper
 import com.arkivanov.mvikotlin.core.store.Store
@@ -9,6 +10,7 @@ import com.bitchat.android.geohash.GeohashBookmarksStore
 import com.bitchat.android.geohash.LocationChannelManager
 import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.mesh.MeshEventBus
+import com.bitchat.android.nostr.GeohashMessageHandler
 import com.bitchat.android.nostr.GeohashRepository
 import com.bitchat.android.nostr.NostrSubscriptionManager
 import kotlinx.coroutines.launch
@@ -25,6 +27,7 @@ internal class LocationChannelsStoreFactory(
     private val meshEventBus: MeshEventBus by inject()
     private val geohashRepository: GeohashRepository by inject()
     private val subscriptionManager: NostrSubscriptionManager by inject()
+    private val geohashMessageHandler: GeohashMessageHandler by inject()
 
     fun create(): LocationChannelsStore =
         object : LocationChannelsStore,
@@ -174,7 +177,10 @@ internal class LocationChannelsStoreFactory(
                                     sinceMs = System.currentTimeMillis() - 86400000L,
                                     limit = 200,
                                     id = "sampling-$geohash",
-                                    handler = { /* Events handled by GeohashMessageHandler via GeohashViewModel */ }
+                                    handler = { event ->
+                                        Log.d("LocationChannelsStore", "📥 Received event for geohash: $geohash")
+                                        geohashMessageHandler.onEvent(event, geohash)
+                                    }
                                 )
                             }
                         }

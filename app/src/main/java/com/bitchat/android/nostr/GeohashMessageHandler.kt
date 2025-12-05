@@ -4,8 +4,11 @@ import android.app.Application
 import android.util.Log
 import com.bitchat.android.domain.event.ChatEventBus
 import com.bitchat.android.model.BitchatMessage
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.util.Date
 
@@ -15,13 +18,14 @@ import java.util.Date
  * - Updates repository for participants + nicknames
  * - Emits messages to MessageManager
  */
-class GeohashMessageHandler(
+@Singleton
+class GeohashMessageHandler @Inject constructor(
     private val application: Application,
     private val repo: GeohashRepository,
-    private val scope: CoroutineScope,
     private val dataManager: com.bitchat.android.ui.DataManager,
     private val powPreferenceManager: PoWPreferenceManager
 ) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     companion object { private const val TAG = "GeohashMessageHandler" }
 
     // Simple event deduplication
@@ -43,10 +47,12 @@ class GeohashMessageHandler(
     fun onEvent(event: NostrEvent, subscribedGeohash: String) {
         scope.launch(Dispatchers.Default) {
             try {
+                Log.d(TAG, "📥 onEvent: kind=${event.kind}, geohash=$subscribedGeohash, pubkey=${event.pubkey.take(8)}")
                 if (event.kind != 20000) return@launch
                 val tagGeo = event.tags.firstOrNull { it.size >= 2 && it[0] == "g" }?.getOrNull(1)
                 if (tagGeo == null || !tagGeo.equals(subscribedGeohash, true)) return@launch
                 if (dedupe(event.id)) return@launch
+                Log.d(TAG, "📥 Processing event id=${event.id.take(8)} for geohash=$subscribedGeohash")
 
                 // PoW validation (if enabled)
                 val pow = powPreferenceManager.getCurrentSettings()
@@ -58,6 +64,7 @@ class GeohashMessageHandler(
                 if (dataManager.isGeohashUserBlocked(event.pubkey)) return@launch
 
                 // Update repository (participants, nickname, teleport)
+                Log.d(TAG, "📥 Updating participant: geohash=$subscribedGeohash, pubkey=${event.pubkey.take(8)}")
                 repo.updateParticipant(subscribedGeohash, event.pubkey, Date(event.createdAt * 1000L))
 
                 val nickname = event.tags.find { it.size >= 2 && it[0] == "n" }?.getOrNull(1)
