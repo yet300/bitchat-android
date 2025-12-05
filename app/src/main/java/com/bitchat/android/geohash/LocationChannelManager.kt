@@ -532,16 +532,14 @@ class LocationChannelManager @Inject constructor(
         try {
             val channelData = when (channel) {
                 is ChannelID.Mesh -> {
-                    JsonUtil.toJson(mapOf("type" to "mesh"))
+                    """{"type":"mesh"}"""
                 }
                 is ChannelID.Location -> {
-                    JsonUtil.toJson(mapOf(
-                        "type" to "location",
-                        "level" to channel.channel.level.name,
-                        "precision" to channel.channel.level.precision,
-                        "geohash" to channel.channel.geohash,
-                        "displayName" to channel.channel.level.displayName
-                    ))
+                    val level = channel.channel.level.name
+                    val precision = channel.channel.level.precision
+                    val geohash = channel.channel.geohash
+                    val displayName = channel.channel.level.displayName
+                    """{"type":"location","level":"$level","precision":$precision,"geohash":"$geohash","displayName":"$displayName"}"""
                 }
             }
             dataManager.saveLastGeohashChannel(channelData)

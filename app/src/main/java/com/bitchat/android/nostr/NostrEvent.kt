@@ -116,18 +116,11 @@ data class NostrEvent(
      * Returns (hex_id, hash_bytes)
      */
     private fun calculateEventId(): Pair<String, ByteArray> {
-        // Create serialized array for hashing according to NIP-01
-        val serialized = listOf(
-            0,
-            pubkey,
-            createdAt,
-            kind,
-            tags,
-            content
-        )
-        
-        // Convert to JSON without escaping slashes (compact format)
-        val jsonString = JsonUtil.toJson(serialized)
+        // Build the NIP-01 serialization manually to avoid List<Any> serialization issues
+        // Format: [0,<pubkey>,<created_at>,<kind>,<tags>,<content>]
+        val tagsJson = buildTagsJson(tags)
+        val escapedContent = escapeJsonString(content)
+        val jsonString = """[0,"$pubkey",$createdAt,$kind,$tagsJson,"$escapedContent"]"""
         
         // SHA256 hash of the JSON string
         val digest = MessageDigest.getInstance("SHA-256")
@@ -139,7 +132,43 @@ data class NostrEvent(
         
         return Pair(hexId, hash)
     }
-    
+
+    /**
+     * Build JSON array string for tags
+     */
+    private fun buildTagsJson(tags: List<List<String>>): String {
+        if (tags.isEmpty()) return "[]"
+        return tags.joinToString(",", "[", "]") { tag ->
+            tag.joinToString(",", "[", "]") { "\"${escapeJsonString(it)}\"" }
+        }
+    }
+
+    /**
+     * Escape special characters in JSON strings
+     */
+    private fun escapeJsonString(s: String): String {
+        val sb = StringBuilder()
+        for (c in s) {
+            when (c) {
+                '"' -> sb.append("\\\"")
+                '\\' -> sb.append("\\\\")
+                '\b' -> sb.append("\\b")
+                '\u000C' -> sb.append("\\f")
+                '\n' -> sb.append("\\n")
+                '\r' -> sb.append("\\r")
+                '\t' -> sb.append("\\t")
+                else -> {
+                    if (c.code < 32) {
+                        sb.append("\\u${String.format("%04x", c.code)}")
+                    } else {
+                        sb.append(c)
+                    }
+                }
+            }
+        }
+        return sb.toString()
+    }
+
     /**
      * Sign hash using BIP-340 Schnorr signatures
      */

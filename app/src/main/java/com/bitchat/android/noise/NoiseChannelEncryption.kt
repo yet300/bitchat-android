@@ -204,15 +204,9 @@ class NoiseChannelEncryption {
      */
     fun createChannelKeyPacket(password: String, channel: String): ByteArray? {
         return try {
-            // Create key packet with channel and password
-            val packet = mapOf(
-                "channel" to channel,
-                "password" to password,
-                "timestamp" to System.currentTimeMillis()
-            )
-            
-            // Simple JSON encoding for now (could be replaced with more efficient format)
-            val json = JsonUtil.toJson(packet)
+            // Create key packet with channel and password - manual JSON to avoid serialization issues
+            val timestamp = System.currentTimeMillis()
+            val json = """{"channel":"$channel","password":"$password","timestamp":$timestamp}"""
             json.toByteArray(Charsets.UTF_8)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to create channel key packet: ${e.message}")
