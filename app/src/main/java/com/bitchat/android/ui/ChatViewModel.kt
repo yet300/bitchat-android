@@ -926,6 +926,9 @@ class ChatViewModel(
         
         // Clear all notifications
         notificationManager.clearAllNotifications()
+
+        // Clear all media files
+        com.bitchat.android.features.file.FileUtils.clearAllMedia(getApplication())
         
         // Clear Nostr/geohash state, keys, connections, bookmarks, and reinitialize from scratch
         try {
@@ -1043,7 +1046,7 @@ class ChatViewModel(
      * End geohash sampling
      */
     fun endGeohashSampling() {
-        // No-op in refactored architecture; sampling subscriptions are short-lived
+        geohashViewModel.endGeohashSampling()
     }
 
     /**

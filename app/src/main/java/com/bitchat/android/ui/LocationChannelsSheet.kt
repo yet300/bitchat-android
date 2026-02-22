@@ -4,7 +4,6 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -39,8 +38,9 @@ import com.bitchat.android.ui.theme.BASE_FONT_SIZE
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bitchat.android.R
-import com.bitchat.android.core.ui.component.button.CloseButton
 import com.bitchat.android.core.ui.component.sheet.BitchatBottomSheet
+import com.bitchat.android.core.ui.component.sheet.BitchatSheetTopBar
+import com.bitchat.android.core.ui.component.sheet.BitchatSheetTitle
 
 /**
  * Location Channels Sheet for selecting geohash-based location channels
@@ -125,32 +125,18 @@ fun LocationChannelsSheet(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 48.dp, bottom = 16.dp)
+                    contentPadding = PaddingValues(top = 64.dp, bottom = 16.dp)
                 ) {
                     // Header Section
                     item(key = "header") {
-                        Column(
+                        Text(
+                            text = stringResource(R.string.location_channels_desc),
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                             modifier = Modifier
-                                .fillMaxWidth()
                                 .padding(horizontal = 24.dp)
-                                .padding(bottom = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.location_channels_title),
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-
-                            Text(
-                                text = stringResource(R.string.location_channels_desc),
-                                fontSize = 12.sp,
-                                fontFamily = FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-                            )
-                        }
+                        )
                     }
 
                     // Permission controls if services enabled
@@ -257,10 +243,17 @@ fun LocationChannelsSheet(
                     } else if (permissionState == LocationChannelManager.PermissionState.AUTHORIZED && locationServicesEnabled) {
                         item {
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 32.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                )
                                 Text(
                                     text = stringResource(R.string.finding_nearby_channels),
                                     fontSize = 12.sp,
@@ -515,20 +508,15 @@ fun LocationChannelsSheet(
                 }
 
                 // TopBar (animated)
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .background(MaterialTheme.colorScheme.background.copy(alpha = topBarAlpha))
-                ) {
-                    CloseButton(
-                        onClick = onDismiss,
-                        modifier = modifier
-                            .align(Alignment.CenterEnd)
-                            .padding(horizontal = 16.dp),
-                    )
-                }
+                BitchatSheetTopBar(
+                    onClose = onDismiss,
+                    modifier = modifier.align(Alignment.TopCenter),
+                    title = {
+                        BitchatSheetTitle(
+                            text = stringResource(R.string.location_channels_title)
+                        )
+                    }
+                )
             }
         }
     }
@@ -551,6 +539,13 @@ fun LocationChannelsSheet(
             val geohashes = (availableChannels.map { it.geohash } + bookmarks).toSet().toList()
             viewModel.beginGeohashSampling(geohashes)
         } else {
+            viewModel.endGeohashSampling()
+        }
+    }
+
+    // Ensure cleanup when the composable is destroyed (e.g. removed from parent composition)
+    DisposableEffect(Unit) {
+        onDispose {
             viewModel.endGeohashSampling()
         }
     }
