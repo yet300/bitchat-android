@@ -17,8 +17,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.Date
+import kotlin.time.Instant
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
+@OptIn(ExperimentalTime::class)
 class NostrDirectMessageHandler(
     private val application: Application,
     private val state: ChatState,
@@ -76,7 +79,7 @@ class NostrDirectMessageHandler(
                 if (packet.type != com.bitchat.android.protocol.MessageType.NOISE_ENCRYPTED.value) return@launch
 
                 val noisePayload = NoisePayload.decode(packet.payload) ?: return@launch
-                val messageTimestamp = Date(giftWrap.createdAt * 1000L)
+                val messageTimestamp = Instant.fromEpochMilliseconds(giftWrap.createdAt * 1000L)
                 val convKey = "nostr_${senderPubkey.take(16)}"
                 repo.putNostrKeyMapping(convKey, senderPubkey)
                 com.bitchat.android.nostr.GeohashAliasRegistry.put(convKey, senderPubkey)
@@ -111,7 +114,7 @@ class NostrDirectMessageHandler(
         payload: NoisePayload,
         convKey: String,
         senderNickname: String,
-        timestamp: Date,
+        timestamp: Instant,
         senderPubkey: String,
         recipientIdentity: NostrIdentity
     ) {
@@ -130,7 +133,7 @@ class NostrDirectMessageHandler(
                     isPrivate = true,
                     recipientNickname = state.getNicknameValue(),
                     senderPeerID = convKey,
-                    deliveryStatus = DeliveryStatus.Delivered(to = state.getNicknameValue() ?: "Unknown", at = Date())
+                    deliveryStatus = DeliveryStatus.Delivered(to = state.getNicknameValue() ?: "Unknown", at = Clock.System.now())
                 )
 
                 val isViewing = state.getSelectedPrivateChatPeerValue() == convKey

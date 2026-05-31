@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.bitchat
 
 import com.bitchat.android.model.BitchatFilePacket
@@ -12,7 +14,8 @@ import org.robolectric.annotation.ConscryptMode
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.Date
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 @RunWith(RobolectricTestRunner::class)
 @ConscryptMode(ConscryptMode.Mode.OFF) // Disable Conscrypt to avoid native library loading issues
@@ -148,7 +151,7 @@ class FileTransferTest {
             senderPeerID = "12345678",
             content = "/data/user/0/com.bitchat.android/files/images/photo.jpg",
             type = BitchatMessageType.Image,
-            timestamp = Date(System.currentTimeMillis()),
+            timestamp = Clock.System.now(),
             isPrivate = false
         )
 
@@ -158,7 +161,7 @@ class FileTransferTest {
             senderPeerID = "87654321",
             content = "/data/user/0/com.bitchat.android/files/audio/voice.amr",
             type = BitchatMessageType.Audio,
-            timestamp = Date(System.currentTimeMillis()),
+            timestamp = Clock.System.now(),
             isPrivate = false
         )
 
@@ -168,7 +171,7 @@ class FileTransferTest {
             senderPeerID = "11223344",
             content = "/data/user/0/com.bitchat.android/files/documents/document.pdf",
             type = BitchatMessageType.File,
-            timestamp = Date(System.currentTimeMillis()),
+            timestamp = Clock.System.now(),
             isPrivate = false
         )
 
@@ -197,7 +200,7 @@ class FileTransferTest {
             senderPeerID = "1234abcd",
             content = "📷 sent an image", // This would be the result of the utility function
             type = BitchatMessageType.Image,
-            timestamp = Date(System.currentTimeMillis()),
+            timestamp = Clock.System.now(),
             isPrivate = true
         )
 

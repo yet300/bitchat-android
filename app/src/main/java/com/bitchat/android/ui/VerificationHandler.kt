@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.bitchat.android.ui
 
 import android.content.Context
@@ -17,8 +19,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.security.MessageDigest
-import java.util.Date
+import kotlin.time.Clock
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.ExperimentalTime
 
 /**
  * Handles QR verification logic and state, extracted from ChatViewModel.
@@ -310,7 +313,7 @@ class VerificationHandler(
         val msg = BitchatMessage(
             sender = "system",
             content = text,
-            timestamp = Date(),
+            timestamp = Clock.System.now(),
             isRelay = false,
             isPrivate = true,
             senderPeerID = peerID

@@ -1,6 +1,7 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.bitchat.android.ui
 
-import com.bitchat.android.R
 import android.util.Log
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.*
@@ -21,19 +22,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bitchat.android.R
 import com.bitchat.android.core.ui.component.button.CloseButton
 import com.bitchat.android.core.ui.component.sheet.BitchatBottomSheet
 import com.bitchat.android.core.ui.component.sheet.BitchatSheetCenterTopBar
 import com.bitchat.android.core.ui.component.sheet.BitchatSheetTitle
 import com.bitchat.android.core.ui.component.sheet.BitchatSheetTopBar
 import com.bitchat.android.geohash.ChannelID
-import com.bitchat.android.ui.theme.BASE_FONT_SIZE
 import com.bitchat.android.nostr.GeohashAliasRegistry
 import com.bitchat.android.nostr.GeohashConversationRegistry
+import com.bitchat.android.ui.theme.BASE_FONT_SIZE
+import kotlin.time.ExperimentalTime
 
 
 /**
@@ -342,7 +345,7 @@ fun PeopleSection(
         // Smart sorting: unread DMs first, then by most recent DM, then favorites, then alphabetical
         val sortedPeers = connectedPeers.sortedWith(
             compareBy<String> { !hasUnreadPrivateMessages.contains(it) } // Unread DM senders first
-            .thenByDescending { privateChats[it]?.maxByOrNull { msg -> msg.timestamp }?.timestamp?.time ?: 0L } // Most recent DM (convert Date to Long)
+            .thenByDescending { privateChats[it]?.maxByOrNull { msg -> msg.timestamp }?.timestamp?.toEpochMilliseconds() ?: 0L } // Most recent DM (convert Instant to Long)
             .thenBy { !(peerFavoriteStates[it] ?: false) } // Favorites first
             .thenBy { (if (it == nickname) "You" else (peerNicknames[it] ?: it)).lowercase() } // Alphabetical
         )

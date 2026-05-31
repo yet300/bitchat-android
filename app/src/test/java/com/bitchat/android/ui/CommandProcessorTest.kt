@@ -15,7 +15,7 @@ import org.junit.runner.RunWith
 import org.mockito.Mockito
 import org.mockito.kotlin.mock
 import org.robolectric.RobolectricTestRunner
-import java.util.Date
+
 
 @RunWith(RobolectricTestRunner::class)
 class CommandProcessorTest() {

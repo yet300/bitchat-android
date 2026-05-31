@@ -9,7 +9,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.Date
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 /**
  * GeohashMessageHandler
@@ -17,6 +18,7 @@ import java.util.Date
  * - Updates repository for participants + nicknames
  * - Emits messages to MessageManager
  */
+@OptIn(ExperimentalTime::class)
 class GeohashMessageHandler(
     private val application: Application,
     private val state: ChatState,
@@ -67,7 +69,7 @@ class GeohashMessageHandler(
                 
                 // Update participant count (last seen) on BOTH Presence (20001) and Chat (20000) events
                 if (event.kind == NostrKind.GEOHASH_PRESENCE || event.kind == NostrKind.EPHEMERAL_EVENT) {
-                    repo.updateParticipant(subscribedGeohash, event.pubkey, Date(event.createdAt * 1000L))
+                    repo.updateParticipant(subscribedGeohash, event.pubkey, Instant.fromEpochMilliseconds(event.createdAt * 1000L))
                 }
                 
                 event.tags.find { it.size >= 2 && it[0] == "n" }?.let { repo.cacheNickname(event.pubkey, it[1]) }
@@ -94,7 +96,7 @@ class GeohashMessageHandler(
                     id = event.id,
                     sender = senderName,
                     content = event.content,
-                    timestamp = Date(event.createdAt * 1000L),
+                    timestamp = Instant.fromEpochMilliseconds(event.createdAt * 1000L),
                     isRelay = false,
                     originalSender = repo.displayNameForNostrPubkey(event.pubkey),
                     senderPeerID = "nostr:${event.pubkey.take(8)}",

@@ -30,6 +30,7 @@ kotlinx-serialization = "1.11.0"
 
 # Coroutines
 kotlinx-coroutines = "1.10.2"
+kotlinxDatetime = "0.8.0"
 
 # Bluetooth
 nordic-ble = "2.6.1"
@@ -95,6 +96,7 @@ google-tink-android = { module = "com.google.crypto.tink:tink-android", version.
 
 # JSON
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
 
 # Coroutines
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }

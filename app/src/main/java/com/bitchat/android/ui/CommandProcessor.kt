@@ -1,8 +1,11 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.bitchat.android.ui
 
 import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.model.BitchatMessage
-import java.util.Date
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Handles processing of IRC-style commands
@@ -61,7 +64,7 @@ class CommandProcessor(
                 val systemMessage = BitchatMessage(
                     sender = "system",
                     content = "joined channel $channel",
-                    timestamp = Date(),
+                    timestamp = Clock.System.now(),
                     isRelay = false
                 )
                 messageManager.addMessage(systemMessage)
@@ -70,7 +73,7 @@ class CommandProcessor(
             val systemMessage = BitchatMessage(
                 sender = "system",
                 content = "usage: /join <channel>",
-                timestamp = Date(),
+                timestamp = Clock.System.now(),
                 isRelay = false
             )
             messageManager.addMessage(systemMessage)
@@ -103,7 +106,7 @@ class CommandProcessor(
                         val systemMessage = BitchatMessage(
                             sender = "system",
                             content = "started private chat with $targetName",
-                            timestamp = Date(),
+                            timestamp = Clock.System.now(),
                             isRelay = false
                         )
                         messageManager.addMessage(systemMessage)
@@ -113,7 +116,7 @@ class CommandProcessor(
                 val systemMessage = BitchatMessage(
                     sender = "system",
                     content = "user '$targetName' not found. they may be offline or using a different nickname.",
-                    timestamp = Date(),
+                    timestamp = Clock.System.now(),
                     isRelay = false
                 )
                 messageManager.addMessage(systemMessage)
@@ -122,7 +125,7 @@ class CommandProcessor(
             val systemMessage = BitchatMessage(
                 sender = "system",
                 content = "usage: /msg <nickname> [message]",
-                timestamp = Date(),
+                timestamp = Clock.System.now(),
                 isRelay = false
             )
             messageManager.addMessage(systemMessage)
@@ -177,7 +180,7 @@ class CommandProcessor(
             } else {
                 "$contextDescription: $peerList"
             },
-            timestamp = Date(),
+            timestamp = Clock.System.now(),
             isRelay = false
         )
         messageManager.addMessage(systemMessage)
@@ -209,7 +212,7 @@ class CommandProcessor(
             val systemMessage = BitchatMessage(
                 sender = "system",
                 content = "you must be in a channel to set a password.",
-                timestamp = Date(),
+                timestamp = Clock.System.now(),
                 isRelay = false
             )
             messageManager.addMessage(systemMessage)
@@ -221,7 +224,7 @@ class CommandProcessor(
                 val systemMessage = BitchatMessage(
                     sender = "system",
                     content = "you must be the channel creator to set a password.",
-                    timestamp = Date(),
+                    timestamp = Clock.System.now(),
                     isRelay = false
                 )
                 channelManager.addChannelMessage(currentChannel,systemMessage,null)
@@ -232,7 +235,7 @@ class CommandProcessor(
             val systemMessage = BitchatMessage(
                 sender = "system",
                 content = "password changed for channel $currentChannel",
-                timestamp = Date(),
+                timestamp = Clock.System.now(),
                 isRelay = false
             )
             channelManager.addChannelMessage(currentChannel,systemMessage,null)
@@ -241,7 +244,7 @@ class CommandProcessor(
             val systemMessage = BitchatMessage(
                 sender = "system",
                 content = "usage: /pass <password>",
-                timestamp = Date(),
+                timestamp = Clock.System.now(),
                 isRelay = false
             )
             channelManager.addChannelMessage(currentChannel,systemMessage,null)
@@ -258,7 +261,7 @@ class CommandProcessor(
             val systemMessage = BitchatMessage(
                 sender = "system",
                 content = blockedInfo,
-                timestamp = Date(),
+                timestamp = Clock.System.now(),
                 isRelay = false
             )
             messageManager.addMessage(systemMessage)
@@ -273,7 +276,7 @@ class CommandProcessor(
             val systemMessage = BitchatMessage(
                 sender = "system",
                 content = "usage: /unblock <nickname>",
-                timestamp = Date(),
+                timestamp = Clock.System.now(),
                 isRelay = false
             )
             messageManager.addMessage(systemMessage)
@@ -315,7 +318,7 @@ class CommandProcessor(
                 val message = BitchatMessage(
                     sender = state.getNicknameValue() ?: myPeerID,
                     content = actionMessage,
-                    timestamp = Date(),
+                    timestamp = Clock.System.now(),
                     isRelay = false,
                     senderPeerID = myPeerID,
                     channel = state.getCurrentChannelValue()
@@ -333,7 +336,7 @@ class CommandProcessor(
             val systemMessage = BitchatMessage(
                 sender = "system",
                 content = "usage: /${parts[0].removePrefix("/")} <nickname>",
-                timestamp = Date(),
+                timestamp = Clock.System.now(),
                 isRelay = false
             )
             messageManager.addMessage(systemMessage)
@@ -351,7 +354,7 @@ class CommandProcessor(
         val systemMessage = BitchatMessage(
             sender = "system",
             content = channelList,
-            timestamp = Date(),
+            timestamp = Clock.System.now(),
             isRelay = false
         )
         messageManager.addMessage(systemMessage)
@@ -361,7 +364,7 @@ class CommandProcessor(
         val systemMessage = BitchatMessage(
             sender = "system",
             content = "unknown command: $cmd. type / to see available commands.",
-            timestamp = Date(),
+            timestamp = Clock.System.now(),
             isRelay = false
         )
         messageManager.addMessage(systemMessage)

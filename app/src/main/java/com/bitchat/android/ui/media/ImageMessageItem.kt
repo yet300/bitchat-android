@@ -31,7 +31,7 @@ import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.model.BitchatMessageType
 import androidx.compose.material3.ColorScheme
-import java.text.SimpleDateFormat
+import com.bitchat.android.ui.TimeFormatter
 import java.util.*
 
 @Composable
@@ -41,7 +41,7 @@ fun ImageMessageItem(
     currentUserNickname: String,
     meshService: BluetoothMeshService,
     colorScheme: ColorScheme,
-    timeFormatter: SimpleDateFormat,
+    timeFormatter: TimeFormatter,
     onNicknameClick: ((String) -> Unit)?,
     onMessageLongPress: ((BitchatMessage) -> Unit)?,
     onCancelTransfer: ((BitchatMessage) -> Unit)?,

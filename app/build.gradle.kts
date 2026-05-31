@@ -120,7 +120,8 @@ dependencies {
     
     // JSON
     implementation(libs.kotlinx.serialization.json)
-    
+    implementation(libs.kotlinx.datetime)
+
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
     

@@ -1,13 +1,13 @@
+@file:OptIn(ExperimentalTime::class)
 package com.bitchat.android.ui
 
+import android.util.Log
+import com.bitchat.android.mesh.BluetoothMeshService
+import com.bitchat.android.mesh.PeerFingerprintManager
 import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.model.DeliveryStatus
-import com.bitchat.android.mesh.PeerFingerprintManager
-import java.security.MessageDigest
-
-import com.bitchat.android.mesh.BluetoothMeshService
-import java.util.*
-import android.util.Log
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Interface for Noise session operations needed by PrivateChatManager
@@ -48,7 +48,7 @@ class PrivateChatManager(
             val systemMessage = BitchatMessage(
                 sender = "system",
                 content = "cannot start chat with $peerNickname: user is blocked.",
-                timestamp = Date(),
+                timestamp = Clock.System.now(),
                 isRelay = false
             )
             messageManager.addMessage(systemMessage)
@@ -93,7 +93,7 @@ class PrivateChatManager(
             val systemMessage = BitchatMessage(
                 sender = "system",
                 content = "cannot send message to $recipientNickname: user is blocked.",
-                timestamp = Date(),
+                timestamp = Clock.System.now(),
                 isRelay = false
             )
             messageManager.addMessage(systemMessage)
@@ -103,7 +103,7 @@ class PrivateChatManager(
         val message = BitchatMessage(
             sender = senderNickname ?: myPeerID,
             content = content,
-            timestamp = Date(),
+            timestamp = Clock.System.now(),
             isRelay = false,
             isPrivate = true,
             recipientNickname = recipientNickname,
@@ -197,7 +197,7 @@ class PrivateChatManager(
             val systemMessage = BitchatMessage(
                 sender = "system",
                 content = "blocked user $peerNickname",
-                timestamp = Date(),
+                timestamp = Clock.System.now(),
                 isRelay = false
             )
             messageManager.addMessage(systemMessage)
@@ -221,7 +221,7 @@ class PrivateChatManager(
             val systemMessage = BitchatMessage(
                 sender = "system",
                 content = "unblocked user $peerNickname",
-                timestamp = Date(),
+                timestamp = Clock.System.now(),
                 isRelay = false
             )
             messageManager.addMessage(systemMessage)
@@ -239,7 +239,7 @@ class PrivateChatManager(
             val systemMessage = BitchatMessage(
                 sender = "system",
                 content = "user '$targetName' not found",
-                timestamp = Date(),
+                timestamp = Clock.System.now(),
                 isRelay = false
             )
             messageManager.addMessage(systemMessage)
@@ -258,7 +258,7 @@ class PrivateChatManager(
                 val systemMessage = BitchatMessage(
                     sender = "system",
                     content = "user '$targetName' is not blocked",
-                    timestamp = Date(),
+                    timestamp = Clock.System.now(),
                     isRelay = false
                 )
                 messageManager.addMessage(systemMessage)
@@ -268,7 +268,7 @@ class PrivateChatManager(
             val systemMessage = BitchatMessage(
                 sender = "system",
                 content = "user '$targetName' not found",
-                timestamp = Date(),
+                timestamp = Clock.System.now(),
                 isRelay = false
             )
             messageManager.addMessage(systemMessage)
