@@ -7,11 +7,13 @@ import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.model.DeliveryStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import java.util.Date
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Handles all BluetoothMeshDelegate callbacks and routes them to appropriate managers
  */
+@OptIn(ExperimentalTime::class)
 class MeshDelegateHandler(
     private val state: ChatState,
     private val messageManager: MessageManager,
@@ -207,13 +209,13 @@ class MeshDelegateHandler(
     
     override fun didReceiveDeliveryAck(messageID: String, recipientPeerID: String) {
         coroutineScope.launch {
-            messageManager.updateMessageDeliveryStatus(messageID, DeliveryStatus.Delivered(recipientPeerID, Date()))
+            messageManager.updateMessageDeliveryStatus(messageID, DeliveryStatus.Delivered(recipientPeerID, Clock.System.now()))
         }
     }
     
     override fun didReceiveReadReceipt(messageID: String, recipientPeerID: String) {
         coroutineScope.launch {
-            messageManager.updateMessageDeliveryStatus(messageID, DeliveryStatus.Read(recipientPeerID, Date()))
+            messageManager.updateMessageDeliveryStatus(messageID, DeliveryStatus.Read(recipientPeerID, Clock.System.now()))
         }
     }
 

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.bitchat.android.ui
 
 import androidx.compose.animation.core.animateFloatAsState
@@ -32,9 +34,11 @@ import com.bitchat.android.core.ui.component.sheet.BitchatSheetTitle
 import com.bitchat.android.geohash.GeohashChannelLevel
 import com.bitchat.android.geohash.LocationChannelManager
 import com.bitchat.android.nostr.LocationNotesManager
-import java.text.SimpleDateFormat
-import java.util.*
-import java.util.Calendar
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 /**
  * Location Notes Sheet - EXACT iOS UI match for bitchat
@@ -539,32 +543,24 @@ private fun LocationNotesInputSection(
  * Shows relative time for < 7 days, absolute date otherwise
  */
 private fun timestampText(createdAt: Int): String {
-    val date = Date(createdAt * 1000L)
-    val now = Date()
-    
+    val nowInstant = Clock.System.now()
+    val tz = TimeZone.currentSystemDefault()
+
+    val noteLocal = Instant.fromEpochSeconds(createdAt.toLong())
+        .toLocalDateTime(tz)
+    val nowLocal = Instant.fromEpochMilliseconds(nowInstant.toEpochMilliseconds())
+        .toLocalDateTime(tz)
+
     // Calculate days difference
-    val calendar = Calendar.getInstance()
-    calendar.time = date
-    val dateDay = calendar.get(Calendar.DAY_OF_YEAR)
-    val dateYear = calendar.get(Calendar.YEAR)
-    
-    calendar.time = now
-    val nowDay = calendar.get(Calendar.DAY_OF_YEAR)
-    val nowYear = calendar.get(Calendar.YEAR)
-    
-    val daysDiff = if (dateYear == nowYear) {
-        nowDay - dateDay
-    } else {
-        // Simplified: just check if less than 7 days by timestamp
-        val diff = (now.time - date.time) / (1000 * 60 * 60 * 24)
-        diff.toInt()
-    }
-    
+    val noteEpochMs = createdAt * 1000L
+    val nowEpochMs = nowInstant.toEpochMilliseconds()
+    val diffMillis = nowEpochMs - noteEpochMs
+    val daysDiff = (diffMillis / (1000 * 60 * 60 * 24)).toInt()
+
     return if (daysDiff < 7) {
         // Relative formatting (abbreviated)
-        val diffMillis = now.time - date.time
         val diffSeconds = diffMillis / 1000
-        
+
         when {
             diffSeconds < 60 -> "" // Don't show "just now" in iOS
             diffSeconds < 3600 -> {
@@ -582,12 +578,14 @@ private fun timestampText(createdAt: Int): String {
         }
     } else {
         // Absolute date formatting
-        val sameYear = dateYear == nowYear
-        val formatter = if (sameYear) {
-            SimpleDateFormat("MMM d", Locale.getDefault())
+        val sameYear = noteLocal.year == nowLocal.year
+        val monthName = noteLocal.month.name.lowercase()
+            .replaceFirstChar { it.uppercase() }
+            .take(3) // "Jan", "Feb", etc.
+        if (sameYear) {
+            "$monthName ${noteLocal.day}"
         } else {
-            SimpleDateFormat("MMM d, y", Locale.getDefault())
+            "$monthName ${noteLocal.day}, ${noteLocal.year}"
         }
-        formatter.format(date)
     }
 }

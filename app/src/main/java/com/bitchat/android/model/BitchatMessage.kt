@@ -1,4 +1,5 @@
 @file:UseSerializers(DateSerializer::class)
+@file:OptIn(ExperimentalTime::class)
 
 package com.bitchat.android.model
 
@@ -7,7 +8,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.*
+import java.util.UUID
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 @Serializable
 enum class BitchatMessageType {
@@ -29,10 +32,10 @@ sealed class DeliveryStatus {
     object Sent : DeliveryStatus()
 
     @Serializable
-    data class Delivered(val to: String, val at: Date) : DeliveryStatus()
+    data class Delivered(val to: String, val at: Instant) : DeliveryStatus()
 
     @Serializable
-    data class Read(val by: String, val at: Date) : DeliveryStatus()
+    data class Read(val by: String, val at: Instant) : DeliveryStatus()
 
     @Serializable
     data class Failed(val reason: String) : DeliveryStatus()
@@ -61,7 +64,7 @@ data class BitchatMessage(
     val sender: String,
     val content: String,
     val type: BitchatMessageType = BitchatMessageType.Message,
-    val timestamp: Date,
+    val timestamp: Instant,
     val isRelay: Boolean = false,
     val originalSender: String? = null,
     val isPrivate: Boolean = false,
@@ -103,7 +106,7 @@ data class BitchatMessage(
             buffer.put(flags.toByte())
 
             // Timestamp (in milliseconds, 8 bytes big-endian)
-            val timestampMillis = timestamp.time
+            val timestampMillis = timestamp.toEpochMilliseconds()
             buffer.putLong(timestampMillis)
 
             // ID
@@ -197,7 +200,7 @@ data class BitchatMessage(
 
                 // Timestamp
                 val timestampMillis = buffer.getLong()
-                val timestamp = Date(timestampMillis)
+                val timestamp = Instant.fromEpochMilliseconds(timestampMillis)
 
                 // ID
                 val idLength = buffer.get().toInt() and 0xFF

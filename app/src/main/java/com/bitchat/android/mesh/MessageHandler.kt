@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.bitchat.android.mesh
 
 import android.util.Log
@@ -9,8 +11,10 @@ import com.bitchat.android.protocol.BitchatPacket
 import com.bitchat.android.protocol.MessageType
 import com.bitchat.android.util.toHexString
 import kotlinx.coroutines.*
-import java.util.*
 import kotlin.random.Random
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 /**
  * Handles processing of different message types
@@ -94,7 +98,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
                             id = privateMessage.messageID,
                             sender = delegate?.getPeerNickname(peerID) ?: "Unknown",
                             content = privateMessage.content,
-                            timestamp = java.util.Date(packet.timestamp.toLong()),
+                            timestamp = Instant.fromEpochMilliseconds(packet.timestamp.toLong()),
                             isRelay = false,
                             originalSender = null,
                             isPrivate = true,
@@ -123,7 +127,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
                             sender = delegate?.getPeerNickname(peerID) ?: "Unknown",
                             content = savedPath,
                             type = com.bitchat.android.features.file.FileUtils.messageTypeForMime(file.mimeType),
-                            timestamp = java.util.Date(packet.timestamp.toLong()),
+                            timestamp = Instant.fromEpochMilliseconds(packet.timestamp.toLong()),
                             isRelay = false,
                             isPrivate = true,
                             recipientNickname = delegate?.getMyNickname(),
@@ -405,7 +409,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
                     content = savedPath,
                     type = com.bitchat.android.features.file.FileUtils.messageTypeForMime(file.mimeType),
                     senderPeerID = peerID,
-                    timestamp = Date(packet.timestamp.toLong())
+                    timestamp = Instant.fromEpochMilliseconds(packet.timestamp.toLong())
                 )
                 Log.d(TAG, "📄 Saved incoming file to $savedPath")
                 delegate?.onMessageReceived(message)
@@ -419,7 +423,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
                 sender = delegate?.getPeerNickname(peerID) ?: "unknown",
                 content = String(packet.payload, Charsets.UTF_8),
                 senderPeerID = peerID,
-                timestamp = Date(packet.timestamp.toLong())
+                timestamp = Instant.fromEpochMilliseconds(packet.timestamp.toLong())
             )
             delegate?.onMessageReceived(message)
         } catch (e: Exception) {
@@ -452,7 +456,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
                     content = savedPath,
                     type = com.bitchat.android.features.file.FileUtils.messageTypeForMime(file.mimeType),
                     senderPeerID = peerID,
-                    timestamp = Date(packet.timestamp.toLong()),
+                    timestamp = Instant.fromEpochMilliseconds(packet.timestamp.toLong()),
                     isPrivate = true,
                     recipientNickname = delegate?.getMyNickname()
                 )
@@ -468,7 +472,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
                 sender = delegate?.getPeerNickname(peerID) ?: "unknown",
                 content = String(packet.payload, Charsets.UTF_8),
                 senderPeerID = peerID,
-                timestamp = Date(packet.timestamp.toLong())
+                timestamp = Instant.fromEpochMilliseconds(packet.timestamp.toLong())
             )
             delegate?.onMessageReceived(message)
 
@@ -575,7 +579,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
                 val sys = com.bitchat.android.model.BitchatMessage(
                     sender = "system",
                     content = "${peerInfo.nickname} $action you$guidance",
-                    timestamp = java.util.Date(),
+                    timestamp = Clock.System.now(),
                     isRelay = false
                 )
                 delegate?.onMessageReceived(sys)

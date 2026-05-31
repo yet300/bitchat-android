@@ -1,4 +1,8 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.bitchat.android.ui
+
+import kotlin.time.Instant
 
 import android.app.Application
 import android.util.Log
@@ -22,7 +26,7 @@ import kotlinx.coroutines.launch
 import com.bitchat.android.util.NotificationIntervalManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.util.Date
+import kotlin.time.Clock
 import kotlin.random.Random
 import com.bitchat.android.services.VerificationService
 import com.bitchat.android.identity.SecureIdentityStateManager
@@ -31,6 +35,7 @@ import com.bitchat.android.nostr.GeohashAliasRegistry
 import com.bitchat.android.util.dataFromHexString
 import com.bitchat.android.util.hexEncodedString
 import java.security.MessageDigest
+import kotlin.time.ExperimentalTime
 
 /**
  * Refactored ChatViewModel - Main coordinator for bitchat functionality
@@ -432,7 +437,7 @@ class ChatViewModel(
                 if (!list.isNullOrEmpty()) {
                     // Prefer the latest incoming message (sender != me), fallback to last message
                     val latestIncoming = list.lastOrNull { it.sender != me }
-                    val candidateTime = (latestIncoming ?: list.last()).timestamp.time
+                    val candidateTime = (latestIncoming ?: list.last()).timestamp.toEpochMilliseconds()
                     if (candidateTime > bestTime) {
                         bestTime = candidateTime
                         bestKey = key
@@ -542,7 +547,7 @@ class ChatViewModel(
                 val message = BitchatMessage(
                     sender = state.getNicknameValue() ?: meshService.myPeerID,
                     content = content,
-                    timestamp = Date(),
+                    timestamp = Clock.System.now(),
                     isRelay = false,
                     senderPeerID = meshService.myPeerID,
                     mentions = if (mentions.isNotEmpty()) mentions else null,

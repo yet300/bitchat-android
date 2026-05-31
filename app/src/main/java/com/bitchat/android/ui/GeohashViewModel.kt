@@ -1,5 +1,8 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.bitchat.android.ui
 
+import kotlin.time.Instant
 import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
@@ -22,13 +25,15 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import java.util.Date
+import kotlin.time.Clock
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.Dispatchers
 import java.security.SecureRandom
 import kotlin.random.asKotlinRandom
+import kotlin.time.ExperimentalTime
 
+@OptIn(ExperimentalTime::class)
 class GeohashViewModel(
     application: Application,
     private val state: ChatState,
@@ -195,7 +200,7 @@ class GeohashViewModel(
                     id = tempId,
                     sender = nickname ?: myPeerID,
                     content = content,
-                    timestamp = Date(),
+                    timestamp = Clock.System.now(),
                     isRelay = false,
                     senderPeerID = "geohash:${channel.geohash}",
                     channel = "#${channel.geohash}",
@@ -313,7 +318,7 @@ class GeohashViewModel(
             val sysMsg = com.bitchat.android.model.BitchatMessage(
                 sender = "system",
                 content = "blocked $targetNickname in geohash channels",
-                timestamp = Date(),
+                timestamp = Clock.System.now(),
                 isRelay = false
             )
             messageManager.addMessage(sysMsg)
@@ -321,7 +326,7 @@ class GeohashViewModel(
             val sysMsg = com.bitchat.android.model.BitchatMessage(
                 sender = "system",
                 content = "user '$targetNickname' not found in current geohash",
-                timestamp = Date(),
+                timestamp = Clock.System.now(),
                 isRelay = false
             )
             messageManager.addMessage(sysMsg)

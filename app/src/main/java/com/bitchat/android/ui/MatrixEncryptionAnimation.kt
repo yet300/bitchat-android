@@ -1,7 +1,14 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.bitchat.android.ui
 
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -12,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlin.random.Random
+import kotlin.time.ExperimentalTime
 
 /**
  * Animation state for individual characters
@@ -79,7 +87,7 @@ fun MessageWithMatrixAnimation(
     currentUserNickname: String,
     meshService: com.bitchat.android.mesh.BluetoothMeshService,
     colorScheme: androidx.compose.material3.ColorScheme,
-    timeFormatter: java.text.SimpleDateFormat,
+    timeFormatter: TimeFormatter,
     onNicknameClick: ((String) -> Unit)?,
     onMessageLongPress: ((com.bitchat.android.model.BitchatMessage) -> Unit)?,
     onImageClick: ((String, List<String>, Int) -> Unit)?,
@@ -126,7 +134,7 @@ private fun AnimatedMessageDisplay(
     currentUserNickname: String,
     meshService: com.bitchat.android.mesh.BluetoothMeshService,
     colorScheme: androidx.compose.material3.ColorScheme,
-    timeFormatter: java.text.SimpleDateFormat,
+    timeFormatter: TimeFormatter,
     modifier: Modifier = Modifier
 ) {
     // Get the animated content text
@@ -245,7 +253,7 @@ private fun formatMessageAsAnnotatedStringWithoutTimestamp(
     colorScheme: androidx.compose.material3.ColorScheme
 ): AnnotatedString {
     // Get the full formatted text first
-    val timeFormatter = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
+    val timeFormatter = HHmmssTimeFormatter
     val fullText = formatMessageAsAnnotatedString(
         message = message,
         currentUserNickname = currentUserNickname,

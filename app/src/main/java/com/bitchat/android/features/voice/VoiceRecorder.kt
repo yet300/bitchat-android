@@ -4,20 +4,20 @@ package com.bitchat.android.features.voice
 import android.content.Context
 import android.media.MediaRecorder
 import android.util.Log
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.withContext
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Simple MediaRecorder wrapper that records to M4A (AAC) for wide compatibility.
  * The resulting file has MIME audio/mp4.
  */
+@OptIn(ExperimentalTime::class)
 class VoiceRecorder(private val context: Context) {
     companion object { private const val TAG = "VoiceRecorder" }
 
@@ -31,7 +31,9 @@ class VoiceRecorder(private val context: Context) {
         stop() // ensure previous session closed
         return try {
             val dir = File(context.filesDir, "voicenotes/outgoing").apply { mkdirs() }
-            val name = "voice_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + ".m4a"
+            val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+            val timeString = "${now.year}${now.monthNumber.toString().padStart(2, '0')}${now.dayOfMonth.toString().padStart(2, '0')}_${now.hour.toString().padStart(2, '0')}${now.minute.toString().padStart(2, '0')}${now.second.toString().padStart(2, '0')}"
+            val name = "voice_$timeString.m4a"
             val file = File(dir, name)
             val rec = MediaRecorder()
             rec.setAudioSource(MediaRecorder.AudioSource.MIC)

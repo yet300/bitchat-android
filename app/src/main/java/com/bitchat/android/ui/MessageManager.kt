@@ -1,9 +1,11 @@
+@file:OptIn(ExperimentalTime::class)
 package com.bitchat.android.ui
 
 import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.model.DeliveryStatus
-import java.util.*
 import java.util.Collections
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Handles all message-related operations including deduplication and organization
@@ -31,7 +33,7 @@ class MessageManager(private val state: ChatState) {
         val sys = BitchatMessage(
             sender = "system",
             content = text,
-            timestamp = Date(),
+            timestamp = Clock.System.now(),
             isRelay = false
         )
         addMessage(sys)
@@ -162,7 +164,7 @@ class MessageManager(private val state: ChatState) {
     fun generateMessageKey(message: BitchatMessage): String {
         val senderKey = message.senderPeerID ?: message.sender
         val contentHash = message.content.hashCode()
-        return "$senderKey-${message.timestamp.time}-$contentHash"
+        return "$senderKey-${message.timestamp.toEpochMilliseconds()}-$contentHash"
     }
     
     /**

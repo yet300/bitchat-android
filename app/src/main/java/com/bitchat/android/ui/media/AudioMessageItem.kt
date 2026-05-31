@@ -24,7 +24,7 @@ import com.bitchat.android.R
 import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.model.BitchatMessage
 import androidx.compose.material3.ColorScheme
-import java.text.SimpleDateFormat
+import com.bitchat.android.ui.TimeFormatter
 
 @Composable
 fun AudioMessageItem(
@@ -32,7 +32,7 @@ fun AudioMessageItem(
     currentUserNickname: String,
     meshService: BluetoothMeshService,
     colorScheme: ColorScheme,
-    timeFormatter: SimpleDateFormat,
+    timeFormatter: TimeFormatter,
     onNicknameClick: ((String) -> Unit)?,
     onMessageLongPress: ((BitchatMessage) -> Unit)?,
     onCancelTransfer: ((BitchatMessage) -> Unit)?,

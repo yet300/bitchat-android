@@ -3,11 +3,14 @@ package com.bitchat.android.nostr
 import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.*
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 /**
  * Test manager for Nostr functionality
  * Use this to verify the Nostr client works correctly
  */
+@OptIn(ExperimentalTime::class)
 class NostrTestManager(private val context: Context) {
     
     companion object {
@@ -247,7 +250,7 @@ class NostrTestManager(private val context: Context) {
             if (identity != null) {
                 appendLine("Identity: ${identity.getShortNpub()}")
                 appendLine("Public Key: ${identity.publicKeyHex.take(16)}...")
-                appendLine("Created: ${java.util.Date(identity.createdAt)}")
+                appendLine("Created: ${Instant.fromEpochMilliseconds(identity.createdAt)}")
             } else {
                 appendLine("No identity loaded")
             }

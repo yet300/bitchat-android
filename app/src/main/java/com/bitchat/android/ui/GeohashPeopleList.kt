@@ -17,7 +17,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bitchat.android.ui.theme.BASE_FONT_SIZE
-import java.util.*
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -31,12 +32,14 @@ import com.bitchat.android.R
 /**
  * GeoPerson data class - matches iOS GeoPerson structure exactly
  */
+@OptIn(ExperimentalTime::class)
 data class GeoPerson(
     val id: String,           // pubkey hex (lowercased) - matches iOS
-    val displayName: String,  // nickname with #suffix - matches iOS  
-    val lastSeen: Date        // activity timestamp - matches iOS
+    val displayName: String,  // nickname with #suffix - matches iOS
+    val lastSeen: Instant     // activity timestamp - matches iOS
 )
 
+@OptIn(ExperimentalTime::class)
 @Composable
 fun GeohashPeopleList(
     viewModel: ChatViewModel,

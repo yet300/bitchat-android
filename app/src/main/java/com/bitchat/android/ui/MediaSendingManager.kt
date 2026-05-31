@@ -5,13 +5,15 @@ import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.model.BitchatFilePacket
 import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.model.BitchatMessageType
-import java.util.Date
+import kotlin.time.Clock
 import java.security.MessageDigest
+import kotlin.time.ExperimentalTime
 
 /**
  * Handles media file sending operations (voice notes, images, generic files)
  * Separated from ChatViewModel for better separation of concerns
  */
+@OptIn(ExperimentalTime::class)
 class MediaSendingManager(
     private val state: ChatState,
     private val messageManager: MessageManager,
@@ -191,7 +193,7 @@ class MediaSendingManager(
             sender = state.getNicknameValue() ?: "me",
             content = filePath,
             type = messageType,
-            timestamp = Date(),
+            timestamp = Clock.System.now(),
             isRelay = false,
             isPrivate = true,
             recipientNickname = try { meshService.getPeerNicknames()[toPeerID] } catch (_: Exception) { null },
@@ -242,7 +244,7 @@ class MediaSendingManager(
             sender = state.getNicknameValue() ?: meshService.myPeerID,
             content = filePath,
             type = messageType,
-            timestamp = Date(),
+            timestamp = Clock.System.now(),
             isRelay = false,
             senderPeerID = meshService.myPeerID,
             channel = channelOrNull
@@ -324,7 +326,7 @@ class MediaSendingManager(
             if (evt.completed) {
                 messageManager.updateMessageDeliveryStatus(
                     msgId,
-                    com.bitchat.android.model.DeliveryStatus.Delivered(to = "mesh", at = java.util.Date())
+                    com.bitchat.android.model.DeliveryStatus.Delivered(to = "mesh", at = Clock.System.now())
                 )
                 synchronized(transferMessageMap) {
                     val msgIdRemoved = transferMessageMap.remove(evt.transferId)

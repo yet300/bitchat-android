@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.bitchat.android.ui
 
 import androidx.compose.ui.graphics.Color
@@ -14,8 +16,8 @@ import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.mesh.BluetoothMeshService
 import androidx.compose.material3.ColorScheme
 import com.bitchat.android.ui.theme.BASE_FONT_SIZE
-import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.time.ExperimentalTime
 
 /**
  * Utility functions for ChatScreen UI components
@@ -44,7 +46,7 @@ fun formatMessageAsAnnotatedString(
     currentUserNickname: String,
     meshService: BluetoothMeshService,
     colorScheme: ColorScheme,
-    timeFormatter: SimpleDateFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+    timeFormatter: TimeFormatter = HHmmssTimeFormatter
 ): AnnotatedString {
     val builder = AnnotatedString.Builder()
     val isDark = colorScheme.background.red + colorScheme.background.green + colorScheme.background.blue < 1.5f
@@ -164,7 +166,7 @@ fun formatMessageHeaderAnnotatedString(
     currentUserNickname: String,
     meshService: BluetoothMeshService,
     colorScheme: ColorScheme,
-    timeFormatter: SimpleDateFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+    timeFormatter: TimeFormatter = HHmmssTimeFormatter
 ): AnnotatedString {
     val builder = AnnotatedString.Builder()
     val isDark = colorScheme.background.red + colorScheme.background.green + colorScheme.background.blue < 1.5f

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.bitchat.android.ui.debug
 
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -5,10 +7,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import java.util.Date
+import kotlin.time.Instant
+import kotlin.time.Clock
 import java.util.concurrent.ConcurrentLinkedQueue
 import com.bitchat.android.protocol.BitchatPacket
 import com.bitchat.android.util.toHexString
+import kotlin.time.ExperimentalTime
 
 /**
  * Debug settings manager for controlling debug features and collecting debug data
@@ -584,7 +588,7 @@ class DebugSettingsManager private constructor() {
 /**
  * Different types of debug messages for categorization and formatting
  */
-sealed class DebugMessage(val content: String, val timestamp: Date = Date()) {
+sealed class DebugMessage(val content: String, val timestamp: Instant = Clock.System.now()) {
     class SystemMessage(content: String) : DebugMessage("⚙️ $content")
     class PeerEvent(content: String) : DebugMessage(content)
     class PacketEvent(content: String) : DebugMessage(content)
@@ -599,7 +603,7 @@ data class DebugScanResult(
     val deviceAddress: String,
     val rssi: Int,
     val peerID: String?,
-    val timestamp: Date = Date()
+    val timestamp: Instant = Clock.System.now()
 )
 
 /**
@@ -628,7 +632,7 @@ data class PacketRelayStats(
     val last10SecondRelays: Int = 0,
     val lastMinuteRelays: Int = 0,
     val last15MinuteRelays: Int = 0,
-    val lastResetTime: Date = Date(),
+    val lastResetTime: Instant = Clock.System.now(),
     val lastSecondIncoming: Int = 0,
     val lastSecondOutgoing: Int = 0,
     val last10SecondIncoming: Int = 0,

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.bitchat.android.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -32,12 +34,15 @@ import android.net.Uri
 import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.model.DeliveryStatus
 import com.bitchat.android.mesh.BluetoothMeshService
-import java.text.SimpleDateFormat
 import java.util.*
 import com.bitchat.android.ui.media.VoiceNotePlayer
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import kotlin.time.Instant
+import kotlin.time.ExperimentalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
@@ -145,7 +150,7 @@ fun MessageItem(
     onImageClick: ((String, List<String>, Int) -> Unit)? = null
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val timeFormatter = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
+    val timeFormatter = remember { HHmmssTimeFormatter }
     
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -203,7 +208,7 @@ fun MessageItem(
         currentUserNickname: String,
         meshService: BluetoothMeshService,
         colorScheme: ColorScheme,
-        timeFormatter: SimpleDateFormat,
+        timeFormatter: TimeFormatter,
         onNicknameClick: ((String) -> Unit)?,
         onMessageLongPress: ((BitchatMessage) -> Unit)?,
         onCancelTransfer: ((BitchatMessage) -> Unit)?,

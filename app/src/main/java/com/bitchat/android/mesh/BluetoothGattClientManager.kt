@@ -1,4 +1,8 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.bitchat.android.mesh
+
+import kotlin.time.ExperimentalTime
 
 import android.bluetooth.*
 import android.bluetooth.le.BluetoothLeScanner
