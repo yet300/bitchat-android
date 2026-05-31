@@ -1,13 +1,16 @@
+@file:UseSerializers(DateSerializer::class)
+
 package com.bitchat.android.model
 
-import android.os.Parcelable
-import kotlinx.parcelize.Parcelize
+import com.bitchat.android.serialization.DateSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.*
 
-@Parcelize
-enum class BitchatMessageType : Parcelable {
+@Serializable
+enum class BitchatMessageType {
     Message,
     Audio,
     Image,
@@ -17,23 +20,24 @@ enum class BitchatMessageType : Parcelable {
 /**
  * Delivery status for messages - exact same as iOS version
  */
-sealed class DeliveryStatus : Parcelable {
-    @Parcelize
+@Serializable
+sealed class DeliveryStatus {
+    @Serializable
     object Sending : DeliveryStatus()
 
-    @Parcelize
+    @Serializable
     object Sent : DeliveryStatus()
 
-    @Parcelize
+    @Serializable
     data class Delivered(val to: String, val at: Date) : DeliveryStatus()
 
-    @Parcelize
+    @Serializable
     data class Read(val by: String, val at: Date) : DeliveryStatus()
 
-    @Parcelize
+    @Serializable
     data class Failed(val reason: String) : DeliveryStatus()
 
-    @Parcelize
+    @Serializable
     data class PartiallyDelivered(val reached: Int, val total: Int) : DeliveryStatus()
 
     fun getDisplayText(): String {
@@ -51,7 +55,7 @@ sealed class DeliveryStatus : Parcelable {
 /**
  * BitchatMessage - 100% compatible with iOS version
  */
-@Parcelize
+@Serializable
 data class BitchatMessage(
     val id: String = UUID.randomUUID().toString().uppercase(),
     val sender: String,
@@ -69,7 +73,7 @@ data class BitchatMessage(
     val isEncrypted: Boolean = false,
     val deliveryStatus: DeliveryStatus? = null,
     val powDifficulty: Int? = null
-) : Parcelable {
+) {
 
     /**
      * Convert message to binary payload format - exactly same as iOS version
