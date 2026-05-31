@@ -1,7 +1,6 @@
 package com.bitchat.android.model
 
 import android.os.Parcelable
-import com.google.gson.GsonBuilder
 import kotlinx.parcelize.Parcelize
 import java.nio.ByteBuffer
 import java.nio.ByteOrder

@@ -1,24 +1,40 @@
 package com.bitchat.android.nostr
 
-import com.google.gson.Gson
-import com.google.gson.GsonBuilder
-import com.google.gson.annotations.SerializedName
+import com.bitchat.android.serialization.JsonConfig
+import kotlinx.serialization.InternalSerializationApi
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildSerialDescriptor
+import kotlinx.serialization.descriptors.StructureKind
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonEncoder
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import java.security.MessageDigest
 
 /**
  * Nostr Event structure following NIP-01
  * Compatible with iOS implementation
  */
+@Serializable
 data class NostrEvent(
     var id: String = "",
     val pubkey: String,
-    @SerializedName("created_at") val createdAt: Int,
+    @SerialName("created_at") val createdAt: Int,
     val kind: Int,
+    @Serializable(with = TagListSerializer::class)
     val tags: List<List<String>>,
     val content: String,
     var sig: String? = null
 ) {
-    
+
     companion object {
         /**
          * Create from JSON dictionary
@@ -38,19 +54,18 @@ data class NostrEvent(
                 null
             }
         }
-        
+
         /**
          * Create from JSON string
          */
         fun fromJsonString(jsonString: String): NostrEvent? {
             return try {
-                val gson = Gson()
-                gson.fromJson(jsonString, NostrEvent::class.java)
+                JsonConfig.json.decodeFromString(serializer(), jsonString)
             } catch (e: Exception) {
                 null
             }
         }
-        
+
         /**
          * Create a new text note event
          */
@@ -70,7 +85,7 @@ data class NostrEvent(
             )
             return event.sign(privateKeyHex)
         }
-        
+
         /**
          * Create a new metadata event (kind 0)
          */
@@ -90,23 +105,23 @@ data class NostrEvent(
             return event.sign(privateKeyHex)
         }
     }
-    
+
     /**
      * Sign event with secp256k1 private key
      * Returns signed event with id and signature set
      */
     fun sign(privateKeyHex: String): NostrEvent {
         val (eventId, eventIdHash) = calculateEventId()
-        
+
         // Create signature using secp256k1
         val signature = signHash(eventIdHash, privateKeyHex)
-        
+
         return this.copy(
             id = eventId,
             sig = signature
         )
     }
-    
+
     /**
      * Compute event ID (NIP-01) without signing
      */
@@ -114,37 +129,45 @@ data class NostrEvent(
         val (eventId, _) = calculateEventId()
         return eventId
     }
-    
+
     /**
      * Calculate event ID according to NIP-01
      * Returns (hex_id, hash_bytes)
+     *
+     * NIP-01 requires hashing the compact JSON array
+     * [0, pubkey, created_at, kind, tags, content] with no extra whitespace and
+     * without escaping forward slashes. Building the array explicitly with
+     * [buildJsonArray] reproduces the exact byte layout the previous Gson
+     * (disableHtmlEscaping) implementation produced, preserving event IDs.
      */
     private fun calculateEventId(): Pair<String, ByteArray> {
-        // Create serialized array for hashing according to NIP-01
-        val serialized = listOf(
-            0,
-            pubkey,
-            createdAt,
-            kind,
-            tags,
-            content
-        )
-        
-        // Convert to JSON without escaping slashes (compact format)
-        val gson = GsonBuilder().disableHtmlEscaping().create()
-        val jsonString = gson.toJson(serialized)
-        
+        val jsonArray = buildJsonArray {
+            add(JsonPrimitive(0))
+            add(JsonPrimitive(pubkey))
+            add(JsonPrimitive(createdAt))
+            add(JsonPrimitive(kind))
+            add(
+                JsonArray(
+                    tags.map { tag ->
+                        JsonArray(tag.map { JsonPrimitive(it) })
+                    }
+                )
+            )
+            add(JsonPrimitive(content))
+        }
+        val jsonString = JsonConfig.json.encodeToString(JsonArray.serializer(), jsonArray)
+
         // SHA256 hash of the JSON string
         val digest = MessageDigest.getInstance("SHA-256")
         val jsonBytes = jsonString.toByteArray(Charsets.UTF_8)
         val hash = digest.digest(jsonBytes)
-        
+
         // Convert to hex
         val hexId = hash.joinToString("") { "%02x".format(it) }
-        
+
         return Pair(hexId, hash)
     }
-    
+
     /**
      * Sign hash using BIP-340 Schnorr signatures
      */
@@ -156,15 +179,14 @@ data class NostrEvent(
             throw RuntimeException("Failed to sign event: ${e.message}", e)
         }
     }
-    
+
     /**
      * Convert to JSON string
      */
     fun toJsonString(): String {
-        val gson = Gson()
-        return gson.toJson(this)
+        return JsonConfig.json.encodeToString(serializer(), this)
     }
-    
+
     /**
      * Validate event signature using BIP-340 Schnorr verification
      */
@@ -172,20 +194,20 @@ data class NostrEvent(
         return try {
             val signatureHex = sig ?: return false
             if (id.isEmpty() || pubkey.isEmpty()) return false
-            
+
             // Recalculate the event ID hash for verification
             val (calculatedId, messageHash) = calculateEventId()
-            
+
             // Check if the calculated ID matches the stored ID
             if (calculatedId != id) return false
-            
+
             // Verify the Schnorr signature
             NostrCrypto.schnorrVerify(messageHash, signatureHex, pubkey)
         } catch (e: Exception) {
             false
         }
     }
-    
+
     /**
      * Validate event structure and signature
      */
@@ -195,7 +217,7 @@ data class NostrEvent(
             if (pubkey.isEmpty() || content.isEmpty()) return false
             if (createdAt <= 0 || kind < 0) return false
             if (!NostrCrypto.isValidPublicKey(pubkey)) return false
-            
+
             // Signature validation
             isValidSignature()
         } catch (e: Exception) {
@@ -229,3 +251,40 @@ fun String.hexToByteArray(): ByteArray {
 }
 
 fun ByteArray.toHexString(): String = joinToString("") { "%02x".format(it) }
+
+/**
+ * Serializes Nostr tags as a JSON array of string arrays — `[["p","abc"],["g","u4"]]`.
+ * kotlinx.serialization cannot derive this nested shape automatically while
+ * keeping the exact NIP-01 layout, so it is handled explicitly.
+ */
+private object TagListSerializer : KSerializer<List<List<String>>> {
+    @OptIn(InternalSerializationApi::class)
+    override val descriptor: SerialDescriptor =
+        buildSerialDescriptor("TagList", StructureKind.LIST)
+
+    override fun serialize(encoder: Encoder, value: List<List<String>>) {
+        val jsonEncoder = encoder as? JsonEncoder
+            ?: throw SerializationException("TagListSerializer only supports JSON")
+        val jsonArray = JsonArray(
+            value.map { tag ->
+                JsonArray(tag.map { JsonPrimitive(it) })
+            }
+        )
+        jsonEncoder.encodeJsonElement(jsonArray)
+    }
+
+    override fun deserialize(decoder: Decoder): List<List<String>> {
+        val jsonDecoder = decoder as? JsonDecoder
+            ?: throw SerializationException("TagListSerializer only supports JSON")
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonArray = element as? JsonArray
+            ?: throw SerializationException("Expected JsonArray for tags")
+
+        return jsonArray.mapNotNull { tagElement ->
+            val tagArray = tagElement as? JsonArray ?: return@mapNotNull null
+            tagArray.map { item ->
+                item.jsonPrimitive.content
+            }
+        }
+    }
+}

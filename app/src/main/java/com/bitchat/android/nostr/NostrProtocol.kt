@@ -1,8 +1,7 @@
 package com.bitchat.android.nostr
 
 import android.util.Log
-import com.google.gson.Gson
-import com.google.gson.JsonParser
+import com.bitchat.android.serialization.JsonConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -11,9 +10,8 @@ import kotlinx.coroutines.withContext
  * Compatible with iOS implementation
  */
 object NostrProtocol {
-    
+
     private const val TAG = "NostrProtocol"
-    private val gson = Gson()
     
     /**
      * Create NIP-17 private message gift-wrap (receiver copy only per iOS)
@@ -211,8 +209,8 @@ object NostrProtocol {
         senderPrivateKey: String,
         senderPublicKey: String
     ): NostrEvent {
-        val rumorJSON = gson.toJson(rumor)
-        
+        val rumorJSON = JsonConfig.json.encodeToString(NostrEvent.serializer(), rumor)
+
         val encrypted = NostrCrypto.encryptNIP44(
             plaintext = rumorJSON,
             recipientPublicKeyHex = recipientPubkey,
@@ -235,8 +233,8 @@ object NostrProtocol {
         seal: NostrEvent,
         recipientPubkey: String
     ): NostrEvent {
-        val sealJSON = gson.toJson(seal)
-        
+        val sealJSON = JsonConfig.json.encodeToString(NostrEvent.serializer(), seal)
+
         // Create new ephemeral key for gift wrap
         val (wrapPrivateKey, wrapPublicKey) = NostrCrypto.generateKeyPair()
         Log.v(TAG, "Creating gift wrap with ephemeral key")
@@ -273,23 +271,8 @@ object NostrProtocol {
                 recipientPrivateKeyHex = recipientPrivateKey
             )
             
-            val jsonElement = JsonParser.parseString(decrypted)
-            if (!jsonElement.isJsonObject) {
-                Log.w(TAG, "Decrypted gift wrap is not a JSON object")
-                return null
-            }
-            
-            val jsonObject = jsonElement.asJsonObject
-            val seal = NostrEvent(
-                id = jsonObject.get("id")?.asString ?: "",
-                pubkey = jsonObject.get("pubkey")?.asString ?: "",
-                createdAt = jsonObject.get("created_at")?.asInt ?: 0,
-                kind = jsonObject.get("kind")?.asInt ?: 0,
-                tags = parseTagsFromJson(jsonObject.get("tags")?.asJsonArray) ?: emptyList(),
-                content = jsonObject.get("content")?.asString ?: "",
-                sig = jsonObject.get("sig")?.asString
-            )
-            
+            val seal = JsonConfig.json.decodeFromString(NostrEvent.serializer(), decrypted)
+
             Log.v(TAG, "Unwrapped seal with kind: ${seal.kind}")
             seal
         } catch (e: Exception) {
@@ -309,42 +292,9 @@ object NostrProtocol {
                 recipientPrivateKeyHex = recipientPrivateKey
             )
             
-            val jsonElement = JsonParser.parseString(decrypted)
-            if (!jsonElement.isJsonObject) {
-                Log.w(TAG, "Decrypted seal is not a JSON object")
-                return null
-            }
-            
-            val jsonObject = jsonElement.asJsonObject
-            NostrEvent(
-                id = jsonObject.get("id")?.asString ?: "",
-                pubkey = jsonObject.get("pubkey")?.asString ?: "",
-                createdAt = jsonObject.get("created_at")?.asInt ?: 0,
-                kind = jsonObject.get("kind")?.asInt ?: 0,
-                tags = parseTagsFromJson(jsonObject.get("tags")?.asJsonArray) ?: emptyList(),
-                content = jsonObject.get("content")?.asString ?: "",
-                sig = jsonObject.get("sig")?.asString
-            )
+            JsonConfig.json.decodeFromString(NostrEvent.serializer(), decrypted)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to open seal: ${e.message}")
-            null
-        }
-    }
-    
-    private fun parseTagsFromJson(tagsArray: com.google.gson.JsonArray?): List<List<String>>? {
-        if (tagsArray == null) return emptyList()
-        
-        return try {
-            tagsArray.map { tagElement ->
-                if (tagElement.isJsonArray) {
-                    val tagArray = tagElement.asJsonArray
-                    tagArray.map { it.asString }
-                } else {
-                    emptyList()
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to parse tags: ${e.message}")
             null
         }
     }

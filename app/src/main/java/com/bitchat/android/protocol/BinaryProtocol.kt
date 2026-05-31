@@ -365,7 +365,7 @@ object BinaryProtocol {
                 buffer.getShort().toUShort().toUInt()  // 2 bytes for v1, convert to UInt
             }
 
-            if (payloadLength > com.bitchat.android.util.AppConstants.Protocol.MAX_PAYLOAD_LENGTH.toUInt()) {
+            if (payloadLength.toLong() > com.bitchat.android.util.AppConstants.Protocol.MAX_PAYLOAD_LENGTH.toLong()) {
                 Log.w("BinaryProtocol", "Payload length ${payloadLength} exceeds maximum allowed (${com.bitchat.android.util.AppConstants.Protocol.MAX_PAYLOAD_LENGTH})")
                 return null
             }
