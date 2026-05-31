@@ -14,8 +14,9 @@ import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import kotlinx.coroutines.*
 import java.util.*
-import com.google.gson.Gson
-import com.google.gson.JsonSyntaxException
+import com.bitchat.android.serialization.JsonConfig
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -52,7 +53,6 @@ class LocationChannelManager private constructor(private val context: Context) {
     private val geocoderProvider: GeocoderProvider = GeocoderFactory.get(context)
     private var lastLocation: Location? = null
     private var geocodingJob: Job? = null
-    private val gson = Gson()
     private var dataManager: com.bitchat.android.ui.DataManager? = null
 
     private fun checkSystemLocationEnabled(): Boolean {
@@ -472,8 +472,12 @@ class LocationChannelManager private constructor(private val context: Context) {
     private fun saveChannelSelection(channel: ChannelID) {
         try {
             val channelData = when (channel) {
-                is ChannelID.Mesh -> gson.toJson(PersistedChannel(mesh = true))
-                is ChannelID.Location -> gson.toJson(
+                is ChannelID.Mesh -> JsonConfig.json.encodeToString(
+                    PersistedChannel.serializer(),
+                    PersistedChannel(mesh = true)
+                )
+                is ChannelID.Location -> JsonConfig.json.encodeToString(
+                    PersistedChannel.serializer(),
                     PersistedChannel(
                         mesh = false,
                         level = channel.channel.level.name,
@@ -495,8 +499,8 @@ class LocationChannelManager private constructor(private val context: Context) {
         try {
             val channelData = dataManager?.loadLastGeohashChannel()
             if (!channelData.isNullOrBlank()) {
-                val persisted = gson.fromJson(channelData, PersistedChannel::class.java)
-                val channel = persisted?.toChannel()
+                val persisted = JsonConfig.json.decodeFromString(PersistedChannel.serializer(), channelData)
+                val channel = persisted.toChannel()
                 if (channel != null) {
                     _selectedChannel.value = channel
                     Log.d(TAG, "Restored persisted channel: ${channel.displayName}")
@@ -508,7 +512,7 @@ class LocationChannelManager private constructor(private val context: Context) {
                 Log.d(TAG, "No persisted channel found, defaulting to Mesh")
                 _selectedChannel.value = ChannelID.Mesh
             }
-        } catch (e: JsonSyntaxException) {
+        } catch (e: SerializationException) {
             Log.e(TAG, "Failed to parse persisted channel data: ${e.message}")
             _selectedChannel.value = ChannelID.Mesh
         } catch (e: Exception) {
@@ -517,6 +521,7 @@ class LocationChannelManager private constructor(private val context: Context) {
         }
     }
 
+    @Serializable
     data class PersistedChannel(
         val mesh: Boolean,
         val level: String? = null,

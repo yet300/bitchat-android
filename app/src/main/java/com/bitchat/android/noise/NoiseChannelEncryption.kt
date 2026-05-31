@@ -1,6 +1,12 @@
 package com.bitchat.android.noise
 
 import android.util.Log
+import com.bitchat.android.serialization.JsonConfig
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import javax.crypto.Cipher
@@ -203,14 +209,14 @@ class NoiseChannelEncryption {
     fun createChannelKeyPacket(password: String, channel: String): ByteArray? {
         return try {
             // Create key packet with channel and password
-            val packet = mapOf(
-                "channel" to channel,
-                "password" to password,
-                "timestamp" to System.currentTimeMillis()
-            )
-            
+            val packet = buildJsonObject {
+                put("channel", JsonPrimitive(channel))
+                put("password", JsonPrimitive(password))
+                put("timestamp", JsonPrimitive(System.currentTimeMillis()))
+            }
+
             // Simple JSON encoding for now (could be replaced with more efficient format)
-            val json = com.google.gson.Gson().toJson(packet)
+            val json = JsonConfig.json.encodeToString(JsonObject.serializer(), packet)
             json.toByteArray(Charsets.UTF_8)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to create channel key packet: ${e.message}")
@@ -225,10 +231,10 @@ class NoiseChannelEncryption {
     fun processChannelKeyPacket(data: ByteArray): Pair<String, String>? {
         return try {
             val json = String(data, Charsets.UTF_8)
-            val packet = com.google.gson.Gson().fromJson(json, Map::class.java) as Map<String, Any>
-            
-            val channel = packet["channel"] as? String
-            val password = packet["password"] as? String
+            val packet = JsonConfig.json.parseToJsonElement(json) as JsonObject
+
+            val channel = packet["channel"]?.jsonPrimitive?.contentOrNull
+            val password = packet["password"]?.jsonPrimitive?.contentOrNull
             
             if (channel != null && password != null) {
                 Pair(channel, password)

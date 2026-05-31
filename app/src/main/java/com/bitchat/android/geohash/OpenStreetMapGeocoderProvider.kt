@@ -3,7 +3,8 @@ package com.bitchat.android.geohash
 import android.location.Address
 import android.util.Log
 import com.bitchat.android.net.OkHttpProvider
-import com.google.gson.Gson
+import com.bitchat.android.serialization.JsonConfig
+import kotlinx.serialization.Serializable
 import okhttp3.Request
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
@@ -11,7 +12,6 @@ import kotlinx.coroutines.withContext
 
 class OpenStreetMapGeocoderProvider : GeocoderProvider {
     private val TAG = "OSMGeocoderProvider"
-    private val gson = Gson()
     private val userAgent = "Bitchat-Android/1.0"
 
     override suspend fun getFromLocation(latitude: Double, longitude: Double, maxResults: Int): List<Address> {
@@ -39,8 +39,8 @@ class OpenStreetMapGeocoderProvider : GeocoderProvider {
                 if (body.isNullOrEmpty()) return@withContext emptyList<Address>()
 
                 try {
-                    val osmResponse = gson.fromJson(body, OsmResponse::class.java)
-                    if (osmResponse?.address == null) return@withContext emptyList<Address>()
+                    val osmResponse = JsonConfig.json.decodeFromString(OsmResponse.serializer(), body)
+                    if (osmResponse.address == null) return@withContext emptyList<Address>()
                     
                     val address = mapToAddress(osmResponse, latitude, longitude)
                     listOf(address)
@@ -82,25 +82,27 @@ class OpenStreetMapGeocoderProvider : GeocoderProvider {
     }
 
     // Data classes for JSON parsing
+    @Serializable
     private data class OsmResponse(
-        val name: String?,
-        val display_name: String?,
-        val address: OsmAddress?
+        val name: String? = null,
+        val display_name: String? = null,
+        val address: OsmAddress? = null
     )
 
+    @Serializable
     private data class OsmAddress(
-        val country: String?,
-        val state: String?,
-        val county: String?,
-        val city: String?,
-        val town: String?,
-        val village: String?,
-        val hamlet: String?,
-        val suburb: String?,
-        val neighbourhood: String?,
-        val residential: String?,
-        val quarter: String?,
-        val postcode: String?,
-        val road: String?
+        val country: String? = null,
+        val state: String? = null,
+        val county: String? = null,
+        val city: String? = null,
+        val town: String? = null,
+        val village: String? = null,
+        val hamlet: String? = null,
+        val suburb: String? = null,
+        val neighbourhood: String? = null,
+        val residential: String? = null,
+        val quarter: String? = null,
+        val postcode: String? = null,
+        val road: String? = null
     )
 }

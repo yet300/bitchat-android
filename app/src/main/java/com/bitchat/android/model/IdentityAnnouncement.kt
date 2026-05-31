@@ -1,19 +1,17 @@
 package com.bitchat.android.model
 
-import android.os.Parcelable
-import kotlinx.parcelize.Parcelize
-import com.bitchat.android.util.*
+import kotlinx.serialization.Serializable
 
 /**
  * Identity announcement structure with TLV encoding
  * Compatible with iOS AnnouncementPacket TLV format
  */
-@Parcelize
+@Serializable
 data class IdentityAnnouncement(
     val nickname: String,
     val noisePublicKey: ByteArray,    // Noise static public key (Curve25519.KeyAgreement)
     val signingPublicKey: ByteArray   // Ed25519 public key for signing
-) : Parcelable {
+) {
 
     /**
      * TLV types matching iOS implementation
@@ -25,7 +23,7 @@ data class IdentityAnnouncement(
         
         companion object {
             fun fromValue(value: UByte): TLVType? {
-                return values().find { it.value == value }
+                return entries.find { it.value == value }
             }
         }
     }
