@@ -1,40 +1,38 @@
 package com.bitchat.android.nostr
 
 import android.content.Context
-import android.content.SharedPreferences
+import com.bitchat.android.core.data.appSettings
+import com.russhwolf.settings.Settings
 import java.util.concurrent.ConcurrentHashMap
 
 /**
  * GeohashAliasRegistry
  * - Global, thread-safe registry for alias->Nostr pubkey mappings (e.g., nostr_<pub16> -> pubkeyHex)
- * - Persisted to SharedPreferences to survive app restarts.
+ * - Persisted via multiplatform-settings to survive app restarts.
  */
 object GeohashAliasRegistry {
     private val map: MutableMap<String, String> = ConcurrentHashMap()
     private const val PREFS_NAME = "geohash_alias_registry"
-    private var prefs: SharedPreferences? = null
+    private var settings: Settings? = null
 
     fun initialize(context: Context) {
-        if (prefs == null) {
-            prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            loadFromPrefs()
+        if (settings == null) {
+            settings = appSettings(context, PREFS_NAME)
+            loadFromSettings()
         }
     }
 
-    private fun loadFromPrefs() {
-        prefs?.let { p ->
-            val allEntries = p.all
-            for ((key, value) in allEntries) {
-                if (key is String && value is String) {
-                    map[key] = value
-                }
+    private fun loadFromSettings() {
+        settings?.let { s ->
+            for (key in s.keys) {
+                s.getStringOrNull(key)?.let { map[key] = it }
             }
         }
     }
 
     fun put(alias: String, pubkeyHex: String) {
         map[alias] = pubkeyHex
-        prefs?.edit()?.putString(alias, pubkeyHex)?.apply()
+        settings?.putString(alias, pubkeyHex)
     }
 
     fun get(alias: String): String? = map[alias]
@@ -45,6 +43,6 @@ object GeohashAliasRegistry {
 
     fun clear() {
         map.clear()
-        prefs?.edit()?.clear()?.apply()
+        settings?.clear()
     }
 }

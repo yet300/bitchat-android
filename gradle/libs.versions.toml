@@ -25,6 +25,9 @@ accompanist-permissions = "0.37.3"
 bouncycastle = "1.70"
 tink-android = "1.10.0"
 
+multiplatformSettings = "1.3.0"
+
+
 # JSON
 kotlinx-serialization = "1.11.0"
 
@@ -42,9 +45,6 @@ tor-android-binary = "0.4.4.6"
 
 # Google Play Services
 gms-location = "21.3.0"
-
-# Security
-security-crypto = "1.1.0-beta01"
 
 # QR
 zxing-core = "3.5.4"
@@ -113,9 +113,6 @@ tor-android-binary = { module = "org.torproject:tor-android-binary", version.ref
 # Google Play Services
 gms-location = { module = "com.google.android.gms:play-services-location", version.ref = "gms-location" }
 
-# Security
-androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "security-crypto" }
-
 # QR
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing-core" }
 
@@ -124,6 +121,15 @@ androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.r
 androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
 androidx-camera-compose = { module = "androidx.camera:camera-compose", version.ref = "camerax" }
 mlkit-barcode-scanning = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkit-barcode" }
+
+
+#settings
+multiplatform-settings = { module = "com.russhwolf:multiplatform-settings", version.ref = "multiplatformSettings" }
+multiplatform-settings-test = { module = "com.russhwolf:multiplatform-settings-test", version.ref = "multiplatformSettings" }
+multiplatform-settings-no-arg = { module = "com.russhwolf:multiplatform-settings-no-arg", version.ref = "multiplatformSettings" }
+multiplatform-settings-coroutines = { module = "com.russhwolf:multiplatform-settings-coroutines", version.ref = "multiplatformSettings" }
+multiplatform-settings-observable = { module = "com.russhwolf:multiplatform-settings-make-observable", version.ref = "multiplatformSettings" }
+
 
 # Testing
 junit = { module = "junit:junit", version.ref = "junit" }
@@ -160,6 +166,13 @@ lifecycle = [
 cryptography = [
     "bouncycastle-bcprov",
     "google-tink-android"
+]
+
+multiplatform-settings = [
+    "multiplatform-settings",
+    "multiplatform-settings-no-arg",
+    "multiplatform-settings-coroutines",
+    "multiplatform-settings-observable"
 ]
 
 testing = [

@@ -117,7 +117,9 @@ dependencies {
     
     // Cryptography
     implementation(libs.bundles.cryptography)
-    
+
+    implementation(libs.bundles.multiplatform.settings)
+
     // JSON
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.datetime)
@@ -140,9 +142,6 @@ dependencies {
     // Google Play Services Location
     implementation(libs.gms.location)
 
-    // Security preferences
-    implementation(libs.androidx.security.crypto)
-    
     // EXIF orientation handling for images
     implementation("androidx.exifinterface:exifinterface:1.3.7")
     
