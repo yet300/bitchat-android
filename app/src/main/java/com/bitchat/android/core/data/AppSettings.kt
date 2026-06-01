@@ -5,16 +5,32 @@ import com.russhwolf.settings.ObservableSettings
 import com.russhwolf.settings.SharedPreferencesSettings
 
 /**
- * Builds an [ObservableSettings] backed by a named `SharedPreferences` file.
+ * Single app-wide [ObservableSettings] for all non-secret preferences
+ * (BlockBlast style: one store, namespaced keys, never enumerate keys).
  *
- * Thin platform factory replacing scattered `context.getSharedPreferences(...)`
- * calls with the multiplatform-settings abstraction. Consumers depend only on
- * the `Settings` API, so the non-secure preference code is ready to move to
- * `commonMain` (with a platform-provided factory) on the KMP step — at the DI
- * step this becomes a Metro provider.
+ * Backed by one `SharedPreferences` file shared across the whole app. The
+ * instance is built once via a [lazy] delegate; assigning the (application)
+ * context on each call is idempotent. At the Metro DI step this collapses into
+ * a `@Provides @SingleIn(AppScope) fun provideSettings(): Settings = Settings()`
+ * singleton — call sites already depend only on the `Settings` API.
  *
- * For secrets at rest use [com.bitchat.android.core.data.secure.SecureKeyValueStore]
- * instead — this store is not encrypted.
+ * Secrets at rest (identity / signing keys, fingerprints) go through
+ * [com.bitchat.android.core.data.secure.SecureKeyValueStore] (Tink), not here —
+ * this store is not encrypted.
  */
-fun appSettings(context: Context, name: String): ObservableSettings =
-    SharedPreferencesSettings(context.getSharedPreferences(name, Context.MODE_PRIVATE))
+fun appSettings(context: Context): ObservableSettings = AppSettings.get(context)
+
+private object AppSettings {
+    private const val STORE_FILE = "bitchat"
+
+    private lateinit var appContext: Context
+
+    private val instance: ObservableSettings by lazy {
+        SharedPreferencesSettings(appContext.getSharedPreferences(STORE_FILE, Context.MODE_PRIVATE))
+    }
+
+    fun get(context: Context): ObservableSettings {
+        appContext = context.applicationContext
+        return instance
+    }
+}

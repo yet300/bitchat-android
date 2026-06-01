@@ -45,7 +45,7 @@ class GeohashBookmarksStore private constructor(private val context: Context) {
         }
     }
 
-    private val settings = appSettings(context, "geohash_prefs")
+    private val settings = appSettings(context)
 
     private val membership = mutableSetOf<String>()
 

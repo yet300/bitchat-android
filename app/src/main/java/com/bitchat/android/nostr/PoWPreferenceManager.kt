@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 object PoWPreferenceManager {
     
-    private const val PREFS_NAME = "pow_preferences"
     private const val KEY_POW_ENABLED = "pow_enabled"
     private const val KEY_POW_DIFFICULTY = "pow_difficulty"
     
@@ -41,7 +40,7 @@ object PoWPreferenceManager {
     fun init(context: Context) {
         if (isInitialized) return
         
-        settings = appSettings(context, PREFS_NAME)
+        settings = appSettings(context)
 
         // Load current values
         _powEnabled.value = settings.getBoolean(KEY_POW_ENABLED, DEFAULT_POW_ENABLED)

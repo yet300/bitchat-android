@@ -7,14 +7,13 @@ import com.bitchat.android.core.data.appSettings
  * Preference manager for background location skip choice.
  */
 object BackgroundLocationPreferenceManager {
-    private const val PREFS_NAME = "bitchat_settings"
     private const val KEY_BACKGROUND_LOCATION_SKIP = "background_location_skipped"
 
     fun setSkipped(context: Context, skipped: Boolean) {
-        appSettings(context, PREFS_NAME).putBoolean(KEY_BACKGROUND_LOCATION_SKIP, skipped)
+        appSettings(context).putBoolean(KEY_BACKGROUND_LOCATION_SKIP, skipped)
     }
 
     fun isSkipped(context: Context): Boolean {
-        return appSettings(context, PREFS_NAME).getBoolean(KEY_BACKGROUND_LOCATION_SKIP, false)
+        return appSettings(context).getBoolean(KEY_BACKGROUND_LOCATION_SKIP, false)
     }
 }

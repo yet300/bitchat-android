@@ -23,7 +23,7 @@ class DataManager(private val context: Context) {
         private const val TAG = "DataManager"
     }
 
-    private val settings: Settings = appSettings(context, "bitchat_prefs")
+    private val settings: Settings = appSettings(context)
 
     // Channel-related maps that need to persist state
     private val _channelCreators = mutableMapOf<String, String>()
