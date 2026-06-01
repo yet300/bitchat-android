@@ -23,19 +23,18 @@ enum class ThemePreference {
  * Avoids adding DataStore dependency for now.
  */
 object ThemePreferenceManager {
-    private const val PREFS_NAME = "bitchat_settings"
     private const val KEY_THEME = "theme_preference"
 
     private val _themeFlow = MutableStateFlow(ThemePreference.System)
     val themeFlow: StateFlow<ThemePreference> = _themeFlow
 
     fun init(context: Context) {
-        val saved = appSettings(context, PREFS_NAME).getString(KEY_THEME, ThemePreference.System.name)
+        val saved = appSettings(context).getString(KEY_THEME, ThemePreference.System.name)
         _themeFlow.value = runCatching { ThemePreference.valueOf(saved) }.getOrDefault(ThemePreference.System)
     }
 
     fun set(context: Context, preference: ThemePreference) {
-        appSettings(context, PREFS_NAME).putString(KEY_THEME, preference.name)
+        appSettings(context).putString(KEY_THEME, preference.name)
         _themeFlow.value = preference
     }
 }

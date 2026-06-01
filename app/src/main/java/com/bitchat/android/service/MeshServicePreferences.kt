@@ -5,14 +5,13 @@ import com.bitchat.android.core.data.appSettings
 import com.russhwolf.settings.Settings
 
 object MeshServicePreferences {
-    private const val PREFS_NAME = "bitchat_mesh_service_prefs"
     private const val KEY_AUTO_START = "auto_start_on_boot"
     private const val KEY_BACKGROUND_ENABLED = "background_enabled"
 
     private lateinit var settings: Settings
 
     fun init(context: Context) {
-        settings = appSettings(context, PREFS_NAME)
+        settings = appSettings(context)
     }
 
     fun isAutoStartEnabled(default: Boolean = true): Boolean {

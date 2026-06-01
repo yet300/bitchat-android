@@ -30,7 +30,6 @@ object RelayDirectory {
     private const val ASSET_FILE_URL = "https://raw.githubusercontent.com/permissionlesstech/georelays/refs/heads/main/nostr_relays.csv"
     private const val ASSET_FILE = "nostr_relays.csv"
     private const val DOWNLOADED_FILE = "nostr_relays_latest.csv"
-    private const val PREFS_NAME = "relay_directory_prefs"
     private const val KEY_LAST_UPDATE_MS = "last_update_ms"
     private val ONE_DAY_MS = TimeUnit.DAYS.toMillis(1)
 
@@ -124,7 +123,7 @@ object RelayDirectory {
     // ===== Implementation details =====
 
     private fun getPrefs(application: Application): Settings =
-        appSettings(application, PREFS_NAME)
+        appSettings(application)
 
     private fun getDownloadedFile(application: Application): File =
         File(application.filesDir, DOWNLOADED_FILE)

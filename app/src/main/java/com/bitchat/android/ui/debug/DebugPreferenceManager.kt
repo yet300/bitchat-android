@@ -9,7 +9,6 @@ import com.russhwolf.settings.Settings
  * Keeps the DebugSettingsManager stateless with regard to Android Context.
  */
 object DebugPreferenceManager {
-    private const val PREFS_NAME = "bitchat_debug_settings"
     private const val KEY_VERBOSE = "verbose_logging"
     private const val KEY_GATT_SERVER = "gatt_server_enabled"
     private const val KEY_GATT_CLIENT = "gatt_client_enabled"
@@ -26,7 +25,7 @@ object DebugPreferenceManager {
     private lateinit var settings: Settings
 
     fun init(context: Context) {
-        settings = appSettings(context, PREFS_NAME)
+        settings = appSettings(context)
     }
 
     private fun ready(): Boolean = ::settings.isInitialized
