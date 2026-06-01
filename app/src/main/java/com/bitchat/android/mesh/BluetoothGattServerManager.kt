@@ -13,7 +13,6 @@ import com.bitchat.android.util.AppConstants
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.util.*
 
 /**
  * Manages GATT server operations, advertising, and server-side connections

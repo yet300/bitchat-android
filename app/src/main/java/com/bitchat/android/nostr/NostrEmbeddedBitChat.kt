@@ -6,7 +6,6 @@ import com.bitchat.android.model.PrivateMessagePacket
 import com.bitchat.android.model.NoisePayloadType
 import com.bitchat.android.protocol.BitchatPacket
 import com.bitchat.android.protocol.MessageType
-import java.util.*
 
 /**
  * BitChat-over-Nostr Adapter

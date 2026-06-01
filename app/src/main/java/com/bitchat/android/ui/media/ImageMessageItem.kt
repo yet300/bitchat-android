@@ -32,7 +32,6 @@ import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.model.BitchatMessageType
 import androidx.compose.material3.ColorScheme
 import com.bitchat.android.ui.TimeFormatter
-import java.util.*
 
 @Composable
 fun ImageMessageItem(

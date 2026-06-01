@@ -7,7 +7,6 @@ import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 import com.bitchat.android.model.BitchatMessage
-import java.util.*
 
 /**
  * Handles channel management including creation, joining, leaving, and encryption
