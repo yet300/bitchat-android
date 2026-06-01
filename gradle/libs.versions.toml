@@ -46,9 +46,6 @@ tor-android-binary = "0.4.4.6"
 # Google Play Services
 gms-location = "21.3.0"
 
-# Security
-security-crypto = "1.1.0-beta01"
-
 # QR
 zxing-core = "3.5.4"
 
@@ -115,9 +112,6 @@ tor-android-binary = { module = "org.torproject:tor-android-binary", version.ref
 
 # Google Play Services
 gms-location = { module = "com.google.android.gms:play-services-location", version.ref = "gms-location" }
-
-# Security
-androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "security-crypto" }
 
 # QR
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing-core" }
