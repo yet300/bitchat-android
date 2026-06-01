@@ -1,32 +1,33 @@
 package com.bitchat.android.service
 
 import android.content.Context
-import android.content.SharedPreferences
+import com.bitchat.android.core.data.appSettings
+import com.russhwolf.settings.Settings
 
 object MeshServicePreferences {
     private const val PREFS_NAME = "bitchat_mesh_service_prefs"
     private const val KEY_AUTO_START = "auto_start_on_boot"
     private const val KEY_BACKGROUND_ENABLED = "background_enabled"
 
-    private lateinit var prefs: SharedPreferences
+    private lateinit var settings: Settings
 
     fun init(context: Context) {
-        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        settings = appSettings(context, PREFS_NAME)
     }
 
     fun isAutoStartEnabled(default: Boolean = true): Boolean {
-        return prefs.getBoolean(KEY_AUTO_START, default)
+        return settings.getBoolean(KEY_AUTO_START, default)
     }
 
     fun setAutoStartEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_AUTO_START, enabled).apply()
+        settings.putBoolean(KEY_AUTO_START, enabled)
     }
 
     fun isBackgroundEnabled(default: Boolean = true): Boolean {
-        return prefs.getBoolean(KEY_BACKGROUND_ENABLED, default)
+        return settings.getBoolean(KEY_BACKGROUND_ENABLED, default)
     }
 
     fun setBackgroundEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_BACKGROUND_ENABLED, enabled).apply()
+        settings.putBoolean(KEY_BACKGROUND_ENABLED, enabled)
     }
 }

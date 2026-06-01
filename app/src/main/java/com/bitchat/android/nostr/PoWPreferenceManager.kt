@@ -1,7 +1,8 @@
 package com.bitchat.android.nostr
 
 import android.content.Context
-import android.content.SharedPreferences
+import com.bitchat.android.core.data.appSettings
+import com.russhwolf.settings.Settings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,7 +31,7 @@ object PoWPreferenceManager {
     private val _isMining = MutableStateFlow(false)
     val isMining: StateFlow<Boolean> = _isMining.asStateFlow()
     
-    private lateinit var sharedPrefs: SharedPreferences
+    private lateinit var settings: Settings
     private var isInitialized = false
     
     /**
@@ -40,11 +41,11 @@ object PoWPreferenceManager {
     fun init(context: Context) {
         if (isInitialized) return
         
-        sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        
+        settings = appSettings(context, PREFS_NAME)
+
         // Load current values
-        _powEnabled.value = sharedPrefs.getBoolean(KEY_POW_ENABLED, DEFAULT_POW_ENABLED)
-        _powDifficulty.value = sharedPrefs.getInt(KEY_POW_DIFFICULTY, DEFAULT_POW_DIFFICULTY)
+        _powEnabled.value = settings.getBoolean(KEY_POW_ENABLED, DEFAULT_POW_ENABLED)
+        _powDifficulty.value = settings.getInt(KEY_POW_DIFFICULTY, DEFAULT_POW_DIFFICULTY)
         
         isInitialized = true
     }
@@ -61,8 +62,8 @@ object PoWPreferenceManager {
      */
     fun setPowEnabled(enabled: Boolean) {
         _powEnabled.value = enabled
-        if (::sharedPrefs.isInitialized) {
-            sharedPrefs.edit().putBoolean(KEY_POW_ENABLED, enabled).apply()
+        if (::settings.isInitialized) {
+            settings.putBoolean(KEY_POW_ENABLED, enabled)
         }
     }
     
@@ -79,8 +80,8 @@ object PoWPreferenceManager {
     fun setPowDifficulty(difficulty: Int) {
         val clampedDifficulty = difficulty.coerceIn(0, 32)
         _powDifficulty.value = clampedDifficulty
-        if (::sharedPrefs.isInitialized) {
-            sharedPrefs.edit().putInt(KEY_POW_DIFFICULTY, clampedDifficulty).apply()
+        if (::settings.isInitialized) {
+            settings.putInt(KEY_POW_DIFFICULTY, clampedDifficulty)
         }
     }
     

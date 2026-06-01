@@ -5,6 +5,7 @@ import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
 import android.util.Log
+import com.bitchat.android.core.data.appSettings
 import com.bitchat.android.serialization.JsonConfig
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
@@ -44,7 +45,7 @@ class GeohashBookmarksStore private constructor(private val context: Context) {
         }
     }
 
-    private val prefs = context.getSharedPreferences("geohash_prefs", Context.MODE_PRIVATE)
+    private val settings = appSettings(context, "geohash_prefs")
 
     private val membership = mutableSetOf<String>()
 
@@ -96,7 +97,7 @@ class GeohashBookmarksStore private constructor(private val context: Context) {
 
     private fun load() {
         try {
-            val arrJson = prefs.getString(STORE_KEY, null)
+            val arrJson = settings.getStringOrNull(STORE_KEY)
             if (!arrJson.isNullOrEmpty()) {
                 val arr = JsonConfig.json.decodeFromString(ListSerializer(String.serializer()), arrJson)
                 val seen = mutableSetOf<String>()
@@ -115,7 +116,7 @@ class GeohashBookmarksStore private constructor(private val context: Context) {
             Log.e(TAG, "Failed to load bookmarks: ${e.message}")
         }
         try {
-            val namesJson = prefs.getString(NAMES_STORE_KEY, null)
+            val namesJson = settings.getStringOrNull(NAMES_STORE_KEY)
             if (!namesJson.isNullOrEmpty()) {
                 val dict = JsonConfig.json.decodeFromString(
                     MapSerializer(String.serializer(), String.serializer()),
@@ -131,7 +132,7 @@ class GeohashBookmarksStore private constructor(private val context: Context) {
     private fun persist() {
         try {
             val json = JsonConfig.json.encodeToString(ListSerializer(String.serializer()), _bookmarks.value)
-            prefs.edit().putString(STORE_KEY, json).apply()
+            settings.putString(STORE_KEY, json)
         } catch (_: Exception) {}
     }
 
@@ -141,7 +142,7 @@ class GeohashBookmarksStore private constructor(private val context: Context) {
                 MapSerializer(String.serializer(), String.serializer()),
                 _bookmarkNames.value
             )
-            prefs.edit().putString(NAMES_STORE_KEY, json).apply()
+            settings.putString(NAMES_STORE_KEY, json)
         } catch (_: Exception) {}
     }
 
@@ -152,10 +153,8 @@ class GeohashBookmarksStore private constructor(private val context: Context) {
             membership.clear()
             _bookmarks.value = emptyList()
             _bookmarkNames.value = emptyMap()
-            prefs.edit()
-                .remove(STORE_KEY)
-                .remove(NAMES_STORE_KEY)
-                .apply()
+            settings.remove(STORE_KEY)
+            settings.remove(NAMES_STORE_KEY)
             // Clear any in-flight resolutions to avoid repopulating
             resolving.clear()
             Log.i(TAG, "Cleared all geohash bookmarks and names")
@@ -239,7 +238,7 @@ class GeohashBookmarksStore private constructor(private val context: Context) {
     private fun persist(list: List<String>) {
         try {
             val json = JsonConfig.json.encodeToString(ListSerializer(String.serializer()), list)
-            prefs.edit().putString(STORE_KEY, json).apply()
+            settings.putString(STORE_KEY, json)
         } catch (_: Exception) {}
     }
 
@@ -249,7 +248,7 @@ class GeohashBookmarksStore private constructor(private val context: Context) {
                 MapSerializer(String.serializer(), String.serializer()),
                 map
             )
-            prefs.edit().putString(NAMES_STORE_KEY, json).apply()
+            settings.putString(NAMES_STORE_KEY, json)
         } catch (_: Exception) {}
     }
 }

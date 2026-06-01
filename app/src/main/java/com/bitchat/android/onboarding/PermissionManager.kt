@@ -8,6 +8,7 @@ import android.os.PowerManager
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.bitchat.android.R
+import com.bitchat.android.core.data.appSettings
 
 /**
  * Centralized permission management for bitchat app
@@ -21,7 +22,7 @@ class PermissionManager(private val context: Context) {
         private const val KEY_FIRST_TIME_COMPLETE = "first_time_onboarding_complete"
     }
 
-    private val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val sharedPrefs = appSettings(context, PREFS_NAME)
 
     /**
      * Check if this is the first time the user is launching the app
@@ -34,9 +35,7 @@ class PermissionManager(private val context: Context) {
      * Mark the first-time onboarding as complete
      */
     fun markOnboardingComplete() {
-        sharedPrefs.edit()
-            .putBoolean(KEY_FIRST_TIME_COMPLETE, true)
-            .apply()
+        sharedPrefs.putBoolean(KEY_FIRST_TIME_COMPLETE, true)
         Log.d(TAG, "First-time onboarding marked as complete")
     }
 

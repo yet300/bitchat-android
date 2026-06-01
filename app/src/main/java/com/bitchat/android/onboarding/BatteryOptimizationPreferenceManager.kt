@@ -1,6 +1,7 @@
 package com.bitchat.android.onboarding
 
 import android.content.Context
+import com.bitchat.android.core.data.appSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -15,19 +16,15 @@ object BatteryOptimizationPreferenceManager {
     val skipFlow: StateFlow<Boolean> = _skipFlow
 
     fun init(context: Context) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val skipped = prefs.getBoolean(KEY_BATTERY_SKIP, false)
-        _skipFlow.value = skipped
+        _skipFlow.value = isSkipped(context)
     }
 
     fun setSkipped(context: Context, skipped: Boolean) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putBoolean(KEY_BATTERY_SKIP, skipped).apply()
+        appSettings(context, PREFS_NAME).putBoolean(KEY_BATTERY_SKIP, skipped)
         _skipFlow.value = skipped
     }
 
     fun isSkipped(context: Context): Boolean {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getBoolean(KEY_BATTERY_SKIP, false)
+        return appSettings(context, PREFS_NAME).getBoolean(KEY_BATTERY_SKIP, false)
     }
 }

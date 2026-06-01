@@ -1,8 +1,9 @@
 package com.bitchat.android.nostr
 
 import android.app.Application
-import android.content.SharedPreferences
 import android.util.Log
+import com.bitchat.android.core.data.appSettings
+import com.russhwolf.settings.Settings
 import java.io.BufferedReader
 import java.io.File
 import java.io.FileInputStream
@@ -122,8 +123,8 @@ object RelayDirectory {
 
     // ===== Implementation details =====
 
-    private fun getPrefs(application: Application): SharedPreferences =
-        application.getSharedPreferences(PREFS_NAME, Application.MODE_PRIVATE)
+    private fun getPrefs(application: Application): Settings =
+        appSettings(application, PREFS_NAME)
 
     private fun getDownloadedFile(application: Application): File =
         File(application.filesDir, DOWNLOADED_FILE)
@@ -182,7 +183,7 @@ object RelayDirectory {
                 relays.addAll(parsed)
             }
 
-            getPrefs(application).edit().putLong(KEY_LAST_UPDATE_MS, System.currentTimeMillis()).apply()
+            getPrefs(application).putLong(KEY_LAST_UPDATE_MS, System.currentTimeMillis())
 
             Log.i(TAG, "✅ Using downloaded relay list (${dest.absolutePath}), entries=$entries, sha256=$hash, updatedAtMs=${getPrefs(application).getLong(KEY_LAST_UPDATE_MS, 0L)}")
         } catch (e: Exception) {

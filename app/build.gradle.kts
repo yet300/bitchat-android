@@ -117,7 +117,9 @@ dependencies {
     
     // Cryptography
     implementation(libs.bundles.cryptography)
-    
+
+    implementation(libs.bundles.multiplatform.settings)
+
     // JSON
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.datetime)

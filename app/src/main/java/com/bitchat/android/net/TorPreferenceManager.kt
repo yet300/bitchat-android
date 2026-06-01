@@ -1,6 +1,7 @@
 package com.bitchat.android.net
 
 import android.content.Context
+import com.bitchat.android.core.data.appSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -12,22 +13,18 @@ object TorPreferenceManager {
     val modeFlow: StateFlow<TorMode> = _modeFlow
 
     fun init(context: Context) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val saved = prefs.getString(KEY_TOR_MODE, TorMode.ON.name)
-        val mode = runCatching { TorMode.valueOf(saved ?: TorMode.ON.name) }.getOrDefault(TorMode.ON)
-        _modeFlow.value = mode
+        _modeFlow.value = read(context)
     }
 
     fun set(context: Context, mode: TorMode) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putString(KEY_TOR_MODE, mode.name).apply()
+        appSettings(context, PREFS_NAME).putString(KEY_TOR_MODE, mode.name)
         _modeFlow.value = mode
     }
 
-    fun get(context: Context): TorMode {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val saved = prefs.getString(KEY_TOR_MODE, TorMode.ON.name)
-        return runCatching { TorMode.valueOf(saved ?: TorMode.ON.name) }.getOrDefault(TorMode.ON)
+    fun get(context: Context): TorMode = read(context)
+
+    private fun read(context: Context): TorMode {
+        val saved = appSettings(context, PREFS_NAME).getString(KEY_TOR_MODE, TorMode.ON.name)
+        return runCatching { TorMode.valueOf(saved) }.getOrDefault(TorMode.ON)
     }
 }
-
