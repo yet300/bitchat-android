@@ -16,7 +16,6 @@ import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.mesh.BluetoothMeshService
 import androidx.compose.material3.ColorScheme
 import com.bitchat.android.ui.theme.BASE_FONT_SIZE
-import java.util.*
 import kotlin.time.ExperimentalTime
 
 /**

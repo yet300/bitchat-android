@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.bitchat.android.favorites
 
 import android.content.Context
@@ -7,7 +9,9 @@ import com.bitchat.android.serialization.JsonConfig
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
-import java.util.*
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 /**
  * Bridging Noise and Nostr favorites
@@ -20,8 +24,8 @@ data class FavoriteRelationship(
     val peerNickname: String,
     val isFavorite: Boolean,              // We favorited them
     val theyFavoritedUs: Boolean,         // They favorited us
-    val favoritedAt: Date,
-    val lastUpdated: Date
+    val favoritedAt: Instant,
+    val lastUpdated: Instant
 ) {
     val isMutual: Boolean get() = isFavorite && theyFavoritedUs
 
@@ -118,7 +122,7 @@ class FavoritesPersistenceService private constructor(private val context: Conte
         if (existing != null) {
             val updated = existing.copy(
                 peerNostrPublicKey = nostrPubkey,
-                lastUpdated = Date()
+                lastUpdated = Clock.System.now()
             )
             favorites[keyHex] = updated
         } else {
@@ -128,8 +132,8 @@ class FavoritesPersistenceService private constructor(private val context: Conte
                 peerNickname = "Unknown",
                 isFavorite = false,
                 theyFavoritedUs = false,
-                favoritedAt = Date(),
-                lastUpdated = Date()
+                favoritedAt = Clock.System.now(),
+                lastUpdated = Clock.System.now()
             )
             favorites[keyHex] = relationship
         }
@@ -187,8 +191,8 @@ class FavoritesPersistenceService private constructor(private val context: Conte
             existing.copy(
                 peerNickname = nickname,
                 isFavorite = isFavorite,
-                lastUpdated = Date(),
-                favoritedAt = if (isFavorite && !existing.isFavorite) Date() else existing.favoritedAt
+                lastUpdated = Clock.System.now(),
+                favoritedAt = if (isFavorite && !existing.isFavorite) Clock.System.now() else existing.favoritedAt
             )
         } else {
             FavoriteRelationship(
@@ -197,8 +201,8 @@ class FavoritesPersistenceService private constructor(private val context: Conte
                 peerNickname = nickname,
                 isFavorite = isFavorite,
                 theyFavoritedUs = false,
-                favoritedAt = Date(),
-                lastUpdated = Date()
+                favoritedAt = Clock.System.now(),
+                lastUpdated = Clock.System.now()
             )
         }
 
@@ -217,7 +221,7 @@ class FavoritesPersistenceService private constructor(private val context: Conte
         if (existing != null) {
             val updated = existing.copy(
                 theyFavoritedUs = theyFavoritedUs,
-                lastUpdated = Date()
+                lastUpdated = Clock.System.now()
             )
             favorites[keyHex] = updated
             saveFavorites()
@@ -365,8 +369,8 @@ private data class FavoriteRelationshipData(
                 peerNickname = relationship.peerNickname,
                 isFavorite = relationship.isFavorite,
                 theyFavoritedUs = relationship.theyFavoritedUs,
-                favoritedAt = relationship.favoritedAt.time,
-                lastUpdated = relationship.lastUpdated.time
+                favoritedAt = relationship.favoritedAt.toEpochMilliseconds(),
+                lastUpdated = relationship.lastUpdated.toEpochMilliseconds()
             )
         }
     }
@@ -379,8 +383,8 @@ private data class FavoriteRelationshipData(
             peerNickname = peerNickname,
             isFavorite = isFavorite,
             theyFavoritedUs = theyFavoritedUs,
-            favoritedAt = Date(favoritedAt),
-            lastUpdated = Date(lastUpdated)
+            favoritedAt = Instant.fromEpochMilliseconds(favoritedAt),
+            lastUpdated = Instant.fromEpochMilliseconds(lastUpdated)
         )
     }
 }

@@ -17,9 +17,6 @@ import com.bitchat.android.sync.GossipSyncManager
 import com.bitchat.android.util.toHexString
 import com.bitchat.android.services.VerificationService
 import kotlinx.coroutines.*
-import java.util.*
-import kotlin.math.sign
-import kotlin.random.Random
 
 /**
  * Bluetooth mesh service - REFACTORED to use component-based architecture

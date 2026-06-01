@@ -1,8 +1,9 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.bitchat.android.util
 
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import java.util.*
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 /**
  * Binary encoding utilities for efficient protocol messages
@@ -89,8 +90,8 @@ class BinaryDataBuilder {
         buffer.addAll(data.take(length).toList())
     }
     
-    fun appendDate(date: Date) {
-        val timestamp = (date.time).toULong() // milliseconds
+    fun appendDate(date: Instant) {
+        val timestamp = date.toEpochMilliseconds().toULong() // milliseconds
         appendUInt64(timestamp)
     }
     
@@ -189,9 +190,9 @@ class BinaryDataReader(private val data: ByteArray) {
         return data
     }
     
-    fun readDate(): Date? {
+    fun readDate(): Instant? {
         val timestamp = readUInt64() ?: return null
-        return Date(timestamp.toLong())
+        return Instant.fromEpochMilliseconds(timestamp.toLong())
     }
     
     fun readUUID(): String? {
@@ -327,9 +328,9 @@ fun ByteArray.readData(at: IntArray, maxLength: Int = 65535): ByteArray? {
     return data
 }
 
-fun ByteArray.readDate(at: IntArray): Date? {
+fun ByteArray.readDate(at: IntArray): Instant? {
     val timestamp = readUInt64(at) ?: return null
-    return Date(timestamp.toLong())
+    return Instant.fromEpochMilliseconds(timestamp.toLong())
 }
 
 fun ByteArray.readUUID(at: IntArray): String? {
