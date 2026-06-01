@@ -34,7 +34,7 @@ internal class TinkSecureKeyValueStore(
     private val prefs: SharedPreferences =
         context.applicationContext.getSharedPreferences(storeName, Context.MODE_PRIVATE)
 
-    private val aead: Aead = aead(context.applicationContext)
+    private val aead: Aead = TinkAead.get(context.applicationContext)
 
     override fun getString(key: String): String? {
         val encoded = prefs.getString(key, null) ?: return null
@@ -78,29 +78,39 @@ internal class TinkSecureKeyValueStore(
         val ciphertext = Base64.decode(encoded, Base64.NO_WRAP)
         String(aead.decrypt(ciphertext, aad), Charsets.UTF_8)
     }.getOrNull()
+}
 
-    private companion object {
-        private const val KEYSET_NAME = "bitchat_tink_keyset"
-        private const val KEYSET_PREFS = "bitchat_tink_keyset_prefs"
-        private const val MASTER_KEY_URI = "android-keystore://bitchat_tink_master_key"
+/**
+ * Process-wide AES-256-GCM AEAD. The keyset is global to the app (one master
+ * key), so it is built once and shared by every [TinkSecureKeyValueStore]
+ * instance. The one-time, thread-safe initialisation is handled by the [lazy]
+ * delegate (default SYNCHRONIZED mode) — no explicit locking needed.
+ */
+private object TinkAead {
+    private const val KEYSET_NAME = "bitchat_tink_keyset"
+    private const val KEYSET_PREFS = "bitchat_tink_keyset_prefs"
+    private const val MASTER_KEY_URI = "android-keystore://bitchat_tink_master_key"
 
-        @Volatile
-        private var cachedAead: Aead? = null
+    private lateinit var appContext: Context
 
-        fun aead(context: Context): Aead {
-            cachedAead?.let { return it }
-            return synchronized(this) {
-                cachedAead ?: run {
-                    AeadConfig.register()
-                    val handle = AndroidKeysetManager.Builder()
-                        .withSharedPref(context, KEYSET_NAME, KEYSET_PREFS)
-                        .withKeyTemplate(KeyTemplates.get("AES256_GCM"))
-                        .withMasterKeyUri(MASTER_KEY_URI)
-                        .build()
-                        .keysetHandle
-                    handle.getPrimitive(Aead::class.java).also { cachedAead = it }
-                }
-            }
-        }
+    private val instance: Aead by lazy {
+        AeadConfig.register()
+        val handle = AndroidKeysetManager.Builder()
+            .withSharedPref(appContext, KEYSET_NAME, KEYSET_PREFS)
+            .withKeyTemplate(KeyTemplates.get("AES256_GCM"))
+            .withMasterKeyUri(MASTER_KEY_URI)
+            .build()
+            .keysetHandle
+        handle.getPrimitive(Aead::class.java)
+    }
+
+    /**
+     * [context] must be an application context. Assigning it on every call is
+     * idempotent (always the same singleton context), and [instance] is read
+     * only after the assignment, so the [lazy] block always sees a valid value.
+     */
+    fun get(context: Context): Aead {
+        appContext = context
+        return instance
     }
 }
