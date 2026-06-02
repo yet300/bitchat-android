@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
@@ -65,11 +64,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
-    }
-    kotlinOptions {
-        jvmTarget = "1.8"
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
     buildFeatures {
         compose = true
@@ -99,9 +95,6 @@ dependencies {
     // Lifecycle
     implementation(libs.bundles.lifecycle)
     implementation(libs.androidx.lifecycle.process)
-    
-    // Navigation
-    implementation(libs.androidx.navigation.compose)
     
     // Permissions
     implementation(libs.accompanist.permissions)
@@ -143,7 +136,7 @@ dependencies {
     implementation(libs.gms.location)
 
     // EXIF orientation handling for images
-    implementation("androidx.exifinterface:exifinterface:1.3.7")
+    implementation(libs.androidx.exifinterface)
     
     // Testing
     testImplementation(libs.bundles.testing)
