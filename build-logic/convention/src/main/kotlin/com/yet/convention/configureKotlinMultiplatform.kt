@@ -18,6 +18,8 @@ internal fun Project.configureKotlinMultiplatform(
         compileSdk = libs.findVersion("compileSdk").get().requiredVersion.toInt()
         minSdk = libs.findVersion("minSdk").get().requiredVersion.toInt()
 
+        // Run commonTest on the JVM host (fast) instead of only the iOS simulator.
+        withHostTest {}
     }
 
     iosArm64()

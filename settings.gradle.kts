@@ -21,3 +21,4 @@ include(":app")
 
 include(":core")
 include(":core:common")
+include(":core:domain")
