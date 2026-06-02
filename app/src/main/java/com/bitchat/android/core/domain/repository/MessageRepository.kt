@@ -6,29 +6,29 @@ import com.bitchat.android.core.domain.model.DeliveryStatus
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Хранилище ленты сообщений (источник правды для UI). Намеренно отделено от [MessageTransport]
- * (исходящая отправка): разные клиенты и причины меняться (ISP/SRP).
+ * Storage for the message timeline (source of truth for the UI). Deliberately separated from
+ * [MessageTransport] (outgoing send): different clients and reasons to change (ISP/SRP).
  */
 interface MessageRepository {
 
-    /** Поток сообщений одного диалога. */
+    /** Stream of messages for a single conversation. */
     fun observeMessages(id: ConversationId): Flow<List<BitMessage>>
 
-    /** Текущий снимок сообщений диалога (например, для рассылки read-receipts). */
+    /** Current snapshot of a conversation's messages (e.g. to send read receipts). */
     suspend fun snapshot(id: ConversationId): List<BitMessage>
 
-    /** Добавить сообщение (локальное эхо или входящее). */
+    /** Append a message (local echo or incoming). */
     suspend fun append(id: ConversationId, message: BitMessage)
 
     /**
-     * Обновить статус доставки по id сообщения. Контракт: статус не понижается
-     * (см. [DeliveryStatusPolicy][com.bitchat.android.core.domain.model.DeliveryStatusPolicy]).
+     * Update delivery status by message id. Contract: status is never downgraded
+     * (see [DeliveryStatusPolicy][com.bitchat.android.core.domain.model.DeliveryStatusPolicy]).
      */
     suspend fun updateDeliveryStatus(messageId: String, status: DeliveryStatus)
 
-    /** Удалить сообщение из всех мест. */
+    /** Remove a message from everywhere. */
     suspend fun remove(messageId: String)
 
-    /** Очистить ленту диалога. */
+    /** Clear a conversation's timeline. */
     suspend fun clear(id: ConversationId)
 }

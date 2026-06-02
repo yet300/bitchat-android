@@ -1,7 +1,7 @@
 package com.bitchat.android.core.domain.model
 
 /**
- * Канал `#name`. Крипто канала (PBKDF2/AES-GCM) — инфраструктура; в domain только мета.
+ * A channel `#name`. Channel crypto (PBKDF2/AES-GCM) is infrastructure; the domain keeps only metadata.
  */
 data class Channel(
     val tag: String,
@@ -11,7 +11,7 @@ data class Channel(
     val memberCount: Int = 0,
 ) {
     companion object {
-        /** Нормализует имя канала к виду `#name`. */
+        /** Normalizes a channel name to the `#name` form. */
         fun tag(raw: String): String = if (raw.startsWith("#")) raw else "#$raw"
     }
 }

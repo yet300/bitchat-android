@@ -5,16 +5,16 @@ import com.bitchat.android.core.domain.model.ConversationId
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Агрегат списка чатов (атрибут мессенджера) и непрочитанное.
+ * Chat-list aggregate (a messenger trait) and unread tracking.
  */
 interface ConversationRepository {
 
-    /** Поток списка диалогов (для экрана чатов). */
+    /** Stream of conversations (for the chat-list screen). */
     fun observeConversations(): Flow<List<Conversation>>
 
-    /** Суммарное число непрочитанных (для бейджа). */
+    /** Total unread count (for the badge). */
     fun observeUnreadCount(): Flow<Int>
 
-    /** Пометить диалог прочитанным (сбросить локальный счётчик непрочитанного). */
+    /** Mark a conversation as read (reset its local unread counter). */
     suspend fun markRead(id: ConversationId)
 }

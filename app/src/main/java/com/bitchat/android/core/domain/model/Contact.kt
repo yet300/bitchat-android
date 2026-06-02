@@ -5,14 +5,14 @@ package com.bitchat.android.core.domain.model
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-/** Стабильная межсессионная личность: Noise-ключ (hex) + опциональный Nostr npub. */
+/** Stable cross-session identity: Noise key (hex) + optional Nostr npub. */
 data class PeerIdentity(
     val noiseKeyHex: String,
     val nostrNpub: String? = null,
 )
 
 /**
- * Контакт/избранное (мост Noise↔Nostr). Порт из FavoriteRelationship, без ByteArray.
+ * Contact / favorite (Noise<->Nostr bridge). Ported from FavoriteRelationship, without ByteArray.
  */
 data class Contact(
     val identity: PeerIdentity,
@@ -22,6 +22,6 @@ data class Contact(
     val favoritedAt: Instant,
     val lastUpdated: Instant,
 ) {
-    /** Взаимное избранное — условие маршрутизации через Nostr при оффлайн-mesh. */
+    /** Mutual favorite — the condition for routing over Nostr when mesh is offline. */
     val isMutual: Boolean get() = isFavorite && theyFavoritedUs
 }

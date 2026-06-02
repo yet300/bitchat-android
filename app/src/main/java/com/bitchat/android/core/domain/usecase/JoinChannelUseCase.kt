@@ -4,7 +4,7 @@ import com.bitchat.android.core.domain.model.Channel
 import com.bitchat.android.core.domain.repository.ChannelRepository
 import com.bitchat.android.core.domain.repository.JoinResult
 
-/** Войти/создать канал. Имя нормализуется к `#name`. */
+/** Join/create a channel. The name is normalized to `#name`. */
 class JoinChannelUseCase(
     private val channels: ChannelRepository,
 ) {

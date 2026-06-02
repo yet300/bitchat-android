@@ -16,7 +16,7 @@ import com.bitchat.android.core.domain.repository.PeerRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 
-/** Записывает исходящие вызовы транспорта. */
+/** Records outgoing transport calls. */
 class FakeMessageTransport : MessageTransport {
     data class Public(val content: String, val mentions: List<String>, val channel: String?)
     data class Private(val content: String, val to: PeerId, val recipientNickname: String?, val messageId: String)
@@ -56,7 +56,7 @@ class FakeMessageTransport : MessageTransport {
     }
 }
 
-/** In-memory лента сообщений. */
+/** In-memory message timeline. */
 class FakeMessageRepository : MessageRepository {
     val store = linkedMapOf<ConversationId, MutableList<BitMessage>>()
     val appended = mutableListOf<Pair<ConversationId, BitMessage>>()
@@ -73,7 +73,7 @@ class FakeMessageRepository : MessageRepository {
     override suspend fun clear(id: ConversationId) { store.remove(id) }
 }
 
-/** Фиксированный список пиров. */
+/** Fixed list of peers. */
 class FakePeerRepository(private val peers: List<Peer> = emptyList()) : PeerRepository {
     override fun observePeers(): Flow<List<Peer>> = flowOf(peers)
     override fun observeConnectionState(): Flow<Boolean> = flowOf(peers.any { it.isConnected })
@@ -81,7 +81,7 @@ class FakePeerRepository(private val peers: List<Peer> = emptyList()) : PeerRepo
     override suspend fun peer(id: PeerId): Peer? = peers.firstOrNull { it.id == id }
 }
 
-/** Память favorites/blocked + карта алиас→noiseHex. */
+/** In-memory favorites/blocked + alias->noiseHex map. */
 class FakeContactRepository(
     private val aliasToNoiseHex: Map<String, String> = emptyMap(),
     initialFavorites: Set<PeerId> = emptySet(),

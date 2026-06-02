@@ -1,8 +1,8 @@
 package com.bitchat.android.core.domain.model
 
 /**
- * Отпечаток личности — SHA-256 (hex) от Noise static public key.
- * Используется как стабильный ключ для favorites/blocked/верификации.
+ * Identity fingerprint — SHA-256 (hex) of the Noise static public key.
+ * Used as a stable key for favorites / blocked / verification.
  */
 @JvmInline
 value class Fingerprint(val value: String)

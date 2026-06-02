@@ -1,6 +1,6 @@
 package com.bitchat.android.core.domain.model
 
-/** Наша собственная личность. */
+/** Our own identity. */
 data class MyIdentity(
     val peerId: PeerId,
     val fingerprint: Fingerprint,

@@ -5,11 +5,11 @@ import com.bitchat.android.core.domain.repository.ContactRepository
 import com.bitchat.android.core.domain.repository.PeerRepository
 
 /**
- * Резолв канонического адреса собеседника (порт логики ConversationAliasResolver).
+ * Resolves the canonical peer address (a port of the ConversationAliasResolver logic).
  *
- * Правило: для стабильного Noise-ключа или Nostr-алиаса, если этот же человек СЕЙЧАС онлайн
- * по mesh — предпочитаем живой mesh-peerID (туда дешевле и быстрее доставлять). Иначе
- * оставляем исходный адрес.
+ * Rule: for a stable Noise key or a Nostr alias, if that same person is currently online over
+ * mesh, prefer the live mesh peerID (cheaper and faster to deliver). Otherwise keep the original
+ * address.
  */
 class ResolveConversationUseCase(
     private val peers: PeerRepository,

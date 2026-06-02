@@ -3,7 +3,7 @@ package com.bitchat.android.core.domain.repository
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Обычные (несекретные) настройки приложения.
+ * Ordinary (non-secret) application settings.
  */
 interface SettingsRepository {
 

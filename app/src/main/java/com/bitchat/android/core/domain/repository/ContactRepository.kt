@@ -7,14 +7,14 @@ import com.bitchat.android.core.domain.model.PeerIdentity
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Избранное (favorites) и блокировки по mesh-отпечатку, плюс резолв Noise↔Nostr.
+ * Favorites and blocking by mesh fingerprint, plus Noise<->Nostr resolution.
  */
 interface ContactRepository {
 
-    /** Поток множества избранных отпечатков (для реактивного UI). */
+    /** Stream of the favorite-fingerprints set (for reactive UI). */
     fun observeFavorites(): Flow<Set<Fingerprint>>
 
-    /** Переключить избранное для пира. */
+    /** Toggle favorite for a peer. */
     suspend fun toggleFavorite(peer: PeerId)
 
     suspend fun isFavorite(peer: PeerId): Boolean
@@ -23,9 +23,9 @@ interface ContactRepository {
 
     suspend fun isBlocked(peer: PeerId): Boolean
 
-    /** Контакт по стабильной личности (для маршрутизации/взаимности). */
+    /** Contact by stable identity (for routing/mutuality). */
     suspend fun contact(identity: PeerIdentity): Contact?
 
-    /** Noise-ключ (hex) для Nostr-алиаса `nostr_<pub16>` — для резолва канонического пира. */
+    /** Noise key (hex) for a Nostr alias `nostr_<pub16>` — for canonical-peer resolution. */
     suspend fun noiseKeyHexForNostrAlias(alias: PeerId): String?
 }

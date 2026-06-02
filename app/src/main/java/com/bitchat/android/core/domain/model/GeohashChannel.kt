@@ -1,8 +1,9 @@
 package com.bitchat.android.core.domain.model
 
 /**
- * Уровни гео-каналов (точность geohash). Чистый порт из текущего geohash-слоя для
- * совместимости. Геокодер/координаты остаются инфраструктурой — в domain только эти значения.
+ * Geo-channel levels (geohash precision). A clean port of the current geohash layer for
+ * compatibility. The geocoder / coordinates stay in infrastructure — the domain only keeps
+ * these values.
  */
 enum class GeohashLevel(val precision: Int) {
     BUILDING(8),
@@ -13,7 +14,7 @@ enum class GeohashLevel(val precision: Int) {
     REGION(2),
 }
 
-/** Вычисленный гео-канал: уровень + geohash-строка. */
+/** A computed geo-channel: level + geohash string. */
 data class GeohashChannel(
     val level: GeohashLevel,
     val geohash: String,

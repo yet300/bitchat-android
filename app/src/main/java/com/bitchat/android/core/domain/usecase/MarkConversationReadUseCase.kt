@@ -6,8 +6,8 @@ import com.bitchat.android.core.domain.repository.MessageRepository
 import com.bitchat.android.core.domain.repository.MessageTransport
 
 /**
- * Пометить диалог прочитанным: сбросить локальный счётчик непрочитанного и (для личных чатов)
- * разослать квитанции прочтения по входящим сообщениям.
+ * Mark a conversation as read: reset the local unread counter and (for private chats) send read
+ * receipts for incoming messages.
  */
 class MarkConversationReadUseCase(
     private val conversations: ConversationRepository,

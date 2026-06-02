@@ -3,7 +3,7 @@ package com.bitchat.android.core.domain.usecase
 import com.bitchat.android.core.domain.repository.MessageTransport
 import com.bitchat.android.core.domain.repository.SettingsRepository
 
-/** Сменить ник и анонсировать себя в сеть. Пустой ник игнорируется. */
+/** Change the nickname and announce self to the network. An empty nickname is ignored. */
 class SetNicknameUseCase(
     private val settings: SettingsRepository,
     private val transport: MessageTransport,

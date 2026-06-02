@@ -5,19 +5,19 @@ import com.bitchat.android.core.domain.model.PeerId
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Доступ к состоянию пиров mesh-сети.
+ * Access to mesh-network peer state.
  */
 interface PeerRepository {
 
-    /** Поток пиров (подключённость, сессия, fingerprint, rssi и т.д.). */
+    /** Stream of peers (connectivity, session, fingerprint, rssi, etc.). */
     fun observePeers(): Flow<List<Peer>>
 
-    /** Поток общего состояния связи (есть ли хоть один пир). */
+    /** Stream of overall connection state (is there at least one peer). */
     fun observeConnectionState(): Flow<Boolean>
 
-    /** Текущий снимок пиров (для разовых резолвов). */
+    /** Current snapshot of peers (for one-shot resolutions). */
     suspend fun snapshot(): List<Peer>
 
-    /** Найти пира по id. */
+    /** Find a peer by id. */
     suspend fun peer(id: PeerId): Peer?
 }
