@@ -1,6 +1,4 @@
-package com.bitchat.android.model
-
-import com.bitchat.android.protocol.MessageType
+package com.app.transport.model
 
 /**
  * FragmentPayload - 100% iOS-compatible fragment payload structure

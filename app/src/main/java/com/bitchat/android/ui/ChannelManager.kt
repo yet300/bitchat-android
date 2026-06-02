@@ -1,12 +1,10 @@
 package com.bitchat.android.ui
 
+import com.app.transport.model.BitchatMessage
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
-import java.security.MessageDigest
 import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
-import com.bitchat.android.model.BitchatMessage
 
 /**
  * Handles channel management including creation, joining, leaving, and encryption

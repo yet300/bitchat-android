@@ -3,16 +3,16 @@ package com.bitchat.android.mesh
 import android.content.Context
 import android.util.Log
 import com.app.crypto.EncryptionService
-import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.protocol.MessagePadding
-import com.bitchat.android.model.RoutedPacket
-import com.bitchat.android.model.IdentityAnnouncement
-import com.bitchat.android.model.NoisePayload
-import com.bitchat.android.model.NoisePayloadType
-import com.bitchat.android.protocol.BitchatPacket
-import com.bitchat.android.protocol.MessageType
-import com.bitchat.android.protocol.SpecialRecipients
-import com.bitchat.android.model.RequestSyncPacket
+import com.app.transport.model.BitchatMessage
+import com.app.transport.protocol.MessagePadding
+import com.app.transport.model.RoutedPacket
+import com.app.transport.model.IdentityAnnouncement
+import com.app.transport.model.NoisePayload
+import com.app.transport.model.NoisePayloadType
+import com.app.transport.protocol.BitchatPacket
+import com.app.transport.protocol.MessageType
+import com.app.transport.protocol.SpecialRecipients
+import com.app.transport.model.RequestSyncPacket
 import com.bitchat.android.sync.GossipSyncManager
 import com.bitchat.android.util.toHexString
 import com.bitchat.android.services.VerificationService
@@ -723,7 +723,7 @@ class BluetoothMeshService(private val context: Context) {
     /**
      * Send a file over mesh as a broadcast MESSAGE (public mesh timeline/channels).
      */
-    fun sendFileBroadcast(file: com.bitchat.android.model.BitchatFilePacket) {
+    fun sendFileBroadcast(file: com.app.transport.model.BitchatFilePacket) {
         try {
             Log.d(TAG, "📤 sendFileBroadcast: name=${file.fileName}, size=${file.fileSize}")
             val payload = file.encode()
@@ -758,7 +758,7 @@ class BluetoothMeshService(private val context: Context) {
     /**
      * Send a file as an encrypted private message using Noise protocol
      */
-    fun sendFilePrivate(recipientPeerID: String, file: com.bitchat.android.model.BitchatFilePacket) {
+    fun sendFilePrivate(recipientPeerID: String, file: com.app.transport.model.BitchatFilePacket) {
         try {
             Log.d(TAG, "📤 sendFilePrivate (ENCRYPTED): to=$recipientPeerID, name=${file.fileName}, size=${file.fileSize}")
             
@@ -775,8 +775,8 @@ class BluetoothMeshService(private val context: Context) {
                         Log.d(TAG, "📦 Encoded file TLV: ${filePayload.size} bytes")
                         
                         // Create NoisePayload wrapper (type byte + file TLV data) - same as iOS
-                        val noisePayload = com.bitchat.android.model.NoisePayload(
-                            type = com.bitchat.android.model.NoisePayloadType.FILE_TRANSFER,
+                        val noisePayload = com.app.transport.model.NoisePayload(
+                            type = com.app.transport.model.NoisePayloadType.FILE_TRANSFER,
                             data = filePayload
                         )
                         
@@ -850,7 +850,7 @@ class BluetoothMeshService(private val context: Context) {
             if (encryptionService.hasEstablishedSession(recipientPeerID)) {
                 try {
                     // Create TLV-encoded private message exactly like iOS
-                    val privateMessage = com.bitchat.android.model.PrivateMessagePacket(
+                    val privateMessage = com.app.transport.model.PrivateMessagePacket(
                         messageID = finalMessageID,
                         content = content
                     )
@@ -862,8 +862,8 @@ class BluetoothMeshService(private val context: Context) {
                     }
                     
                     // Create message payload with NoisePayloadType prefix: [type byte] + [TLV data]
-                    val messagePayload = com.bitchat.android.model.NoisePayload(
-                        type = com.bitchat.android.model.NoisePayloadType.PRIVATE_MESSAGE,
+                    val messagePayload = com.app.transport.model.NoisePayload(
+                        type = com.app.transport.model.NoisePayloadType.PRIVATE_MESSAGE,
                         data = tlvData
                     )
                     
@@ -920,7 +920,7 @@ class BluetoothMeshService(private val context: Context) {
                 map.containsKey(recipientPeerID)
             } catch (_: Exception) { false }
             if (isGeoAlias && geo != null) {
-                geo.sendReadReceipt(com.bitchat.android.model.ReadReceipt(messageID), recipientPeerID)
+                geo.sendReadReceipt(com.app.transport.model.ReadReceipt(messageID), recipientPeerID)
                 return@launch
             }
 
@@ -933,8 +933,8 @@ class BluetoothMeshService(private val context: Context) {
                 }
 
                 // Create read receipt payload using NoisePayloadType exactly like iOS
-                val readReceiptPayload = com.bitchat.android.model.NoisePayload(
-                    type = com.bitchat.android.model.NoisePayloadType.READ_RECEIPT,
+                val readReceiptPayload = com.app.transport.model.NoisePayload(
+                    type = com.app.transport.model.NoisePayloadType.READ_RECEIPT,
                     data = messageID.toByteArray(Charsets.UTF_8)
                 )
                 

@@ -1,4 +1,4 @@
-package com.bitchat.android.protocol
+package com.app.transport.protocol
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull

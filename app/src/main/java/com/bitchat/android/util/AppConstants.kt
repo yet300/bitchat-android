@@ -58,11 +58,6 @@ object AppConstants {
         const val QR_MAX_AGE_SECONDS: Long = 300L // 5 minutes
     }
 
-    object Protocol {
-        const val COMPRESSION_THRESHOLD_BYTES: Int = 100
-        const val MAX_PAYLOAD_LENGTH: Int = 10_485_760
-    }
-
     object StoreForward {
         const val MESSAGE_CACHE_TIMEOUT_MS: Long = 43_200_000L // 12h
         const val MAX_CACHED_MESSAGES: Int = 100

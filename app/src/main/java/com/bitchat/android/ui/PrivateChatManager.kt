@@ -4,8 +4,8 @@ package com.bitchat.android.ui
 import android.util.Log
 import com.bitchat.android.mesh.BluetoothMeshService
 import com.app.crypto.identity.PeerFingerprintManager
-import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.model.DeliveryStatus
+import com.app.transport.model.BitchatMessage
+import com.app.transport.model.DeliveryStatus
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 

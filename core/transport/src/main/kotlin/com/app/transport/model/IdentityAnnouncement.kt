@@ -1,4 +1,4 @@
-package com.bitchat.android.model
+package com.app.transport.model
 
 import kotlinx.serialization.Serializable
 

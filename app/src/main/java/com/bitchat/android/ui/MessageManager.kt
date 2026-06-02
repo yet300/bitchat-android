@@ -1,8 +1,8 @@
 @file:OptIn(ExperimentalTime::class)
 package com.bitchat.android.ui
 
-import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.model.DeliveryStatus
+import com.app.transport.model.BitchatMessage
+import com.app.transport.model.DeliveryStatus
 import java.util.Collections
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime

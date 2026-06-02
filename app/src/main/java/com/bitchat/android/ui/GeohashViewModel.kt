@@ -11,6 +11,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.viewModelScope
+import com.app.transport.model.BitchatMessage
 import com.bitchat.android.nostr.GeohashMessageHandler
 import com.bitchat.android.nostr.GeohashRepository
 import com.bitchat.android.nostr.NostrDirectMessageHandler
@@ -196,7 +197,7 @@ class GeohashViewModel(
             try {
                 val tempId = "temp_${System.currentTimeMillis()}_${kotlin.random.Random.nextInt(1000)}"
                 val pow = PoWPreferenceManager.getCurrentSettings()
-                val localMsg = com.bitchat.android.model.BitchatMessage(
+                val localMsg = BitchatMessage(
                     id = tempId,
                     sender = nickname ?: myPeerID,
                     content = content,
@@ -209,7 +210,7 @@ class GeohashViewModel(
                 messageManager.addChannelMessage("geo:${channel.geohash}", localMsg)
                 val startedMining = pow.enabled && pow.difficulty > 0
                 if (startedMining) {
-                    com.bitchat.android.ui.PoWMiningTracker.startMiningMessage(tempId)
+                    PoWMiningTracker.startMiningMessage(tempId)
                 }
                 try {
                     val identity = NostrIdentityBridge.deriveIdentity(forGeohash = channel.geohash, context = getApplication())
@@ -220,7 +221,7 @@ class GeohashViewModel(
                 } finally {
                     // Ensure we stop the per-message mining animation regardless of success/failure
                     if (startedMining) {
-                        com.bitchat.android.ui.PoWMiningTracker.stopMiningMessage(tempId)
+                        PoWMiningTracker.stopMiningMessage(tempId)
                     }
                 }
             } catch (e: Exception) {
@@ -315,7 +316,7 @@ class GeohashViewModel(
             // Refresh people list and counts to remove blocked entry immediately
             repo.refreshGeohashPeople()
             repo.updateReactiveParticipantCounts()
-            val sysMsg = com.bitchat.android.model.BitchatMessage(
+            val sysMsg = BitchatMessage(
                 sender = "system",
                 content = "blocked $targetNickname in geohash channels",
                 timestamp = Clock.System.now(),
@@ -323,7 +324,7 @@ class GeohashViewModel(
             )
             messageManager.addMessage(sysMsg)
         } else {
-            val sysMsg = com.bitchat.android.model.BitchatMessage(
+            val sysMsg = BitchatMessage(
                 sender = "system",
                 content = "user '$targetNickname' not found in current geohash",
                 timestamp = Clock.System.now(),

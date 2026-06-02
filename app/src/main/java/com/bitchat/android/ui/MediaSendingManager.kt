@@ -1,10 +1,12 @@
 package com.bitchat.android.ui
 
 import android.util.Log
+import com.app.transport.features.file.FileUtils
 import com.bitchat.android.mesh.BluetoothMeshService
-import com.bitchat.android.model.BitchatFilePacket
-import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.model.BitchatMessageType
+import com.app.transport.model.BitchatFilePacket
+import com.app.transport.model.BitchatMessage
+import com.app.transport.model.BitchatMessageType
+import com.app.transport.model.DeliveryStatus
 import kotlin.time.Clock
 import java.security.MessageDigest
 import kotlin.time.ExperimentalTime
@@ -124,7 +126,7 @@ class MediaSendingManager(
 
             // Use the real MIME type based on extension; fallback to octet-stream
             val mimeType = try { 
-                com.bitchat.android.features.file.FileUtils.getMimeTypeFromExtension(file.name) 
+                FileUtils.getMimeTypeFromExtension(file.name)
             } catch (_: Exception) { 
                 "application/octet-stream" 
             }
@@ -210,7 +212,7 @@ class MediaSendingManager(
         // Seed progress so delivery icons render for media
         messageManager.updateMessageDeliveryStatus(
             msg.id,
-            com.bitchat.android.model.DeliveryStatus.PartiallyDelivered(0, 100)
+            DeliveryStatus.PartiallyDelivered(0, 100)
         )
         
         Log.d(TAG, "📤 Calling meshService.sendFilePrivate to $toPeerID")
@@ -264,7 +266,7 @@ class MediaSendingManager(
         // Seed progress so animations start immediately
         messageManager.updateMessageDeliveryStatus(
             message.id,
-            com.bitchat.android.model.DeliveryStatus.PartiallyDelivered(0, 100)
+            DeliveryStatus.PartiallyDelivered(0, 100)
         )
         
         Log.d(TAG, "📤 Calling meshService.sendFileBroadcast")
@@ -326,7 +328,7 @@ class MediaSendingManager(
             if (evt.completed) {
                 messageManager.updateMessageDeliveryStatus(
                     msgId,
-                    com.bitchat.android.model.DeliveryStatus.Delivered(to = "mesh", at = Clock.System.now())
+                    DeliveryStatus.Delivered(to = "mesh", at = Clock.System.now())
                 )
                 synchronized(transferMessageMap) {
                     val msgIdRemoved = transferMessageMap.remove(evt.transferId)
@@ -335,7 +337,7 @@ class MediaSendingManager(
             } else {
                 messageManager.updateMessageDeliveryStatus(
                     msgId,
-                    com.bitchat.android.model.DeliveryStatus.PartiallyDelivered(evt.sent, evt.total)
+                    DeliveryStatus.PartiallyDelivered(evt.sent, evt.total)
                 )
             }
         }

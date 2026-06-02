@@ -32,8 +32,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.bitchat.android.features.file.FileUtils
-import com.bitchat.android.model.BitchatFilePacket
+import com.app.transport.features.file.FileUtils
+import com.app.transport.model.BitchatFilePacket
 
 /**
  * Modern chat-style file message display

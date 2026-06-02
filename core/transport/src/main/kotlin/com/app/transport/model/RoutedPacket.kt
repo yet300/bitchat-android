@@ -1,6 +1,6 @@
-package com.bitchat.android.model
+package com.app.transport.model
 
-import com.bitchat.android.protocol.BitchatPacket
+import com.app.transport.protocol.BitchatPacket
 
 /**
  * Represents a routed packet with additional metadata

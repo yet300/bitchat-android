@@ -86,6 +86,7 @@ dependencies {
     // Project modules
     implementation(projects.core.common)
     implementation(projects.core.crypto)
+    implementation(projects.core.transport)
 
     // Core Android dependencies
     implementation(libs.androidx.core.ktx)

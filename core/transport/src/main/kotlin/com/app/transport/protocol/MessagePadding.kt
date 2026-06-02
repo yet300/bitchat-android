@@ -1,6 +1,4 @@
-package com.bitchat.android.protocol
-
-import java.security.SecureRandom
+package com.app.transport.protocol
 
 /**
  * Privacy-preserving padding utilities - exact same as iOS version

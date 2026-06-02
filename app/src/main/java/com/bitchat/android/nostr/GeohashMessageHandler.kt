@@ -2,7 +2,7 @@ package com.bitchat.android.nostr
 
 import android.app.Application
 import android.util.Log
-import com.bitchat.android.model.BitchatMessage
+import com.app.transport.model.BitchatMessage
 import com.bitchat.android.ui.ChatState
 import com.bitchat.android.ui.MessageManager
 import kotlinx.coroutines.CoroutineScope

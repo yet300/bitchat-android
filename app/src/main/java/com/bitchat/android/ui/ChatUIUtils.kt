@@ -2,19 +2,15 @@
 
 package com.bitchat.android.ui
 
+import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.sp
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Shield
-import androidx.compose.ui.graphics.vector.ImageVector
-import com.bitchat.android.model.BitchatMessage
+import com.app.transport.model.BitchatMessage
 import com.bitchat.android.mesh.BluetoothMeshService
-import androidx.compose.material3.ColorScheme
 import com.bitchat.android.ui.theme.BASE_FONT_SIZE
 import kotlin.time.ExperimentalTime
 
@@ -261,19 +257,21 @@ fun formatMessageHeaderAnnotatedString(
  * Avoids orange (~30°) reserved for self messages
  */
 fun getPeerColor(message: BitchatMessage, isDark: Boolean): Color {
-    // Create seed from peer identifier (prioritizing stable keys)
+    // Create seed from peer identifier (prioritizing stable keys).
+    // Capture the cross-module nullable property into a local val so smart-casts apply.
+    val senderPeerID = message.senderPeerID
     val seed = when {
-        message.senderPeerID?.startsWith("nostr:") == true || message.senderPeerID?.startsWith("nostr_") == true -> {
+        senderPeerID?.startsWith("nostr:") == true || senderPeerID?.startsWith("nostr_") == true -> {
             // For Nostr peers, use the full key if available, otherwise the peer ID
-            "nostr:${message.senderPeerID.lowercase()}"
+            "nostr:${senderPeerID.lowercase()}"
         }
-        message.senderPeerID?.length == 16 -> {
-            // For ephemeral peer IDs, try to get stable Noise key, fallback to peer ID  
-            "noise:${message.senderPeerID.lowercase()}"
+        senderPeerID?.length == 16 -> {
+            // For ephemeral peer IDs, try to get stable Noise key, fallback to peer ID
+            "noise:${senderPeerID.lowercase()}"
         }
-        message.senderPeerID?.length == 64 -> {
+        senderPeerID?.length == 64 -> {
             // This is already a stable Noise key
-            "noise:${message.senderPeerID.lowercase()}"
+            "noise:${senderPeerID.lowercase()}"
         }
         else -> {
             // Fallback to sender name

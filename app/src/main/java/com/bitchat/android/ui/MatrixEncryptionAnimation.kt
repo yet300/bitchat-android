@@ -82,14 +82,14 @@ object PoWMiningTracker {
  */
 @Composable
 fun MessageWithMatrixAnimation(
-    message: com.bitchat.android.model.BitchatMessage,
-    messages: List<com.bitchat.android.model.BitchatMessage> = emptyList(),
+    message: com.app.transport.model.BitchatMessage,
+    messages: List<com.app.transport.model.BitchatMessage> = emptyList(),
     currentUserNickname: String,
     meshService: com.bitchat.android.mesh.BluetoothMeshService,
     colorScheme: androidx.compose.material3.ColorScheme,
     timeFormatter: TimeFormatter,
     onNicknameClick: ((String) -> Unit)?,
-    onMessageLongPress: ((com.bitchat.android.model.BitchatMessage) -> Unit)?,
+    onMessageLongPress: ((com.app.transport.model.BitchatMessage) -> Unit)?,
     onImageClick: ((String, List<String>, Int) -> Unit)?,
     modifier: Modifier = Modifier
 ) {
@@ -130,7 +130,7 @@ fun MessageWithMatrixAnimation(
  */
 @Composable
 private fun AnimatedMessageDisplay(
-    message: com.bitchat.android.model.BitchatMessage,
+    message: com.app.transport.model.BitchatMessage,
     currentUserNickname: String,
     meshService: com.bitchat.android.mesh.BluetoothMeshService,
     colorScheme: androidx.compose.material3.ColorScheme,
@@ -247,7 +247,7 @@ private fun AnimatedMessageDisplay(
  * Identical to formatMessageAsAnnotatedString but excludes timestamp and PoW badge
  */
 private fun formatMessageAsAnnotatedStringWithoutTimestamp(
-    message: com.bitchat.android.model.BitchatMessage,
+    message: com.app.transport.model.BitchatMessage,
     currentUserNickname: String,
     meshService: com.bitchat.android.mesh.BluetoothMeshService,
     colorScheme: androidx.compose.material3.ColorScheme

@@ -1,10 +1,9 @@
 package com.bitchat.android.ui
 
+import com.app.transport.model.BitchatMessage
+import com.app.transport.model.DeliveryStatus
 import com.bitchat.android.mesh.BluetoothMeshDelegate
-import com.bitchat.android.ui.NotificationTextUtils
 import com.bitchat.android.mesh.BluetoothMeshService
-import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.model.DeliveryStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
@@ -68,7 +67,8 @@ class MeshDelegateHandler(
             } else if (message.channel != null) {
                 // Channel message: AppStateStore is the source of truth for list; only manage unread
                 if (state.getJoinedChannelsValue().contains(message.channel)) {
-                    val channel = message.channel
+                    // Capture the cross-module nullable property locally for smart-casts.
+                    val channel = message.channel ?: return@launch
                     val viewingClassic = state.getCurrentChannelValue() == channel
                     val viewingGeohash = try {
                         if (channel.startsWith("geo:")) {

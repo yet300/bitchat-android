@@ -6,9 +6,9 @@ import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattServer
 import android.util.Log
-import com.bitchat.android.protocol.SpecialRecipients
-import com.bitchat.android.model.RoutedPacket
-import com.bitchat.android.protocol.MessageType
+import com.app.transport.protocol.SpecialRecipients
+import com.app.transport.model.RoutedPacket
+import com.app.transport.protocol.MessageType
 import com.bitchat.android.util.toHexString
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

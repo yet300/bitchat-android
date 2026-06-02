@@ -1,7 +1,7 @@
 package com.bitchat.android.ui
 
-import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.model.BitchatMessageType
+import com.app.transport.model.BitchatMessage
+import com.app.transport.model.BitchatMessageType
 
 /**
  * Utilities for building human-friendly notification text/previews.

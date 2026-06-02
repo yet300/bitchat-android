@@ -27,8 +27,8 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import android.content.Intent
 import android.net.Uri
-import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.model.DeliveryStatus
+import com.app.transport.model.BitchatMessage
+import com.app.transport.model.DeliveryStatus
 import com.bitchat.android.mesh.BluetoothMeshService
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
@@ -38,9 +38,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import com.bitchat.android.ui.media.FileMessageItem
-import com.bitchat.android.model.BitchatMessageType
+import com.app.transport.model.BitchatMessageType
 import com.bitchat.android.R
 import androidx.compose.ui.res.stringResource
+import com.app.transport.features.file.FileUtils
+import com.app.transport.model.BitchatFilePacket
 
 
 // VoiceNotePlayer moved to com.bitchat.android.ui.media.VoiceNotePlayer
@@ -245,7 +247,7 @@ fun MessageItem(
         val path = message.content.trim()
         // Derive sending progress if applicable
         val (overrideProgress, _) = when (val st = message.deliveryStatus) {
-            is com.bitchat.android.model.DeliveryStatus.PartiallyDelivered -> {
+            is DeliveryStatus.PartiallyDelivered -> {
                 if (st.total > 0 && st.reached < st.total) {
                     (st.reached.toFloat() / st.total.toFloat()) to Color(0xFF1E88E5) // blue while sending
                 } else null to null
@@ -287,10 +289,10 @@ fun MessageItem(
                 if (file.exists()) {
                     // Create a temporary BitchatFilePacket for display
                     // In a real implementation, this would be stored with the packet metadata
-                    com.bitchat.android.model.BitchatFilePacket(
+                    BitchatFilePacket(
                         fileName = file.name,
                         fileSize = file.length(),
-                        mimeType = com.bitchat.android.features.file.FileUtils.getMimeTypeFromExtension(file.name),
+                        mimeType = FileUtils.getMimeTypeFromExtension(file.name),
                         content = file.readBytes()
                     )
                 } else null

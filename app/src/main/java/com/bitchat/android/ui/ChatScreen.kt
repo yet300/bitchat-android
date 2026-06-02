@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.bitchat.android.model.BitchatMessage
+import com.app.transport.model.BitchatMessage
 import com.bitchat.android.ui.media.FullScreenImageViewer
 
 /**
