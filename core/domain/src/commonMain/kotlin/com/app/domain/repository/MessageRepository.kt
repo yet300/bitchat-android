@@ -31,4 +31,7 @@ interface MessageRepository {
 
     /** Clear a conversation's timeline. */
     suspend fun clear(id: ConversationId)
+
+    /** Clear all timelines (used by the panic wipe). */
+    suspend fun clearAll()
 }

@@ -28,4 +28,7 @@ interface ContactRepository {
 
     /** Noise key (hex) for a Nostr alias `nostr_<pub16>` — for canonical-peer resolution. */
     suspend fun noiseKeyHexForNostrAlias(alias: PeerId): String?
+
+    /** Clear all favorites and blocked entries (used by the panic wipe). */
+    suspend fun clearAll()
 }
