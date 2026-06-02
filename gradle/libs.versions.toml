@@ -16,6 +16,11 @@ exifinterface = "1.4.2"
 # Compose
 compose-bom = "2026.05.01"
 
+
+decompose = "3.5.0"
+essenty = "2.5.0"
+mvi = "4.4.0"
+
 # Accompanist
 accompanist-permissions = "0.37.3"
 
@@ -50,6 +55,8 @@ zxing-core = "3.5.4"
 camerax = "1.6.1"
 mlkit-barcode = "17.3.0"
 
+metro = "1.1.1"
+
 # Testing
 junit = "4.13.2"
 androidx-test-ext = "1.3.0"
@@ -57,6 +64,7 @@ espresso = "3.7.0"
 mockito-kotlin = "6.3.0"
 mockito-inline = "5.2.0"
 roboelectric = "4.16.1"
+turbine = "1.2.1"
 
 lifecycle-process = "2.10.0"
 
@@ -93,7 +101,9 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
 
 # Coroutines
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines"}
 
 # Bluetooth
 nordic-ble = { module = "no.nordicsemi.android:ble", version.ref = "nordic-ble" }
@@ -121,8 +131,28 @@ multiplatform-settings-no-arg = { module = "com.russhwolf:multiplatform-settings
 multiplatform-settings-coroutines = { module = "com.russhwolf:multiplatform-settings-coroutines", version.ref = "multiplatformSettings" }
 multiplatform-settings-observable = { module = "com.russhwolf:multiplatform-settings-make-observable", version.ref = "multiplatformSettings" }
 
+metrox-android = { module = "dev.zacsweers.metro:metrox-android", version.ref = "metro" }
+
+#decompose
+decompose = { module = "com.arkivanov.decompose:decompose", version.ref = "decompose" }
+decompose-compose = { module = "com.arkivanov.decompose:extensions-compose", version.ref = "decompose" }
+essenty-lifecycle = { group = "com.arkivanov.essenty", name = "lifecycle", version.ref = "essenty" }
+essenty-stateKeeper = { group = "com.arkivanov.essenty", name = "state-keeper", version.ref = "essenty" }
+essenty-instanceKeeper = { group = "com.arkivanov.essenty", name = "instance-keeper", version.ref = "essenty" }
+essenty-backHandler = { group = "com.arkivanov.essenty", name = "back-handler", version.ref = "essenty" }
+
+#mvi-kotlin
+mvikotlin = { group = "com.arkivanov.mvikotlin", name = "mvikotlin", version.ref = "mvi" }
+mvikotlin-main = { group = "com.arkivanov.mvikotlin", name = "mvikotlin-main", version.ref = "mvi" }
+mvikotlin-logging = { group = "com.arkivanov.mvikotlin", name = "mvikotlin-logging", version.ref = "mvi" }
+mvikotlin-timetravel = { group = "com.arkivanov.mvikotlin", name = "mvikotlin-timetravel", version.ref = "mvi" }
+mvikotlin-extensions-coroutines = { group = "com.arkivanov.mvikotlin", name = "mvikotlin-extensions-coroutines", version.ref = "mvi" }
 
 # Testing
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+kotlin-test-annotations = { module = "org.jetbrains.kotlin:kotlin-test-annotations-common", version.ref = "kotlin" }
+turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
+
 junit = { module = "junit:junit", version.ref = "junit" }
 androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-test-ext" }
 androidx-test-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso" }
@@ -131,13 +161,20 @@ androidx-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-mani
 mockito-kotlin = { module = "org.mockito.kotlin:mockito-kotlin", version.ref = "mockito-kotlin" }
 mockito-inline = { module = "org.mockito:mockito-inline", version.ref = "mockito-inline" }
 roboelectric = { module = "org.robolectric:robolectric", version.ref = "roboelectric"}
-kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines"}
+
+#build
+android-gradlePlugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
+kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-android-library = { id = "com.android.library", version.ref = "agp" }
+android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
+kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+metro = { id = "dev.zacsweers.metro", version.ref = "metro" }
+
+local-kotlin-multiplatform = { id = "com.plugins.kotlinMultiplatformPlugin", version = "unspecified" }
 
 [bundles]
 compose = [
@@ -146,6 +183,21 @@ compose = [
     "androidx-compose-ui-tooling-preview",
     "androidx-compose-material3",
     "androidx-compose-material-icons-extended"
+]
+
+decompose = [
+    "decompose",
+    "essenty-lifecycle",
+    "essenty-stateKeeper",
+    "essenty-instanceKeeper",
+    "essenty-backHandler"
+]
+mvi = [
+    "mvikotlin",
+    "mvikotlin-main",
+    "mvikotlin-logging",
+    "mvikotlin-timetravel",
+    "mvikotlin-extensions-coroutines"
 ]
 
 lifecycle = [
@@ -166,6 +218,13 @@ multiplatform-settings = [
 ]
 
 testing = [
+    "kotlin-test",
+    "kotlin-test-annotations",
+    "kotlinx-coroutines-test",
+    "turbine",
+]
+
+android-testing = [
     "junit",
     "androidx-test-ext-junit",
     "androidx-test-espresso-core",

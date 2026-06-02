@@ -139,7 +139,7 @@ dependencies {
     implementation(libs.androidx.exifinterface)
     
     // Testing
-    testImplementation(libs.bundles.testing)
+    testImplementation(libs.bundles.android.testing)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.bundles.compose.testing)
     debugImplementation(libs.androidx.compose.ui.tooling)
