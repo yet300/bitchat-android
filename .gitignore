@@ -52,7 +52,7 @@ gen/
 *.swp
 *.lock
 .goosehints
-
+.kotlin
 # Google services
 google-services.json
 
