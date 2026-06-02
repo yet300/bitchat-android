@@ -15,11 +15,11 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
- * Отправка сообщения: маршрутизация по виду диалога + локальное эхо в ленту.
- * SRP: одно действие; выбор транспорта (mesh/Nostr) скрыт за [MessageTransport].
+ * Sends a message: routes by conversation kind and adds a local echo to the timeline.
+ * SRP: a single action; transport choice (mesh/Nostr) is hidden behind [MessageTransport].
  *
- * @param clock источник времени (инъекция ради детерминированных тестов)
- * @param newId генератор id сообщения (инъекция ради тестов)
+ * @param clock time source (injected for deterministic tests)
+ * @param newId message-id generator (injected for tests)
  */
 class SendMessageUseCase(
     private val transport: MessageTransport,
@@ -58,8 +58,8 @@ class SendMessageUseCase(
             }
 
             is ConversationId.Geohash -> {
-                // Локальное эхо для гео-чата добавляет транспорт (как сейчас в GeohashViewModel),
-                // чтобы не задвоить — поэтому здесь только отправка.
+                // The local echo for a geo-chat is added by the transport (as the current
+                // GeohashViewModel does) to avoid duplication — so we only send here.
                 transport.sendGeohash(content, target.channel, sender.displayName)
             }
         }

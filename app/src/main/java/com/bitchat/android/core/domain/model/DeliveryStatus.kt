@@ -6,8 +6,8 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**
- * Статус доставки сообщения. Набор значений совпадает с текущим (и iOS) для поведенческой
- * нейтральности.
+ * Message delivery status. The set of values matches the current (and iOS) one for behavioral
+ * neutrality.
  */
 sealed interface DeliveryStatus {
     data object Sending : DeliveryStatus
@@ -19,8 +19,8 @@ sealed interface DeliveryStatus {
 }
 
 /**
- * Бизнес-правило обновления статуса: статус НИКОГДА не понижается (например, Read не
- * откатывается до Delivered). Чистая, тестируемая политика (перенос из MessageManager.chooseStatus).
+ * Status-update business rule: the status is NEVER downgraded (e.g. Read does not revert to
+ * Delivered). Pure, testable policy (ported from MessageManager.chooseStatus).
  */
 object DeliveryStatusPolicy {
 
@@ -31,10 +31,10 @@ object DeliveryStatusPolicy {
         is DeliveryStatus.PartiallyDelivered -> 3
         is DeliveryStatus.Delivered -> 4
         is DeliveryStatus.Read -> 5
-        is DeliveryStatus.Failed -> 0 // как и раньше — низший приоритет для порядка «галочек»
+        is DeliveryStatus.Failed -> 0 // as before — lowest priority for check-mark ordering
     }
 
-    /** Возвращает статус с бОльшим приоритетом; при равенстве — новый. */
+    /** Returns the higher-priority status; on a tie, the new one. */
     fun merge(old: DeliveryStatus?, new: DeliveryStatus): DeliveryStatus =
         if (priority(new) >= priority(old)) new else old!!
 }

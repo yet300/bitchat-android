@@ -1,21 +1,21 @@
 package com.bitchat.android.core.domain.model
 
 /**
- * Идентификатор диалога — сумма видов чата мессенджера. Каждый вид несёт свою нагрузку,
- * поэтому это sealed-тип (value-класс это не выразил бы). Служит ключом ленты сообщений
- * и агрегата [Conversation].
+ * Conversation identifier — a sum type over the messenger's chat kinds. Each kind carries a
+ * different payload, hence a sealed type (a value class could not express it). Serves as the
+ * key for the message timeline and the [Conversation] aggregate.
  */
 sealed interface ConversationId {
 
-    /** Общий публичный mesh-чат. */
+    /** Shared public mesh chat. */
     data object PublicMesh : ConversationId
 
-    /** Классический канал `#name`. */
+    /** Classic channel `#name`. */
     data class Channel(val tag: String) : ConversationId
 
-    /** Личный диалог с конкретной личностью. */
+    /** Private dialog with a specific identity. */
     data class Private(val peer: PeerId) : ConversationId
 
-    /** Гео-чат (Nostr поверх geohash). */
+    /** Geo-chat (Nostr over geohash). */
     data class Geohash(val channel: GeohashChannel) : ConversationId
 }

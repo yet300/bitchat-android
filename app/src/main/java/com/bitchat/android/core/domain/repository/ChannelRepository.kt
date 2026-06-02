@@ -2,7 +2,7 @@ package com.bitchat.android.core.domain.repository
 
 import kotlinx.coroutines.flow.Flow
 
-/** Результат попытки войти в канал. */
+/** Result of an attempt to join a channel. */
 sealed interface JoinResult {
     data object Joined : JoinResult
     data object NeedsPassword : JoinResult
@@ -10,7 +10,7 @@ sealed interface JoinResult {
 }
 
 /**
- * Каналы `#name`. Крипто/деривация ключа канала — в data/crypto, не здесь.
+ * Channels `#name`. Channel crypto / key derivation lives in data/crypto, not here.
  */
 interface ChannelRepository {
 

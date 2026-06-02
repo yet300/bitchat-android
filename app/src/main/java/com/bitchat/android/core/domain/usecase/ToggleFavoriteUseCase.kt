@@ -4,7 +4,7 @@ import com.bitchat.android.core.domain.model.PeerId
 import com.bitchat.android.core.domain.repository.ContactRepository
 import com.bitchat.android.core.domain.repository.MessageTransport
 
-/** Переключить избранное и уведомить собеседника (mesh/Nostr — решает транспорт). */
+/** Toggle favorite and notify the peer (mesh/Nostr — decided by the transport). */
 class ToggleFavoriteUseCase(
     private val contacts: ContactRepository,
     private val transport: MessageTransport,

@@ -1,9 +1,9 @@
 package com.bitchat.android.core.domain.model
 
-/** Вид вложения. */
+/** Attachment kind. */
 enum class AttachmentKind { AUDIO, IMAGE, FILE }
 
-/** Прогресс передачи вложения (BLE/Nostr). */
+/** Attachment transfer progress (BLE/Nostr). */
 sealed interface TransferState {
     data object Idle : TransferState
     data class InProgress(val sent: Long, val total: Long) : TransferState
@@ -13,8 +13,8 @@ sealed interface TransferState {
 }
 
 /**
- * Вложение сообщения. В domain храним ссылку (локальный путь/идентификатор), а не байты —
- * работа с файлами/потоками остаётся инфраструктурой.
+ * Message attachment. The domain keeps a reference (local path / id), not bytes — file/stream
+ * handling stays in infrastructure.
  */
 data class Attachment(
     val kind: AttachmentKind,

@@ -4,26 +4,26 @@ import com.bitchat.android.core.domain.model.GeohashChannel
 import com.bitchat.android.core.domain.model.PeerId
 
 /**
- * Порт исходящего транспорта. Скрывает выбор mesh⇄Nostr (текущий MessageRouter), outbox и
- * адресацию — это инфраструктурная деталь. Domain просто «отправляет».
+ * Outgoing-transport port. Hides the mesh<->Nostr choice (the current MessageRouter), the outbox
+ * and addressing — that's an infrastructure detail. The domain just "sends".
  */
 interface MessageTransport {
 
-    /** Публичное/канальное сообщение (channel == null → общий mesh-чат). */
+    /** Public/channel message (channel == null -> shared mesh chat). */
     suspend fun sendPublic(content: String, mentions: List<String>, channel: String?)
 
-    /** Личное сообщение. Маршрут (mesh/Nostr) выбирает реализация. */
+    /** Private message. The route (mesh/Nostr) is chosen by the implementation. */
     suspend fun sendPrivate(content: String, to: PeerId, recipientNickname: String?, messageId: String)
 
-    /** Сообщение в гео-чат (Nostr ephemeral event). */
+    /** Message to a geo-chat (Nostr ephemeral event). */
     suspend fun sendGeohash(content: String, channel: GeohashChannel, nickname: String?)
 
-    /** Квитанция прочтения. */
+    /** Read receipt. */
     suspend fun sendReadReceipt(messageId: String, to: PeerId)
 
-    /** Уведомление о (раз)избранном — рассылается mesh или Nostr. */
+    /** (Un)favorite notification — sent over mesh or Nostr. */
     suspend fun sendFavoriteNotification(to: PeerId, isFavorite: Boolean)
 
-    /** Анонс себя в сеть (например, после смены ника). */
+    /** Announce self to the network (e.g. after a nickname change). */
     suspend fun announceSelf()
 }

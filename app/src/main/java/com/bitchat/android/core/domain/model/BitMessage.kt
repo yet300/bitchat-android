@@ -5,12 +5,12 @@ package com.bitchat.android.core.domain.model
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-/** Тип содержимого сообщения. */
+/** Message content type. */
 enum class MessageType { TEXT, AUDIO, IMAGE, FILE }
 
 /**
- * Лёгкая ссылка на отправителя — чтобы UI не ходил в репозитории за именем на каждый рендер.
- * [peerId] = null для системных сообщений.
+ * Lightweight reference to the sender — so the UI doesn't hit repositories for a name on every
+ * render. [peerId] == null for system messages.
  */
 data class SenderRef(
     val peerId: PeerId?,
@@ -23,8 +23,8 @@ data class SenderRef(
 }
 
 /**
- * Доменная сущность сообщения мессенджера (имя — bitMessage). Чистая: НЕ содержит бинарной
- * упаковки (wire-кодек `toBinaryPayload` остаётся в data-mapper'е ради байт-совместимости).
+ * The messenger's message domain entity (named bitMessage). Pure: it does NOT contain binary
+ * packing (the wire codec `toBinaryPayload` stays in a data mapper to preserve byte compatibility).
  */
 data class BitMessage(
     val id: String,

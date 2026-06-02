@@ -5,12 +5,12 @@ package com.bitchat.android.core.domain.model
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-/** Состояние Noise-сессии с пиром. */
+/** State of the Noise session with a peer. */
 enum class SessionState { NONE, HANDSHAKING, ESTABLISHED }
 
 /**
- * Пир mesh-сети. Ключи храним как hex-строки (а не ByteArray), чтобы domain оставался
- * чистым value-слоем без бинарных типов и ручных equals/hashCode.
+ * A mesh-network peer. Keys are stored as hex strings (not ByteArray) so the domain stays a
+ * clean value layer without binary types and hand-written equals/hashCode.
  */
 data class Peer(
     val id: PeerId,

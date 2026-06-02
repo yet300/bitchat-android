@@ -2,32 +2,32 @@ package com.bitchat.android.core.domain.usecase
 
 import com.bitchat.android.core.domain.model.Channel
 
-/** Действие-«роль» (IRC-стиль). */
+/** Action "role" command (IRC style). */
 enum class ActionKind(val verb: String, val obj: String) {
     HUG("gives", "a warm hug 🫂"),
     SLAP("slaps", "around a bit with a large trout 🐟"),
 }
 
-/** Разобранная IRC-команда. */
+/** A parsed IRC-style command. */
 sealed interface ChatCommand {
     data class Join(val channel: String, val password: String?) : ChatCommand
     data class Msg(val nickname: String, val body: String?) : ChatCommand
     data object Who : ChatCommand
     data object Clear : ChatCommand
     data object Channels : ChatCommand
-    /** [nickname] == null → показать список заблокированных. */
+    /** [nickname] == null -> list blocked users. */
     data class Block(val nickname: String?) : ChatCommand
     data class Unblock(val nickname: String) : ChatCommand
     data class Pass(val password: String?) : ChatCommand
     data class Action(val kind: ActionKind, val target: String) : ChatCommand
     data class Unknown(val name: String) : ChatCommand
-    /** Команда распознана, но аргументы неверны — текст для подсказки пользователю. */
+    /** Command recognized but arguments are invalid — hint text for the user. */
     data class Usage(val text: String) : ChatCommand
 }
 
 /**
- * Чистый парсер команд. Возвращает null, если строка НЕ команда (не начинается с '/').
- * Перенос разбора из CommandProcessor; исполнение делегируется отдельным use-case'ам/Store.
+ * Pure command parser. Returns null if the string is NOT a command (does not start with '/').
+ * Ported from CommandProcessor parsing; execution is delegated to separate use-cases/Store.
  */
 class ParseCommandUseCase {
 

@@ -1,8 +1,8 @@
 package com.bitchat.android.core.domain.usecase
 
 /**
- * Чистый парсинг @-упоминаний. Возвращает только те ники, что реально известны
- * ([knownNicknames] = ники пиров + собственный). Перенос логики MessageManager.parseMentions.
+ * Pure parsing of @-mentions. Returns only the nicknames that are actually known
+ * ([knownNicknames] = peer nicknames + own). Ported from MessageManager.parseMentions.
  */
 class ParseMentionsUseCase {
 

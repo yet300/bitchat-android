@@ -1,23 +1,24 @@
 package com.bitchat.android.core.domain.model
 
 /**
- * Адрес собеседника. В bitchat одна и та же «строка-адрес» может означать три разные вещи,
- * и бизнес-логика маршрутизации/резолва постоянно их различает. Тип [PeerId] делает это
- * различие явным и собирает классификацию в одном месте (вместо regex по всему коду).
+ * Address of a conversation peer. In bitchat the same "address string" can mean three
+ * different things, and the routing/resolution business logic constantly distinguishes
+ * between them. [PeerId] makes that distinction explicit and centralizes the classification
+ * in a single place (instead of regex parsing scattered across the codebase).
  *
- * Чистый value-объект (KMP-ready, без Android/транспортных типов).
+ * Pure value object (KMP-ready, no Android/transport types).
  */
 @JvmInline
 value class PeerId(val raw: String) {
 
     enum class Kind {
-        /** Эфемерный mesh peerID (16 hex) — живёт только пока есть BLE-сессия. */
+        /** Ephemeral mesh peerID (16 hex) — lives only while a BLE session exists. */
         MESH_EPHEMERAL,
 
-        /** Noise static public key (64 hex) — стабильная межсессионная личность. */
+        /** Noise static public key (64 hex) — stable cross-session identity. */
         NOISE_STABLE,
 
-        /** Nostr/гео-DM алиас (`nostr_<pub16>`). */
+        /** Nostr / geohash-DM alias (`nostr_<pub16>`). */
         NOSTR_ALIAS,
     }
 
