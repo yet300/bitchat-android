@@ -1,5 +1,7 @@
 package com.app.domain.repository
 
+import com.app.domain.model.Attachment
+import com.app.domain.model.ConversationId
 import com.app.domain.model.GeohashChannel
 import com.app.domain.model.PeerId
 
@@ -17,6 +19,12 @@ interface MessageTransport {
 
     /** Message to a geo-chat (Nostr ephemeral event). */
     suspend fun sendGeohash(content: String, channel: GeohashChannel, nickname: String?)
+
+    /** Send a media attachment to the target conversation. */
+    suspend fun sendAttachment(attachment: Attachment, target: ConversationId, messageId: String)
+
+    /** Cancel an in-flight attachment transfer. Returns true if it was cancelled. */
+    suspend fun cancelTransfer(messageId: String): Boolean
 
     /** Read receipt. */
     suspend fun sendReadReceipt(messageId: String, to: PeerId)
