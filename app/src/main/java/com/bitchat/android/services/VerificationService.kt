@@ -2,10 +2,10 @@ package com.bitchat.android.services
 
 import android.net.Uri
 import android.util.Base64
-import com.bitchat.android.crypto.EncryptionService
+import com.app.crypto.EncryptionService
 import com.bitchat.android.util.AppConstants
-import com.bitchat.android.util.dataFromHexString
-import com.bitchat.android.util.hexEncodedString
+import com.app.common.encoding.dataFromHexString
+import com.app.common.encoding.hexEncodedString
 import java.io.ByteArrayOutputStream
 import java.security.SecureRandom
 import androidx.core.net.toUri

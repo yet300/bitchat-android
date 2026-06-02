@@ -2,8 +2,8 @@ package com.bitchat.android.services
 
 import android.content.Context
 import android.util.Log
-import com.bitchat.android.identity.SecureIdentityStateManager
-import com.bitchat.android.serialization.JsonConfig
+import com.app.crypto.identity.SecureIdentityStateManager
+import com.app.common.serialization.JsonConfig
 import kotlinx.serialization.Serializable
 
 /**

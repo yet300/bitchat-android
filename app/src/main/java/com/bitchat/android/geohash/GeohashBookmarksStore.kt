@@ -6,7 +6,7 @@ import android.location.Location
 import android.location.LocationManager
 import android.util.Log
 import com.bitchat.android.core.data.appSettings
-import com.bitchat.android.serialization.JsonConfig
+import com.app.common.serialization.JsonConfig
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer

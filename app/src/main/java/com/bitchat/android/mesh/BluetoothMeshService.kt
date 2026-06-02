@@ -2,7 +2,7 @@ package com.bitchat.android.mesh
 
 import android.content.Context
 import android.util.Log
-import com.bitchat.android.crypto.EncryptionService
+import com.app.crypto.EncryptionService
 import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.protocol.MessagePadding
 import com.bitchat.android.model.RoutedPacket
@@ -1188,7 +1188,7 @@ class BluetoothMeshService(private val context: Context) {
     /**
      * Get session state for a peer (for UI state display)
      */
-    fun getSessionState(peerID: String): com.bitchat.android.noise.NoiseSession.NoiseSessionState {
+    fun getSessionState(peerID: String): com.app.crypto.noise.NoiseSession.NoiseSessionState {
         return encryptionService.getSessionState(peerID)
     }
     

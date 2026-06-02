@@ -2,7 +2,7 @@ package com.bitchat.android.nostr
 
 import android.content.Context
 import android.util.Log
-import com.bitchat.android.identity.SecureIdentityStateManager
+import com.app.crypto.identity.SecureIdentityStateManager
 import java.security.MessageDigest
 import java.security.SecureRandom
 

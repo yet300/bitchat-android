@@ -83,6 +83,10 @@ android {
 }
 
 dependencies {
+    // Project modules
+    implementation(projects.core.common)
+    implementation(projects.core.crypto)
+
     // Core Android dependencies
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

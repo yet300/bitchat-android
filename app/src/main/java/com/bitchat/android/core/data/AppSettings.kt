@@ -15,7 +15,7 @@ import com.russhwolf.settings.SharedPreferencesSettings
  * singleton — call sites already depend only on the `Settings` API.
  *
  * Secrets at rest (identity / signing keys, fingerprints) go through
- * [com.bitchat.android.core.data.secure.SecureKeyValueStore] (Tink), not here —
+ * [com.app.crypto.secure.SecureKeyValueStore] (Tink), not here —
  * this store is not encrypted.
  */
 fun appSettings(context: Context): ObservableSettings = AppSettings.get(context)

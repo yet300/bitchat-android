@@ -1,3 +1,6 @@
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
+rootProject.name = "bitchat-android"
+
 pluginManagement {
     includeBuild("build-logic")
     repositories {
@@ -16,9 +19,9 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "bitchat-android"
 include(":app")
 
 include(":core")
 include(":core:common")
 include(":core:domain")
+include(":core:crypto")
