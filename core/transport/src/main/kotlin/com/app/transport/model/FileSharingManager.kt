@@ -1,9 +1,9 @@
-package com.bitchat.android.model
+package com.app.transport.model
 
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import com.bitchat.android.features.file.FileUtils
+import com.app.transport.features.file.FileUtils
 import java.io.File
 
 /**

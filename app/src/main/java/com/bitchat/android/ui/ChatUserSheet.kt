@@ -16,7 +16,7 @@ import com.bitchat.android.R
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import com.bitchat.android.core.ui.component.sheet.BitchatBottomSheet
-import com.bitchat.android.model.BitchatMessage
+import com.app.transport.model.BitchatMessage
 
 /**
  * User Action Sheet for selecting actions on a specific user (slap, hug, block)

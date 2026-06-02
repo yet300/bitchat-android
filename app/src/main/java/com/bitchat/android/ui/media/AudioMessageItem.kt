@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import com.bitchat.android.R
 import com.bitchat.android.mesh.BluetoothMeshService
-import com.bitchat.android.model.BitchatMessage
+import com.app.transport.model.BitchatMessage
 import androidx.compose.material3.ColorScheme
 import com.bitchat.android.ui.TimeFormatter
 
@@ -41,7 +41,7 @@ fun AudioMessageItem(
     val path = message.content.trim()
     // Derive sending progress if applicable
     val (overrideProgress, overrideColor) = when (val st = message.deliveryStatus) {
-        is com.bitchat.android.model.DeliveryStatus.PartiallyDelivered -> {
+        is com.app.transport.model.DeliveryStatus.PartiallyDelivered -> {
             if (st.total > 0 && st.reached < st.total) {
                 (st.reached.toFloat() / st.total.toFloat()) to Color(0xFF1E88E5) // blue while sending
             } else null to null
@@ -83,7 +83,7 @@ fun AudioMessageItem(
                 progressOverride = overrideProgress,
                 progressColor = overrideColor
             )
-            val showCancel = message.sender == currentUserNickname && (message.deliveryStatus is com.bitchat.android.model.DeliveryStatus.PartiallyDelivered)
+            val showCancel = message.sender == currentUserNickname && (message.deliveryStatus is com.app.transport.model.DeliveryStatus.PartiallyDelivered)
             if (showCancel) {
                 Spacer(Modifier.width(8.dp))
                 Box(

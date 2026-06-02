@@ -1,4 +1,4 @@
-package com.bitchat.android.protocol
+package com.app.transport.protocol
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -98,7 +98,7 @@ data class BitchatPacket(
             payload = payload,
             signature = null, // Remove signature for signing
             route = route,
-            ttl = com.bitchat.android.util.AppConstants.SYNC_TTL_HOPS // Use fixed TTL=0 for signing to ensure relay compatibility
+            ttl = 0u.toUByte() // Use fixed TTL=0 for signing to ensure relay compatibility
         )
         return BinaryProtocol.encode(unsignedPacket)
     }
@@ -182,6 +182,7 @@ object BinaryProtocol {
     private const val SENDER_ID_SIZE = 8
     private const val RECIPIENT_ID_SIZE = 8
     private const val SIGNATURE_SIZE = 64
+    private const val MAX_PAYLOAD_LENGTH = 10_485_760  // 10 MiB — wire-level payload cap, same as iOS
 
     object Flags {
         const val HAS_RECIPIENT: UByte = 0x01u
@@ -364,8 +365,8 @@ object BinaryProtocol {
                 buffer.getShort().toUShort().toUInt()  // 2 bytes for v1, convert to UInt
             }
 
-            if (payloadLength.toLong() > com.bitchat.android.util.AppConstants.Protocol.MAX_PAYLOAD_LENGTH.toLong()) {
-                Log.w("BinaryProtocol", "Payload length ${payloadLength} exceeds maximum allowed (${com.bitchat.android.util.AppConstants.Protocol.MAX_PAYLOAD_LENGTH})")
+            if (payloadLength.toLong() > MAX_PAYLOAD_LENGTH.toLong()) {
+                Log.w("BinaryProtocol", "Payload length ${payloadLength} exceeds maximum allowed (${MAX_PAYLOAD_LENGTH})")
                 return null
             }
 

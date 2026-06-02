@@ -2,10 +2,10 @@ package com.bitchat.android.sync
 
 import android.util.Log
 import com.bitchat.android.mesh.BluetoothPacketBroadcaster
-import com.bitchat.android.model.RequestSyncPacket
-import com.bitchat.android.protocol.BitchatPacket
-import com.bitchat.android.protocol.MessageType
-import com.bitchat.android.protocol.SpecialRecipients
+import com.app.transport.model.RequestSyncPacket
+import com.app.transport.protocol.BitchatPacket
+import com.app.transport.protocol.MessageType
+import com.app.transport.protocol.SpecialRecipients
 import kotlinx.coroutines.*
 import java.util.concurrent.ConcurrentHashMap
 

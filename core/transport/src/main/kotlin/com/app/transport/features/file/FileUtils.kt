@@ -1,8 +1,10 @@
-package com.bitchat.android.features.file
+package com.app.transport.features.file
 
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import com.app.transport.model.BitchatFilePacket
+import com.app.transport.model.BitchatMessageType
 import java.io.File
 import java.io.FileOutputStream
 
@@ -188,7 +190,7 @@ object FileUtils {
      */
     fun saveIncomingFile(
         context: Context,
-        file: com.bitchat.android.model.BitchatFilePacket
+        file: BitchatFilePacket
     ): String {
         val lowerMime = file.mimeType.lowercase()
         val isImage = lowerMime.startsWith("image/")
@@ -260,12 +262,12 @@ object FileUtils {
     /**
      * Classify BitchatMessageType from MIME string used in file messages.
      */
-    fun messageTypeForMime(mime: String): com.bitchat.android.model.BitchatMessageType {
+    fun messageTypeForMime(mime: String): BitchatMessageType {
         val lower = mime.lowercase()
         return when {
-            lower.startsWith("image/") -> com.bitchat.android.model.BitchatMessageType.Image
-            lower.startsWith("audio/") -> com.bitchat.android.model.BitchatMessageType.Audio
-            else -> com.bitchat.android.model.BitchatMessageType.File
+            lower.startsWith("image/") -> BitchatMessageType.Image
+            lower.startsWith("audio/") -> BitchatMessageType.Audio
+            else -> BitchatMessageType.File
         }
     }
 

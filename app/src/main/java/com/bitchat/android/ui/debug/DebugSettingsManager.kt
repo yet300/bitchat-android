@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlin.time.Instant
 import kotlin.time.Clock
 import java.util.concurrent.ConcurrentLinkedQueue
-import com.bitchat.android.protocol.BitchatPacket
+import com.app.transport.protocol.BitchatPacket
 import com.bitchat.android.util.toHexString
 import kotlin.time.ExperimentalTime
 

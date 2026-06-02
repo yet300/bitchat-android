@@ -1,4 +1,4 @@
-package com.bitchat.android.serialization
+package com.app.transport.serialization
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind

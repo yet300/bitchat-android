@@ -7,7 +7,7 @@ import com.bitchat.android.R
 import com.bitchat.android.favorites.FavoritesPersistenceService
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.bitchat.android.mesh.BluetoothMeshService
-import com.bitchat.android.model.BitchatMessage
+import com.app.transport.model.BitchatMessage
 import com.app.crypto.noise.NoiseSession
 import com.bitchat.android.nostr.GeohashAliasRegistry
 import com.bitchat.android.services.VerificationService

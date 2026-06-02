@@ -2,39 +2,28 @@
 
 package com.bitchat.android.ui
 
-import kotlin.time.Instant
 
 import android.app.Application
 import android.util.Log
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.bitchat.android.favorites.FavoritesPersistenceService
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import com.bitchat.android.mesh.BluetoothMeshDelegate
-import com.bitchat.android.mesh.BluetoothMeshService
-import com.bitchat.android.service.MeshServiceHolder
-import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.model.BitchatMessageType
-import com.bitchat.android.nostr.NostrIdentityBridge
-import com.bitchat.android.protocol.BitchatPacket
-
-
-import kotlinx.coroutines.launch
-import com.bitchat.android.util.NotificationIntervalManager
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlin.time.Clock
-import kotlin.random.Random
-import com.bitchat.android.services.VerificationService
+import com.app.common.encoding.hexEncodedString
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.crypto.noise.NoiseSession
-import com.bitchat.android.nostr.GeohashAliasRegistry
-import com.app.common.encoding.dataFromHexString
-import com.app.common.encoding.hexEncodedString
-import java.security.MessageDigest
+import com.app.transport.model.BitchatMessage
+import com.bitchat.android.favorites.FavoritesPersistenceService
+import com.bitchat.android.mesh.BluetoothMeshDelegate
+import com.bitchat.android.mesh.BluetoothMeshService
+import com.bitchat.android.nostr.NostrIdentityBridge
+import com.bitchat.android.service.MeshServiceHolder
+import com.bitchat.android.services.VerificationService
+import com.bitchat.android.util.NotificationIntervalManager
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import kotlin.random.Random
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 /**
@@ -933,7 +922,7 @@ class ChatViewModel(
         notificationManager.clearAllNotifications()
 
         // Clear all media files
-        com.bitchat.android.features.file.FileUtils.clearAllMedia(getApplication())
+        com.app.transport.features.file.FileUtils.clearAllMedia(getApplication())
         
         // Clear Nostr/geohash state, keys, connections, bookmarks, and reinitialize from scratch
         try {

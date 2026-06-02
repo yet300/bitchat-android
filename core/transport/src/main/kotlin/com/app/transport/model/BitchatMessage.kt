@@ -1,9 +1,9 @@
 @file:UseSerializers(DateSerializer::class)
 @file:OptIn(ExperimentalTime::class)
 
-package com.bitchat.android.model
+package com.app.transport.model
 
-import com.bitchat.android.serialization.DateSerializer
+import com.app.transport.serialization.DateSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 import java.nio.ByteBuffer

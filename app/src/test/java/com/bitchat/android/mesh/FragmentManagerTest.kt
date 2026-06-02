@@ -1,8 +1,8 @@
 package com.bitchat.android.mesh
 
-import com.bitchat.android.protocol.BitchatPacket
-import com.bitchat.android.protocol.MessageType
-import com.bitchat.android.model.FragmentPayload
+import com.app.transport.protocol.BitchatPacket
+import com.app.transport.protocol.MessageType
+import com.app.transport.model.FragmentPayload
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue

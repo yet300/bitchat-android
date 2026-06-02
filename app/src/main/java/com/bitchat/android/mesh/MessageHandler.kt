@@ -3,15 +3,22 @@
 package com.bitchat.android.mesh
 
 import android.util.Log
-import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.model.BitchatMessageType
-import com.bitchat.android.model.IdentityAnnouncement
-import com.bitchat.android.model.RoutedPacket
-import com.bitchat.android.protocol.BitchatPacket
-import com.bitchat.android.protocol.MessageType
+import com.app.transport.features.file.FileUtils
+import com.app.transport.model.BitchatFilePacket
+import com.app.transport.model.BitchatMessage
+import com.app.transport.model.IdentityAnnouncement
+import com.app.transport.model.NoisePayload
+import com.app.transport.model.NoisePayloadType
+import com.app.transport.model.PrivateMessagePacket
+import com.app.transport.model.RoutedPacket
+import com.app.transport.protocol.BitchatPacket
+import com.app.transport.protocol.MessageType
 import com.bitchat.android.util.toHexString
-import kotlinx.coroutines.*
-import kotlin.random.Random
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -69,7 +76,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
             }
             
             // NEW: Use NoisePayload system exactly like iOS
-            val noisePayload = com.bitchat.android.model.NoisePayload.decode(decryptedData)
+            val noisePayload = NoisePayload.decode(decryptedData)
             if (noisePayload == null) {
                 Log.w(TAG, "Failed to parse NoisePayload from $peerID")
                 return
@@ -78,9 +85,9 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
             Log.d(TAG, "🔓 Decrypted NoisePayload type ${noisePayload.type} from $peerID")
             
             when (noisePayload.type) {
-                com.bitchat.android.model.NoisePayloadType.PRIVATE_MESSAGE -> {
+                NoisePayloadType.PRIVATE_MESSAGE -> {
                     // Decode TLV private message exactly like iOS
-                    val privateMessage = com.bitchat.android.model.PrivateMessagePacket.decode(noisePayload.data)
+                    val privateMessage = PrivateMessagePacket.decode(noisePayload.data)
                     if (privateMessage != null) {
                         Log.d(TAG, "🔓 Decrypted TLV PM from $peerID: ${privateMessage.content.take(30)}...")
 
@@ -115,18 +122,18 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
                     }
                 }
                 
-                com.bitchat.android.model.NoisePayloadType.FILE_TRANSFER -> {
+                NoisePayloadType.FILE_TRANSFER -> {
                     // Handle encrypted file transfer; generate unique message ID
-                    val file = com.bitchat.android.model.BitchatFilePacket.decode(noisePayload.data)
+                    val file = BitchatFilePacket.decode(noisePayload.data)
                     if (file != null) {
                         Log.d(TAG, "🔓 Decrypted encrypted file from $peerID: name='${file.fileName}', size=${file.fileSize}, mime='${file.mimeType}'")
                         val uniqueMsgId = java.util.UUID.randomUUID().toString().uppercase()
-                        val savedPath = com.bitchat.android.features.file.FileUtils.saveIncomingFile(appContext, file)
+                        val savedPath = FileUtils.saveIncomingFile(appContext, file)
                         val message = BitchatMessage(
                             id = uniqueMsgId,
                             sender = delegate?.getPeerNickname(peerID) ?: "Unknown",
                             content = savedPath,
-                            type = com.bitchat.android.features.file.FileUtils.messageTypeForMime(file.mimeType),
+                            type = FileUtils.messageTypeForMime(file.mimeType),
                             timestamp = Instant.fromEpochMilliseconds(packet.timestamp.toLong()),
                             isRelay = false,
                             isPrivate = true,
@@ -144,7 +151,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
                     }
                 }
                 
-                com.bitchat.android.model.NoisePayloadType.DELIVERED -> {
+                NoisePayloadType.DELIVERED -> {
                     // Handle delivery ACK exactly like iOS
                     val messageID = String(noisePayload.data, Charsets.UTF_8)
                     Log.d(TAG, "📬 Delivery ACK received from $peerID for message $messageID")
@@ -153,7 +160,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
                     delegate?.onDeliveryAckReceived(messageID, peerID)
                 }
                 
-                com.bitchat.android.model.NoisePayloadType.READ_RECEIPT -> {
+                NoisePayloadType.READ_RECEIPT -> {
                     // Handle read receipt exactly like iOS
                     val messageID = String(noisePayload.data, Charsets.UTF_8)
                     Log.d(TAG, "👁️ Read receipt received from $peerID for message $messageID")
@@ -161,11 +168,11 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
                     // Simplified: Call delegate with messageID and peerID directly
                     delegate?.onReadReceiptReceived(messageID, peerID)
                 }
-                com.bitchat.android.model.NoisePayloadType.VERIFY_CHALLENGE -> {
+                NoisePayloadType.VERIFY_CHALLENGE -> {
                     Log.d(TAG, "🔐 Verify challenge received from $peerID (${noisePayload.data.size} bytes)")
                     delegate?.onVerifyChallengeReceived(peerID, noisePayload.data, packet.timestamp.toLong())
                 }
-                com.bitchat.android.model.NoisePayloadType.VERIFY_RESPONSE -> {
+                NoisePayloadType.VERIFY_RESPONSE -> {
                     Log.d(TAG, "🔐 Verify response received from $peerID (${noisePayload.data.size} bytes)")
                     delegate?.onVerifyResponseReceived(peerID, noisePayload.data, packet.timestamp.toLong())
                 }
@@ -182,8 +189,8 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
     private suspend fun sendDeliveryAck(messageID: String, senderPeerID: String) {
         try {
             // Create ACK payload: [type byte] + [message ID] - exactly like iOS
-            val ackPayload = com.bitchat.android.model.NoisePayload(
-                type = com.bitchat.android.model.NoisePayloadType.DELIVERED,
+            val ackPayload = NoisePayload(
+                type = NoisePayloadType.DELIVERED,
                 data = messageID.toByteArray(Charsets.UTF_8)
             )
             
@@ -396,18 +403,18 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
         
         try {
             // Try file packet first (voice, image, etc.) and log outcome for FILE_TRANSFER
-            val isFileTransfer = com.bitchat.android.protocol.MessageType.fromValue(packet.type) == com.bitchat.android.protocol.MessageType.FILE_TRANSFER
-            val file = com.bitchat.android.model.BitchatFilePacket.decode(packet.payload)
+            val isFileTransfer = MessageType.fromValue(packet.type) == com.app.transport.protocol.MessageType.FILE_TRANSFER
+            val file = BitchatFilePacket.decode(packet.payload)
             if (file != null) {
                 if (isFileTransfer) {
                     Log.d(TAG, "📥 FILE_TRANSFER decode success (broadcast): name='${file.fileName}', size=${file.fileSize}, mime='${file.mimeType}', from=${peerID.take(8)}")
                 }
-                val savedPath = com.bitchat.android.features.file.FileUtils.saveIncomingFile(appContext, file)
+                val savedPath = FileUtils.saveIncomingFile(appContext, file)
                 val message = BitchatMessage(
                     id = java.util.UUID.randomUUID().toString().uppercase(),
                     sender = delegate?.getPeerNickname(peerID) ?: "unknown",
                     content = savedPath,
-                    type = com.bitchat.android.features.file.FileUtils.messageTypeForMime(file.mimeType),
+                    type = FileUtils.messageTypeForMime(file.mimeType),
                     senderPeerID = peerID,
                     timestamp = Instant.fromEpochMilliseconds(packet.timestamp.toLong())
                 )
@@ -443,18 +450,18 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
             }
 
             // Try file packet first (voice, image, etc.) and log outcome for FILE_TRANSFER
-            val isFileTransfer = com.bitchat.android.protocol.MessageType.fromValue(packet.type) == com.bitchat.android.protocol.MessageType.FILE_TRANSFER
-            val file = com.bitchat.android.model.BitchatFilePacket.decode(packet.payload)
+            val isFileTransfer = MessageType.fromValue(packet.type) == com.app.transport.protocol.MessageType.FILE_TRANSFER
+            val file = BitchatFilePacket.decode(packet.payload)
             if (file != null) {
                 if (isFileTransfer) {
                     Log.d(TAG, "📥 FILE_TRANSFER decode success (private): name='${file.fileName}', size=${file.fileSize}, mime='${file.mimeType}', from=${peerID.take(8)}")
                 }
-                val savedPath = com.bitchat.android.features.file.FileUtils.saveIncomingFile(appContext, file)
+                val savedPath = FileUtils.saveIncomingFile(appContext, file)
                 val message = BitchatMessage(
                     id = java.util.UUID.randomUUID().toString().uppercase(),
                     sender = delegate?.getPeerNickname(peerID) ?: "unknown",
                     content = savedPath,
-                    type = com.bitchat.android.features.file.FileUtils.messageTypeForMime(file.mimeType),
+                    type = FileUtils.messageTypeForMime(file.mimeType),
                     senderPeerID = peerID,
                     timestamp = Instant.fromEpochMilliseconds(packet.timestamp.toLong()),
                     isPrivate = true,
@@ -576,7 +583,7 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
 
                 // Emit system message via delegate callback
                 val action = if (isFavorite) "favorited" else "unfavorited"
-                val sys = com.bitchat.android.model.BitchatMessage(
+                val sys = BitchatMessage(
                     sender = "system",
                     content = "${peerInfo.nickname} $action you$guidance",
                     timestamp = Clock.System.now(),

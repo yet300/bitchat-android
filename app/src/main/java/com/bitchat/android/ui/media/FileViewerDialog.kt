@@ -25,8 +25,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.bitchat.android.R
-import com.bitchat.android.features.file.FileUtils
-import com.bitchat.android.model.BitchatFilePacket
+import com.app.transport.features.file.FileUtils
+import com.app.transport.model.BitchatFilePacket
 import kotlinx.coroutines.launch
 import java.io.File
 

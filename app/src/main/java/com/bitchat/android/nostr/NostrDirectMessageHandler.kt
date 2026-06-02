@@ -2,13 +2,15 @@ package com.bitchat.android.nostr
 
 import android.app.Application
 import android.util.Log
-import com.bitchat.android.model.BitchatFilePacket
-import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.model.DeliveryStatus
-import com.bitchat.android.model.NoisePayload
-import com.bitchat.android.model.NoisePayloadType
-import com.bitchat.android.model.PrivateMessagePacket
-import com.bitchat.android.protocol.BitchatPacket
+import com.app.transport.features.file.FileUtils
+import com.app.transport.model.BitchatFilePacket
+import com.app.transport.model.BitchatMessage
+import com.app.transport.model.DeliveryStatus
+import com.app.transport.model.NoisePayload
+import com.app.transport.model.NoisePayloadType
+import com.app.transport.model.PrivateMessagePacket
+import com.app.transport.protocol.BitchatPacket
+import com.app.transport.protocol.MessageType
 import com.bitchat.android.services.SeenMessageStore
 import com.bitchat.android.ui.ChatState
 import com.bitchat.android.ui.MeshDelegateHandler
@@ -76,7 +78,7 @@ class NostrDirectMessageHandler(
                 val packetData = base64URLDecode(base64Content) ?: return@launch
                 val packet = BitchatPacket.fromBinaryData(packetData) ?: return@launch
 
-                if (packet.type != com.bitchat.android.protocol.MessageType.NOISE_ENCRYPTED.value) return@launch
+                if (packet.type != MessageType.NOISE_ENCRYPTED.value) return@launch
 
                 val noisePayload = NoisePayload.decode(packet.payload) ?: return@launch
                 val messageTimestamp = Instant.fromEpochMilliseconds(giftWrap.createdAt * 1000L)
@@ -172,12 +174,12 @@ class NostrDirectMessageHandler(
                 val file = BitchatFilePacket.decode(payload.data)
                 if (file != null) {
                     val uniqueMsgId = java.util.UUID.randomUUID().toString().uppercase()
-                    val savedPath = com.bitchat.android.features.file.FileUtils.saveIncomingFile(application, file)
+                    val savedPath = FileUtils.saveIncomingFile(application, file)
                     val message = BitchatMessage(
                         id = uniqueMsgId,
                         sender = senderNickname,
                         content = savedPath,
-                        type = com.bitchat.android.features.file.FileUtils.messageTypeForMime(file.mimeType),
+                        type = FileUtils.messageTypeForMime(file.mimeType),
                         timestamp = timestamp,
                         isRelay = false,
                         isPrivate = true,

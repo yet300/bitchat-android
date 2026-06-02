@@ -2,16 +2,15 @@
 
 package com.bitchat
 
-import com.bitchat.android.model.BitchatFilePacket
-import com.bitchat.android.model.BitchatMessage
-import com.bitchat.android.model.BitchatMessageType
+import com.app.transport.model.BitchatFilePacket
+import com.app.transport.model.BitchatMessage
+import com.app.transport.model.BitchatMessageType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.ConscryptMode
-import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.time.Clock

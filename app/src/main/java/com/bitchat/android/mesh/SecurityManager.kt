@@ -2,9 +2,10 @@ package com.bitchat.android.mesh
 
 import android.util.Log
 import com.app.crypto.EncryptionService
-import com.bitchat.android.protocol.BitchatPacket
-import com.bitchat.android.protocol.MessageType
-import com.bitchat.android.model.RoutedPacket
+import com.app.transport.model.IdentityAnnouncement
+import com.app.transport.protocol.BitchatPacket
+import com.app.transport.protocol.MessageType
+import com.app.transport.model.RoutedPacket
 import com.bitchat.android.util.toHexString
 import kotlinx.coroutines.*
 import java.util.*
@@ -257,7 +258,7 @@ class SecurityManager(private val encryptionService: EncryptionService, private 
             if (MessageType.fromValue(packet.type) == MessageType.ANNOUNCE) {
                 // Special Case: ANNOUNCE packets carry their own signing key
                 try {
-                    val announcement = com.bitchat.android.model.IdentityAnnouncement.decode(packet.payload)
+                    val announcement = IdentityAnnouncement.decode(packet.payload)
                     signingPublicKey = announcement?.signingPublicKey
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed to decode announcement for key extraction: ${e.message}")

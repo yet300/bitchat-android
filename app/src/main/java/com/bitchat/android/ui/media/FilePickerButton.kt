@@ -16,7 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import com.bitchat.android.R
-import com.bitchat.android.features.file.FileUtils
+import com.app.transport.features.file.FileUtils
 
 @Composable
 fun FilePickerButton(

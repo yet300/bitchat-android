@@ -1,6 +1,6 @@
 package com.bitchat.android.sync
 
-import com.bitchat.android.protocol.BitchatPacket
+import com.app.transport.protocol.BitchatPacket
 import java.security.MessageDigest
 
 /**

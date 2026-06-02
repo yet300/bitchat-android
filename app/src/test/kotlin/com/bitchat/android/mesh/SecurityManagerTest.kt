@@ -2,9 +2,9 @@ package com.bitchat.android.mesh
 
 import android.os.Build
 import com.app.crypto.EncryptionService
-import com.bitchat.android.model.IdentityAnnouncement
-import com.bitchat.android.protocol.BitchatPacket
-import com.bitchat.android.protocol.MessageType
+import com.app.transport.model.IdentityAnnouncement
+import com.app.transport.protocol.BitchatPacket
+import com.app.transport.protocol.MessageType
 import org.junit.After
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
