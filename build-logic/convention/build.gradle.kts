@@ -8,6 +8,10 @@ gradlePlugin {
             id = "com.plugins.kotlinMultiplatformPlugin"
             implementationClass = "com.yet.plugins.KotlinMultiplatformPlugin"
         }
+        register("androidLibrary") {
+            id = "com.plugins.androidLibraryPlugin"
+            implementationClass = "com.yet.plugins.AndroidLibraryPlugin"
+        }
     }
 }
 
