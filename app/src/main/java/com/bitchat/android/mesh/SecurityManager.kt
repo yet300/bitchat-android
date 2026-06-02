@@ -1,7 +1,7 @@
 package com.bitchat.android.mesh
 
 import android.util.Log
-import com.bitchat.android.crypto.EncryptionService
+import com.app.crypto.EncryptionService
 import com.bitchat.android.protocol.BitchatPacket
 import com.bitchat.android.protocol.MessageType
 import com.bitchat.android.model.RoutedPacket

@@ -29,11 +29,11 @@ import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import kotlin.random.Random
 import com.bitchat.android.services.VerificationService
-import com.bitchat.android.identity.SecureIdentityStateManager
-import com.bitchat.android.noise.NoiseSession
+import com.app.crypto.identity.SecureIdentityStateManager
+import com.app.crypto.noise.NoiseSession
 import com.bitchat.android.nostr.GeohashAliasRegistry
-import com.bitchat.android.util.dataFromHexString
-import com.bitchat.android.util.hexEncodedString
+import com.app.common.encoding.dataFromHexString
+import com.app.common.encoding.hexEncodedString
 import java.security.MessageDigest
 import kotlin.time.ExperimentalTime
 
@@ -618,7 +618,7 @@ class ChatViewModel(
 
             if (noiseKey != null) {
                 // Determine current favorite state from DataManager using fingerprint
-                val identityManager = com.bitchat.android.identity.SecureIdentityStateManager(getApplication())
+                val identityManager = com.app.crypto.identity.SecureIdentityStateManager(getApplication())
                 val fingerprint = identityManager.generateFingerprint(noiseKey!!)
                 val isNowFavorite = dataManager.favoritePeers.contains(fingerprint)
 

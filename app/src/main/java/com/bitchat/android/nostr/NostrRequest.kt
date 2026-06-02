@@ -1,6 +1,6 @@
 package com.bitchat.android.nostr
 
-import com.bitchat.android.serialization.JsonConfig
+import com.app.common.serialization.JsonConfig
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable

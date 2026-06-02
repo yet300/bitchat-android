@@ -26,6 +26,14 @@ internal fun Project.configureAndroidLibrary(
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
+    // Local unit tests run on the JVM via Robolectric (Tink/Context need an Android runtime).
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 /** Default dependencies shared by Android library modules. */
@@ -34,5 +42,6 @@ internal fun Project.configureAndroidLibraryDependencies() {
         add("api", libs.findLibrary("kotlinx-coroutines-core").get())
         add("api", libs.findLibrary("kotlinx-serialization-json").get())
         add("api", libs.findLibrary("kotlinx-datetime").get())
+        add("testImplementation", libs.findBundle("android-testing").get())
     }
 }

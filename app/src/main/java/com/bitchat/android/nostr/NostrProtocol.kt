@@ -1,7 +1,7 @@
 package com.bitchat.android.nostr
 
 import android.util.Log
-import com.bitchat.android.serialization.JsonConfig
+import com.app.common.serialization.JsonConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

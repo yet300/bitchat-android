@@ -3,7 +3,7 @@ package com.bitchat.android.ui
 import android.content.Context
 import android.util.Log
 import com.bitchat.android.core.data.appSettings
-import com.bitchat.android.serialization.JsonConfig
+import com.app.common.serialization.JsonConfig
 import com.russhwolf.settings.Settings
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.SetSerializer

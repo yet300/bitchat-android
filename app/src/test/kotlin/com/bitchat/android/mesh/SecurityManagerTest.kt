@@ -1,7 +1,7 @@
 package com.bitchat.android.mesh
 
 import android.os.Build
-import com.bitchat.android.crypto.EncryptionService
+import com.app.crypto.EncryptionService
 import com.bitchat.android.model.IdentityAnnouncement
 import com.bitchat.android.protocol.BitchatPacket
 import com.bitchat.android.protocol.MessageType

@@ -13,7 +13,7 @@ import androidx.core.app.ActivityCompat
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import kotlinx.coroutines.*
-import com.bitchat.android.serialization.JsonConfig
+import com.app.common.serialization.JsonConfig
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.coroutines.flow.MutableStateFlow

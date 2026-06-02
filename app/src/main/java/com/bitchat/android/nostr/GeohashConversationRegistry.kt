@@ -2,7 +2,7 @@ package com.bitchat.android.nostr
 
 import android.content.Context
 import com.bitchat.android.core.data.appSettings
-import com.bitchat.android.serialization.JsonConfig
+import com.app.common.serialization.JsonConfig
 import com.russhwolf.settings.Settings
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
