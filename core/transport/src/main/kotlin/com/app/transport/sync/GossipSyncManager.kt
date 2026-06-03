@@ -1,7 +1,6 @@
-package com.bitchat.android.sync
+package com.app.transport.sync
 
 import android.util.Log
-import com.bitchat.android.mesh.BluetoothPacketBroadcaster
 import com.app.transport.model.RequestSyncPacket
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
@@ -33,6 +32,10 @@ class GossipSyncManager(
 
     companion object {
         private const val TAG = "GossipSyncManager"
+
+        // Ignore ANNOUNCE packets older than this (matches the mesh stale-peer timeout, 3 minutes).
+        // Inlined to keep sync independent of the mesh layer's AppConstants.
+        private const val STALE_ANNOUNCE_MAX_AGE_MS: Long = 180_000L
     }
 
     var delegate: Delegate? = null
@@ -66,7 +69,7 @@ class GossipSyncManager(
         cleanupJob = scope.launch(Dispatchers.IO) {
             while (isActive) {
                 try {
-                    delay(com.bitchat.android.util.AppConstants.Sync.CLEANUP_INTERVAL_MS)
+                    delay(SyncDefaults.CLEANUP_INTERVAL_MS)
                     pruneStaleAnnouncements()
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) { Log.e(TAG, "Periodic cleanup error: ${e.message}") }
@@ -117,8 +120,8 @@ class GossipSyncManager(
             // Ignore stale announcements older than STALE_PEER_TIMEOUT
             val now = System.currentTimeMillis()
             val age = now - packet.timestamp.toLong()
-            if (age > com.bitchat.android.util.AppConstants.Mesh.STALE_PEER_TIMEOUT_MS) {
-                Log.d(TAG, "Ignoring stale ANNOUNCE (age=${age}ms > ${com.bitchat.android.util.AppConstants.Mesh.STALE_PEER_TIMEOUT_MS}ms)")
+            if (age > STALE_ANNOUNCE_MAX_AGE_MS) {
+                Log.d(TAG, "Ignoring stale ANNOUNCE (age=${age}ms > ${STALE_ANNOUNCE_MAX_AGE_MS}ms)")
                 return
             }
             // senderID is fixed-size 8 bytes; map to hex string for key
@@ -141,7 +144,7 @@ class GossipSyncManager(
             senderID = hexStringToByteArray(myPeerID),
             timestamp = System.currentTimeMillis().toULong(),
             payload = payload,
-            ttl = com.bitchat.android.util.AppConstants.SYNC_TTL_HOPS // neighbors only
+            ttl = SyncDefaults.SYNC_TTL_HOPS // neighbors only
         )
         // Sign and broadcast
         val signed = delegate?.signPacketForBroadcast(packet) ?: packet
@@ -157,7 +160,7 @@ class GossipSyncManager(
             recipientID = hexStringToByteArray(peerID),
             timestamp = System.currentTimeMillis().toULong(),
             payload = payload,
-            ttl = com.bitchat.android.util.AppConstants.SYNC_TTL_HOPS // neighbor only
+            ttl = SyncDefaults.SYNC_TTL_HOPS // neighbor only
         )
         Log.d(TAG, "Sending sync request to $peerID (${payload.size} bytes)")
         // Sign and send directly to peer
@@ -185,7 +188,7 @@ class GossipSyncManager(
             val idBytes = hexToBytes(id)
             if (!mightContain(idBytes)) {
                 // Send original packet unchanged to requester only (keep local TTL)
-                val toSend = pkt.copy(ttl = com.bitchat.android.util.AppConstants.SYNC_TTL_HOPS)
+                val toSend = pkt.copy(ttl = SyncDefaults.SYNC_TTL_HOPS)
                 delegate?.sendPacketToPeer(fromPeerID, toSend)
                 Log.d(TAG, "Sent sync announce: Type ${toSend.type} from ${toSend.senderID.toHexString()} to $fromPeerID packet id ${idBytes.toHexString()}")
             }
@@ -196,7 +199,7 @@ class GossipSyncManager(
         for (pkt in toSendMsgs) {
             val idBytes = PacketIdUtil.computeIdBytes(pkt)
             if (!mightContain(idBytes)) {
-                val toSend = pkt.copy(ttl = com.bitchat.android.util.AppConstants.SYNC_TTL_HOPS)
+                val toSend = pkt.copy(ttl = SyncDefaults.SYNC_TTL_HOPS)
                 delegate?.sendPacketToPeer(fromPeerID, toSend)
                 Log.d(TAG, "Sent sync message: Type ${toSend.type} to $fromPeerID packet id ${idBytes.toHexString()}")
             }
@@ -267,7 +270,7 @@ class GossipSyncManager(
         for ((peerID, pair) in latestAnnouncementByPeer.entries) {
             val pkt = pair.second
             val age = now - pkt.timestamp.toLong()
-            if (age > com.bitchat.android.util.AppConstants.Mesh.STALE_PEER_TIMEOUT_MS) {
+            if (age > STALE_ANNOUNCE_MAX_AGE_MS) {
                 stalePeers.add(peerID)
             }
         }

@@ -1,4 +1,4 @@
-package com.bitchat.android.sync
+package com.app.transport.sync
 
 import java.security.MessageDigest
 import kotlin.math.ceil
