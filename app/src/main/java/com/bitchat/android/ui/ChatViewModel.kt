@@ -38,7 +38,7 @@ class ChatViewModel(
     // Made var to support mesh service replacement after panic clear
     var meshService: BluetoothMeshService = initialMeshService
         private set
-    private val debugManager by lazy { try { com.bitchat.android.ui.debug.DebugSettingsManager.getInstance() } catch (e: Exception) { null } }
+    private val debugManager by lazy { try { com.app.transport.debug.DebugSettingsManager.getInstance() } catch (e: Exception) { null } }
 
     companion object {
         private const val TAG = "ChatViewModel"
@@ -266,8 +266,8 @@ class ChatViewModel(
 
         // Bridge DebugSettingsManager -> Chat messages when verbose logging is on
         viewModelScope.launch {
-            com.bitchat.android.ui.debug.DebugSettingsManager.getInstance().debugMessages.collect { msgs ->
-                if (com.bitchat.android.ui.debug.DebugSettingsManager.getInstance().verboseLoggingEnabled.value) {
+            com.app.transport.debug.DebugSettingsManager.getInstance().debugMessages.collect { msgs ->
+                if (com.app.transport.debug.DebugSettingsManager.getInstance().verboseLoggingEnabled.value) {
                     // Only show debug logs in the Mesh chat timeline to avoid leaking into geohash chats
                     val selectedLocation = state.selectedLocationChannel.value
                     if (selectedLocation is com.bitchat.android.geohash.ChannelID.Mesh) {

@@ -4,6 +4,7 @@ import android.util.Log
 import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
 import com.app.common.encoding.toHexString
+import com.app.transport.debug.DebugSettingsManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -18,14 +19,14 @@ import kotlin.random.Random
  * All packets that aren't specifically addressed to us get processed here.
  */
 class PacketRelayManager(private val myPeerID: String) {
-    private val debugManager by lazy { try { com.bitchat.android.ui.debug.DebugSettingsManager.getInstance() } catch (e: Exception) { null } }
+    private val debugManager by lazy { try { DebugSettingsManager.getInstance() } catch (e: Exception) { null } }
     
     companion object {
         private const val TAG = "PacketRelayManager"
     }
     
     private fun isRelayEnabled(): Boolean = try {
-        com.bitchat.android.ui.debug.DebugSettingsManager.getInstance().packetRelayEnabled.value
+        DebugSettingsManager.getInstance().packetRelayEnabled.value
     } catch (_: Exception) { true }
 
     // Logging moved to BluetoothPacketBroadcaster per actual transmission target

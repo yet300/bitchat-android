@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalTime::class)
 
-package com.bitchat.android.ui.debug
+package com.app.transport.debug
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

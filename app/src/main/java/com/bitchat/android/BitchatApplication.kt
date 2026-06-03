@@ -39,7 +39,7 @@ class BitchatApplication : Application() {
         ThemePreferenceManager.init(this)
 
         // Initialize debug preference manager (persists debug toggles)
-        try { com.bitchat.android.ui.debug.DebugPreferenceManager.init(this) } catch (_: Exception) { }
+        try { com.app.transport.debug.DebugPreferenceManager.init(this) } catch (_: Exception) { }
 
         // Initialize Geohash Registries for persistence
         try {

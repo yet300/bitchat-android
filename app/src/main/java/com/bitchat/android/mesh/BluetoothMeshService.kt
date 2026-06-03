@@ -32,7 +32,7 @@ import kotlinx.coroutines.*
  * - PacketProcessor: Incoming packet routing
  */
 class BluetoothMeshService(private val context: Context) {
-    private val debugManager by lazy { try { com.bitchat.android.ui.debug.DebugSettingsManager.getInstance() } catch (e: Exception) { null } }
+    private val debugManager by lazy { try { com.app.transport.debug.DebugSettingsManager.getInstance() } catch (e: Exception) { null } }
     
     companion object {
         private const val TAG = "BluetoothMeshService"
@@ -83,15 +83,15 @@ class BluetoothMeshService(private val context: Context) {
             scope = serviceScope,
             configProvider = object : GossipSyncManager.ConfigProvider {
                 override fun seenCapacity(): Int = try {
-                    com.bitchat.android.ui.debug.DebugPreferenceManager.getSeenPacketCapacity(500)
+                    com.app.transport.debug.DebugPreferenceManager.getSeenPacketCapacity(500)
                 } catch (_: Exception) { 500 }
 
                 override fun gcsMaxBytes(): Int = try {
-                    com.bitchat.android.ui.debug.DebugPreferenceManager.getGcsMaxFilterBytes(400)
+                    com.app.transport.debug.DebugPreferenceManager.getGcsMaxFilterBytes(400)
                 } catch (_: Exception) { 400 }
 
                 override fun gcsTargetFpr(): Double = try {
-                    com.bitchat.android.ui.debug.DebugPreferenceManager.getGcsFprPercent(1.0) / 100.0
+                    com.app.transport.debug.DebugPreferenceManager.getGcsFprPercent(1.0) / 100.0
                 } catch (_: Exception) { 0.01 }
             }
         )
@@ -555,7 +555,7 @@ class BluetoothMeshService(private val context: Context) {
         override fun onPacketReceived(packet: BitchatPacket, peerID: String, device: android.bluetooth.BluetoothDevice?) {
             // Log incoming for debug graphs (do not double-count anywhere else)
             try {
-                com.bitchat.android.ui.debug.DebugSettingsManager.getInstance().logIncoming(
+                com.app.transport.debug.DebugSettingsManager.getInstance().logIncoming(
                     packet = packet,
                     fromPeerID = peerID,
                     fromNickname = null,
@@ -578,7 +578,7 @@ class BluetoothMeshService(private val context: Context) {
                     val addr = device.address
                     val peer = connectionManager.addressPeerMap[addr]
                     val nick = peer?.let { peerManager.getPeerNickname(it) } ?: "unknown"
-                    com.bitchat.android.ui.debug.DebugSettingsManager.getInstance()
+                    com.app.transport.debug.DebugSettingsManager.getInstance()
                         .logPeerConnection(peer ?: "unknown", nick, addr, isInbound = !connectionManager.isClientConnection(addr)!!)
                 } catch (_: Exception) { }
             }
@@ -598,7 +598,7 @@ class BluetoothMeshService(private val context: Context) {
                     // Verbose debug: device disconnected
                     try {
                         val nick = peerManager.getPeerNickname(peer) ?: "unknown"
-                        com.bitchat.android.ui.debug.DebugSettingsManager.getInstance()
+                        com.app.transport.debug.DebugSettingsManager.getInstance()
                             .logPeerDisconnection(peer, nick, addr)
                     } catch (_: Exception) { }
                 }
