@@ -28,22 +28,36 @@ object MeshServiceHolder {
                     try { existing.stopServices() } catch (e: Exception) {
                         android.util.Log.w(TAG, "Error while stopping non-reusable instance: ${e.message}")
                     }
-                    val created = BluetoothMeshService(context.applicationContext)
+                    val created = configure(BluetoothMeshService(context.applicationContext), context)
                     android.util.Log.i(TAG, "Created new BluetoothMeshService (replacement)")
                     meshService = created
                     created
                 }
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "Error checking service reusability; creating new instance: ${e.message}")
-                val created = BluetoothMeshService(context.applicationContext)
+                val created = configure(BluetoothMeshService(context.applicationContext), context)
                 meshService = created
                 created
             }
         }
-        val created = BluetoothMeshService(context.applicationContext)
+        val created = configure(BluetoothMeshService(context.applicationContext), context)
         android.util.Log.i(TAG, "Created new BluetoothMeshService (no existing instance)")
         meshService = created
         return created
+    }
+
+    /** Wires app-side dependencies (notifications, nickname) into a fresh mesh service. */
+    private fun configure(service: BluetoothMeshService, context: Context): BluetoothMeshService {
+        val appCtx = context.applicationContext
+        service.serviceNotifier = com.bitchat.android.ui.NotificationManager(
+            appCtx,
+            androidx.core.app.NotificationManagerCompat.from(appCtx),
+            com.bitchat.android.util.NotificationIntervalManager()
+        )
+        service.nicknameSource = com.app.transport.NicknameSource { fallback ->
+            com.bitchat.android.services.NicknameProvider.getNickname(appCtx, fallback)
+        }
+        return service
     }
 
     @Synchronized

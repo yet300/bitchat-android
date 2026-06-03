@@ -1,4 +1,4 @@
-package com.bitchat.android.ui
+package com.app.transport.notification
 
 import com.app.transport.model.BitchatMessage
 import com.app.transport.model.BitchatMessageType
