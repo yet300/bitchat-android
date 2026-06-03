@@ -76,7 +76,7 @@ class BluetoothPacketBroadcaster(
         try {
             val fromNick = incomingPeer?.let { nicknameResolver?.invoke(it) }
             val toNick = toPeer?.let { nicknameResolver?.invoke(it) }
-            val manager = com.bitchat.android.ui.debug.DebugSettingsManager.getInstance()
+            val manager = com.app.transport.debug.DebugSettingsManager.getInstance()
             // Always log outgoing for the actual transmission target
             manager.logOutgoing(
                 packetType = typeName,

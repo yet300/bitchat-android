@@ -1,4 +1,4 @@
-package com.bitchat.android.ui.debug
+package com.app.transport.debug
 
 import android.content.Context
 import com.app.common.appSettings

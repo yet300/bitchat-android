@@ -1,5 +1,9 @@
 package com.bitchat.android.ui.debug
 
+import com.app.transport.debug.DebugSettingsManager
+import com.app.transport.debug.ConnectedDevice
+import com.app.transport.debug.ConnectionType
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -138,7 +142,7 @@ fun DebugSettingsSheet(
                 val directMap = peers.associateWith { pid -> meshService.getPeerInfo(pid)?.isDirectConnection == true }
                 val devices = entries.map { (address, isClient, rssi) ->
                     val pid = mapping[address]
-                    com.bitchat.android.ui.debug.ConnectedDevice(
+                    ConnectedDevice(
                         deviceAddress = address,
                         peerID = pid,
                         nickname = pid?.let { nicknames[it] },
