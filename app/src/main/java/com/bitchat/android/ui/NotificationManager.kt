@@ -10,6 +10,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.app.NotificationManagerCompat
+import com.app.transport.notification.ServiceNotifier
 import com.bitchat.android.MainActivity
 import com.bitchat.android.R
 import com.bitchat.android.util.NotificationIntervalManager
@@ -29,7 +30,7 @@ class NotificationManager(
   private val context: Context,
   private val notificationManager: NotificationManagerCompat,
   private val notificationIntervalManager: NotificationIntervalManager
-) {
+) : ServiceNotifier {
 
     companion object {
         private const val TAG = "NotificationManager"
@@ -119,7 +120,7 @@ class NotificationManager(
     /**
      * Update app background state - notifications should only be shown when app is backgrounded
      */
-    fun setAppBackgroundState(inBackground: Boolean) {
+    override fun setAppBackgroundState(inBackground: Boolean) {
         isAppInBackground = inBackground
         Log.d(TAG, "App background state changed: $inBackground")
     }
@@ -143,7 +144,7 @@ class NotificationManager(
     /**
      * Show a notification for a private message with proper grouping and state awareness
      */
-    fun showPrivateMessageNotification(senderPeerID: String, senderNickname: String, messageContent: String) {
+    override fun showPrivateMessageNotification(senderPeerID: String, senderNickname: String, messageContent: String) {
         // Only show notifications if app is in background OR user is not viewing this specific chat
         val shouldNotify = isAppInBackground || (!isAppInBackground && currentPrivateChatPeer != senderPeerID)
         

@@ -1,5 +1,6 @@
 package com.bitchat.android.ui
 
+import com.app.transport.notification.NotificationTextUtils
 import com.app.transport.model.BitchatMessage
 import com.app.transport.model.DeliveryStatus
 import com.bitchat.android.mesh.BluetoothMeshDelegate

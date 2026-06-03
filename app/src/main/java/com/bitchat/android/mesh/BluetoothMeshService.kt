@@ -15,6 +15,8 @@ import com.app.transport.protocol.SpecialRecipients
 import com.app.transport.model.RequestSyncPacket
 import com.app.transport.sync.GossipSyncManager
 import com.app.common.encoding.toHexString
+import com.app.transport.NicknameSource
+import com.app.transport.notification.ServiceNotifier
 import com.bitchat.android.services.VerificationService
 import kotlinx.coroutines.*
 
@@ -52,13 +54,15 @@ class BluetoothMeshService(private val context: Context) {
     internal val connectionManager = BluetoothConnectionManager(context, myPeerID, fragmentManager) // Made internal for access
     private val packetProcessor = PacketProcessor(myPeerID)
     private lateinit var gossipSyncManager: GossipSyncManager
-    // Service-level notification manager for background (no-UI) DMs
-    private val serviceNotificationManager = com.bitchat.android.ui.NotificationManager(
-        context.applicationContext,
-        androidx.core.app.NotificationManagerCompat.from(context.applicationContext),
-        com.bitchat.android.util.NotificationIntervalManager()
-    )
-    
+
+    // Service-level notifier for background (no-UI) DMs. The Android implementation
+    // (app resources + NotificationCompat) is injected from the app module.
+    var serviceNotifier: ServiceNotifier? = null
+
+    // Supplies the user's nickname for announcements/leave messages (injected from app).
+    var nicknameSource: NicknameSource? = null
+
+
     // Service state management
     private var isActive = false
     
@@ -408,9 +412,9 @@ class BluetoothMeshService(private val context: Context) {
                         val senderPeerID = message.senderPeerID
                         if (senderPeerID != null) {
                             val nick = try { peerManager.getPeerNickname(senderPeerID) } catch (_: Exception) { null } ?: senderPeerID
-                            val preview = com.bitchat.android.ui.NotificationTextUtils.buildPrivateMessagePreview(message)
-                            serviceNotificationManager.setAppBackgroundState(true)
-                            serviceNotificationManager.showPrivateMessageNotification(senderPeerID, nick, preview)
+                            val preview = com.app.transport.notification.NotificationTextUtils.buildPrivateMessagePreview(message)
+                            serviceNotifier?.setAppBackgroundState(true)
+                            serviceNotifier?.showPrivateMessageNotification(senderPeerID, nick, preview)
                         }
                     } catch (_: Exception) { }
                 }
@@ -1017,7 +1021,7 @@ class BluetoothMeshService(private val context: Context) {
     fun sendBroadcastAnnounce() {
         Log.d(TAG, "Sending broadcast announce")
         serviceScope.launch {
-            val nickname = try { com.bitchat.android.services.NicknameProvider.getNickname(context, myPeerID) } catch (_: Exception) { myPeerID }
+            val nickname = try { (nicknameSource?.nickname(myPeerID) ?: myPeerID) } catch (_: Exception) { myPeerID }
             
             // Get the static public key for the announcement
             val staticKey = encryptionService.getStaticPublicKey()
@@ -1080,7 +1084,7 @@ class BluetoothMeshService(private val context: Context) {
     fun sendAnnouncementToPeer(peerID: String) {
         if (peerManager.hasAnnouncedToPeer(peerID)) return
         
-        val nickname = try { com.bitchat.android.services.NicknameProvider.getNickname(context, myPeerID) } catch (_: Exception) { myPeerID }
+        val nickname = try { (nicknameSource?.nickname(myPeerID) ?: myPeerID) } catch (_: Exception) { myPeerID }
         
         // Get the static public key for the announcement
         val staticKey = encryptionService.getStaticPublicKey()
