@@ -10,6 +10,8 @@ import com.app.transport.protocol.SpecialRecipients
 import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.MessageType
 import com.app.common.encoding.toHexString
+import com.app.transport.MeshConstants
+import com.app.transport.debug.DebugSettingsManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -48,7 +50,7 @@ class BluetoothPacketBroadcaster(
     
     companion object {
         private const val TAG = "BluetoothPacketBroadcaster"
-        private const val CLEANUP_DELAY = com.bitchat.android.util.AppConstants.Mesh.BROADCAST_CLEANUP_DELAY_MS
+        private const val CLEANUP_DELAY = MeshConstants.Mesh.BROADCAST_CLEANUP_DELAY_MS
     }
 
     // Optional nickname resolver injected by higher layer (peerID -> nickname?)
@@ -76,7 +78,7 @@ class BluetoothPacketBroadcaster(
         try {
             val fromNick = incomingPeer?.let { nicknameResolver?.invoke(it) }
             val toNick = toPeer?.let { nicknameResolver?.invoke(it) }
-            val manager = com.app.transport.debug.DebugSettingsManager.getInstance()
+            val manager = DebugSettingsManager.getInstance()
             // Always log outgoing for the actual transmission target
             manager.logOutgoing(
                 packetType = typeName,

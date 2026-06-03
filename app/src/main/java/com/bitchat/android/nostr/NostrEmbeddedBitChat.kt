@@ -2,6 +2,7 @@ package com.bitchat.android.nostr
 
 import android.util.Base64
 import android.util.Log
+import com.app.transport.MeshConstants
 import com.app.transport.model.PrivateMessagePacket
 import com.app.transport.model.NoisePayloadType
 import com.app.transport.protocol.BitchatPacket
@@ -45,7 +46,7 @@ object NostrEmbeddedBitChat {
                 timestamp = System.currentTimeMillis().toULong(),
                 payload = payload,
                 signature = null,
-                ttl = com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS
+                ttl = MeshConstants.MESSAGE_TTL_HOPS
             )
             
             val data = packet.toBinaryData() ?: return null
@@ -85,7 +86,7 @@ object NostrEmbeddedBitChat {
                 timestamp = System.currentTimeMillis().toULong(),
                 payload = payload,
                 signature = null,
-                ttl = com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS
+                ttl = MeshConstants.MESSAGE_TTL_HOPS
             )
             
             val data = packet.toBinaryData() ?: return null
@@ -122,7 +123,7 @@ object NostrEmbeddedBitChat {
                 timestamp = System.currentTimeMillis().toULong(),
                 payload = payload,
                 signature = null,
-                ttl = com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS
+                ttl = MeshConstants.MESSAGE_TTL_HOPS
             )
             
             val data = packet.toBinaryData() ?: return null
@@ -157,7 +158,7 @@ object NostrEmbeddedBitChat {
                 timestamp = System.currentTimeMillis().toULong(),
                 payload = payload,
                 signature = null,
-                ttl = com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS
+                ttl = MeshConstants.MESSAGE_TTL_HOPS
             )
             
             val data = packet.toBinaryData() ?: return null

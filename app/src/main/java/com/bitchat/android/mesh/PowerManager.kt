@@ -14,6 +14,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import com.app.transport.MeshConstants
 import kotlinx.coroutines.*
 import kotlin.math.max
 
@@ -27,22 +28,22 @@ class PowerManager(private val context: Context) : LifecycleEventObserver {
         private const val TAG = "PowerManager"
         
         // Battery thresholds
-        private const val CRITICAL_BATTERY = com.bitchat.android.util.AppConstants.Power.CRITICAL_BATTERY_PERCENT
-        private const val LOW_BATTERY = com.bitchat.android.util.AppConstants.Power.LOW_BATTERY_PERCENT
-        private const val MEDIUM_BATTERY = com.bitchat.android.util.AppConstants.Power.MEDIUM_BATTERY_PERCENT
+        private const val CRITICAL_BATTERY = MeshConstants.Power.CRITICAL_BATTERY_PERCENT
+        private const val LOW_BATTERY = MeshConstants.Power.LOW_BATTERY_PERCENT
+        private const val MEDIUM_BATTERY = MeshConstants.Power.MEDIUM_BATTERY_PERCENT
         
         // Scan duty cycle periods (ms)
-        private const val SCAN_ON_DURATION_NORMAL = com.bitchat.android.util.AppConstants.Power.SCAN_ON_DURATION_NORMAL_MS    // 8 seconds on
-        private const val SCAN_OFF_DURATION_NORMAL = com.bitchat.android.util.AppConstants.Power.SCAN_OFF_DURATION_NORMAL_MS   // 2 seconds off
-        private const val SCAN_ON_DURATION_POWER_SAVE = com.bitchat.android.util.AppConstants.Power.SCAN_ON_DURATION_POWER_SAVE_MS    // 2 seconds on
-        private const val SCAN_OFF_DURATION_POWER_SAVE = com.bitchat.android.util.AppConstants.Power.SCAN_OFF_DURATION_POWER_SAVE_MS  // 8 seconds off
-        private const val SCAN_ON_DURATION_ULTRA_LOW = com.bitchat.android.util.AppConstants.Power.SCAN_ON_DURATION_ULTRA_LOW_MS      // 1 second on
-        private const val SCAN_OFF_DURATION_ULTRA_LOW = com.bitchat.android.util.AppConstants.Power.SCAN_OFF_DURATION_ULTRA_LOW_MS   // 10 seconds off
+        private const val SCAN_ON_DURATION_NORMAL = MeshConstants.Power.SCAN_ON_DURATION_NORMAL_MS    // 8 seconds on
+        private const val SCAN_OFF_DURATION_NORMAL = MeshConstants.Power.SCAN_OFF_DURATION_NORMAL_MS   // 2 seconds off
+        private const val SCAN_ON_DURATION_POWER_SAVE = MeshConstants.Power.SCAN_ON_DURATION_POWER_SAVE_MS    // 2 seconds on
+        private const val SCAN_OFF_DURATION_POWER_SAVE = MeshConstants.Power.SCAN_OFF_DURATION_POWER_SAVE_MS  // 8 seconds off
+        private const val SCAN_ON_DURATION_ULTRA_LOW = MeshConstants.Power.SCAN_ON_DURATION_ULTRA_LOW_MS      // 1 second on
+        private const val SCAN_OFF_DURATION_ULTRA_LOW = MeshConstants.Power.SCAN_OFF_DURATION_ULTRA_LOW_MS   // 10 seconds off
         
         // Connection limits
-        private const val MAX_CONNECTIONS_NORMAL = com.bitchat.android.util.AppConstants.Power.MAX_CONNECTIONS_NORMAL
-        private const val MAX_CONNECTIONS_POWER_SAVE = com.bitchat.android.util.AppConstants.Power.MAX_CONNECTIONS_POWER_SAVE
-        private const val MAX_CONNECTIONS_ULTRA_LOW = com.bitchat.android.util.AppConstants.Power.MAX_CONNECTIONS_ULTRA_LOW
+        private const val MAX_CONNECTIONS_NORMAL = MeshConstants.Power.MAX_CONNECTIONS_NORMAL
+        private const val MAX_CONNECTIONS_POWER_SAVE = MeshConstants.Power.MAX_CONNECTIONS_POWER_SAVE
+        private const val MAX_CONNECTIONS_ULTRA_LOW = MeshConstants.Power.MAX_CONNECTIONS_ULTRA_LOW
     }
     
     enum class PowerMode {

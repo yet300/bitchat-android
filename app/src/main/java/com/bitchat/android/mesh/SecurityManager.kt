@@ -7,6 +7,7 @@ import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
 import com.app.transport.model.RoutedPacket
 import com.app.common.encoding.toHexString
+import com.app.transport.MeshConstants
 import kotlinx.coroutines.*
 import java.util.*
 import kotlin.collections.mutableSetOf
@@ -20,10 +21,10 @@ class SecurityManager(private val encryptionService: EncryptionService, private 
     
     companion object {
         private const val TAG = "SecurityManager"
-        private const val MESSAGE_TIMEOUT = com.bitchat.android.util.AppConstants.Security.MESSAGE_TIMEOUT_MS // 5 minutes (same as iOS)
-        private const val CLEANUP_INTERVAL = com.bitchat.android.util.AppConstants.Security.CLEANUP_INTERVAL_MS // 5 minutes
-        private const val MAX_PROCESSED_MESSAGES = com.bitchat.android.util.AppConstants.Security.MAX_PROCESSED_MESSAGES
-        private const val MAX_PROCESSED_KEY_EXCHANGES = com.bitchat.android.util.AppConstants.Security.MAX_PROCESSED_KEY_EXCHANGES
+        private const val MESSAGE_TIMEOUT = MeshConstants.Security.MESSAGE_TIMEOUT_MS // 5 minutes (same as iOS)
+        private const val CLEANUP_INTERVAL = MeshConstants.Security.CLEANUP_INTERVAL_MS // 5 minutes
+        private const val MAX_PROCESSED_MESSAGES = MeshConstants.Security.MAX_PROCESSED_MESSAGES
+        private const val MAX_PROCESSED_KEY_EXCHANGES = MeshConstants.Security.MAX_PROCESSED_KEY_EXCHANGES
     }
     
     // Security tracking
@@ -63,7 +64,7 @@ class SecurityManager(private val encryptionService: EncryptionService, private 
             // This ensures we catch the "first announce" on a new connection for binding,
             // while still dropping looped/relayed duplicates.
             val isFreshAnnounce = messageType == MessageType.ANNOUNCE &&
-                    packet.ttl >= com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS
+                    packet.ttl >= MeshConstants.MESSAGE_TTL_HOPS
 
             if (!isFreshAnnounce) {
                 Log.d(TAG, "Dropping duplicate packet: $messageID")

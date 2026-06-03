@@ -9,7 +9,7 @@ import android.content.Context
 import android.os.ParcelUuid
 import android.util.Log
 import com.app.transport.protocol.BitchatPacket
-import com.bitchat.android.util.AppConstants
+import com.app.transport.MeshConstants
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -218,7 +218,7 @@ class BluetoothGattServerManager(
                     return
                 }
                 
-                if (characteristic.uuid == AppConstants.Mesh.Gatt.CHARACTERISTIC_UUID) {
+                if (characteristic.uuid == MeshConstants.Mesh.Gatt.CHARACTERISTIC_UUID) {
                     Log.i(TAG, "Server: Received packet from ${device.address}, size: ${value.size} bytes")
                     val packet = BitchatPacket.fromBinaryData(value)
                     if (packet != null) {
@@ -292,7 +292,7 @@ class BluetoothGattServerManager(
         
         // Create characteristic with notification support
         characteristic = BluetoothGattCharacteristic(
-            AppConstants.Mesh.Gatt.CHARACTERISTIC_UUID,
+            MeshConstants.Mesh.Gatt.CHARACTERISTIC_UUID,
             BluetoothGattCharacteristic.PROPERTY_READ or 
             BluetoothGattCharacteristic.PROPERTY_WRITE or 
             BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE or
@@ -302,12 +302,12 @@ class BluetoothGattServerManager(
         )
         
         val descriptor = BluetoothGattDescriptor(
-            AppConstants.Mesh.Gatt.DESCRIPTOR_UUID,
+            MeshConstants.Mesh.Gatt.DESCRIPTOR_UUID,
             BluetoothGattDescriptor.PERMISSION_READ or BluetoothGattDescriptor.PERMISSION_WRITE
         )
         characteristic?.addDescriptor(descriptor)
         
-        val service = BluetoothGattService(AppConstants.Mesh.Gatt.SERVICE_UUID, BluetoothGattService.SERVICE_TYPE_PRIMARY)
+        val service = BluetoothGattService(MeshConstants.Mesh.Gatt.SERVICE_UUID, BluetoothGattService.SERVICE_TYPE_PRIMARY)
         service.addCharacteristic(characteristic)
         
         gattServer?.addService(service)
@@ -352,7 +352,7 @@ class BluetoothGattServerManager(
         val settings = powerManager.getAdvertiseSettings()
         
         val data = AdvertiseData.Builder()
-            .addServiceUuid(ParcelUuid(AppConstants.Mesh.Gatt.SERVICE_UUID))
+            .addServiceUuid(ParcelUuid(MeshConstants.Mesh.Gatt.SERVICE_UUID))
             .setIncludeTxPowerLevel(false)
             .setIncludeDeviceName(false)
             .build()
@@ -366,7 +366,7 @@ class BluetoothGattServerManager(
         }
         
         val scanResponse = AdvertiseData.Builder()
-            .addServiceData(ParcelUuid(AppConstants.Mesh.Gatt.SERVICE_UUID), peerIDBytes)
+            .addServiceData(ParcelUuid(MeshConstants.Mesh.Gatt.SERVICE_UUID), peerIDBytes)
             .setIncludeTxPowerLevel(false)
             .setIncludeDeviceName(false)
             .build()
