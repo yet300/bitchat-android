@@ -6,7 +6,7 @@ import com.app.transport.model.IdentityAnnouncement
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
 import com.app.transport.model.RoutedPacket
-import com.bitchat.android.util.toHexString
+import com.app.common.encoding.toHexString
 import kotlinx.coroutines.*
 import java.util.*
 import kotlin.collections.mutableSetOf

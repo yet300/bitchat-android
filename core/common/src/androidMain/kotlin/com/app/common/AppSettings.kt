@@ -1,4 +1,4 @@
-package com.bitchat.android.core.data
+package com.app.common
 
 import android.content.Context
 import com.russhwolf.settings.ObservableSettings

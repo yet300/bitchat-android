@@ -36,3 +36,9 @@ fun String.dataFromHexString(): ByteArray? {
 
     return data
 }
+
+/**
+ * Alias of [hexEncodedString]. Kept as a distinct name used by the transport/mesh
+ * layers; delegates to the single hex implementation to avoid duplication.
+ */
+fun ByteArray.toHexString(): String = hexEncodedString()

@@ -3,7 +3,7 @@ package com.bitchat.android.mesh
 import android.util.Log
 import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
-import com.bitchat.android.util.toHexString
+import com.app.common.encoding.toHexString
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

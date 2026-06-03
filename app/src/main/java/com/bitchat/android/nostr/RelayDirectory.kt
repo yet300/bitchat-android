@@ -2,7 +2,7 @@ package com.bitchat.android.nostr
 
 import android.app.Application
 import android.util.Log
-import com.bitchat.android.core.data.appSettings
+import com.app.common.appSettings
 import com.russhwolf.settings.Settings
 import java.io.BufferedReader
 import java.io.File

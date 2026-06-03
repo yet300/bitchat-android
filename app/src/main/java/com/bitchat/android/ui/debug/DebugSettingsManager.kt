@@ -11,7 +11,7 @@ import kotlin.time.Instant
 import kotlin.time.Clock
 import java.util.concurrent.ConcurrentLinkedQueue
 import com.app.transport.protocol.BitchatPacket
-import com.bitchat.android.util.toHexString
+import com.app.common.encoding.toHexString
 import kotlin.time.ExperimentalTime
 
 /**

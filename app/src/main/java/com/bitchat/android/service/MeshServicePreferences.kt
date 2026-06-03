@@ -1,7 +1,7 @@
 package com.bitchat.android.service
 
 import android.content.Context
-import com.bitchat.android.core.data.appSettings
+import com.app.common.appSettings
 import com.russhwolf.settings.Settings
 
 object MeshServicePreferences {
