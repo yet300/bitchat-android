@@ -2,6 +2,7 @@ package com.bitchat.android.mesh
 
 import android.util.Log
 import com.app.crypto.identity.PeerFingerprintManager
+import com.app.transport.MeshConstants
 import kotlinx.coroutines.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -70,8 +71,8 @@ class PeerManager {
         private const val TAG = "PeerManager"
     }
 
-    // Centralized timeout from AppConstants
-    private val stalePeerTimeoutMs: Long = com.bitchat.android.util.AppConstants.Mesh.STALE_PEER_TIMEOUT_MS
+    // Centralized timeout from MeshConstants
+    private val stalePeerTimeoutMs: Long = MeshConstants.Mesh.STALE_PEER_TIMEOUT_MS
     
     // Peer tracking data - enhanced with verification status
     private val peers = ConcurrentHashMap<String, PeerInfo>() // peerID -> PeerInfo
@@ -422,7 +423,7 @@ class PeerManager {
     private fun startPeriodicCleanup() {
         managerScope.launch {
             while (isActive) {
-                delay(com.bitchat.android.util.AppConstants.Mesh.PEER_CLEANUP_INTERVAL_MS)
+                delay(MeshConstants.Mesh.PEER_CLEANUP_INTERVAL_MS)
                 cleanupStalePeers()
             }
         }

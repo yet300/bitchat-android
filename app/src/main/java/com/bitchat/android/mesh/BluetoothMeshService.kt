@@ -15,6 +15,7 @@ import com.app.transport.protocol.SpecialRecipients
 import com.app.transport.model.RequestSyncPacket
 import com.app.transport.sync.GossipSyncManager
 import com.app.common.encoding.toHexString
+import com.app.transport.MeshConstants
 import com.app.transport.NicknameSource
 import com.app.transport.notification.ServiceNotifier
 import com.bitchat.android.services.VerificationService
@@ -38,7 +39,7 @@ class BluetoothMeshService(private val context: Context) {
     
     companion object {
         private const val TAG = "BluetoothMeshService"
-        private val MAX_TTL: UByte = com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS
+        private val MAX_TTL: UByte = MeshConstants.MESSAGE_TTL_HOPS
     }
     
     // Core components - each handling specific responsibilities
@@ -483,8 +484,8 @@ class BluetoothMeshService(private val context: Context) {
                     val pid = routed.peerID
                     if (deviceAddress != null && pid != null) {
                         // Check if this is a direct connection (MAX TTL)
-                        // Note: packet.ttl is UByte, compare with AppConstants.MESSAGE_TTL_HOPS
-                        val isDirect = routed.packet.ttl == com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS
+                        // Note: packet.ttl is UByte, compare with MeshConstants.MESSAGE_TTL_HOPS
+                        val isDirect = routed.packet.ttl == MeshConstants.MESSAGE_TTL_HOPS
                         
                         if (isDirect) {
                             // Bind or rebind this device address to the announcing peer
@@ -801,7 +802,7 @@ class BluetoothMeshService(private val context: Context) {
                             timestamp = System.currentTimeMillis().toULong(),
                             payload = encrypted,
                             signature = null,
-                            ttl = com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS
+                            ttl = MeshConstants.MESSAGE_TTL_HOPS
                         )
                         
                         // Sign and send the encrypted packet
@@ -954,7 +955,7 @@ class BluetoothMeshService(private val context: Context) {
                     timestamp = System.currentTimeMillis().toULong(),
                     payload = encrypted,
                     signature = null,
-                    ttl = com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS // Same TTL as iOS messageTTL
+                    ttl = MeshConstants.MESSAGE_TTL_HOPS // Same TTL as iOS messageTTL
                 )
                 
                 // Sign the packet before broadcasting
@@ -1003,7 +1004,7 @@ class BluetoothMeshService(private val context: Context) {
                     timestamp = System.currentTimeMillis().toULong(),
                     payload = encrypted,
                     signature = null,
-                    ttl = com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS
+                    ttl = MeshConstants.MESSAGE_TTL_HOPS
                 )
 
                 val signedPacket = signPacketBeforeBroadcast(packet)

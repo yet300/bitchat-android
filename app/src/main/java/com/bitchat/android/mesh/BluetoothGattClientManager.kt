@@ -13,7 +13,7 @@ import android.content.Context
 import android.os.ParcelUuid
 import android.util.Log
 import com.app.transport.protocol.BitchatPacket
-import com.bitchat.android.util.AppConstants
+import com.app.transport.MeshConstants
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -179,10 +179,10 @@ class BluetoothGattClientManager(
                             Log.w(TAG, "Failed to request RSSI from ${deviceConn.device.address}: ${e.message}")
                         }
                     }
-                    delay(AppConstants.Mesh.RSSI_UPDATE_INTERVAL_MS)
+                    delay(MeshConstants.Mesh.RSSI_UPDATE_INTERVAL_MS)
                 } catch (e: Exception) {
                     Log.w(TAG, "Error in RSSI monitoring: ${e.message}")
-                    delay(AppConstants.Mesh.RSSI_UPDATE_INTERVAL_MS)
+                    delay(MeshConstants.Mesh.RSSI_UPDATE_INTERVAL_MS)
                 }
             }
         }
@@ -228,12 +228,12 @@ class BluetoothGattClientManager(
         }
         
         val scanFilter = ScanFilter.Builder()
-            .setServiceUuid(ParcelUuid(AppConstants.Mesh.Gatt.SERVICE_UUID))
+            .setServiceUuid(ParcelUuid(MeshConstants.Mesh.Gatt.SERVICE_UUID))
             .build()
         
         val scanFilters = listOf(scanFilter) 
         
-        Log.d(TAG, "Starting BLE scan with target service UUID: ${AppConstants.Mesh.Gatt.SERVICE_UUID}")
+        Log.d(TAG, "Starting BLE scan with target service UUID: ${MeshConstants.Mesh.Gatt.SERVICE_UUID}")
         
         scanCallback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
@@ -318,13 +318,13 @@ class BluetoothGattClientManager(
         val scanRecord = result.scanRecord
         
         // CRITICAL: Only process devices that have our service UUID
-        val hasOurService = scanRecord?.serviceUuids?.any { it.uuid == AppConstants.Mesh.Gatt.SERVICE_UUID } == true
+        val hasOurService = scanRecord?.serviceUuids?.any { it.uuid == MeshConstants.Mesh.Gatt.SERVICE_UUID } == true
         if (!hasOurService) {
             return
         }
 
         // Try to extract peerID from Service Data (if available) for stable identity
-        val serviceData = scanRecord?.getServiceData(ParcelUuid(AppConstants.Mesh.Gatt.SERVICE_UUID))
+        val serviceData = scanRecord?.getServiceData(ParcelUuid(MeshConstants.Mesh.Gatt.SERVICE_UUID))
         val peerID = if (serviceData != null && serviceData.size >= 8) {
             serviceData.joinToString("") { "%02x".format(it) }
         } else {
@@ -474,9 +474,9 @@ class BluetoothGattClientManager(
 
             override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {                
                 if (status == BluetoothGatt.GATT_SUCCESS) {
-                    val service = gatt.getService(AppConstants.Mesh.Gatt.SERVICE_UUID)
+                    val service = gatt.getService(MeshConstants.Mesh.Gatt.SERVICE_UUID)
                     if (service != null) {
-                        val characteristic = service.getCharacteristic(AppConstants.Mesh.Gatt.CHARACTERISTIC_UUID)
+                        val characteristic = service.getCharacteristic(MeshConstants.Mesh.Gatt.CHARACTERISTIC_UUID)
                         if (characteristic != null) {
                             connectionTracker.getDeviceConnection(deviceAddress)?.let { deviceConn ->
                                 val updatedConn = deviceConn.copy(characteristic = characteristic)
@@ -485,7 +485,7 @@ class BluetoothGattClientManager(
                             }
                             
                             gatt.setCharacteristicNotification(characteristic, true)
-                            val descriptor = characteristic.getDescriptor(AppConstants.Mesh.Gatt.DESCRIPTOR_UUID)
+                            val descriptor = characteristic.getDescriptor(MeshConstants.Mesh.Gatt.DESCRIPTOR_UUID)
                             if (descriptor != null) {
                                 descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
                                 gatt.writeDescriptor(descriptor)
