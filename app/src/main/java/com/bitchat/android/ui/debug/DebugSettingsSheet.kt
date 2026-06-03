@@ -549,8 +549,8 @@ fun DebugSettingsSheet(
                         Slider(value = gcsMaxBytes.toFloat(), onValueChange = { manager.setGcsMaxBytes(it.toInt()) }, valueRange = 128f..1024f, steps = 0)
                         Text(stringResource(R.string.debug_target_fpr_fmt, gcsFpr), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = colorScheme.onSurface.copy(alpha = 0.7f))
                         Slider(value = gcsFpr.toFloat(), onValueChange = { manager.setGcsFprPercent(it.toDouble()) }, valueRange = 0.1f..5.0f, steps = 49)
-                        val p = remember(gcsFpr) { com.bitchat.android.sync.GCSFilter.deriveP(gcsFpr / 100.0) }
-                        val nmax = remember(gcsFpr, gcsMaxBytes) { com.bitchat.android.sync.GCSFilter.estimateMaxElementsForSize(gcsMaxBytes, p) }
+                        val p = remember(gcsFpr) { com.app.transport.sync.GCSFilter.deriveP(gcsFpr / 100.0) }
+                        val nmax = remember(gcsFpr, gcsMaxBytes) { com.app.transport.sync.GCSFilter.estimateMaxElementsForSize(gcsMaxBytes, p) }
                         Text(stringResource(R.string.debug_derived_p_fmt, p.toString(), nmax.toString()), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = colorScheme.onSurface.copy(alpha = 0.7f))
                     }
                 }

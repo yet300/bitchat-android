@@ -13,7 +13,7 @@ import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
 import com.app.transport.protocol.SpecialRecipients
 import com.app.transport.model.RequestSyncPacket
-import com.bitchat.android.sync.GossipSyncManager
+import com.app.transport.sync.GossipSyncManager
 import com.bitchat.android.util.toHexString
 import com.bitchat.android.services.VerificationService
 import kotlinx.coroutines.*

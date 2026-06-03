@@ -8,7 +8,6 @@ import java.util.UUID
 object AppConstants {
     // Packet time-to-live (hops)
     val MESSAGE_TTL_HOPS: UByte = 7u     // Default TTL for regular packets
-    val SYNC_TTL_HOPS: UByte = 0u        // TTL for neighbor-only sync packets
 
     object Mesh {
         // Peer lifecycle
@@ -30,10 +29,6 @@ object AppConstants {
             val CHARACTERISTIC_UUID: UUID = UUID.fromString("A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D")
             val DESCRIPTOR_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
         }
-    }
-
-    object Sync {
-        const val CLEANUP_INTERVAL_MS: Long = 60_000L
     }
 
     object Fragmentation {
