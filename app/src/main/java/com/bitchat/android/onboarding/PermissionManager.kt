@@ -8,7 +8,7 @@ import android.os.PowerManager
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.bitchat.android.R
-import com.bitchat.android.core.data.appSettings
+import com.app.common.appSettings
 
 /**
  * Centralized permission management for bitchat app
