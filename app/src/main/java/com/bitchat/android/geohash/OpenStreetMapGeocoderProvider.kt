@@ -2,10 +2,13 @@ package com.bitchat.android.geohash
 
 import android.location.Address
 import android.util.Log
-import com.app.transport.net.OkHttpProvider
+import com.app.transport.net.HttpClientProvider
 import com.app.common.serialization.JsonConfig
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.isSuccess
 import kotlinx.serialization.Serializable
-import okhttp3.Request
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -21,20 +24,15 @@ class OpenStreetMapGeocoderProvider : GeocoderProvider {
             val url = "https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$latitude&lon=$longitude&zoom=18&addressdetails=1&accept-language=$lang"
 
             try {
-                val request = Request.Builder()
-                    .url(url)
-                    .header("User-Agent", userAgent)
-                    .build()
-
-                val response = OkHttpProvider.httpClient().newCall(request).execute()
-                if (!response.isSuccessful) {
-                    Log.e(TAG, "OSM Request failed: ${response.code}")
-                    response.close()
+                val response = HttpClientProvider.httpClient().get(url) {
+                    header("User-Agent", userAgent)
+                }
+                if (!response.status.isSuccess()) {
+                    Log.e(TAG, "OSM Request failed: ${response.status.value}")
                     return@withContext emptyList<Address>()
                 }
 
-                val body = response.body?.string()
-                response.close()
+                val body = response.bodyAsText()
 
                 if (body.isNullOrEmpty()) return@withContext emptyList<Address>()
 

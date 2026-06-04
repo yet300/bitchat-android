@@ -150,9 +150,9 @@ class ArtiTorManager private constructor() {
                 desiredMode = savedMode
                 socksAddr = InetSocketAddress("127.0.0.1", currentSocksPort)
                 try {
-                    OkHttpProvider.reset()
+                    HttpClientProvider.reset()
                 } catch (_: Throwable) {
-                }  // Only reset OkHttp during init
+                }  // Only reset HTTP clients during init
             }
             appScope.launch {
                 applyMode(application, savedMode)
@@ -316,11 +316,11 @@ class ArtiTorManager private constructor() {
 
     /**
      * Reset network connections after Tor state changes.
-     * Rebuilds OkHttp clients and notifies dependents to reconnect.
+     * Rebuilds HTTP clients and notifies dependents to reconnect.
      */
     private fun resetNetworkConnections() {
         try {
-            OkHttpProvider.reset()
+            HttpClientProvider.reset()
         } catch (_: Throwable) {
         }
         try {

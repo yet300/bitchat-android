@@ -4,8 +4,12 @@ import android.app.Application
 import android.util.Log
 import com.app.common.appSettings
 import com.app.common.geohash.Geohash
-import com.app.transport.net.OkHttpProvider
+import com.app.transport.net.HttpClientProvider
 import com.russhwolf.settings.Settings
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.get
+import io.ktor.http.isSuccess
 import java.io.BufferedReader
 import java.io.File
 import java.io.FileInputStream
@@ -20,8 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
-import okhttp3.Request
+import kotlinx.coroutines.withContext
 
 /**
  * Loads relay coordinates from assets and provides nearest-relay lookup by geohash.
@@ -36,8 +39,8 @@ object RelayDirectory {
     private val ONE_DAY_MS = TimeUnit.DAYS.toMillis(1)
 
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val httpClient: OkHttpClient
-        get() = OkHttpProvider.httpClient()
+    private val httpClient: HttpClient
+        get() = HttpClientProvider.httpClient()
 
     data class RelayInfo(
         val url: String,
@@ -151,7 +154,7 @@ object RelayDirectory {
         }
     }
 
-    private fun fetchAndMaybeSwap(application: Application) {
+    private suspend fun fetchAndMaybeSwap(application: Application) {
         try {
             val tmpFile = File.createTempFile("relays_", ".csv", application.cacheDir)
             val ok = downloadToFile(ASSET_FILE_URL, tmpFile)
@@ -192,22 +195,18 @@ object RelayDirectory {
         }
     }
 
-    private fun downloadToFile(url: String, dest: File): Boolean {
+    private suspend fun downloadToFile(url: String, dest: File): Boolean {
         return try {
-            val req = Request.Builder().url(url).get().build()
-            httpClient.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) {
-                    Log.w(TAG, "HTTP ${'$'}{resp.code} when fetching $url")
-                    return false
-                }
-                val body = resp.body ?: return false
-                FileOutputStream(dest).use { out ->
-                    body.byteStream().use { input ->
-                        input.copyTo(out)
-                    }
-                }
-                true
+            val response = httpClient.get(url)
+            if (!response.status.isSuccess()) {
+                Log.w(TAG, "HTTP ${response.status.value} when fetching $url")
+                return false
             }
+            val bytes: ByteArray = response.body()
+            withContext(Dispatchers.IO) {
+                FileOutputStream(dest).use { out -> out.write(bytes) }
+            }
+            true
         } catch (e: Exception) {
             Log.w(TAG, "Download error: ${e.message}")
             false
