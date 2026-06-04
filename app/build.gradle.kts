@@ -128,9 +128,6 @@ dependencies {
     // Bluetooth
     implementation(libs.nordic.ble)
 
-    // WebSocket
-    implementation(libs.okhttp)
-
     // Google Play Services Location
     implementation(libs.gms.location)
 

@@ -3,15 +3,20 @@ package com.app.transport.nostr
 import android.util.Log
 import com.app.common.serialization.JsonConfig
 import com.app.transport.NostrConstants
-import com.app.transport.net.OkHttpProvider
+import com.app.transport.net.HttpClientProvider
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
+import io.ktor.client.plugins.websocket.webSocketSession
+import io.ktor.websocket.CloseReason
+import io.ktor.websocket.Frame
+import io.ktor.websocket.close
+import io.ktor.websocket.readText
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.JsonArray
 import kotlinx.coroutines.*
-import okhttp3.*
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
 import kotlin.math.min
 import kotlin.math.pow
 
@@ -82,7 +87,7 @@ class NostrRelayManager private constructor() {
     
     // Internal state
     private val relaysList = mutableListOf<Relay>()
-    private val connections = ConcurrentHashMap<String, WebSocket>()
+    private val connections = ConcurrentHashMap<String, DefaultClientWebSocketSession>()
     private val subscriptions = ConcurrentHashMap<String, Set<String>>() // relay URL -> subscription IDs
     private val messageHandlers = ConcurrentHashMap<String, (NostrEvent) -> Unit>()
     
@@ -115,9 +120,9 @@ class NostrRelayManager private constructor() {
     private var subscriptionValidationJob: Job? = null
     private val SUBSCRIPTION_VALIDATION_INTERVAL = NostrConstants.SUBSCRIPTION_VALIDATION_INTERVAL_MS // 30 seconds
     
-    // OkHttp client for WebSocket connections (via provider to honor Tor)
-    private val httpClient: OkHttpClient
-        get() = OkHttpProvider.webSocketClient()
+    // ktor client for WebSocket connections (via provider to honor Tor)
+    private val httpClient: HttpClient
+        get() = HttpClientProvider.webSocketClient()
     
     
     // Per-geohash relay selection
@@ -265,8 +270,8 @@ class NostrRelayManager private constructor() {
         // Stop subscription validation
         stopSubscriptionValidation()
         
-        connections.values.forEach { webSocket ->
-            webSocket.close(1000, "Manual disconnect")
+        connections.values.forEach { session ->
+            closeSession(session, "Manual disconnect")
         }
         connections.clear()
         
@@ -344,7 +349,7 @@ class NostrRelayManager private constructor() {
                 val webSocket = connections[relayUrl]
                 if (webSocket != null) {
                     try {
-                        val success = webSocket.send(message)
+                        val success = webSocket.trySendText(message)
                         if (success) {
                             // Track subscription for this relay
                             val currentSubs = subscriptions[relayUrl] ?: emptySet()
@@ -391,7 +396,7 @@ class NostrRelayManager private constructor() {
                 val currentSubs = subscriptions[relayUrl]
                 if (currentSubs?.contains(id) == true) {
                     try {
-                        webSocket.send(message)
+                        webSocket.trySendText(message)
                         subscriptions[relayUrl] = currentSubs - id
                         Log.v(TAG, "Unsubscribed '$id' from relay: $relayUrl")
                     } catch (e: Exception) {
@@ -413,7 +418,7 @@ class NostrRelayManager private constructor() {
         relay.nextReconnectTime = null
         
         // Disconnect if connected
-        connections[relayUrl]?.close(1000, "Manual retry")
+        connections[relayUrl]?.let { closeSession(it, "Manual retry") }
         connections.remove(relayUrl)
         
         // Attempt immediate reconnection
@@ -616,27 +621,41 @@ class NostrRelayManager private constructor() {
         Log.v(TAG, "Attempting to connect to Nostr relay: $urlString")
         
         try {
-            val request = Request.Builder()
-                .url(urlString)
-                .build()
-            
-            val webSocket = httpClient.newWebSocket(request, RelayWebSocketListener(urlString))
-            connections[urlString] = webSocket
-            
+            val session = httpClient.webSocketSession(urlString)
+            connections[urlString] = session
+            onRelayConnected(urlString, session)
+
+            // Pump incoming frames until the session closes or fails (replaces WebSocketListener).
+            scope.launch {
+                try {
+                    for (frame in session.incoming) {
+                        if (frame is Frame.Text) {
+                            handleMessage(frame.readText(), urlString)
+                        }
+                    }
+                    Log.d(TAG, "WebSocket closed for $urlString")
+                    handleDisconnection(urlString, Exception("WebSocket closed"))
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ WebSocket failure for $urlString: ${e.message}")
+                    handleDisconnection(urlString, e)
+                }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to create WebSocket connection to $urlString: ${e.message}")
             handleDisconnection(urlString, e)
         }
     }
     
-    private fun sendToRelay(event: NostrEvent, webSocket: WebSocket, relayUrl: String) {
+    private fun sendToRelay(event: NostrEvent, webSocket: DefaultClientWebSocketSession, relayUrl: String) {
         try {
             val request = NostrRequest.Event(event)
             val message = NostrRequest.toJson(request)
             
             Log.v(TAG, "📤 Sending Nostr event (kind: ${event.kind}) to relay: $relayUrl")
             
-            val success = webSocket.send(message)
+            val success = webSocket.trySendText(message)
             if (success) {
                 // Update relay stats
                 val relay = relaysList.find { it.url == relayUrl }
@@ -813,7 +832,7 @@ class NostrRelayManager private constructor() {
     /**
      * Restore all active subscriptions for a specific relay that just reconnected
      */
-    private fun restoreSubscriptionsForRelay(relayUrl: String, webSocket: WebSocket) {
+    private fun restoreSubscriptionsForRelay(relayUrl: String, webSocket: DefaultClientWebSocketSession) {
         val subscriptionsToRestore = activeSubscriptions.values.filter { subscriptionInfo ->
             // Include subscription if it targets all relays or specifically targets this relay
             subscriptionInfo.targetRelayUrls == null || subscriptionInfo.targetRelayUrls.contains(relayUrl)
@@ -831,7 +850,7 @@ class NostrRelayManager private constructor() {
                 val request = NostrRequest.Subscribe(subscriptionInfo.id, listOf(subscriptionInfo.filter))
                 val message = NostrRequest.toJson(request)
                 
-                val success = webSocket.send(message)
+                val success = webSocket.trySendText(message)
                 if (success) {
                     // Track subscription for this relay
                     val currentSubs = subscriptions[relayUrl] ?: emptySet()
@@ -848,46 +867,41 @@ class NostrRelayManager private constructor() {
     }
     
     /**
-     * WebSocket listener for relay connections
+     * Handle a freshly opened relay session: mark connected, restore subscriptions, flush the queue.
+     * Equivalent to the former WebSocketListener.onOpen.
      */
-    private inner class RelayWebSocketListener(private val relayUrl: String) : WebSocketListener() {
-        
-        override fun onOpen(webSocket: WebSocket, response: Response) {
-            Log.d(TAG, "✅ Connected to Nostr relay: $relayUrl")
-            updateRelayStatus(relayUrl, true)
-            
-            // Restore all active subscriptions for this relay
-            restoreSubscriptionsForRelay(relayUrl, webSocket)
-            
-            // Process any queued messages for this relay
-            synchronized(messageQueueLock) {
-                val iterator = messageQueue.iterator()
-                while (iterator.hasNext()) {
-                    val (event, targetRelays) = iterator.next()
-                    if (relayUrl in targetRelays) {
-                        sendToRelay(event, webSocket, relayUrl)
-                    }
+    private fun onRelayConnected(relayUrl: String, session: DefaultClientWebSocketSession) {
+        Log.d(TAG, "✅ Connected to Nostr relay: $relayUrl")
+        updateRelayStatus(relayUrl, true)
+
+        // Restore all active subscriptions for this relay
+        restoreSubscriptionsForRelay(relayUrl, session)
+
+        // Process any queued messages for this relay
+        synchronized(messageQueueLock) {
+            val iterator = messageQueue.iterator()
+            while (iterator.hasNext()) {
+                val (event, targetRelays) = iterator.next()
+                if (relayUrl in targetRelays) {
+                    sendToRelay(event, session, relayUrl)
                 }
             }
         }
-        
-        override fun onMessage(webSocket: WebSocket, text: String) {
-            handleMessage(text, relayUrl)
-        }
-        
-        override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-            Log.d(TAG, "WebSocket closing for $relayUrl: $code $reason")
-        }
-        
-        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-            Log.d(TAG, "WebSocket closed for $relayUrl: $code $reason")
-            val error = Exception("WebSocket closed: $code $reason")
-            handleDisconnection(relayUrl, error)
-        }
-        
-        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-            Log.e(TAG, "❌ WebSocket failure for $relayUrl: ${t.message}")
-            handleDisconnection(relayUrl, t)
+    }
+
+    /**
+     * Gracefully close a relay session off the caller's thread. The receive loop then ends and routes
+     * through handleDisconnection (mirrors the former WebSocketListener.onClosed).
+     */
+    private fun closeSession(session: DefaultClientWebSocketSession, reason: String) {
+        scope.launch {
+            try {
+                session.close(CloseReason(CloseReason.Codes.NORMAL, reason))
+            } catch (_: Exception) {
+            }
         }
     }
 }
+
+private fun DefaultClientWebSocketSession.trySendText(text: String): Boolean =
+    outgoing.trySend(Frame.Text(text)).isSuccess
