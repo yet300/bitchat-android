@@ -2,6 +2,7 @@ package com.bitchat.android.nostr
 
 import android.util.Log
 import androidx.annotation.MainThread
+import com.app.common.geohash.Geohash
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -147,7 +148,7 @@ class LocationNotesManager private constructor() {
         
         // Compute target geohashes: center + neighbors (±1)
         val neighbors = try {
-            com.bitchat.android.geohash.Geohash.neighborsSamePrecision(normalized)
+            Geohash.neighborsSamePrecision(normalized)
         } catch (_: Exception) { emptySet() }
         subscribedGeohashes = (neighbors + normalized).toSet()
 
@@ -183,7 +184,7 @@ class LocationNotesManager private constructor() {
         _initialLoadComplete.value = false
         // Rebuild subscribedGeohashes and resubscribe
         val neighbors = try {
-            com.bitchat.android.geohash.Geohash.neighborsSamePrecision(currentGeohash)
+            Geohash.neighborsSamePrecision(currentGeohash)
         } catch (_: Exception) { emptySet() }
         subscribedGeohashes = (neighbors + currentGeohash).toSet()
         subscribeAll()

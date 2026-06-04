@@ -1,5 +1,6 @@
 package com.bitchat.android.geohash
 
+import com.app.common.geohash.Geohash
 import android.content.Context
 import android.location.Geocoder
 import android.location.Location
