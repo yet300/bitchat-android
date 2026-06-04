@@ -6,6 +6,7 @@ import com.bitchat.android.mesh.BluetoothMeshService
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.transport.model.BitchatMessage
 import com.app.transport.model.DeliveryStatus
+import com.app.transport.nostr.Bech32
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -436,7 +437,7 @@ class PrivateChatManager(
             val npub = com.bitchat.android.favorites.FavoritesPersistenceService.shared.findNostrPubkey(noiseKeyBytes)
             if (npub != null) {
                 // Normalize to hex to match how we formed temp keys (nostr_<pub16>)
-                val (hrp, data) = com.bitchat.android.nostr.Bech32.decode(npub)
+                val (hrp, data) = Bech32.decode(npub)
                 if (hrp == "npub") {
                     val pubHex = data.joinToString("") { "%02x".format(it) }
                     tryMergeKeys.add("nostr_${pubHex.take(16)}")

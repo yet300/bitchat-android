@@ -2,6 +2,7 @@
 
 package com.bitchat.android.nostr
 
+import com.app.transport.nostr.*
 import android.app.Application
 import android.util.Log
 import com.bitchat.android.ui.ChatState

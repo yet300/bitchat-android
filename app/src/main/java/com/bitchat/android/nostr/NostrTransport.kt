@@ -1,5 +1,7 @@
 package com.bitchat.android.nostr
 
+import com.app.transport.nostr.*
+
 import android.content.Context
 import android.util.Log
 import com.app.transport.NostrConstants

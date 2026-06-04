@@ -1,4 +1,4 @@
-package com.bitchat.android.nostr
+package com.app.transport.nostr
 
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer

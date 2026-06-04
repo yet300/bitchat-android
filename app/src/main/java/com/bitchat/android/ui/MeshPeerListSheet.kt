@@ -33,8 +33,8 @@ import com.bitchat.android.core.ui.component.sheet.BitchatSheetCenterTopBar
 import com.bitchat.android.core.ui.component.sheet.BitchatSheetTitle
 import com.bitchat.android.core.ui.component.sheet.BitchatSheetTopBar
 import com.bitchat.android.geohash.ChannelID
-import com.bitchat.android.nostr.GeohashAliasRegistry
-import com.bitchat.android.nostr.GeohashConversationRegistry
+import com.app.transport.nostr.GeohashAliasRegistry
+import com.app.transport.nostr.GeohashConversationRegistry
 import com.bitchat.android.ui.theme.BASE_FONT_SIZE
 import kotlin.time.ExperimentalTime
 
@@ -448,7 +448,7 @@ fun PeopleSection(
                 val npubOrHex = com.bitchat.android.favorites.FavoritesPersistenceService.shared.findNostrPubkey(fav.peerNoisePublicKey)
                 if (npubOrHex != null) {
                     val hex = if (npubOrHex.startsWith("npub")) {
-                        val (hrp, data) = com.bitchat.android.nostr.Bech32.decode(npubOrHex)
+                        val (hrp, data) = com.app.transport.nostr.Bech32.decode(npubOrHex)
                         if (hrp == "npub") data.joinToString("") { "%02x".format(it) } else null
                     } else {
                         npubOrHex.lowercase()

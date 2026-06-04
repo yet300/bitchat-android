@@ -1,5 +1,6 @@
 package com.bitchat.android.nostr
 
+import com.app.transport.nostr.*
 import android.app.Application
 import android.util.Log
 import com.app.transport.model.BitchatMessage
@@ -76,7 +77,7 @@ class GeohashMessageHandler(
                 event.tags.find { it.size >= 2 && it[0] == "t" && it[1] == "teleport" }?.let { repo.markTeleported(event.pubkey) }
                 // Register a geohash DM alias for this participant so MessageRouter can route DMs via Nostr
                 try {
-                    com.bitchat.android.nostr.GeohashAliasRegistry.put("nostr_${event.pubkey.take(16)}", event.pubkey)
+                    com.app.transport.nostr.GeohashAliasRegistry.put("nostr_${event.pubkey.take(16)}", event.pubkey)
                 } catch (_: Exception) { }
 
                 // Stop here for presence events - they don't produce chat messages

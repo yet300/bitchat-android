@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.bitchat.android.R
 import com.bitchat.android.geohash.ChannelID
 import com.bitchat.android.geohash.LocationChannelManager
-import com.bitchat.android.nostr.LocationNotesManager
+import com.app.transport.nostr.LocationNotesManager
 
 /**
  * Location Notes button component for MainHeader

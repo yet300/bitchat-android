@@ -1,4 +1,4 @@
-package com.bitchat.android.nostr
+package com.app.transport.nostr
 
 import android.content.Context
 import com.app.common.appSettings
@@ -9,13 +9,14 @@ import kotlinx.serialization.builtins.serializer
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * GeohashAliasRegistry
- * - Global, thread-safe registry for alias->Nostr pubkey mappings (e.g., nostr_<pub16> -> pubkeyHex)
+ * GeohashConversationRegistry
+ * - Global, thread-safe registry of conversationKey (e.g., "nostr_<pub16>") -> source geohash
+ * - Enables routing geohash DMs from anywhere by providing the correct geohash identity
  * - Persisted as a single JSON map under [KEY] in the shared app settings store.
  */
-object GeohashAliasRegistry {
-    private val map: MutableMap<String, String> = ConcurrentHashMap()
-    private const val KEY = "geohash_alias_registry"
+object GeohashConversationRegistry {
+    private val map = ConcurrentHashMap<String, String>()
+    private const val KEY = "geohash_conversation_registry"
     private val serializer = MapSerializer(String.serializer(), String.serializer())
     private var settings: Settings? = null
 
@@ -36,16 +37,16 @@ object GeohashAliasRegistry {
         settings?.putString(KEY, JsonConfig.json.encodeToString(serializer, HashMap(map)))
     }
 
-    fun put(alias: String, pubkeyHex: String) {
-        map[alias] = pubkeyHex
-        persist()
+    fun set(convKey: String, geohash: String) {
+        if (geohash.isNotEmpty()) {
+            map[convKey] = geohash
+            persist()
+        }
     }
 
-    fun get(alias: String): String? = map[alias]
+    fun get(convKey: String): String? = map[convKey]
 
-    fun contains(alias: String): Boolean = map.containsKey(alias)
-
-    fun snapshot(): Map<String, String> = HashMap(map)
+    fun snapshot(): Map<String, String> = map.toMap()
 
     fun clear() {
         map.clear()

@@ -1,14 +1,14 @@
 package com.bitchat.android
 
 import android.app.Application
-import com.bitchat.android.nostr.RelayDirectory
+import com.app.transport.nostr.RelayDirectory
 import com.bitchat.android.ui.theme.ThemePreferenceManager
 import com.app.transport.net.ArtiTorManager
-import com.bitchat.android.nostr.GeohashAliasRegistry
-import com.bitchat.android.nostr.GeohashConversationRegistry
-import com.bitchat.android.nostr.LocationNotesInitializer
-import com.bitchat.android.nostr.NostrIdentityBridge
-import com.bitchat.android.nostr.NostrRelayManager
+import com.app.transport.nostr.GeohashAliasRegistry
+import com.app.transport.nostr.GeohashConversationRegistry
+import com.app.transport.nostr.LocationNotesInitializer
+import com.app.transport.nostr.NostrIdentityBridge
+import com.app.transport.nostr.NostrRelayManager
 
 /**
  * Main application class for bitchat Android
