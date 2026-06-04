@@ -3,7 +3,7 @@ package com.bitchat.android
 import android.app.Application
 import com.bitchat.android.nostr.RelayDirectory
 import com.bitchat.android.ui.theme.ThemePreferenceManager
-import com.bitchat.android.net.ArtiTorManager
+import com.app.transport.net.ArtiTorManager
 import com.bitchat.android.nostr.GeohashAliasRegistry
 import com.bitchat.android.nostr.GeohashConversationRegistry
 import com.bitchat.android.nostr.LocationNotesInitializer

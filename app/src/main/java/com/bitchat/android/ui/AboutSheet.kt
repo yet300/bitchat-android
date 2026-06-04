@@ -32,9 +32,9 @@ import androidx.compose.ui.res.stringResource
 import com.bitchat.android.R
 import com.bitchat.android.core.ui.component.button.CloseButton
 import com.bitchat.android.core.ui.component.sheet.BitchatBottomSheet
-import com.bitchat.android.net.TorMode
-import com.bitchat.android.net.TorPreferenceManager
-import com.bitchat.android.net.ArtiTorManager
+import com.app.transport.net.TorMode
+import com.app.transport.net.TorPreferenceManager
+import com.app.transport.net.ArtiTorManager
 
 /**
  * Feature row for displaying app capabilities

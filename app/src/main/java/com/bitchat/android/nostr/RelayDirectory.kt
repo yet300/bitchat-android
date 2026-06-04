@@ -3,6 +3,7 @@ package com.bitchat.android.nostr
 import android.app.Application
 import android.util.Log
 import com.app.common.appSettings
+import com.app.transport.net.OkHttpProvider
 import com.russhwolf.settings.Settings
 import java.io.BufferedReader
 import java.io.File
@@ -35,7 +36,7 @@ object RelayDirectory {
 
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val httpClient: OkHttpClient
-        get() = com.bitchat.android.net.OkHttpProvider.httpClient()
+        get() = OkHttpProvider.httpClient()
 
     data class RelayInfo(
         val url: String,
