@@ -43,10 +43,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 fun TorStatusDot(
     modifier: Modifier = Modifier
 ) {
-    val torProvider = remember { com.bitchat.android.net.ArtiTorManager.getInstance() }
+    val torProvider = remember { com.app.transport.net.ArtiTorManager.getInstance() }
     val torStatus by torProvider.statusFlow.collectAsState()
     
-    if (torStatus.mode != com.bitchat.android.net.TorMode.OFF) {
+    if (torStatus.mode != com.app.transport.net.TorMode.OFF) {
         val dotColor = when {
             torStatus.running && torStatus.bootstrapPercent < 100 -> Color(0xFFFF9500) // Orange - bootstrapping
             torStatus.running && torStatus.bootstrapPercent >= 100 -> Color(0xFF00C851) // Green - connected

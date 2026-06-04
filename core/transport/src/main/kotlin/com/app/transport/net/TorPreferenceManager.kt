@@ -1,4 +1,4 @@
-package com.bitchat.android.net
+package com.app.transport.net
 
 import android.content.Context
 import com.app.common.appSettings

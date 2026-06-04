@@ -1,8 +1,8 @@
-package com.bitchat.android.net
+package com.app.transport.net
 
 import android.app.Application
 import android.util.Log
-import com.bitchat.android.util.AppConstants
+import com.app.transport.TorConstants
 import info.guardianproject.arti.ArtiLogListener
 import info.guardianproject.arti.ArtiProxy
 import kotlinx.coroutines.CoroutineScope
@@ -53,11 +53,11 @@ class ArtiTorManager private constructor() {
 
     companion object {
         private const val TAG = "ArtiTorManager"
-        private const val DEFAULT_SOCKS_PORT = AppConstants.Tor.DEFAULT_SOCKS_PORT
-        private const val RESTART_DELAY_MS = AppConstants.Tor.RESTART_DELAY_MS
-        private const val INACTIVITY_TIMEOUT_MS = AppConstants.Tor.INACTIVITY_TIMEOUT_MS
-        private const val MAX_RETRY_ATTEMPTS = AppConstants.Tor.MAX_RETRY_ATTEMPTS
-        private const val STOP_TIMEOUT_MS = AppConstants.Tor.STOP_TIMEOUT_MS
+        private const val DEFAULT_SOCKS_PORT = TorConstants.DEFAULT_SOCKS_PORT
+        private const val RESTART_DELAY_MS = TorConstants.RESTART_DELAY_MS
+        private const val INACTIVITY_TIMEOUT_MS = TorConstants.INACTIVITY_TIMEOUT_MS
+        private const val MAX_RETRY_ATTEMPTS = TorConstants.MAX_RETRY_ATTEMPTS
+        private const val STOP_TIMEOUT_MS = TorConstants.STOP_TIMEOUT_MS
 
         @Volatile
         private var INSTANCE: ArtiTorManager? = null

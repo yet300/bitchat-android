@@ -3,6 +3,7 @@ package com.bitchat.android.nostr
 import android.util.Log
 import com.app.common.serialization.JsonConfig
 import com.app.transport.NostrConstants
+import com.app.transport.net.OkHttpProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -116,7 +117,7 @@ class NostrRelayManager private constructor() {
     
     // OkHttp client for WebSocket connections (via provider to honor Tor)
     private val httpClient: OkHttpClient
-        get() = com.bitchat.android.net.OkHttpProvider.webSocketClient()
+        get() = OkHttpProvider.webSocketClient()
     
     
     // Per-geohash relay selection

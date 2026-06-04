@@ -2,7 +2,7 @@ package com.bitchat.android.geohash
 
 import android.location.Address
 import android.util.Log
-import com.bitchat.android.net.OkHttpProvider
+import com.app.transport.net.OkHttpProvider
 import com.app.common.serialization.JsonConfig
 import kotlinx.serialization.Serializable
 import okhttp3.Request
