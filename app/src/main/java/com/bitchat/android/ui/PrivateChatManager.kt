@@ -2,7 +2,7 @@
 package com.bitchat.android.ui
 
 import android.util.Log
-import com.bitchat.android.mesh.BluetoothMeshService
+import com.app.transport.mesh.BluetoothMeshService
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.transport.model.BitchatMessage
 import com.app.transport.model.DeliveryStatus

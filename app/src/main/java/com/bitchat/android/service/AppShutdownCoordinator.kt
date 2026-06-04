@@ -3,7 +3,7 @@ package com.bitchat.android.service
 import android.app.Application
 import android.os.Process
 import androidx.core.app.NotificationManagerCompat
-import com.bitchat.android.mesh.BluetoothMeshService
+import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.net.ArtiTorManager
 import com.app.transport.net.TorMode
 import kotlinx.coroutines.CoroutineScope

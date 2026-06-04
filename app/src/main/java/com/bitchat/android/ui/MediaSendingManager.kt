@@ -2,7 +2,7 @@ package com.bitchat.android.ui
 
 import android.util.Log
 import com.app.transport.features.file.FileUtils
-import com.bitchat.android.mesh.BluetoothMeshService
+import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.model.BitchatFilePacket
 import com.app.transport.model.BitchatMessage
 import com.app.transport.model.BitchatMessageType
@@ -322,7 +322,7 @@ class MediaSendingManager(
     /**
      * Handle transfer progress events
      */
-    fun handleTransferProgressEvent(evt: com.bitchat.android.mesh.TransferProgressEvent) {
+    fun handleTransferProgressEvent(evt: com.app.transport.mesh.TransferProgressEvent) {
         val msgId = synchronized(transferMessageMap) { transferMessageMap[evt.transferId] }
         if (msgId != null) {
             if (evt.completed) {

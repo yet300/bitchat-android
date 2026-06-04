@@ -1,4 +1,4 @@
-package com.bitchat.android.mesh
+package com.app.transport.mesh
 
 import android.Manifest
 import android.content.Context

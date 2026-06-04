@@ -2,7 +2,7 @@ package com.bitchat.android.service
 
 import android.content.Context
 import com.app.transport.nostr.GeohashAliasRegistry
-import com.bitchat.android.mesh.BluetoothMeshService
+import com.app.transport.mesh.BluetoothMeshService
 
 /**
  * Process-wide holder to share a single BluetoothMeshService instance

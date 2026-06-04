@@ -85,7 +85,7 @@ fun MessageWithMatrixAnimation(
     message: com.app.transport.model.BitchatMessage,
     messages: List<com.app.transport.model.BitchatMessage> = emptyList(),
     currentUserNickname: String,
-    meshService: com.bitchat.android.mesh.BluetoothMeshService,
+    meshService: com.app.transport.mesh.BluetoothMeshService,
     colorScheme: androidx.compose.material3.ColorScheme,
     timeFormatter: TimeFormatter,
     onNicknameClick: ((String) -> Unit)?,
@@ -132,7 +132,7 @@ fun MessageWithMatrixAnimation(
 private fun AnimatedMessageDisplay(
     message: com.app.transport.model.BitchatMessage,
     currentUserNickname: String,
-    meshService: com.bitchat.android.mesh.BluetoothMeshService,
+    meshService: com.app.transport.mesh.BluetoothMeshService,
     colorScheme: androidx.compose.material3.ColorScheme,
     timeFormatter: TimeFormatter,
     modifier: Modifier = Modifier
@@ -249,7 +249,7 @@ private fun AnimatedMessageDisplay(
 private fun formatMessageAsAnnotatedStringWithoutTimestamp(
     message: com.app.transport.model.BitchatMessage,
     currentUserNickname: String,
-    meshService: com.bitchat.android.mesh.BluetoothMeshService,
+    meshService: com.app.transport.mesh.BluetoothMeshService,
     colorScheme: androidx.compose.material3.ColorScheme
 ): AnnotatedString {
     // Get the full formatted text first

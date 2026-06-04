@@ -1,4 +1,4 @@
-package com.bitchat.android.mesh
+package com.app.transport.mesh
 
 import android.bluetooth.le.AdvertiseSettings
 import android.bluetooth.le.ScanSettings
