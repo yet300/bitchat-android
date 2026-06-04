@@ -2,6 +2,7 @@ package com.bitchat.android.nostr
 
 import android.content.Context
 import android.util.Log
+import com.app.transport.NostrConstants
 import com.app.transport.model.ReadReceipt
 import com.app.transport.model.NoisePayloadType
 import kotlinx.coroutines.*
@@ -19,7 +20,7 @@ class NostrTransport(
     
     companion object {
         private const val TAG = "NostrTransport"
-        private const val READ_ACK_INTERVAL = com.bitchat.android.util.AppConstants.Nostr.READ_ACK_INTERVAL_MS // ~3 per second (0.35s interval like iOS)
+        private const val READ_ACK_INTERVAL = NostrConstants.READ_ACK_INTERVAL_MS // ~3 per second (0.35s interval like iOS)
         
         @Volatile
         private var INSTANCE: NostrTransport? = null

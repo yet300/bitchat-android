@@ -9,23 +9,6 @@ package com.bitchat.android.util
  */
 object AppConstants {
 
-    object Nostr {
-        // Relay backoff
-        const val INITIAL_BACKOFF_INTERVAL_MS: Long = 1_000L
-        const val MAX_BACKOFF_INTERVAL_MS: Long = 300_000L
-        const val BACKOFF_MULTIPLIER: Double = 2.0
-        const val MAX_RECONNECT_ATTEMPTS: Int = 10
-
-        // Transport
-        const val READ_ACK_INTERVAL_MS: Long = 350L
-
-        // Deduplicator
-        const val DEFAULT_DEDUP_CAPACITY: Int = 10_000
-
-        // Relay subscription validation
-        const val SUBSCRIPTION_VALIDATION_INTERVAL_MS: Long = 30_000L
-    }
-
     object Tor {
         const val DEFAULT_SOCKS_PORT: Int = 9060
         const val RESTART_DELAY_MS: Long = 2_000L
