@@ -2,6 +2,8 @@ package com.bitchat.android.services
 
 import android.content.Context
 import android.util.Log
+import com.app.data.favorites.FavoritesChangeListener
+import com.app.data.favorites.FavoritesPersistenceService
 import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.model.ReadReceipt
 import com.app.transport.nostr.GeohashAliasRegistry
@@ -28,7 +30,7 @@ class MessageRouter private constructor(
                     MessageRouter(context.applicationContext, mesh, nostr).also { instance ->
                         // Register for favorites changes to flush outbox
                         try {
-                            com.bitchat.android.favorites.FavoritesPersistenceService.shared.addListener(instance.favoriteListener)
+                            FavoritesPersistenceService.shared.addListener(instance.favoriteListener)
                         } catch (_: Exception) {}
                         INSTANCE = instance
                     }
@@ -45,7 +47,7 @@ class MessageRouter private constructor(
     private val outbox = mutableMapOf<String, MutableList<Triple<String, String, String>>>()
 
     // Listener for favorites changes to flush outbox when npub mapping appears/changes
-    private val favoriteListener = object: com.bitchat.android.favorites.FavoritesChangeListener {
+    private val favoriteListener = object: FavoritesChangeListener {
 
         override fun onFavoriteChanged(noiseKeyHex: String) {
             flushOutboxFor(noiseKeyHex)
@@ -168,11 +170,11 @@ class MessageRouter private constructor(
             // Full Noise key hex
             if (peerID.length == 64 && peerID.matches(Regex("^[0-9a-fA-F]+$"))) {
                 val noiseKey = hexToBytes(peerID)
-                val fav = com.bitchat.android.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey)
+                val fav = FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey)
                 fav?.isMutual == true && fav.peerNostrPublicKey != null
             } else if (peerID.length == 16 && peerID.matches(Regex("^[0-9a-fA-F]+$"))) {
                 // Ephemeral 16-hex mesh ID: resolve via prefix match in favorites
-                val fav = com.bitchat.android.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(peerID)
+                val fav = FavoritesPersistenceService.shared.getFavoriteStatus(peerID)
                 fav?.isMutual == true && fav.peerNostrPublicKey != null
             } else {
                 false

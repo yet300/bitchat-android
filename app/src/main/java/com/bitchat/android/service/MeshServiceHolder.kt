@@ -1,6 +1,7 @@
 package com.bitchat.android.service
 
 import android.content.Context
+import com.app.data.favorites.FavoritesPersistenceService
 import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.mesh.BluetoothMeshService
 
@@ -63,18 +64,18 @@ object MeshServiceHolder {
         // Noise<->Nostr favorite mapping, backed by favorites persistence.
         service.favoriteNostrLink = object : com.app.transport.FavoriteNostrLink {
             override fun updatePeerFavoritedUs(noiseKey: ByteArray, theyFavoritedUs: Boolean) {
-                com.bitchat.android.favorites.FavoritesPersistenceService.shared.updatePeerFavoritedUs(noiseKey, theyFavoritedUs)
+                FavoritesPersistenceService.shared.updatePeerFavoritedUs(noiseKey, theyFavoritedUs)
             }
             override fun updateNostrPublicKey(noiseKey: ByteArray, nostrPubkey: String) {
-                com.bitchat.android.favorites.FavoritesPersistenceService.shared.updateNostrPublicKey(noiseKey, nostrPubkey)
+                FavoritesPersistenceService.shared.updateNostrPublicKey(noiseKey, nostrPubkey)
             }
             override fun updateNostrPublicKeyForPeerId(peerId: String, nostrPubkey: String) {
-                com.bitchat.android.favorites.FavoritesPersistenceService.shared.updateNostrPublicKeyForPeerID(peerId, nostrPubkey)
+                FavoritesPersistenceService.shared.updateNostrPublicKeyForPeerID(peerId, nostrPubkey)
             }
             override fun findNostrPubkey(noiseKey: ByteArray): String? =
-                com.bitchat.android.favorites.FavoritesPersistenceService.shared.findNostrPubkey(noiseKey)
+                FavoritesPersistenceService.shared.findNostrPubkey(noiseKey)
             override fun isFavorite(noiseKey: ByteArray): Boolean =
-                com.bitchat.android.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey)?.isFavorite == true
+                FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey)?.isFavorite == true
         }
         // Routes read receipts over the relay when the recipient is a geohash alias.
         service.geohashReadReceiptRouter = com.app.transport.GeohashReadReceiptRouter { messageId, toPeerId ->

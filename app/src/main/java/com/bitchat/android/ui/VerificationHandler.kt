@@ -4,7 +4,7 @@ package com.bitchat.android.ui
 
 import android.content.Context
 import com.bitchat.android.R
-import com.bitchat.android.favorites.FavoritesPersistenceService
+import com.app.data.favorites.FavoritesPersistenceService
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.model.BitchatMessage

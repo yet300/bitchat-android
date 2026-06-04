@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalTime::class)
 
-package com.bitchat.android.favorites
+package com.app.data.favorites
 
 import android.content.Context
 import android.util.Log
