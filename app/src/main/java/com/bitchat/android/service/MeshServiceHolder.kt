@@ -3,8 +3,11 @@ package com.bitchat.android.service
 import android.content.Context
 import com.app.data.AppStateStore
 import com.app.data.favorites.FavoritesPersistenceService
+import com.app.data.routing.MessageRouter
+import com.app.transport.GeohashReadReceiptRouter
 import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.mesh.BluetoothMeshService
+import com.app.transport.model.ReadReceipt
 
 /**
  * Process-wide holder to share a single BluetoothMeshService instance
@@ -79,13 +82,13 @@ object MeshServiceHolder {
                 FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey)?.isFavorite == true
         }
         // Routes read receipts over the relay when the recipient is a geohash alias.
-        service.geohashReadReceiptRouter = com.app.transport.GeohashReadReceiptRouter { messageId, toPeerId ->
-            val router = runCatching { com.bitchat.android.services.MessageRouter.tryGetInstance() }.getOrNull()
+        service.geohashReadReceiptRouter = GeohashReadReceiptRouter { messageId, toPeerId ->
+            val router = runCatching { MessageRouter.tryGetInstance() }.getOrNull()
             val isGeoAlias = runCatching {
                 GeohashAliasRegistry.snapshot().containsKey(toPeerId)
             }.getOrDefault(false)
             if (isGeoAlias && router != null) {
-                router.sendReadReceipt(com.app.transport.model.ReadReceipt(messageId), toPeerId)
+                router.sendReadReceipt(ReadReceipt(messageId), toPeerId)
                 true
             } else {
                 false

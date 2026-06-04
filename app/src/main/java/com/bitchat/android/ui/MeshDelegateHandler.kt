@@ -1,6 +1,7 @@
 package com.bitchat.android.ui
 
 import com.app.data.favorites.FavoritesPersistenceService
+import com.app.data.routing.MessageRouter
 import com.app.transport.notification.NotificationTextUtils
 import com.app.transport.model.BitchatMessage
 import com.app.transport.model.DeliveryStatus
@@ -106,7 +107,7 @@ class MeshDelegateHandler(
             state.setIsConnected(peers.isNotEmpty())
             notificationManager.showActiveUserNotification(peers)
             // Flush router outbox for any peers that just connected (and their noiseHex aliases)
-            runCatching { com.bitchat.android.services.MessageRouter.tryGetInstance()?.onPeersUpdated(peers) }
+            runCatching { MessageRouter.tryGetInstance()?.onPeersUpdated(peers) }
 
             // Clean up channel members who disconnected
             channelManager.cleanupDisconnectedMembers(peers, getMyPeerID())
