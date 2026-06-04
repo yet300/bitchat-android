@@ -1,7 +1,9 @@
 package com.app.data.di
 
+import com.app.data.repository.ChannelRepositoryImpl
 import com.app.data.repository.ContactRepositoryImpl
 import com.app.data.repository.SettingsRepositoryImpl
+import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.SettingsRepository
 import dev.zacsweers.metro.AppScope
@@ -22,4 +24,7 @@ abstract class DataBindings {
 
     @Binds
     internal abstract val ContactRepositoryImpl.bindContact: ContactRepository
+
+    @Binds
+    internal abstract val ChannelRepositoryImpl.bindChannel: ChannelRepository
 }
