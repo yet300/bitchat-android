@@ -184,7 +184,7 @@ class BluetoothMeshService(private val context: Context) {
             override fun onPeerRemoved(peerID: String) {
                 try { gossipSyncManager.removeAnnouncementForPeer(peerID) } catch (_: Exception) { }
                 // Remove from mesh graph topology to prevent routing through stale peers
-                try { com.bitchat.android.services.meshgraph.MeshGraphService.getInstance().removePeer(peerID) } catch (_: Exception) { }
+                try { com.app.transport.meshgraph.MeshGraphService.getInstance().removePeer(peerID) } catch (_: Exception) { }
 
                 // Also drop any Noise session state for this peer when they go offline
                 try {
@@ -931,7 +931,7 @@ class BluetoothMeshService(private val context: Context) {
 
             try {
                 // Avoid duplicate read receipts: check persistent store first
-                val seenStore = try { com.bitchat.android.services.SeenMessageStore.getInstance(context.applicationContext) } catch (_: Exception) { null }
+                val seenStore = try { com.app.transport.SeenMessageStore.getInstance(context.applicationContext) } catch (_: Exception) { null }
                 if (seenStore?.hasRead(messageID) == true) {
                     Log.d(TAG, "Skipping read receipt for $messageID - already marked read")
                     return@launch
@@ -1050,12 +1050,12 @@ class BluetoothMeshService(private val context: Context) {
             try {
                 val directPeers = getDirectPeerIDsForGossip()
                 if (directPeers.isNotEmpty()) {
-                    val gossip = com.bitchat.android.services.meshgraph.GossipTLV.encodeNeighbors(directPeers)
+                    val gossip = com.app.transport.meshgraph.GossipTLV.encodeNeighbors(directPeers)
                     tlvPayload = tlvPayload + gossip
                 }
                 // Always update our own node in the mesh graph with the neighbor list we used
                 try {
-                    com.bitchat.android.services.meshgraph.MeshGraphService.getInstance()
+                    com.app.transport.meshgraph.MeshGraphService.getInstance()
                         .updateFromAnnouncement(myPeerID, nickname, directPeers, System.currentTimeMillis().toULong())
                 } catch (_: Exception) { }
             } catch (_: Exception) { }
@@ -1113,12 +1113,12 @@ class BluetoothMeshService(private val context: Context) {
         try {
             val directPeers = getDirectPeerIDsForGossip()
             if (directPeers.isNotEmpty()) {
-                val gossip = com.bitchat.android.services.meshgraph.GossipTLV.encodeNeighbors(directPeers)
+                val gossip = com.app.transport.meshgraph.GossipTLV.encodeNeighbors(directPeers)
                 tlvPayload = tlvPayload + gossip
             }
             // Always update our own node in the mesh graph with the neighbor list we used
             try {
-                com.bitchat.android.services.meshgraph.MeshGraphService.getInstance()
+                com.app.transport.meshgraph.MeshGraphService.getInstance()
                     .updateFromAnnouncement(myPeerID, nickname, directPeers, System.currentTimeMillis().toULong())
             } catch (_: Exception) { }
         } catch (_: Exception) { }
@@ -1344,7 +1344,7 @@ class BluetoothMeshService(private val context: Context) {
                 val rec = packet.recipientID
                 if (rec != null && !rec.contentEquals(SpecialRecipients.BROADCAST)) {
                     val dest = rec.joinToString("") { b -> "%02x".format(b) }
-                    val path = com.bitchat.android.services.meshgraph.RoutePlanner.shortestPath(myPeerID, dest)
+                    val path = com.app.transport.meshgraph.RoutePlanner.shortestPath(myPeerID, dest)
                     if (path != null && path.size >= 3) {
                         // Exclude first (sender) and last (recipient); only intermediates
                         val intermediates = path.subList(1, path.size - 1)

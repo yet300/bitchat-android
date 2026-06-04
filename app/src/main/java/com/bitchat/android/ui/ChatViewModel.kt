@@ -201,7 +201,7 @@ class ChatViewModel(
                 state.setPrivateChats(byPeer)
                 // Recompute unread set using SeenMessageStore for robustness across Activity recreation
                 try {
-                    val seen = com.bitchat.android.services.SeenMessageStore.getInstance(getApplication())
+                    val seen = com.app.transport.SeenMessageStore.getInstance(getApplication())
                     val myNick = state.getNicknameValue() ?: meshService.myPeerID
                     val unread = mutableSetOf<String>()
                     byPeer.forEach { (peer, list) ->
@@ -387,7 +387,7 @@ class ChatViewModel(
             // Persistently mark all messages in this conversation as read so Nostr fetches
             // after app restarts won't re-mark them as unread.
             try {
-                val seen = com.bitchat.android.services.SeenMessageStore.getInstance(getApplication())
+                val seen = com.app.transport.SeenMessageStore.getInstance(getApplication())
                 val chats = state.getPrivateChatsValue()
                 val messages = chats[peerID] ?: emptyList()
                 messages.forEach { msg ->
@@ -909,7 +909,7 @@ class ChatViewModel(
         
         // Clear seen message store
         try {
-            com.bitchat.android.services.SeenMessageStore.getInstance(getApplication()).clear()
+            com.app.transport.SeenMessageStore.getInstance(getApplication()).clear()
         } catch (_: Exception) { }
         
         // Clear all mesh service data

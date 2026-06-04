@@ -1,4 +1,4 @@
-package com.bitchat.android.services
+package com.app.transport
 
 import android.content.Context
 import android.util.Log
@@ -14,7 +14,7 @@ class SeenMessageStore private constructor(private val context: Context) {
     companion object {
         private const val TAG = "SeenMessageStore"
         private const val STORAGE_KEY = "seen_message_store_v1"
-        private const val MAX_IDS = com.bitchat.android.util.AppConstants.Services.SEEN_MESSAGE_MAX_IDS
+        private const val MAX_IDS = 10_000
 
         @Volatile private var INSTANCE: SeenMessageStore? = null
         fun getInstance(appContext: Context): SeenMessageStore {
