@@ -1,6 +1,7 @@
 package com.bitchat.android.nostr
 
 import com.app.transport.nostr.*
+import com.app.data.nostr.NostrTransport
 import android.app.Application
 import android.util.Log
 import com.app.transport.features.file.FileUtils

@@ -9,7 +9,7 @@ import com.app.transport.model.ReadReceipt
 import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.nostr.GeohashConversationRegistry
 import com.app.transport.nostr.NostrIdentityBridge
-import com.bitchat.android.nostr.NostrTransport
+import com.app.data.nostr.NostrTransport
 
 /**
  * Routes messages between BLE mesh and Nostr transports, matching iOS behavior.
