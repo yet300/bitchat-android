@@ -29,7 +29,7 @@ import android.content.Intent
 import android.net.Uri
 import com.app.transport.model.BitchatMessage
 import com.app.transport.model.DeliveryStatus
-import com.bitchat.android.mesh.BluetoothMeshService
+import com.app.transport.mesh.BluetoothMeshService
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close

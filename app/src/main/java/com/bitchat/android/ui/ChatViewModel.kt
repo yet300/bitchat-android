@@ -13,8 +13,8 @@ import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.crypto.noise.NoiseSession
 import com.app.transport.model.BitchatMessage
 import com.bitchat.android.favorites.FavoritesPersistenceService
-import com.bitchat.android.mesh.BluetoothMeshDelegate
-import com.bitchat.android.mesh.BluetoothMeshService
+import com.app.transport.mesh.BluetoothMeshDelegate
+import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.nostr.NostrIdentityBridge
 import com.bitchat.android.service.MeshServiceHolder
 import com.app.transport.VerificationService
@@ -219,7 +219,7 @@ class ChatViewModel(
         }
         // Subscribe to BLE transfer progress and reflect in message deliveryStatus
         viewModelScope.launch {
-            com.bitchat.android.mesh.TransferProgressManager.events.collect { evt ->
+            com.app.transport.mesh.TransferProgressManager.events.collect { evt ->
                 mediaSendingManager.handleTransferProgressEvent(evt)
             }
         }

@@ -41,7 +41,7 @@ import androidx.compose.ui.unit.dp
 import com.app.transport.model.BitchatMessage
 import com.app.transport.model.BitchatMessageType
 import com.app.transport.model.DeliveryStatus
-import com.bitchat.android.mesh.BluetoothMeshService
+import com.app.transport.mesh.BluetoothMeshService
 import com.bitchat.android.ui.TimeFormatter
 
 @Composable

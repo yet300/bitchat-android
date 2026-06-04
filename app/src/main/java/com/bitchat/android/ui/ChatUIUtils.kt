@@ -10,7 +10,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.sp
 import com.app.transport.model.BitchatMessage
-import com.bitchat.android.mesh.BluetoothMeshService
+import com.app.transport.mesh.BluetoothMeshService
 import com.bitchat.android.ui.theme.BASE_FONT_SIZE
 import kotlin.time.ExperimentalTime
 

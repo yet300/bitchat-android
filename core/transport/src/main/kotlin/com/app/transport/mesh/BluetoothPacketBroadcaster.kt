@@ -1,5 +1,5 @@
 
-package com.bitchat.android.mesh
+package com.app.transport.mesh
 
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt

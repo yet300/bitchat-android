@@ -5,8 +5,8 @@ import com.app.transport.model.BitchatMessage
 import com.app.transport.model.DeliveryStatus
 import com.app.transport.nostr.Bech32
 import com.app.transport.nostr.GeohashAliasRegistry
-import com.bitchat.android.mesh.BluetoothMeshDelegate
-import com.bitchat.android.mesh.BluetoothMeshService
+import com.app.transport.mesh.BluetoothMeshDelegate
+import com.app.transport.mesh.BluetoothMeshService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
@@ -318,7 +318,7 @@ class MeshDelegateHandler(
     /**
      * Expose mesh peer info for components that need to resolve identities (e.g., Nostr mapping)
      */
-    fun getPeerInfo(peerID: String): com.bitchat.android.mesh.PeerInfo? {
+    fun getPeerInfo(peerID: String): com.app.transport.mesh.PeerInfo? {
         return getMeshService().getPeerInfo(peerID)
     }
 

@@ -2,7 +2,7 @@
 
 package com.bitchat.android.ui
 
-import com.bitchat.android.mesh.BluetoothMeshService
+import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.model.BitchatMessage
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime

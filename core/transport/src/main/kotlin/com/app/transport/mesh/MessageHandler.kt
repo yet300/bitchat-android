@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalTime::class)
 
-package com.bitchat.android.mesh
+package com.app.transport.mesh
 
 import android.util.Log
 import com.app.transport.features.file.FileUtils

@@ -2,7 +2,7 @@ package com.bitchat.android.services
 
 import android.content.Context
 import android.util.Log
-import com.bitchat.android.mesh.BluetoothMeshService
+import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.model.ReadReceipt
 import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.nostr.GeohashConversationRegistry
