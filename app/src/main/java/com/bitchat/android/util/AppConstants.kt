@@ -9,10 +9,6 @@ package com.bitchat.android.util
  */
 object AppConstants {
 
-    object Verification {
-        const val QR_MAX_AGE_SECONDS: Long = 300L // 5 minutes
-    }
-
     object Nostr {
         // Relay backoff
         const val INITIAL_BACKOFF_INTERVAL_MS: Long = 1_000L

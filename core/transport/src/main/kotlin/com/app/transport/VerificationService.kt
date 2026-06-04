@@ -1,14 +1,12 @@
-package com.bitchat.android.services
+package com.app.transport
 
 import android.net.Uri
 import android.util.Base64
 import com.app.crypto.EncryptionService
-import com.bitchat.android.util.AppConstants
 import com.app.common.encoding.dataFromHexString
 import com.app.common.encoding.hexEncodedString
 import java.io.ByteArrayOutputStream
 import java.security.SecureRandom
-import androidx.core.net.toUri
 import java.lang.ref.WeakReference
 
 /**
@@ -18,6 +16,7 @@ object VerificationService {
     private const val CONTEXT = "bitchat-verify-v1"
     private const val RESPONSE_CONTEXT = "bitchat-verify-resp-v1"
 
+    private const val QR_MAX_AGE_SECONDS = 300L // 5 minutes
     private var encryptionServiceRef: WeakReference<EncryptionService>? = null
 
     fun configure(encryptionService: EncryptionService) {
@@ -74,7 +73,7 @@ object VerificationService {
 
         companion object {
             fun fromUrlString(urlString: String): VerificationQR? {
-                val uri = runCatching { urlString.toUri() }.getOrNull() ?: return null
+                val uri = runCatching { Uri.parse(urlString) }.getOrNull() ?: return null
                 if (uri.scheme != "bitchat" || uri.host != "verify") return null
 
                 val vStr = uri.getQueryParameter("v") ?: return null
@@ -141,7 +140,7 @@ object VerificationService {
 
     fun verifyScannedQR(
         urlString: String,
-        maxAgeSeconds: Long = AppConstants.Verification.QR_MAX_AGE_SECONDS
+        maxAgeSeconds: Long = QR_MAX_AGE_SECONDS
     ): VerificationQR? {
         val service = encryptionServiceRef?.get() ?: return null
         val qr = VerificationQR.fromUrlString(urlString) ?: return null
