@@ -300,8 +300,8 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
         
         // Update mesh graph from gossip neighbors (only if TLV present)
         try {
-            val neighborsOrNull = com.bitchat.android.services.meshgraph.GossipTLV.decodeNeighborsFromAnnouncementPayload(packet.payload)
-            com.bitchat.android.services.meshgraph.MeshGraphService.getInstance()
+            val neighborsOrNull = com.app.transport.meshgraph.GossipTLV.decodeNeighborsFromAnnouncementPayload(packet.payload)
+            com.app.transport.meshgraph.MeshGraphService.getInstance()
                 .updateFromAnnouncement(peerID, nickname, neighborsOrNull, packet.timestamp)
         } catch (_: Exception) { }
 

@@ -47,8 +47,4 @@ object AppConstants {
     object Media {
         const val MAX_FILE_SIZE_BYTES: Long = 50L * 1024 * 1024
     }
-
-    object Services {
-        const val SEEN_MESSAGE_MAX_IDS: Int = 10_000
-    }
 }

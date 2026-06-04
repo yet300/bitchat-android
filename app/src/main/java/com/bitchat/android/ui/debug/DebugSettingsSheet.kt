@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.rotate
 import com.bitchat.android.mesh.BluetoothMeshService
-import com.bitchat.android.services.meshgraph.MeshGraphService
+import com.app.transport.meshgraph.MeshGraphService
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas

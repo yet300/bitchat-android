@@ -11,7 +11,7 @@ import com.app.transport.model.NoisePayloadType
 import com.app.transport.model.PrivateMessagePacket
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
-import com.bitchat.android.services.SeenMessageStore
+import com.app.transport.SeenMessageStore
 import com.bitchat.android.ui.ChatState
 import com.bitchat.android.ui.MeshDelegateHandler
 import com.bitchat.android.ui.PrivateChatManager

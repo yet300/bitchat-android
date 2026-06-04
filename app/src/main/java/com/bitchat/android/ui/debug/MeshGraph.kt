@@ -18,7 +18,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.bitchat.android.services.meshgraph.MeshGraphService
+import com.app.transport.meshgraph.MeshGraphService
 import kotlin.math.*
 import kotlin.random.Random
 import androidx.compose.material3.MaterialTheme
