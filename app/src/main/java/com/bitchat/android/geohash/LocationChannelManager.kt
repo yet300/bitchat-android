@@ -8,6 +8,7 @@ import android.location.Location
 import android.location.LocationManager
 import android.util.Log
 import androidx.core.app.ActivityCompat
+import com.app.common.appSettings
 import com.app.common.geohash.Geohash
 import com.app.common.serialization.JsonConfig
 import com.google.android.gms.common.ConnectionResult
@@ -57,7 +58,7 @@ class LocationChannelManager private constructor(private val context: Context) {
     private val geocoderProvider: GeocoderProvider = GeocoderFactory.get(context)
     private var lastLocation: Location? = null
     private var geocodingJob: Job? = null
-    private var dataManager: com.bitchat.android.ui.DataManager? = null
+    private val settings = appSettings(context)
 
     private fun checkSystemLocationEnabled(): Boolean {
         return try {
@@ -133,8 +134,7 @@ class LocationChannelManager private constructor(private val context: Context) {
         }
 
         checkAndSyncPermission()
-        // Initialize DataManager and load persisted settings
-        dataManager = com.bitchat.android.ui.DataManager(context)
+        // Load persisted settings
         loadPersistedChannelSelection()
         loadLocationServicesState()
 
@@ -489,7 +489,7 @@ class LocationChannelManager private constructor(private val context: Context) {
                     )
                 )
             }
-            dataManager?.saveLastGeohashChannel(channelData)
+            settings.putString("last_geohash_channel", channelData)
             Log.d(TAG, "Saved channel selection: ${channel.displayName}")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to save channel selection: ${e.message}")
@@ -501,7 +501,7 @@ class LocationChannelManager private constructor(private val context: Context) {
      */
     private fun loadPersistedChannelSelection() {
         try {
-            val channelData = dataManager?.loadLastGeohashChannel()
+            val channelData = settings.getStringOrNull("last_geohash_channel")
             if (!channelData.isNullOrBlank()) {
                 val persisted = JsonConfig.json.decodeFromString(PersistedChannel.serializer(), channelData)
                 val channel = persisted.toChannel()
@@ -546,7 +546,7 @@ class LocationChannelManager private constructor(private val context: Context) {
      * Clear persisted channel selection (useful for testing or reset)
      */
     fun clearPersistedChannel() {
-        dataManager?.clearLastGeohashChannel()
+        settings.remove("last_geohash_channel")
         _selectedChannel.value = ChannelID.Mesh
         Log.d(TAG, "Cleared persisted channel selection")
     }
@@ -558,7 +558,7 @@ class LocationChannelManager private constructor(private val context: Context) {
      */
     private fun saveLocationServicesState(enabled: Boolean) {
         try {
-            dataManager?.saveLocationServicesEnabled(enabled)
+            settings.putBoolean("location_services_enabled", enabled)
             Log.d(TAG, "Saved location services state: $enabled")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to save location services state: ${e.message}")
@@ -570,7 +570,7 @@ class LocationChannelManager private constructor(private val context: Context) {
      */
     private fun loadLocationServicesState() {
         try {
-            val enabled = dataManager?.isLocationServicesEnabled() ?: false
+            val enabled = settings.getBoolean("location_services_enabled", true)
             _locationServicesEnabled.value = enabled
             Log.d(TAG, "Loaded location services state: $enabled")
         } catch (e: Exception) {
