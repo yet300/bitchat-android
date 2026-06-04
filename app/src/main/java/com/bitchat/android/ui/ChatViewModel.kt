@@ -17,7 +17,7 @@ import com.bitchat.android.mesh.BluetoothMeshDelegate
 import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.nostr.NostrIdentityBridge
 import com.bitchat.android.service.MeshServiceHolder
-import com.bitchat.android.services.VerificationService
+import com.app.transport.VerificationService
 import com.bitchat.android.util.NotificationIntervalManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow

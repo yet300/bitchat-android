@@ -10,7 +10,7 @@ import com.bitchat.android.mesh.BluetoothMeshService
 import com.app.transport.model.BitchatMessage
 import com.app.crypto.noise.NoiseSession
 import com.bitchat.android.nostr.GeohashAliasRegistry
-import com.bitchat.android.services.VerificationService
+import com.app.transport.VerificationService
 import com.app.common.encoding.dataFromHexString
 import com.app.common.encoding.hexEncodedString
 import kotlinx.coroutines.CoroutineScope

@@ -41,7 +41,7 @@ import com.bitchat.android.ui.ChatViewModel
 import com.bitchat.android.ui.OrientationAwareActivity
 import com.bitchat.android.ui.theme.BitchatTheme
 import com.bitchat.android.nostr.PoWPreferenceManager
-import com.bitchat.android.services.VerificationService
+import com.app.transport.VerificationService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 

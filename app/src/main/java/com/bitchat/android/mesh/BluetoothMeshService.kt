@@ -18,7 +18,7 @@ import com.app.common.encoding.toHexString
 import com.app.transport.MeshConstants
 import com.app.transport.NicknameSource
 import com.app.transport.notification.ServiceNotifier
-import com.bitchat.android.services.VerificationService
+import com.app.transport.VerificationService
 import kotlinx.coroutines.*
 
 /**
