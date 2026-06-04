@@ -3,6 +3,7 @@ package com.bitchat.android.service
 import android.app.Application
 import android.os.Process
 import androidx.core.app.NotificationManagerCompat
+import com.app.data.AppStateStore
 import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.net.ArtiTorManager
 import com.app.transport.net.TorMode
@@ -64,7 +65,7 @@ object AppShutdownCoordinator {
             }
 
             // Clear AppState in-memory store
-            try { com.bitchat.android.services.AppStateStore.clear() } catch (_: Exception) { }
+            try { AppStateStore.clear() } catch (_: Exception) { }
 
             // Stop foreground and clear notification
             try { stopForeground() } catch (_: Exception) { }

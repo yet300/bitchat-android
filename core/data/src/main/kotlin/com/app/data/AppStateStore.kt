@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalTime::class)
 
-package com.bitchat.android.services
+package com.app.data
 
 import kotlin.time.ExperimentalTime
 

@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.app.common.encoding.hexEncodedString
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.crypto.noise.NoiseSession
+import com.app.data.AppStateStore
 import com.app.transport.model.BitchatMessage
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.transport.mesh.BluetoothMeshDelegate
@@ -184,19 +185,19 @@ class ChatViewModel(
         loadAndInitialize()
         // Hydrate UI state from process-wide AppStateStore to survive Activity recreation
         viewModelScope.launch {
-            try { com.bitchat.android.services.AppStateStore.peers.collect { peers ->
+            try { AppStateStore.peers.collect { peers ->
                 state.setConnectedPeers(peers)
                 state.setIsConnected(peers.isNotEmpty())
             } } catch (_: Exception) { }
         }
         viewModelScope.launch {
-            try { com.bitchat.android.services.AppStateStore.publicMessages.collect { msgs ->
+            try { AppStateStore.publicMessages.collect { msgs ->
                 // Source of truth is AppStateStore; replace to avoid duplicate keys in LazyColumn
                 state.setMessages(msgs)
             } } catch (_: Exception) { }
         }
         viewModelScope.launch {
-            try { com.bitchat.android.services.AppStateStore.privateMessages.collect { byPeer ->
+            try { AppStateStore.privateMessages.collect { byPeer ->
                 // Replace with store snapshot
                 state.setPrivateChats(byPeer)
                 // Recompute unread set using SeenMessageStore for robustness across Activity recreation
@@ -212,7 +213,7 @@ class ChatViewModel(
             } } catch (_: Exception) { }
         }
         viewModelScope.launch {
-            try { com.bitchat.android.services.AppStateStore.channelMessages.collect { byChannel ->
+            try { AppStateStore.channelMessages.collect { byChannel ->
                 // Replace with store snapshot
                 state.setChannelMessages(byChannel)
             } } catch (_: Exception) { }
@@ -284,7 +285,7 @@ class ChatViewModel(
         geohashViewModel.initialize()
 
         // Initialize favorites persistence service
-        com.app.data.favorites.FavoritesPersistenceService.initialize(getApplication())
+        FavoritesPersistenceService.initialize(getApplication())
 
         // Load verified fingerprints from secure storage
         verificationHandler.loadVerifiedFingerprints()
@@ -448,7 +449,7 @@ class ChatViewModel(
                     meshNoiseKeyForPeer = { pid -> meshService.getPeerInfo(pid)?.noisePublicKey },
                     meshHasPeer = { pid -> meshService.getPeerInfo(pid)?.isConnected == true },
                     nostrPubHexForAlias = { alias -> com.app.transport.nostr.GeohashAliasRegistry.get(alias) },
-                    findNoiseKeyForNostr = { key -> com.app.data.favorites.FavoritesPersistenceService.shared.findNoiseKey(key) }
+                    findNoiseKeyForNostr = { key -> FavoritesPersistenceService.shared.findNoiseKey(key) }
                 )
                 canonical ?: targetKey
             }
@@ -502,7 +503,7 @@ class ChatViewModel(
                 meshNoiseKeyForPeer = { pid -> meshService.getPeerInfo(pid)?.noisePublicKey },
                 meshHasPeer = { pid -> meshService.getPeerInfo(pid)?.isConnected == true },
                 nostrPubHexForAlias = { alias -> com.app.transport.nostr.GeohashAliasRegistry.get(alias) },
-                findNoiseKeyForNostr = { key -> com.app.data.favorites.FavoritesPersistenceService.shared.findNoiseKey(key) }
+                findNoiseKeyForNostr = { key -> FavoritesPersistenceService.shared.findNoiseKey(key) }
             ).also { canonical ->
                 if (canonical != state.getSelectedPrivateChatPeerValue()) {
                     privateChatManager.startPrivateChat(canonical, meshService)
@@ -599,7 +600,7 @@ class ChatViewModel(
                     try {
                         noiseKey = peerID.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
                         // Prefer nickname from favorites store if available
-                        val rel = com.app.data.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey!!)
+                        val rel = FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey!!)
                         if (rel != null) nickname = rel.peerNickname
                     } catch (_: Exception) { }
                 }
@@ -611,7 +612,7 @@ class ChatViewModel(
                 val fingerprint = identityManager.generateFingerprint(noiseKey!!)
                 val isNowFavorite = dataManager.favoritePeers.contains(fingerprint)
 
-                com.app.data.favorites.FavoritesPersistenceService.shared.updateFavoriteStatus(
+                FavoritesPersistenceService.shared.updateFavoriteStatus(
                     noisePublicKey = noiseKey!!,
                     nickname = nickname,
                     isFavorite = isNowFavorite
