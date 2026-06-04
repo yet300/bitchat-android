@@ -4,6 +4,7 @@ import com.app.transport.nostr.*
 
 import android.content.Context
 import android.util.Log
+import com.app.data.favorites.FavoritesPersistenceService
 import com.app.transport.NostrConstants
 import com.app.transport.model.ReadReceipt
 import com.app.transport.model.NoisePayloadType
@@ -90,7 +91,7 @@ class NostrTransport(
                 
                 // Strict: lookup the recipient's current BitChat peer ID using favorites mapping
                 val recipientPeerIDForEmbed = try {
-                    com.bitchat.android.favorites.FavoritesPersistenceService.shared
+                    FavoritesPersistenceService.shared
                         .findPeerIDForNostrPubkey(recipientNostrPubkey)
                 } catch (_: Exception) { null }
                 if (recipientPeerIDForEmbed.isNullOrBlank()) {
@@ -486,16 +487,16 @@ class NostrTransport(
     private fun resolveNostrPublicKey(peerID: String): String? {
         try {
             // 1) Fast path: direct peerID→npub mapping (mutual favorites after mesh mapping)
-            com.bitchat.android.favorites.FavoritesPersistenceService.shared.findNostrPubkeyForPeerID(peerID)?.let { return it }
+            FavoritesPersistenceService.shared.findNostrPubkeyForPeerID(peerID)?.let { return it }
 
             // 2) Legacy path: resolve by noise public key association
             val noiseKey = hexStringToByteArray(peerID)
-            val favoriteStatus = com.bitchat.android.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey)
+            val favoriteStatus = FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey)
             if (favoriteStatus?.peerNostrPublicKey != null) return favoriteStatus.peerNostrPublicKey
 
             // 3) Prefix match on noiseHex from 16-hex peerID
             if (peerID.length == 16) {
-                val fallbackStatus = com.bitchat.android.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(peerID)
+                val fallbackStatus = FavoritesPersistenceService.shared.getFavoriteStatus(peerID)
                 return fallbackStatus?.peerNostrPublicKey
             }
             

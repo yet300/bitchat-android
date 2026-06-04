@@ -12,7 +12,7 @@ import com.app.common.encoding.hexEncodedString
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.crypto.noise.NoiseSession
 import com.app.transport.model.BitchatMessage
-import com.bitchat.android.favorites.FavoritesPersistenceService
+import com.app.data.favorites.FavoritesPersistenceService
 import com.app.transport.mesh.BluetoothMeshDelegate
 import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.nostr.NostrIdentityBridge
@@ -284,7 +284,7 @@ class ChatViewModel(
         geohashViewModel.initialize()
 
         // Initialize favorites persistence service
-        com.bitchat.android.favorites.FavoritesPersistenceService.initialize(getApplication())
+        com.app.data.favorites.FavoritesPersistenceService.initialize(getApplication())
 
         // Load verified fingerprints from secure storage
         verificationHandler.loadVerifiedFingerprints()
@@ -448,7 +448,7 @@ class ChatViewModel(
                     meshNoiseKeyForPeer = { pid -> meshService.getPeerInfo(pid)?.noisePublicKey },
                     meshHasPeer = { pid -> meshService.getPeerInfo(pid)?.isConnected == true },
                     nostrPubHexForAlias = { alias -> com.app.transport.nostr.GeohashAliasRegistry.get(alias) },
-                    findNoiseKeyForNostr = { key -> com.bitchat.android.favorites.FavoritesPersistenceService.shared.findNoiseKey(key) }
+                    findNoiseKeyForNostr = { key -> com.app.data.favorites.FavoritesPersistenceService.shared.findNoiseKey(key) }
                 )
                 canonical ?: targetKey
             }
@@ -502,7 +502,7 @@ class ChatViewModel(
                 meshNoiseKeyForPeer = { pid -> meshService.getPeerInfo(pid)?.noisePublicKey },
                 meshHasPeer = { pid -> meshService.getPeerInfo(pid)?.isConnected == true },
                 nostrPubHexForAlias = { alias -> com.app.transport.nostr.GeohashAliasRegistry.get(alias) },
-                findNoiseKeyForNostr = { key -> com.bitchat.android.favorites.FavoritesPersistenceService.shared.findNoiseKey(key) }
+                findNoiseKeyForNostr = { key -> com.app.data.favorites.FavoritesPersistenceService.shared.findNoiseKey(key) }
             ).also { canonical ->
                 if (canonical != state.getSelectedPrivateChatPeerValue()) {
                     privateChatManager.startPrivateChat(canonical, meshService)
@@ -599,7 +599,7 @@ class ChatViewModel(
                     try {
                         noiseKey = peerID.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
                         // Prefer nickname from favorites store if available
-                        val rel = com.bitchat.android.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey!!)
+                        val rel = com.app.data.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey!!)
                         if (rel != null) nickname = rel.peerNickname
                     } catch (_: Exception) { }
                 }
@@ -611,7 +611,7 @@ class ChatViewModel(
                 val fingerprint = identityManager.generateFingerprint(noiseKey!!)
                 val isNowFavorite = dataManager.favoritePeers.contains(fingerprint)
 
-                com.bitchat.android.favorites.FavoritesPersistenceService.shared.updateFavoriteStatus(
+                com.app.data.favorites.FavoritesPersistenceService.shared.updateFavoriteStatus(
                     noisePublicKey = noiseKey!!,
                     nickname = nickname,
                     isFavorite = isNowFavorite

@@ -4,6 +4,7 @@ package com.bitchat.android.ui
 import android.util.Log
 import com.app.transport.mesh.BluetoothMeshService
 import com.app.crypto.identity.PeerFingerprintManager
+import com.app.data.favorites.FavoritesPersistenceService
 import com.app.transport.model.BitchatMessage
 import com.app.transport.model.DeliveryStatus
 import com.app.transport.nostr.Bech32
@@ -434,7 +435,7 @@ class PrivateChatManager(
         // If we know the sender's Nostr pubkey for this peer via favorites, derive temp key
         try {
             val noiseKeyBytes = targetPeerID.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-            val npub = com.bitchat.android.favorites.FavoritesPersistenceService.shared.findNostrPubkey(noiseKeyBytes)
+            val npub = FavoritesPersistenceService.shared.findNostrPubkey(noiseKeyBytes)
             if (npub != null) {
                 // Normalize to hex to match how we formed temp keys (nostr_<pub16>)
                 val (hrp, data) = Bech32.decode(npub)
