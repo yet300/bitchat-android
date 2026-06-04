@@ -4,6 +4,7 @@ package com.bitchat.android.services
 
 import kotlin.time.ExperimentalTime
 
+import com.app.transport.IncomingMessageSink
 import com.app.transport.model.BitchatMessage
 import com.app.transport.model.DeliveryStatus
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,7 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * Process-wide in-memory state store that survives Activity recreation.
  * The foreground Mesh service updates this store; UI subscribes/hydrates from it.
  */
-object AppStateStore {
+object AppStateStore : IncomingMessageSink {
     // Global de-dup set by message id to avoid duplicate keys in Compose lists
     private val seenMessageIds = mutableSetOf<String>()
     // Connected peer IDs (mesh ephemeral IDs)
@@ -33,11 +34,11 @@ object AppStateStore {
     private val _channelMessages = MutableStateFlow<Map<String, List<BitchatMessage>>>(emptyMap())
     val channelMessages: StateFlow<Map<String, List<BitchatMessage>>> = _channelMessages.asStateFlow()
 
-    fun setPeers(ids: List<String>) {
+    override fun setPeers(ids: List<String>) {
         _peers.value = ids
     }
 
-    fun addPublicMessage(msg: BitchatMessage) {
+    override fun addPublicMessage(msg: BitchatMessage) {
         synchronized(this) {
             if (seenMessageIds.contains(msg.id)) return
             seenMessageIds.add(msg.id)
@@ -45,7 +46,7 @@ object AppStateStore {
         }
     }
 
-    fun addPrivateMessage(peerID: String, msg: BitchatMessage) {
+    override fun addPrivateMessage(peerID: String, msg: BitchatMessage) {
         synchronized(this) {
             if (seenMessageIds.contains(msg.id)) return
             seenMessageIds.add(msg.id)
@@ -89,7 +90,7 @@ object AppStateStore {
         }
     }
 
-    fun addChannelMessage(channel: String, msg: BitchatMessage) {
+    override fun addChannelMessage(channel: String, msg: BitchatMessage) {
         synchronized(this) {
             if (seenMessageIds.contains(msg.id)) return
             seenMessageIds.add(msg.id)

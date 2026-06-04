@@ -57,6 +57,37 @@ object MeshServiceHolder {
         service.nicknameSource = com.app.transport.NicknameSource { fallback ->
             com.bitchat.android.services.NicknameProvider.getNickname(appCtx, fallback)
         }
+        // Process-wide in-memory store the UI hydrates from.
+        service.incomingSink = com.bitchat.android.services.AppStateStore
+        // Noise<->Nostr favorite mapping, backed by favorites persistence.
+        service.favoriteNostrLink = object : com.app.transport.FavoriteNostrLink {
+            override fun updatePeerFavoritedUs(noiseKey: ByteArray, theyFavoritedUs: Boolean) {
+                com.bitchat.android.favorites.FavoritesPersistenceService.shared.updatePeerFavoritedUs(noiseKey, theyFavoritedUs)
+            }
+            override fun updateNostrPublicKey(noiseKey: ByteArray, nostrPubkey: String) {
+                com.bitchat.android.favorites.FavoritesPersistenceService.shared.updateNostrPublicKey(noiseKey, nostrPubkey)
+            }
+            override fun updateNostrPublicKeyForPeerId(peerId: String, nostrPubkey: String) {
+                com.bitchat.android.favorites.FavoritesPersistenceService.shared.updateNostrPublicKeyForPeerID(peerId, nostrPubkey)
+            }
+            override fun findNostrPubkey(noiseKey: ByteArray): String? =
+                com.bitchat.android.favorites.FavoritesPersistenceService.shared.findNostrPubkey(noiseKey)
+            override fun isFavorite(noiseKey: ByteArray): Boolean =
+                com.bitchat.android.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey)?.isFavorite == true
+        }
+        // Routes read receipts over the relay when the recipient is a geohash alias.
+        service.geohashReadReceiptRouter = com.app.transport.GeohashReadReceiptRouter { messageId, toPeerId ->
+            val router = runCatching { com.bitchat.android.services.MessageRouter.tryGetInstance() }.getOrNull()
+            val isGeoAlias = runCatching {
+                com.bitchat.android.nostr.GeohashAliasRegistry.snapshot().containsKey(toPeerId)
+            }.getOrDefault(false)
+            if (isGeoAlias && router != null) {
+                router.sendReadReceipt(com.app.transport.model.ReadReceipt(messageId), toPeerId)
+                true
+            } else {
+                false
+            }
+        }
         return service
     }
 

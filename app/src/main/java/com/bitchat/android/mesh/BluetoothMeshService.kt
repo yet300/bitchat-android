@@ -19,6 +19,9 @@ import com.app.transport.MeshConstants
 import com.app.transport.NicknameSource
 import com.app.transport.notification.ServiceNotifier
 import com.app.transport.VerificationService
+import com.app.transport.IncomingMessageSink
+import com.app.transport.FavoriteNostrLink
+import com.app.transport.GeohashReadReceiptRouter
 import kotlinx.coroutines.*
 
 /**
@@ -62,6 +65,19 @@ class BluetoothMeshService(private val context: Context) {
 
     // Supplies the user's nickname for announcements/leave messages (injected from app).
     var nicknameSource: NicknameSource? = null
+
+    // Process-wide message/peer store the UI hydrates from (injected from app).
+    var incomingSink: IncomingMessageSink? = null
+
+    // Noise<->Nostr favorite mapping for routing DMs over Nostr (injected from app); propagated to messageHandler.
+    var favoriteNostrLink: FavoriteNostrLink? = null
+        set(value) {
+            field = value
+            messageHandler.favoriteNostrLink = value
+        }
+
+    // Routes geohash-alias read receipts via the relay (injected from app).
+    var geohashReadReceiptRouter: GeohashReadReceiptRouter? = null
 
 
     // Service state management
@@ -177,7 +193,7 @@ class BluetoothMeshService(private val context: Context) {
         peerManager.delegate = object : PeerManagerDelegate {
             override fun onPeerListUpdated(peerIDs: List<String>) {
                 // Update process-wide state first
-                try { com.bitchat.android.services.AppStateStore.setPeers(peerIDs) } catch (_: Exception) { }
+                try { incomingSink?.setPeers(peerIDs) } catch (_: Exception) { }
                 // Then notify UI delegate if attached
                 delegate?.didUpdatePeerList(peerIDs)
             }
@@ -369,8 +385,8 @@ class BluetoothMeshService(private val context: Context) {
 
                 // Index existing Nostr mapping by the new peerID if we have it
                 try {
-                    com.bitchat.android.favorites.FavoritesPersistenceService.shared.findNostrPubkey(publicKey)?.let { npub ->
-                        com.bitchat.android.favorites.FavoritesPersistenceService.shared.updateNostrPublicKeyForPeerID(newPeerID, npub)
+                    favoriteNostrLink?.findNostrPubkey(publicKey)?.let { npub ->
+                        favoriteNostrLink?.updateNostrPublicKeyForPeerId(newPeerID, npub)
                     }
                 } catch (_: Exception) { }
                 
@@ -394,13 +410,13 @@ class BluetoothMeshService(private val context: Context) {
                     when {
                         message.isPrivate -> {
                             val peer = message.senderPeerID ?: ""
-                            if (peer.isNotEmpty()) com.bitchat.android.services.AppStateStore.addPrivateMessage(peer, message)
+                            if (peer.isNotEmpty()) incomingSink?.addPrivateMessage(peer, message)
                         }
                         message.channel != null -> {
-                            com.bitchat.android.services.AppStateStore.addChannelMessage(message.channel!!, message)
+                            incomingSink?.addChannelMessage(message.channel!!, message)
                         }
                         else -> {
-                            com.bitchat.android.services.AppStateStore.addPublicMessage(message)
+                            incomingSink?.addPublicMessage(message)
                         }
                     }
                 } catch (_: Exception) { }
@@ -918,14 +934,8 @@ class BluetoothMeshService(private val context: Context) {
         serviceScope.launch {
             Log.d(TAG, "📖 Sending read receipt for message $messageID to $recipientPeerID")
 
-            // Route geohash read receipts via MessageRouter instead of here
-            val geo = runCatching { com.bitchat.android.services.MessageRouter.tryGetInstance() }.getOrNull()
-            val isGeoAlias = try {
-                val map = com.bitchat.android.nostr.GeohashAliasRegistry.snapshot()
-                map.containsKey(recipientPeerID)
-            } catch (_: Exception) { false }
-            if (isGeoAlias && geo != null) {
-                geo.sendReadReceipt(com.app.transport.model.ReadReceipt(messageID), recipientPeerID)
+            // Route geohash read receipts via the relay (resolved + routed in the app layer)
+            if (geohashReadReceiptRouter?.routeIfGeohashAlias(messageID, recipientPeerID) == true) {
                 return@launch
             }
 

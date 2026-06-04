@@ -15,6 +15,7 @@ import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
 import com.app.common.encoding.toHexString
 import com.app.transport.MeshConstants
+import com.app.transport.FavoriteNostrLink
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -39,6 +40,9 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
     
     // Reference to PacketProcessor for recursive packet handling
     var packetProcessor: PacketProcessor? = null
+
+    // Noise<->Nostr favorite mapping (injected from BluetoothMeshService).
+    var favoriteNostrLink: FavoriteNostrLink? = null
     
     // Coroutines
     private val handlerScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -563,17 +567,17 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
             val peerInfo = delegate?.getPeerInfo(fromPeerID)
             val noiseKey = peerInfo?.noisePublicKey
             if (noiseKey != null) {
-                com.bitchat.android.favorites.FavoritesPersistenceService.shared.updatePeerFavoritedUs(noiseKey, isFavorite)
+                favoriteNostrLink?.updatePeerFavoritedUs(noiseKey, isFavorite)
                 if (npub != null) {
                     // Index by noise key and current mesh peerID for fast Nostr routing
-                    com.bitchat.android.favorites.FavoritesPersistenceService.shared.updateNostrPublicKey(noiseKey, npub)
-                    com.bitchat.android.favorites.FavoritesPersistenceService.shared.updateNostrPublicKeyForPeerID(fromPeerID, npub)
+                    favoriteNostrLink?.updateNostrPublicKey(noiseKey, npub)
+                    favoriteNostrLink?.updateNostrPublicKeyForPeerId(fromPeerID, npub)
                 }
 
                 // Determine iOS-style guidance text
-                val rel = com.bitchat.android.favorites.FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey)
+                val theyFavorite = favoriteNostrLink?.isFavorite(noiseKey) == true
                 val guidance = if (isFavorite) {
-                    if (rel?.isFavorite == true) {
+                    if (theyFavorite) {
                         " — mutual! You can continue DMs via Nostr when out of mesh."
                     } else {
                         " — favorite back to continue DMs later."
