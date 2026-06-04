@@ -4,23 +4,28 @@ import android.Manifest
 import android.content.Context
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
-import android.os.Bundle
 import android.util.Log
 import androidx.core.app.ActivityCompat
+import com.app.common.geohash.Geohash
+import com.app.common.serialization.JsonConfig
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
-import kotlinx.coroutines.*
-import com.app.common.serialization.JsonConfig
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerializationException
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 
 /**
  * Manages location permissions, one-shot location retrieval, and computing geohash channels.

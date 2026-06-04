@@ -39,7 +39,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.res.stringResource
 import com.bitchat.android.R
 import androidx.core.view.updateLayoutParams
-import com.bitchat.android.geohash.Geohash
+import com.app.common.geohash.Geohash
 import com.bitchat.android.geohash.LocationChannelManager
 import com.bitchat.android.ui.theme.BASE_FONT_SIZE
 
