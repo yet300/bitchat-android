@@ -1,4 +1,4 @@
-package com.bitchat.android.nostr
+package com.app.data.nostr
 
 import com.app.transport.nostr.*
 
@@ -44,7 +44,11 @@ class NostrTransport(
     private val readQueue = ConcurrentLinkedQueue<QueuedRead>()
     private var isSendingReadAcks = false
     private val transportScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    
+
+    /** Set by the app to expose the selected Location channel's geohash (inverts the former direct
+     *  dependency on LocationChannelManager so this stays in the data layer). */
+    var currentGeohashSource: CurrentGeohashSource? = null
+
     // MARK: - Transport Interface Methods
     
     val myPeerID: String get() = senderPeerID
@@ -424,16 +428,14 @@ class NostrTransport(
         messageID: String,
         sourceGeohash: String? = null
     ) {
-        // Use provided geohash or derive from current location
+        // Use provided geohash or derive from the currently selected location channel (via the app).
         val geohash = sourceGeohash ?: run {
-            val selected = try {
-                com.bitchat.android.geohash.LocationChannelManager.getInstance(context).selectedChannel.value
-            } catch (_: Exception) { null }
-            if (selected !is com.bitchat.android.geohash.ChannelID.Location) {
+            val gh = try { currentGeohashSource?.currentGeohash() } catch (_: Exception) { null }
+            if (gh == null) {
                 Log.w(TAG, "NostrTransport: cannot send geohash PM - not in a location channel and no geohash provided")
                 return
             }
-            selected.channel.geohash
+            gh
         }
         
         val fromIdentity = try {

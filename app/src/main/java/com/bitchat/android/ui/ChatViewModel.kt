@@ -14,11 +14,15 @@ import com.app.crypto.noise.NoiseSession
 import com.app.data.AppStateStore
 import com.app.transport.model.BitchatMessage
 import com.app.data.favorites.FavoritesPersistenceService
+import com.app.data.nostr.CurrentGeohashSource
+import com.app.data.nostr.NostrTransport
 import com.app.transport.mesh.BluetoothMeshDelegate
 import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.nostr.NostrIdentityBridge
 import com.bitchat.android.service.MeshServiceHolder
 import com.app.transport.VerificationService
+import com.bitchat.android.geohash.ChannelID
+import com.bitchat.android.geohash.LocationChannelManager
 import com.bitchat.android.util.NotificationIntervalManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
@@ -293,8 +297,12 @@ class ChatViewModel(
 
         // Ensure NostrTransport knows our mesh peer ID for embedded packets
         try {
-            val nostrTransport = com.bitchat.android.nostr.NostrTransport.getInstance(getApplication())
+            val nostrTransport = NostrTransport.getInstance(getApplication())
             nostrTransport.senderPeerID = meshService.myPeerID
+            nostrTransport.currentGeohashSource = CurrentGeohashSource {
+                (LocationChannelManager.getInstance(getApplication()).selectedChannel.value
+                        as? ChannelID.Location)?.channel?.geohash
+            }
         } catch (_: Exception) { }
 
         // Note: Mesh service is now started by MainActivity
@@ -632,7 +640,7 @@ class ChatViewModel(
                             java.util.UUID.randomUUID().toString()
                         )
                     } else {
-                        val nostrTransport = com.bitchat.android.nostr.NostrTransport.getInstance(getApplication())
+                        val nostrTransport = NostrTransport.getInstance(getApplication())
                         nostrTransport.senderPeerID = meshService.myPeerID
                         nostrTransport.sendFavoriteNotification(peerID, isNowFavorite)
                     }
