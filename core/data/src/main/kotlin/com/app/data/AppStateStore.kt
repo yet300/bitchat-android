@@ -101,6 +101,35 @@ object AppStateStore : IncomingMessageSink {
         }
     }
 
+    /** Remove a message by id from every timeline (public/private/channel). */
+    fun removeMessage(messageId: String) {
+        synchronized(this) {
+            seenMessageIds.remove(messageId)
+            _publicMessages.value = _publicMessages.value.filterNot { it.id == messageId }
+            _privateMessages.value = _privateMessages.value.mapValues { (_, list) -> list.filterNot { it.id == messageId } }
+            _channelMessages.value = _channelMessages.value.mapValues { (_, list) -> list.filterNot { it.id == messageId } }
+        }
+    }
+
+    /** Clear the public mesh timeline. */
+    fun clearPublic() {
+        synchronized(this) { _publicMessages.value = emptyList() }
+    }
+
+    /** Clear a single private conversation's timeline. */
+    fun clearPrivate(peerID: String) {
+        synchronized(this) {
+            _privateMessages.value = _privateMessages.value.toMutableMap().apply { remove(peerID) }
+        }
+    }
+
+    /** Clear a single channel's timeline. */
+    fun clearChannel(channel: String) {
+        synchronized(this) {
+            _channelMessages.value = _channelMessages.value.toMutableMap().apply { remove(channel) }
+        }
+    }
+
     // Clear all in-memory state (used for full app shutdown)
     fun clear() {
         synchronized(this) {
