@@ -1,6 +1,7 @@
 package com.bitchat.android.service
 
 import android.content.Context
+import com.app.transport.nostr.GeohashAliasRegistry
 import com.bitchat.android.mesh.BluetoothMeshService
 
 /**
@@ -79,7 +80,7 @@ object MeshServiceHolder {
         service.geohashReadReceiptRouter = com.app.transport.GeohashReadReceiptRouter { messageId, toPeerId ->
             val router = runCatching { com.bitchat.android.services.MessageRouter.tryGetInstance() }.getOrNull()
             val isGeoAlias = runCatching {
-                com.bitchat.android.nostr.GeohashAliasRegistry.snapshot().containsKey(toPeerId)
+                GeohashAliasRegistry.snapshot().containsKey(toPeerId)
             }.getOrDefault(false)
             if (isGeoAlias && router != null) {
                 router.sendReadReceipt(com.app.transport.model.ReadReceipt(messageId), toPeerId)

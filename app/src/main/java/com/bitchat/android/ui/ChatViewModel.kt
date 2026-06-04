@@ -15,7 +15,7 @@ import com.app.transport.model.BitchatMessage
 import com.bitchat.android.favorites.FavoritesPersistenceService
 import com.bitchat.android.mesh.BluetoothMeshDelegate
 import com.bitchat.android.mesh.BluetoothMeshService
-import com.bitchat.android.nostr.NostrIdentityBridge
+import com.app.transport.nostr.NostrIdentityBridge
 import com.bitchat.android.service.MeshServiceHolder
 import com.app.transport.VerificationService
 import com.bitchat.android.util.NotificationIntervalManager
@@ -327,8 +327,8 @@ class ChatViewModel(
             if (!gh.isNullOrEmpty()) {
                 val subMgrField = GeohashViewModel::class.java.getDeclaredField("subscriptionManager")
                 subMgrField.isAccessible = true
-                val subMgr = subMgrField.get(geohashViewModel) as com.bitchat.android.nostr.NostrSubscriptionManager
-                val identity = com.bitchat.android.nostr.NostrIdentityBridge.deriveIdentity(gh, getApplication())
+                val subMgr = subMgrField.get(geohashViewModel) as com.app.transport.nostr.NostrSubscriptionManager
+                val identity = com.app.transport.nostr.NostrIdentityBridge.deriveIdentity(gh, getApplication())
                 val subId = "geo-dm-$gh"
                 val currentDmSubField = GeohashViewModel::class.java.getDeclaredField("currentDmSubId")
                 currentDmSubField.isAccessible = true
@@ -447,7 +447,7 @@ class ChatViewModel(
                     connectedPeers = state.getConnectedPeersValue(),
                     meshNoiseKeyForPeer = { pid -> meshService.getPeerInfo(pid)?.noisePublicKey },
                     meshHasPeer = { pid -> meshService.getPeerInfo(pid)?.isConnected == true },
-                    nostrPubHexForAlias = { alias -> com.bitchat.android.nostr.GeohashAliasRegistry.get(alias) },
+                    nostrPubHexForAlias = { alias -> com.app.transport.nostr.GeohashAliasRegistry.get(alias) },
                     findNoiseKeyForNostr = { key -> com.bitchat.android.favorites.FavoritesPersistenceService.shared.findNoiseKey(key) }
                 )
                 canonical ?: targetKey
@@ -501,7 +501,7 @@ class ChatViewModel(
                 connectedPeers = state.getConnectedPeersValue(),
                 meshNoiseKeyForPeer = { pid -> meshService.getPeerInfo(pid)?.noisePublicKey },
                 meshHasPeer = { pid -> meshService.getPeerInfo(pid)?.isConnected == true },
-                nostrPubHexForAlias = { alias -> com.bitchat.android.nostr.GeohashAliasRegistry.get(alias) },
+                nostrPubHexForAlias = { alias -> com.app.transport.nostr.GeohashAliasRegistry.get(alias) },
                 findNoiseKeyForNostr = { key -> com.bitchat.android.favorites.FavoritesPersistenceService.shared.findNoiseKey(key) }
             ).also { canonical ->
                 if (canonical != state.getSelectedPrivateChatPeerValue()) {
@@ -619,7 +619,7 @@ class ChatViewModel(
 
                 // Send favorite notification via mesh or Nostr with our npub if available
                 try {
-                    val myNostr = com.bitchat.android.nostr.NostrIdentityBridge.getCurrentNostrIdentity(getApplication())
+                    val myNostr = com.app.transport.nostr.NostrIdentityBridge.getCurrentNostrIdentity(getApplication())
                     val announcementContent = if (isNowFavorite) "[FAVORITED]:${myNostr?.npub ?: ""}" else "[UNFAVORITED]:${myNostr?.npub ?: ""}"
                     // Prefer mesh if session established, else try Nostr
                     if (meshService.hasEstablishedSession(peerID)) {

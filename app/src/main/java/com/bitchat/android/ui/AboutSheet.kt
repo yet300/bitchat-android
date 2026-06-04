@@ -26,8 +26,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.bitchat.android.nostr.NostrProofOfWork
-import com.bitchat.android.nostr.PoWPreferenceManager
+import com.app.transport.nostr.NostrProofOfWork
+import com.app.transport.nostr.PoWPreferenceManager
 import androidx.compose.ui.res.stringResource
 import com.bitchat.android.R
 import com.bitchat.android.core.ui.component.button.CloseButton

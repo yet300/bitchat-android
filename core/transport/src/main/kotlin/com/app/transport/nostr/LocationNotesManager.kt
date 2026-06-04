@@ -1,4 +1,4 @@
-package com.bitchat.android.nostr
+package com.app.transport.nostr
 
 import android.util.Log
 import androidx.annotation.MainThread
@@ -209,7 +209,7 @@ class LocationNotesManager private constructor() {
         // CRITICAL FIX: Get geo-specific relays for sending (matching iOS pattern)
         // iOS: let relays = dependencies.relayLookup(geohash, TransportConfig.nostrGeoRelayCount)
         val relays = try {
-            com.bitchat.android.nostr.RelayDirectory.closestRelaysForGeohash(currentGeohash, 5)
+            RelayDirectory.closestRelaysForGeohash(currentGeohash, 5)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to lookup relays for geohash $currentGeohash: ${e.message}")
             emptyList()

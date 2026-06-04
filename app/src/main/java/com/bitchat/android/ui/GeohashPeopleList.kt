@@ -22,6 +22,7 @@ import kotlin.time.Instant
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.app.transport.nostr.NostrIdentityBridge
 import com.bitchat.android.R
 
 /**
@@ -97,7 +98,7 @@ fun GeohashPeopleList(
                 when (val channel = selectedLocationChannel) {
                     is com.bitchat.android.geohash.ChannelID.Location -> {
                         try {
-                            val identity = com.bitchat.android.nostr.NostrIdentityBridge.deriveIdentity(
+                            val identity = NostrIdentityBridge.deriveIdentity(
                                 forGeohash = channel.channel.geohash,
                                 context = viewModel.getApplication()
                             )

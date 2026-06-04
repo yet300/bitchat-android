@@ -1,5 +1,6 @@
 package com.bitchat.android.nostr
 
+import com.app.transport.nostr.*
 import android.app.Application
 import android.util.Log
 import com.app.transport.features.file.FileUtils
@@ -84,7 +85,7 @@ class NostrDirectMessageHandler(
                 val messageTimestamp = Instant.fromEpochMilliseconds(giftWrap.createdAt * 1000L)
                 val convKey = "nostr_${senderPubkey.take(16)}"
                 repo.putNostrKeyMapping(convKey, senderPubkey)
-                com.bitchat.android.nostr.GeohashAliasRegistry.put(convKey, senderPubkey)
+                GeohashAliasRegistry.put(convKey, senderPubkey)
                 if (geohash.isNotEmpty()) {
                     // Remember which geohash this conversation belongs to so we can subscribe on-demand
                     repo.setConversationGeohash(convKey, geohash)

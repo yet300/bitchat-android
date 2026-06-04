@@ -1,4 +1,4 @@
-package com.bitchat.android.nostr
+package com.app.transport.nostr
 
 import android.util.Log
 import com.app.transport.NostrConstants

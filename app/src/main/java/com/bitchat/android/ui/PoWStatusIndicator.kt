@@ -11,14 +11,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.bitchat.android.nostr.NostrProofOfWork
+import com.app.transport.nostr.NostrProofOfWork
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bitchat.android.R
-import com.bitchat.android.nostr.PoWPreferenceManager
+import com.app.transport.nostr.PoWPreferenceManager
 
 /**
  * Shows the current Proof of Work status and settings

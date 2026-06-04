@@ -3,6 +3,8 @@ package com.bitchat.android.ui
 import com.app.transport.notification.NotificationTextUtils
 import com.app.transport.model.BitchatMessage
 import com.app.transport.model.DeliveryStatus
+import com.app.transport.nostr.Bech32
+import com.app.transport.nostr.GeohashAliasRegistry
 import com.bitchat.android.mesh.BluetoothMeshDelegate
 import com.bitchat.android.mesh.BluetoothMeshService
 import kotlinx.coroutines.CoroutineScope
@@ -124,15 +126,15 @@ class MeshDelegateHandler(
                         meshHasPeer = { pid -> peers.contains(pid) },
                         nostrPubHexForAlias = { alias ->
                             // Use GeohashAliasRegistry for geohash aliases, but for mesh favorites, derive from favorites mapping
-                            if (com.bitchat.android.nostr.GeohashAliasRegistry.contains(alias)) {
-                                com.bitchat.android.nostr.GeohashAliasRegistry.get(alias)
+                            if (GeohashAliasRegistry.contains(alias)) {
+                                GeohashAliasRegistry.get(alias)
                             } else {
                                 // Best-effort: derive pub hex from favorites mapping for mesh nostr_ aliases
                                 val prefix = alias.removePrefix("nostr_")
                                 val favs = try { com.bitchat.android.favorites.FavoritesPersistenceService.shared.getOurFavorites() } catch (_: Exception) { emptyList() }
                                 favs.firstNotNullOfOrNull { rel ->
                                     rel.peerNostrPublicKey?.let { s ->
-                                        runCatching { com.bitchat.android.nostr.Bech32.decode(s) }.getOrNull()?.let { dec ->
+                                        runCatching { Bech32.decode(s) }.getOrNull()?.let { dec ->
                                             if (dec.first == "npub") dec.second.joinToString("") { b -> "%02x".format(b) } else null
                                         }
                                     }
@@ -184,7 +186,7 @@ class MeshDelegateHandler(
                     val npub = com.bitchat.android.favorites.FavoritesPersistenceService.shared.findNostrPubkey(noiseKey)
                     val tempNostrKey: String? = try {
                         if (npub != null) {
-                            val (hrp, data) = com.bitchat.android.nostr.Bech32.decode(npub)
+                            val (hrp, data) = Bech32.decode(npub)
                             if (hrp == "npub") "nostr_${data.joinToString("") { b -> "%02x".format(b) }.take(16)}" else null
                         } else null
                     } catch (_: Exception) { null }

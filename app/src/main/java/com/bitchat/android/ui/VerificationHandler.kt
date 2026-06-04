@@ -9,7 +9,7 @@ import com.app.crypto.identity.SecureIdentityStateManager
 import com.bitchat.android.mesh.BluetoothMeshService
 import com.app.transport.model.BitchatMessage
 import com.app.crypto.noise.NoiseSession
-import com.bitchat.android.nostr.GeohashAliasRegistry
+import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.VerificationService
 import com.app.common.encoding.dataFromHexString
 import com.app.common.encoding.hexEncodedString
