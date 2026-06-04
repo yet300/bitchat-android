@@ -308,8 +308,15 @@ class ArtiTorManager private constructor() {
     }
 
     /**
+     * Invoked after Tor network state changes so dependents (e.g. the Nostr relay manager) can
+     * reconnect over the new circuit. Wired from the app module so this Tor substrate stays unaware
+     * of the relay layer (breaks the former net -> nostr dependency).
+     */
+    var onConnectionsReset: (() -> Unit)? = null
+
+    /**
      * Reset network connections after Tor state changes.
-     * Rebuilds OkHttp clients and reconnects Nostr relays.
+     * Rebuilds OkHttp clients and notifies dependents to reconnect.
      */
     private fun resetNetworkConnections() {
         try {
@@ -317,7 +324,7 @@ class ArtiTorManager private constructor() {
         } catch (_: Throwable) {
         }
         try {
-            com.bitchat.android.nostr.NostrRelayManager.shared.resetAllConnections()
+            onConnectionsReset?.invoke()
         } catch (_: Throwable) {
         }
     }

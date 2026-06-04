@@ -4,6 +4,11 @@ import android.app.Application
 import com.bitchat.android.nostr.RelayDirectory
 import com.bitchat.android.ui.theme.ThemePreferenceManager
 import com.bitchat.android.net.ArtiTorManager
+import com.bitchat.android.nostr.GeohashAliasRegistry
+import com.bitchat.android.nostr.GeohashConversationRegistry
+import com.bitchat.android.nostr.LocationNotesInitializer
+import com.bitchat.android.nostr.NostrIdentityBridge
+import com.bitchat.android.nostr.NostrRelayManager
 
 /**
  * Main application class for bitchat Android
@@ -17,13 +22,17 @@ class BitchatApplication : Application() {
         try {
             val torProvider = ArtiTorManager.getInstance()
             torProvider.init(this)
+            // Reconnect Nostr relays when Tor resets (wired here so ArtiTorManager stays unaware of nostr)
+            torProvider.onConnectionsReset = {
+                NostrRelayManager.shared.resetAllConnections()
+            }
         } catch (_: Exception){}
 
         // Initialize relay directory (loads assets/nostr_relays.csv)
         RelayDirectory.initialize(this)
 
         // Initialize LocationNotesManager dependencies early so sheet subscriptions can start immediately
-        try { com.bitchat.android.nostr.LocationNotesInitializer.initialize(this) } catch (_: Exception) { }
+        try { LocationNotesInitializer.initialize(this) } catch (_: Exception) { }
 
         // Initialize favorites persistence early so MessageRouter/NostrTransport can use it on startup
         try {
@@ -32,7 +41,7 @@ class BitchatApplication : Application() {
 
         // Warm up Nostr identity to ensure npub is available for favorite notifications
         try {
-            com.bitchat.android.nostr.NostrIdentityBridge.getCurrentNostrIdentity(this)
+            NostrIdentityBridge.getCurrentNostrIdentity(this)
         } catch (_: Exception) { }
 
         // Initialize theme preference
@@ -43,8 +52,8 @@ class BitchatApplication : Application() {
 
         // Initialize Geohash Registries for persistence
         try {
-            com.bitchat.android.nostr.GeohashAliasRegistry.initialize(this)
-            com.bitchat.android.nostr.GeohashConversationRegistry.initialize(this)
+            GeohashAliasRegistry.initialize(this)
+            GeohashConversationRegistry.initialize(this)
         } catch (_: Exception) { }
 
         // Initialize mesh service preferences
