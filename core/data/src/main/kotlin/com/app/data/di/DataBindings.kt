@@ -3,6 +3,7 @@ package com.app.data.di
 import com.app.data.repository.ChannelRepositoryImpl
 import com.app.data.repository.ContactRepositoryImpl
 import com.app.data.repository.ConversationRepositoryImpl
+import com.app.data.repository.IdentityRepositoryImpl
 import com.app.data.repository.MessageRepositoryImpl
 import com.app.data.repository.PeerRepositoryImpl
 import com.app.data.repository.SearchRepositoryImpl
@@ -11,6 +12,7 @@ import com.app.data.routing.RoutingMessageTransport
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationRepository
+import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.MessageTransport
 import com.app.domain.repository.PeerRepository
@@ -49,6 +51,9 @@ abstract class DataBindings {
 
     @Binds
     internal abstract val SearchRepositoryImpl.bindSearch: SearchRepository
+
+    @Binds
+    internal abstract val IdentityRepositoryImpl.bindIdentity: IdentityRepository
 
     @Binds
     internal abstract val RoutingMessageTransport.bindTransport: MessageTransport
