@@ -6,10 +6,12 @@ import com.app.data.repository.ConversationRepositoryImpl
 import com.app.data.repository.MessageRepositoryImpl
 import com.app.data.repository.PeerRepositoryImpl
 import com.app.data.repository.SettingsRepositoryImpl
+import com.app.data.routing.RoutingMessageTransport
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.MessageRepository
+import com.app.domain.repository.MessageTransport
 import com.app.domain.repository.PeerRepository
 import com.app.domain.repository.SettingsRepository
 import dev.zacsweers.metro.AppScope
@@ -42,4 +44,7 @@ abstract class DataBindings {
 
     @Binds
     internal abstract val PeerRepositoryImpl.bindPeers: PeerRepository
+
+    @Binds
+    internal abstract val RoutingMessageTransport.bindTransport: MessageTransport
 }
