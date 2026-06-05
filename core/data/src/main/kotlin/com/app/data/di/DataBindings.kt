@@ -8,6 +8,7 @@ import com.app.data.repository.MessageRepositoryImpl
 import com.app.data.repository.PeerRepositoryImpl
 import com.app.data.repository.SearchRepositoryImpl
 import com.app.data.repository.SettingsRepositoryImpl
+import com.app.data.repository.SettingsStoreImpl
 import com.app.data.routing.RoutingMessageTransport
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
@@ -18,6 +19,7 @@ import com.app.domain.repository.MessageTransport
 import com.app.domain.repository.PeerRepository
 import com.app.domain.repository.SearchRepository
 import com.app.domain.repository.SettingsRepository
+import com.app.domain.repository.SettingsStore
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Binds
 import dev.zacsweers.metro.BindingContainer
@@ -31,6 +33,9 @@ import dev.zacsweers.metro.ContributesTo
 @ContributesTo(AppScope::class)
 @BindingContainer
 abstract class DataBindings {
+    @Binds
+    internal abstract val SettingsStoreImpl.bindSettingsStore: SettingsStore
+
     @Binds
     internal abstract val SettingsRepositoryImpl.bindSettings: SettingsRepository
 

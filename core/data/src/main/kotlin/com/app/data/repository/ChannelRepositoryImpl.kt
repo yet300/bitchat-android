@@ -1,14 +1,10 @@
-@file:OptIn(ExperimentalSettingsApi::class)
-
 package com.app.data.repository
 
 import com.app.common.serialization.JsonConfig
 import com.app.domain.model.Channel
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.JoinResult
-import com.russhwolf.settings.ExperimentalSettingsApi
-import com.russhwolf.settings.ObservableSettings
-import com.russhwolf.settings.coroutines.getStringOrNullFlow
+import com.app.domain.repository.SettingsStore
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -26,7 +22,7 @@ import kotlinx.serialization.builtins.serializer
 @SingleIn(AppScope::class)
 @Inject
 internal class ChannelRepositoryImpl(
-    private val settings: ObservableSettings,
+    private val settings: SettingsStore,
 ) : ChannelRepository {
 
     override fun observeJoinedChannels(): Flow<Set<String>> =
