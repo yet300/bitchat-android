@@ -1,0 +1,29 @@
+package com.bitchat.android.di
+
+import com.app.domain.repository.ChannelRepository
+import com.app.domain.repository.ContactRepository
+import com.app.domain.repository.ConversationRepository
+import com.app.domain.repository.IdentityRepository
+import com.app.domain.repository.MessageRepository
+import com.app.domain.repository.MessageTransport
+import com.app.domain.repository.PeerRepository
+import com.app.domain.repository.SearchRepository
+import com.app.domain.repository.SettingsRepository
+
+/**
+ * Public API of the application dependency graph: the domain ports the app (and, in Phase C, the
+ * Decompose component tree) resolves. The concrete graph is generated per platform
+ * ([AndroidAppGraph]). Repository implementations stay internal to :core:data — only these domain
+ * interfaces cross the module boundary (DIP).
+ */
+interface AppGraph {
+    val settingsRepository: SettingsRepository
+    val contactRepository: ContactRepository
+    val channelRepository: ChannelRepository
+    val messageRepository: MessageRepository
+    val conversationRepository: ConversationRepository
+    val peerRepository: PeerRepository
+    val searchRepository: SearchRepository
+    val identityRepository: IdentityRepository
+    val messageTransport: MessageTransport
+}

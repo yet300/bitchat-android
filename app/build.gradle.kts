@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.metro)
 }
 
 android {
@@ -85,9 +86,12 @@ android {
 dependencies {
     // Project modules
     implementation(projects.core.common)
+    implementation(projects.core.domain)
     implementation(projects.core.crypto)
     implementation(projects.core.transport)
     implementation(projects.core.data)
+
+    implementation(libs.metrox.android)
 
     // Core Android dependencies
     implementation(libs.androidx.core.ktx)
