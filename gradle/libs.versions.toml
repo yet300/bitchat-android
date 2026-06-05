@@ -3,7 +3,7 @@
 agp = "9.2.1"
 kotlin = "2.3.21"
 compileSdk = "37"
-minSdk = "26" # API 26 for proper BLE support
+minSdk = "28" # API 26 for proper BLE support but right now we update to 28
 targetSdk = "35"
 
 # AndroidX Core

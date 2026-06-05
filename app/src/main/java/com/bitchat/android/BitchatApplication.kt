@@ -3,7 +3,12 @@ package com.bitchat.android
 import android.app.Application
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.transport.nostr.RelayDirectory
+import com.bitchat.android.di.AndroidAppGraph
+import com.bitchat.android.di.AppGraph
 import com.bitchat.android.ui.theme.ThemePreferenceManager
+import dev.zacsweers.metro.createGraphFactory
+import dev.zacsweers.metrox.android.MetroAppComponentProviders
+import dev.zacsweers.metrox.android.MetroApplication
 import com.app.transport.net.ArtiTorManager
 import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.nostr.GeohashConversationRegistry
@@ -14,7 +19,16 @@ import com.app.transport.nostr.NostrRelayManager
 /**
  * Main application class for bitchat Android
  */
-class BitchatApplication : Application() {
+class BitchatApplication : Application(), MetroApplication {
+
+    // Concrete graph held for MetroAppComponentFactory; exposed to the app as the AppGraph contract.
+    private val androidAppGraph by lazy {
+        createGraphFactory<AndroidAppGraph.Factory>().create(this)
+    }
+
+    val appGraph: AppGraph get() = androidAppGraph
+
+    override val appComponentProviders: MetroAppComponentProviders get() = androidAppGraph
 
     override fun onCreate() {
         super.onCreate()
