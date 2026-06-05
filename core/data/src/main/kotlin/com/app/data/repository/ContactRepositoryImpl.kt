@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalSettingsApi::class, ExperimentalTime::class)
+@file:OptIn(ExperimentalTime::class)
 
 package com.app.data.repository
 
@@ -10,9 +10,7 @@ import com.app.domain.model.Fingerprint
 import com.app.domain.model.PeerId
 import com.app.domain.model.PeerIdentity
 import com.app.domain.repository.ContactRepository
-import com.russhwolf.settings.ExperimentalSettingsApi
-import com.russhwolf.settings.ObservableSettings
-import com.russhwolf.settings.coroutines.getStringOrNullFlow
+import com.app.domain.repository.SettingsStore
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -30,7 +28,7 @@ import kotlin.time.ExperimentalTime
 @SingleIn(AppScope::class)
 @Inject
 internal class ContactRepositoryImpl(
-    private val settings: ObservableSettings,
+    private val settings: SettingsStore,
     private val favorites: FavoritesPersistenceService,
     private val fingerprints: PeerFingerprintManager,
 ) : ContactRepository {

@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalSettingsApi::class)
-
 package com.app.data.repository
 
 import com.app.common.serialization.JsonConfig
@@ -12,9 +10,8 @@ import com.app.domain.model.Contact
 import com.app.domain.model.ConversationId
 import com.app.domain.model.PeerId
 import com.app.domain.repository.SearchRepository
+import com.app.domain.repository.SettingsStore
 import com.app.transport.model.BitchatMessage
-import com.russhwolf.settings.ExperimentalSettingsApi
-import com.russhwolf.settings.ObservableSettings
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -29,7 +26,7 @@ import kotlinx.serialization.builtins.serializer
 @SingleIn(AppScope::class)
 @Inject
 internal class SearchRepositoryImpl(
-    private val settings: ObservableSettings,
+    private val settings: SettingsStore,
     private val favorites: FavoritesPersistenceService,
 ) : SearchRepository {
 

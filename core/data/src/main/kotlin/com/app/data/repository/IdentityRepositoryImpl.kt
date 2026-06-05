@@ -7,8 +7,8 @@ import com.app.domain.model.Fingerprint
 import com.app.domain.model.MyIdentity
 import com.app.domain.model.PeerId
 import com.app.domain.repository.IdentityRepository
+import com.app.domain.repository.SettingsStore
 import com.app.transport.nostr.NostrIdentityBridge
-import com.russhwolf.settings.ObservableSettings
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -27,7 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 internal class IdentityRepositoryImpl(
     private val encryption: EncryptionService,
     private val identityState: SecureIdentityStateManager,
-    private val settings: ObservableSettings,
+    private val settings: SettingsStore,
     private val context: Context,
 ) : IdentityRepository {
 
