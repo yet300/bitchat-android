@@ -94,6 +94,8 @@ class ChatViewModel(
         (application as BitchatApplication).appGraph.geohashAliasRegistry
     private val appStateStore =
         (application as BitchatApplication).appGraph.appStateStore
+    private val seenMessageStore =
+        (application as BitchatApplication).appGraph.seenMessageStore
     private val identityManager by lazy { SecureIdentityStateManager(getApplication()) }
     private val messageManager = MessageManager(state, appStateStore)
     private val channelManager = ChannelManager(state, messageManager, dataManager, viewModelScope)
@@ -216,7 +218,7 @@ class ChatViewModel(
                 state.setPrivateChats(byPeer)
                 // Recompute unread set using SeenMessageStore for robustness across Activity recreation
                 try {
-                    val seen = com.app.transport.SeenMessageStore.getInstance(getApplication())
+                    val seen = seenMessageStore
                     val myNick = state.getNicknameValue() ?: meshService.myPeerID
                     val unread = mutableSetOf<String>()
                     byPeer.forEach { (peer, list) ->
@@ -406,7 +408,7 @@ class ChatViewModel(
             // Persistently mark all messages in this conversation as read so Nostr fetches
             // after app restarts won't re-mark them as unread.
             try {
-                val seen = com.app.transport.SeenMessageStore.getInstance(getApplication())
+                val seen = seenMessageStore
                 val chats = state.getPrivateChatsValue()
                 val messages = chats[peerID] ?: emptyList()
                 messages.forEach { msg ->
@@ -937,9 +939,7 @@ class ChatViewModel(
         dataManager.clearAllData()
         
         // Clear seen message store
-        try {
-            com.app.transport.SeenMessageStore.getInstance(getApplication()).clear()
-        } catch (_: Exception) { }
+        seenMessageStore.clear()
         
         // Clear all mesh service data
         clearAllMeshServiceData()
@@ -993,6 +993,7 @@ class ChatViewModel(
             getApplication(),
             appGraph.debugSettingsManager,
             appGraph.debugPreferenceManager,
+            appGraph.seenMessageStore,
         )
 
         // Replace our reference and set up the new service

@@ -1,30 +1,25 @@
 package com.app.transport
 
-import android.content.Context
 import android.util.Log
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.common.serialization.JsonConfig
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.serialization.Serializable
 
 /**
  * Persistent store for message IDs we've already acknowledged (DELIVERED) or READ.
  * Limits to last MAX_IDS entries per set to avoid memory bloat.
  */
-class SeenMessageStore private constructor(private val context: Context) {
+@SingleIn(AppScope::class)
+@Inject
+class SeenMessageStore(private val secure: SecureIdentityStateManager) {
     companion object {
         private const val TAG = "SeenMessageStore"
         private const val STORAGE_KEY = "seen_message_store_v1"
         private const val MAX_IDS = 10_000
-
-        @Volatile private var INSTANCE: SeenMessageStore? = null
-        fun getInstance(appContext: Context): SeenMessageStore {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: SeenMessageStore(appContext.applicationContext).also { INSTANCE = it }
-            }
-        }
     }
-
-    private val secure = SecureIdentityStateManager(context)
 
     private val delivered = LinkedHashSet<String>(MAX_IDS)
     private val read = LinkedHashSet<String>(MAX_IDS)
