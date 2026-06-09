@@ -7,6 +7,8 @@ import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.data.routing.MessageRouter
+import com.app.transport.debug.DebugPreferenceManager
+import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.nostr.GeohashConversationRegistry
@@ -56,8 +58,12 @@ object AndroidDataBindings {
 
     @Provides
     @SingleIn(AppScope::class)
-    fun provideBluetoothMeshService(context: Context): BluetoothMeshService =
-        MeshServiceHolder.getOrCreate(context)
+    fun provideBluetoothMeshService(
+        context: Context,
+        debugSettingsManager: DebugSettingsManager,
+        debugPreferenceManager: DebugPreferenceManager,
+    ): BluetoothMeshService =
+        MeshServiceHolder.getOrCreate(context, debugSettingsManager, debugPreferenceManager)
 
     @Provides
     @SingleIn(AppScope::class)

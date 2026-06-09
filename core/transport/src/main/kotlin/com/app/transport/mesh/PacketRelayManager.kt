@@ -18,15 +18,16 @@ import kotlin.random.Random
  * This class handles all relay decisions and logic for bitchat packets.
  * All packets that aren't specifically addressed to us get processed here.
  */
-class PacketRelayManager(private val myPeerID: String) {
-    private val debugManager by lazy { try { DebugSettingsManager.getInstance() } catch (e: Exception) { null } }
-    
+class PacketRelayManager(
+    private val myPeerID: String,
+    private val debugSettingsManager: DebugSettingsManager,
+) {
     companion object {
         private const val TAG = "PacketRelayManager"
     }
     
     private fun isRelayEnabled(): Boolean = try {
-        DebugSettingsManager.getInstance().packetRelayEnabled.value
+        debugSettingsManager.packetRelayEnabled.value
     } catch (_: Exception) { true }
 
     // Logging moved to BluetoothPacketBroadcaster per actual transmission target

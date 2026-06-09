@@ -60,8 +60,7 @@ class BitchatApplication : Application(), MetroApplication {
         // Initialize theme preference
         ThemePreferenceManager.init(this)
 
-        // Initialize debug preference manager (persists debug toggles)
-        try { com.app.transport.debug.DebugPreferenceManager.init(this) } catch (_: Exception) { }
+        // DebugPreferenceManager is now graph-owned (@Inject over SettingsStore); no static init needed.
 
         // Initialize mesh service preferences
         try { com.bitchat.android.service.MeshServicePreferences.init(this) } catch (_: Exception) { }

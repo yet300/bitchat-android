@@ -3,6 +3,7 @@ package com.app.transport.mesh
 import android.bluetooth.*
 import android.content.Context
 import android.util.Log
+import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
 import kotlinx.coroutines.*
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.combine
 class BluetoothConnectionManager(
     private val context: Context, 
     private val myPeerID: String,
+    private val debugSettingsManager: DebugSettingsManager,
     private val fragmentManager: FragmentManager? = null
 ) : PowerManagerDelegate {
     
@@ -38,7 +40,7 @@ class BluetoothConnectionManager(
     // Component managers
     private val permissionManager = BluetoothPermissionManager(context)
     private val connectionTracker = BluetoothConnectionTracker(connectionScope, powerManager)
-    private val packetBroadcaster = BluetoothPacketBroadcaster(connectionScope, connectionTracker, fragmentManager, myPeerID)
+    private val packetBroadcaster = BluetoothPacketBroadcaster(connectionScope, connectionTracker, fragmentManager, myPeerID, debugSettingsManager)
     
     // Delegate for component managers to call back to main manager
     private val componentDelegate = object : BluetoothConnectionManagerDelegate {
@@ -73,10 +75,10 @@ class BluetoothConnectionManager(
     }
     
     private val serverManager = BluetoothGattServerManager(
-        context, connectionScope, connectionTracker, permissionManager, powerManager, componentDelegate, myPeerID
+        context, connectionScope, connectionTracker, permissionManager, powerManager, componentDelegate, myPeerID, debugSettingsManager
     )
     private val clientManager = BluetoothGattClientManager(
-        context, connectionScope, connectionTracker, permissionManager, powerManager, componentDelegate
+        context, connectionScope, connectionTracker, permissionManager, powerManager, componentDelegate, debugSettingsManager
     )
     
     // Service state
@@ -92,7 +94,7 @@ class BluetoothConnectionManager(
         powerManager.delegate = this
         // Observe debug settings to enforce role state while active
         try {
-            val dbg = com.app.transport.debug.DebugSettingsManager.getInstance()
+            val dbg = debugSettingsManager
             // Role enable/disable
             connectionScope.launch {
                 dbg.gattServerEnabled.collect { enabled ->
@@ -132,7 +134,7 @@ class BluetoothConnectionManager(
         if (!isActive) return
         
         try {
-            val dbg = com.app.transport.debug.DebugSettingsManager.getInstance()
+            val dbg = debugSettingsManager
             val maxOverall = dbg.maxConnectionsOverall.value
             val maxServer = dbg.maxServerConnections.value
             val maxClient = dbg.maxClientConnections.value
@@ -197,9 +199,9 @@ class BluetoothConnectionManager(
                 powerManager.start()
                 
                 // Start server/client based on debug settings
-                val dbg = try { com.app.transport.debug.DebugSettingsManager.getInstance() } catch (_: Exception) { null }
-                val startServer = dbg?.gattServerEnabled?.value != false
-                val startClient = dbg?.gattClientEnabled?.value != false
+                val dbg = debugSettingsManager
+                val startServer = dbg.gattServerEnabled.value != false
+                val startClient = dbg.gattClientEnabled.value != false
 
                 if (startServer) {
                     if (!serverManager.start()) {
@@ -400,7 +402,7 @@ class BluetoothConnectionManager(
             val wasUsingDutyCycle = powerManager.shouldUseDutyCycle()
             
             // Update advertising with new power settings if server enabled
-            val serverEnabled = try { com.app.transport.debug.DebugSettingsManager.getInstance().gattServerEnabled.value } catch (_: Exception) { true }
+            val serverEnabled = try { debugSettingsManager.gattServerEnabled.value } catch (_: Exception) { true }
             if (serverEnabled) {
                 serverManager.restartAdvertising()
             } else {
@@ -411,7 +413,7 @@ class BluetoothConnectionManager(
             val nowUsingDutyCycle = powerManager.shouldUseDutyCycle()
             if (wasUsingDutyCycle != nowUsingDutyCycle) {
                 Log.d(TAG, "Duty cycle behavior changed (${wasUsingDutyCycle} -> ${nowUsingDutyCycle}), restarting scan")
-                val clientEnabled = try { com.app.transport.debug.DebugSettingsManager.getInstance().gattClientEnabled.value } catch (_: Exception) { true }
+                val clientEnabled = try { debugSettingsManager.gattClientEnabled.value } catch (_: Exception) { true }
                 if (clientEnabled) {
                     clientManager.restartScanning()
                 } else {

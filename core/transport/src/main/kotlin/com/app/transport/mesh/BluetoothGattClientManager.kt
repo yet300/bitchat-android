@@ -30,7 +30,8 @@ class BluetoothGattClientManager(
     private val connectionTracker: BluetoothConnectionTracker,
     private val permissionManager: BluetoothPermissionManager,
     private val powerManager: PowerManager,
-    private val delegate: BluetoothConnectionManagerDelegate?
+    private val delegate: BluetoothConnectionManagerDelegate?,
+    private val debugSettingsManager: DebugSettingsManager
 ) {
     
     companion object {
@@ -79,7 +80,7 @@ class BluetoothGattClientManager(
     fun start(): Boolean {
         // Respect debug setting
         try {
-            if (!com.app.transport.debug.DebugSettingsManager.getInstance().gattClientEnabled.value) {
+            if (!debugSettingsManager.gattClientEnabled.value) {
                 Log.i(TAG, "Client start skipped: GATT Client disabled in debug settings")
                 return false
             }
@@ -153,7 +154,7 @@ class BluetoothGattClientManager(
      * Handle scan state changes from power manager
      */
     fun onScanStateChanged(shouldScan: Boolean) {
-        val enabled = try { com.app.transport.debug.DebugSettingsManager.getInstance().gattClientEnabled.value } catch (_: Exception) { true }
+        val enabled = try { debugSettingsManager.gattClientEnabled.value } catch (_: Exception) { true }
         if (shouldScan && enabled) {
             startScanning()
         } else {
@@ -202,7 +203,7 @@ class BluetoothGattClientManager(
     @Suppress("DEPRECATION")
     private fun startScanning() {
         // Respect debug setting
-        val enabled = try { com.app.transport.debug.DebugSettingsManager.getInstance().gattClientEnabled.value } catch (_: Exception) { true }
+        val enabled = try { debugSettingsManager.gattClientEnabled.value } catch (_: Exception) { true }
         if (!permissionManager.hasBluetoothPermissions() || bleScanner == null || !isActive || !enabled) return
         
         // Rate limit scan starts to prevent "scanning too frequently" errors
@@ -346,7 +347,7 @@ class BluetoothGattClientManager(
 
         // Publish scan result to debug UI buffer
         try {
-            DebugSettingsManager.getInstance().addScanResult(
+            debugSettingsManager.addScanResult(
                 DebugScanResult(
                     deviceName = device.name,
                     deviceAddress = deviceAddress,
@@ -361,7 +362,7 @@ class BluetoothGattClientManager(
             Log.d(TAG, "Skipping device $deviceAddress due to weak signal: $rssi < ${powerManager.getRSSIThreshold()}")
             // Even if we skip connecting, still publish scan result to debug UI
             try {
-                DebugSettingsManager.getInstance().addScanResult(
+                debugSettingsManager.addScanResult(
                     DebugScanResult(
                         deviceName = device.name,
                         deviceAddress = deviceAddress,
@@ -385,9 +386,9 @@ class BluetoothGattClientManager(
         }
         
         // Check if connection limit is reached
-        val dbg = try { com.app.transport.debug.DebugSettingsManager.getInstance() } catch (_: Exception) { null }
-        val maxOverall = dbg?.maxConnectionsOverall?.value ?: powerManager.getMaxConnections()
-        val maxClient = dbg?.maxClientConnections?.value ?: maxOverall
+        val dbg = debugSettingsManager
+        val maxOverall = dbg.maxConnectionsOverall.value
+        val maxClient = dbg.maxClientConnections.value
 
         if (!connectionTracker.canConnectAsClient(maxOverall, maxClient)) {
             Log.d(TAG, "Client connection limit reached (overall: $maxOverall, client: $maxClient)")
@@ -565,7 +566,7 @@ class BluetoothGattClientManager(
      */
     fun restartScanning() {
         // Respect debug setting
-        val enabled = try { com.app.transport.debug.DebugSettingsManager.getInstance().gattClientEnabled.value } catch (_: Exception) { true }
+        val enabled = try { debugSettingsManager.gattClientEnabled.value } catch (_: Exception) { true }
         if (!isActive || !enabled) return
         
         connectionScope.launch {
