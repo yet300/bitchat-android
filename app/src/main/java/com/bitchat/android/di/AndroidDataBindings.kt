@@ -54,11 +54,7 @@ object AndroidDataBindings {
 
     @Provides
     @SingleIn(AppScope::class)
-    fun providePeerFingerprintManager(): PeerFingerprintManager = PeerFingerprintManager.getInstance()
-
-    @Provides
-    @SingleIn(AppScope::class)
-    fun provideEncryptionService(context: Context): EncryptionService = EncryptionService(context)
+    fun provideEncryptionService(context: Context, peerFingerprintManager: PeerFingerprintManager): EncryptionService = EncryptionService(context, peerFingerprintManager)
 
     @Provides
     @SingleIn(AppScope::class)
@@ -74,8 +70,9 @@ object AndroidDataBindings {
         seenMessageStore: SeenMessageStore,
         transferProgressManager: TransferProgressManager,
         meshGraphService: MeshGraphService,
+        peerFingerprintManager: PeerFingerprintManager,
     ): BluetoothMeshService =
-        MeshServiceHolder.getOrCreate(context, debugSettingsManager, debugPreferenceManager, seenMessageStore, transferProgressManager, meshGraphService)
+        MeshServiceHolder.getOrCreate(context, debugSettingsManager, debugPreferenceManager, seenMessageStore, transferProgressManager, meshGraphService, peerFingerprintManager)
 
     @Provides
     @SingleIn(AppScope::class)

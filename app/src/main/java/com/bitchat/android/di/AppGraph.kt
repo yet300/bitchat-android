@@ -9,6 +9,7 @@ import com.app.domain.repository.MessageTransport
 import com.app.domain.repository.PeerRepository
 import com.app.domain.repository.SearchRepository
 import com.app.domain.repository.SettingsRepository
+import com.app.crypto.identity.PeerFingerprintManager
 import com.app.data.AppStateStore
 import com.app.transport.SeenMessageStore
 import com.app.transport.mesh.TransferProgressManager
@@ -61,4 +62,6 @@ interface AppGraph {
     val nostrTransport: NostrTransport
     val artiTorManager: ArtiTorManager
     val locationNotesManager: LocationNotesManager
+    // temporary Phase-D/DI-core bridge, retires Phase C
+    val peerFingerprintManager: PeerFingerprintManager
 }
