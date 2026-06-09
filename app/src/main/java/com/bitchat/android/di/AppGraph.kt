@@ -12,6 +12,7 @@ import com.app.domain.repository.SettingsRepository
 import com.app.data.AppStateStore
 import com.app.transport.SeenMessageStore
 import com.app.transport.mesh.TransferProgressManager
+import com.app.transport.meshgraph.MeshGraphService
 import com.app.transport.debug.DebugPreferenceManager
 import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.nostr.GeohashAliasRegistry
@@ -51,4 +52,5 @@ interface AppGraph {
     // temporary Phase-D/DI-core bridge, retires Phase C
     val seenMessageStore: SeenMessageStore
     val transferProgressManager: TransferProgressManager
+    val meshGraphService: MeshGraphService
 }

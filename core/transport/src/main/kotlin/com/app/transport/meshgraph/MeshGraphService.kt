@@ -1,5 +1,8 @@
 package com.app.transport.meshgraph
 
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -9,7 +12,9 @@ import java.util.concurrent.ConcurrentHashMap
  * Maintains an internal graph of the mesh based on gossip.
  * Nodes are peers (peerID), edges are direct connections.
  */
-class MeshGraphService private constructor() {
+@SingleIn(AppScope::class)
+@Inject
+class MeshGraphService {
     data class GraphNode(val peerID: String, val nickname: String?)
     data class GraphEdge(val a: String, val b: String, val isConfirmed: Boolean, val confirmedBy: String? = null)
     data class GraphSnapshot(val nodes: List<GraphNode>, val edges: List<GraphEdge>)
@@ -111,17 +116,4 @@ class MeshGraphService private constructor() {
         _graphState.value = GraphSnapshot(nodeList, sortedEdges)
     }
 
-    companion object {
-        @Volatile private var INSTANCE: MeshGraphService? = null
-        fun getInstance(): MeshGraphService = INSTANCE ?: synchronized(this) {
-            INSTANCE ?: MeshGraphService().also { INSTANCE = it }
-        }
-
-        @org.jetbrains.annotations.TestOnly
-        fun resetForTesting() {
-            synchronized(this) {
-                INSTANCE = null
-            }
-        }
-    }
 }

@@ -2,6 +2,7 @@
 
 package com.app.transport.mesh
 
+import android.content.Context
 import android.util.Log
 import com.app.transport.features.file.FileUtils
 import com.app.transport.model.BitchatFilePacket
@@ -16,6 +17,8 @@ import com.app.transport.protocol.MessageType
 import com.app.common.encoding.toHexString
 import com.app.transport.MeshConstants
 import com.app.transport.FavoriteNostrLink
+import com.app.transport.meshgraph.GossipTLV
+import com.app.transport.meshgraph.MeshGraphService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -29,7 +32,11 @@ import kotlin.time.Instant
  * Handles processing of different message types
  * Extracted from BluetoothMeshService for better separation of concerns
  */
-class MessageHandler(private val myPeerID: String, private val appContext: android.content.Context) {
+class MessageHandler(
+    private val myPeerID: String,
+    private val appContext: Context,
+    private val meshGraphService: MeshGraphService,
+) {
     
     companion object {
         private const val TAG = "MessageHandler"
@@ -304,9 +311,8 @@ class MessageHandler(private val myPeerID: String, private val appContext: andro
         
         // Update mesh graph from gossip neighbors (only if TLV present)
         try {
-            val neighborsOrNull = com.app.transport.meshgraph.GossipTLV.decodeNeighborsFromAnnouncementPayload(packet.payload)
-            com.app.transport.meshgraph.MeshGraphService.getInstance()
-                .updateFromAnnouncement(peerID, nickname, neighborsOrNull, packet.timestamp)
+            val neighborsOrNull = GossipTLV.decodeNeighborsFromAnnouncementPayload(packet.payload)
+            meshGraphService.updateFromAnnouncement(peerID, nickname, neighborsOrNull, packet.timestamp)
         } catch (_: Exception) { }
 
         Log.d(TAG, "✅ Processed verified TLV announce: stored identity for $peerID")

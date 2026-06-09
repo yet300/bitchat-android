@@ -47,7 +47,7 @@ import com.bitchat.android.core.ui.component.sheet.BitchatSheetTitle
 @Composable
 fun MeshTopologySection() {
     val colorScheme = MaterialTheme.colorScheme
-    val graphService = remember { MeshGraphService.getInstance() }
+    val graphService = (LocalContext.current.applicationContext as BitchatApplication).appGraph.meshGraphService
     val snapshot by graphService.graphState.collectAsState()
 
     Surface(shape = RoundedCornerShape(12.dp), color = colorScheme.surfaceVariant.copy(alpha = 0.2f)) {
