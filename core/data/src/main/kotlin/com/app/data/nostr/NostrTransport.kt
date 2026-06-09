@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 class NostrTransport(
     private val context: Context,
     private val relayManager: NostrRelayManager,
+    private val favoritesService: FavoritesPersistenceService,
 ) {
     var senderPeerID: String = ""
 
@@ -92,7 +93,7 @@ class NostrTransport(
                 
                 // Strict: lookup the recipient's current BitChat peer ID using favorites mapping
                 val recipientPeerIDForEmbed = try {
-                    FavoritesPersistenceService.shared
+                    favoritesService
                         .findPeerIDForNostrPubkey(recipientNostrPubkey)
                 } catch (_: Exception) { null }
                 if (recipientPeerIDForEmbed.isNullOrBlank()) {
@@ -486,16 +487,16 @@ class NostrTransport(
     private fun resolveNostrPublicKey(peerID: String): String? {
         try {
             // 1) Fast path: direct peerID→npub mapping (mutual favorites after mesh mapping)
-            FavoritesPersistenceService.shared.findNostrPubkeyForPeerID(peerID)?.let { return it }
+            favoritesService.findNostrPubkeyForPeerID(peerID)?.let { return it }
 
             // 2) Legacy path: resolve by noise public key association
             val noiseKey = hexStringToByteArray(peerID)
-            val favoriteStatus = FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey)
+            val favoriteStatus = favoritesService.getFavoriteStatus(noiseKey)
             if (favoriteStatus?.peerNostrPublicKey != null) return favoriteStatus.peerNostrPublicKey
 
             // 3) Prefix match on noiseHex from 16-hex peerID
             if (peerID.length == 16) {
-                val fallbackStatus = FavoritesPersistenceService.shared.getFavoriteStatus(peerID)
+                val fallbackStatus = favoritesService.getFavoriteStatus(peerID)
                 return fallbackStatus?.peerNostrPublicKey
             }
             

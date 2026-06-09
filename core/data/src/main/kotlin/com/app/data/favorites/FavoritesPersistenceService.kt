@@ -6,6 +6,9 @@ import android.content.Context
 import android.util.Log
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.common.serialization.JsonConfig
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import com.app.transport.nostr.Bech32
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.MapSerializer
@@ -62,30 +65,16 @@ interface FavoritesChangeListener {
 
 /**
  * Manages favorites with Noise↔Nostr mapping
- * Singleton pattern matching iOS implementation.
+ * Graph-constructed singleton — injected via Metro @DependencyGraph.
  */
-class FavoritesPersistenceService private constructor(private val context: Context) {
+@SingleIn(AppScope::class)
+@Inject
+class FavoritesPersistenceService(private val context: Context) {
 
     companion object {
         private const val TAG = "FavoritesPersistenceService"
-        private const val FAVORITES_KEY = "favorite_relationships"            // noiseHex -> relationship
-        private const val PEERID_INDEX_KEY = "favorite_peerid_index"         // peerID(16-hex) -> npub
-
-        @Volatile
-        private var INSTANCE: FavoritesPersistenceService? = null
-
-        val shared: FavoritesPersistenceService
-            get() = INSTANCE ?: throw IllegalStateException("FavoritesPersistenceService not initialized")
-
-        fun initialize(context: Context) {
-            if (INSTANCE == null) {
-                synchronized(this) {
-                    if (INSTANCE == null) {
-                        INSTANCE = FavoritesPersistenceService(context.applicationContext)
-                    }
-                }
-            }
-        }
+        private const val FAVORITES_KEY = "favorite_relationships"      // noiseHex -> relationship
+        private const val PEERID_INDEX_KEY = "favorite_peerid_index"    // peerID(16-hex) -> npub
     }
 
     private val stateManager = SecureIdentityStateManager(context)

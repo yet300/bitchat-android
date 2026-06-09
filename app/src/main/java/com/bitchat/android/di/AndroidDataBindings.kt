@@ -47,13 +47,6 @@ object AndroidDataBindings {
 
     @Provides
     @SingleIn(AppScope::class)
-    fun provideFavoritesPersistenceService(context: Context): FavoritesPersistenceService {
-        FavoritesPersistenceService.initialize(context)
-        return FavoritesPersistenceService.shared
-    }
-
-    @Provides
-    @SingleIn(AppScope::class)
     fun provideEncryptionService(context: Context, peerFingerprintManager: PeerFingerprintManager): EncryptionService = EncryptionService(context, peerFingerprintManager)
 
     @Provides
@@ -82,6 +75,7 @@ object AndroidDataBindings {
         nostrTransport: NostrTransport,
         geohashConversationRegistry: GeohashConversationRegistry,
         geohashAliasRegistry: GeohashAliasRegistry,
+        favoritesService: FavoritesPersistenceService,
     ): MessageRouter =
-        MessageRouter.getInstance(context, mesh, nostrTransport, geohashConversationRegistry, geohashAliasRegistry)
+        MessageRouter.getInstance(context, mesh, nostrTransport, geohashConversationRegistry, geohashAliasRegistry, favoritesService)
 }

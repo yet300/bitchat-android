@@ -35,6 +35,7 @@ class VerificationHandler(
     private val notificationManager: NotificationManager,
     private val messageManager: MessageManager,
     private val geohashAliasRegistry: GeohashAliasRegistry,
+    private val favoritesService: FavoritesPersistenceService,
 ) {
     // Helper to get current mesh service (may change after panic clear)
     private val meshService: BluetoothMeshService
@@ -202,7 +203,7 @@ class VerificationHandler(
                         return fingerprintFromNoiseHex(noiseHex)?.also { identityManager.cacheNoiseFingerprint(noiseHex, it) }
                     }
                     val favorite = try {
-                        FavoritesPersistenceService.shared.getFavoriteStatus(peerID)
+                        favoritesService.getFavoriteStatus(peerID)
                     } catch (_: Exception) {
                         null
                     }
@@ -211,7 +212,7 @@ class VerificationHandler(
                 peerID.startsWith("nostr_") -> {
                     val pubHex = geohashAliasRegistry.get(peerID)
                     val noiseKey = pubHex?.let {
-                        FavoritesPersistenceService.shared.findNoiseKey(it)
+                        favoritesService.findNoiseKey(it)
                     }
                     noiseKey?.let {
                         val noiseHex = it.hexEncodedString()
@@ -225,7 +226,7 @@ class VerificationHandler(
                         .values
                         .firstOrNull { it.lowercase().startsWith(prefix) }
                     val noiseKey = pubHex?.let {
-                        FavoritesPersistenceService.shared.findNoiseKey(it)
+                        favoritesService.findNoiseKey(it)
                     }
                     noiseKey?.let {
                         val noiseHex = it.hexEncodedString()
@@ -241,7 +242,7 @@ class VerificationHandler(
                         return fingerprintFromNoiseHex(noiseHex)?.also { identityManager.cacheNoiseFingerprint(noiseHex, it) }
                     }
                     val favorite = try {
-                        FavoritesPersistenceService.shared.getFavoriteStatus(peerID)
+                        favoritesService.getFavoriteStatus(peerID)
                     } catch (_: Exception) {
                         null
                     }
@@ -273,14 +274,14 @@ class VerificationHandler(
                 peerID.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
             } catch (_: Exception) { null }
             val favorite = noiseKeyBytes?.let {
-                FavoritesPersistenceService.shared.getFavoriteStatus(it)
+                favoritesService.getFavoriteStatus(it)
             }
             favorite?.peerNickname?.takeIf { it.isNotBlank() }?.let { return it }
         }
 
         if (peerID.length == 16 && peerID.matches(hexRegex)) {
             val favorite = try {
-                FavoritesPersistenceService.shared.getFavoriteStatus(peerID)
+                favoritesService.getFavoriteStatus(peerID)
             } catch (_: Exception) {
                 null
             }
