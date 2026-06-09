@@ -1,7 +1,7 @@
 package com.bitchat.android.di
 
 import android.content.Context
-import com.app.common.appSettings
+import com.app.data.appSettings
 import com.app.crypto.EncryptionService
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.identity.SecureIdentityStateManager

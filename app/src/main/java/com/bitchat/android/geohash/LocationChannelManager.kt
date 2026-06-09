@@ -8,7 +8,7 @@ import android.location.Location
 import android.location.LocationManager
 import android.util.Log
 import androidx.core.app.ActivityCompat
-import com.app.common.appSettings
+import com.app.data.appSettings
 import com.app.common.geohash.Geohash
 import com.app.common.serialization.JsonConfig
 import com.google.android.gms.common.ConnectionResult

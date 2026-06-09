@@ -1,7 +1,7 @@
 package com.bitchat.android.onboarding
 
 import android.content.Context
-import com.app.common.appSettings
+import com.app.data.appSettings
 
 /**
  * Preference manager for background location skip choice.

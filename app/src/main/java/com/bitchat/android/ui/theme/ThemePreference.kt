@@ -1,7 +1,7 @@
 package com.bitchat.android.ui.theme
 
 import android.content.Context
-import com.app.common.appSettings
+import com.app.data.appSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
