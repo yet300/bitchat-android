@@ -120,6 +120,7 @@ class MainActivity : OrientationAwareActivity() {
             appGraph.seenMessageStore,
             appGraph.transferProgressManager,
             appGraph.meshGraphService,
+            appGraph.peerFingerprintManager,
         )
         bluetoothStatusManager = BluetoothStatusManager(
             activity = this,

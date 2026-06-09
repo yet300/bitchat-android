@@ -1,40 +1,33 @@
 package com.app.crypto.identity
 
 import android.util.Log
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Centralized peer fingerprint management singleton
- * 
- * This class manages all peer fingerprint storage and retrieval operations, 
+ *
+ * This class manages all peer fingerprint storage and retrieval operations,
  * providing a single source of truth for peer identity across the entire application.
- * 
- * Fingerprints are SHA-256 hashes of peer static public keys and are only stored 
+ *
+ * Fingerprints are SHA-256 hashes of peer static public keys and are only stored
  * after successful Noise handshake session establishment.
- * 
+ *
  * Key Design Principles:
  * - Thread-safe operations using ConcurrentHashMap
- * - Bidirectional mapping (peerID ↔ fingerprint) 
+ * - Bidirectional mapping (peerID ↔ fingerprint)
  * - Support for peer ID rotation while maintaining persistent identity
  * - Centralized logging for debugging identity management
  */
-class PeerFingerprintManager private constructor() {
-    
+@SingleIn(AppScope::class)
+@Inject
+class PeerFingerprintManager {
+
     companion object {
         private const val TAG = "PeerFingerprintManager"
-        
-        @Volatile
-        private var INSTANCE: PeerFingerprintManager? = null
-        
-        /**
-         * Get the singleton instance
-         */
-        fun getInstance(): PeerFingerprintManager {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: PeerFingerprintManager().also { INSTANCE = it }
-            }
-        }
     }
     
     // Bidirectional mapping for efficient lookups

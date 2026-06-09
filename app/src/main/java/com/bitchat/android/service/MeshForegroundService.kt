@@ -132,7 +132,7 @@ class MeshForegroundService : Service() {
         if (existing != null) {
             Log.d("MeshForegroundService", "Using existing BluetoothMeshService from holder")
         } else {
-            val created = MeshServiceHolder.getOrCreate(applicationContext, appGraph.debugSettingsManager, appGraph.debugPreferenceManager, appGraph.seenMessageStore, appGraph.transferProgressManager, appGraph.meshGraphService)
+            val created = MeshServiceHolder.getOrCreate(applicationContext, appGraph.debugSettingsManager, appGraph.debugPreferenceManager, appGraph.seenMessageStore, appGraph.transferProgressManager, appGraph.meshGraphService, appGraph.peerFingerprintManager)
             Log.i("MeshForegroundService", "Created new BluetoothMeshService via holder")
             MeshServiceHolder.attach(created)
         }
@@ -232,7 +232,7 @@ class MeshForegroundService : Service() {
         if (!hasBluetoothPermissions()) return
         try {
             android.util.Log.d("MeshForegroundService", "Ensuring mesh service is started")
-            val service = MeshServiceHolder.getOrCreate(applicationContext, appGraph.debugSettingsManager, appGraph.debugPreferenceManager, appGraph.seenMessageStore, appGraph.transferProgressManager, appGraph.meshGraphService)
+            val service = MeshServiceHolder.getOrCreate(applicationContext, appGraph.debugSettingsManager, appGraph.debugPreferenceManager, appGraph.seenMessageStore, appGraph.transferProgressManager, appGraph.meshGraphService, appGraph.peerFingerprintManager)
             service.startServices()
         } catch (e: Exception) {
             android.util.Log.e("MeshForegroundService", "Failed to start mesh service: ${e.message}")

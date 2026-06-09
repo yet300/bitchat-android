@@ -3,6 +3,7 @@ package com.app.transport.mesh
 import android.content.Context
 import android.util.Log
 import com.app.crypto.EncryptionService
+import com.app.crypto.identity.PeerFingerprintManager
 import com.app.transport.model.BitchatMessage
 import com.app.transport.model.RoutedPacket
 import com.app.transport.model.IdentityAnnouncement
@@ -46,6 +47,7 @@ class BluetoothMeshService(
     private val seenMessageStore: SeenMessageStore,
     private val transferProgressManager: TransferProgressManager,
     private val meshGraphService: MeshGraphService,
+    private val peerFingerprintManager: PeerFingerprintManager,
 ) {
     private val debugManager = debugSettingsManager
     
@@ -55,11 +57,11 @@ class BluetoothMeshService(
     }
     
     // Core components - each handling specific responsibilities
-    private val encryptionService = EncryptionService(context)
+    private val encryptionService = EncryptionService(context, peerFingerprintManager)
 
     // My peer identification - derived from persisted Noise identity fingerprint (first 16 hex chars)
     val myPeerID: String = encryptionService.getIdentityFingerprint().take(16)
-    private val peerManager = PeerManager()
+    private val peerManager = PeerManager(peerFingerprintManager)
     private val fragmentManager = FragmentManager()
     private val securityManager = SecurityManager(encryptionService, myPeerID)
     private val storeForwardManager = StoreForwardManager()

@@ -99,6 +99,8 @@ class ChatViewModel(
         (application as BitchatApplication).appGraph.transferProgressManager
     private val nostrTransport =
         (application as BitchatApplication).appGraph.nostrTransport
+    private val peerFingerprintManager =
+        (application as BitchatApplication).appGraph.peerFingerprintManager
     private val identityManager by lazy { SecureIdentityStateManager(getApplication()) }
     private val messageManager = MessageManager(state, appStateStore)
     private val channelManager = ChannelManager(state, messageManager, dataManager, viewModelScope)
@@ -110,7 +112,7 @@ class ChatViewModel(
         override fun getMyPeerID(): String = meshService.myPeerID
     }
 
-    val privateChatManager = PrivateChatManager(state, messageManager, dataManager, noiseSessionDelegate)
+    val privateChatManager = PrivateChatManager(state, messageManager, dataManager, noiseSessionDelegate, peerFingerprintManager)
     private val commandProcessor = CommandProcessor(state, messageManager, channelManager, privateChatManager)
     private val notificationManager = NotificationManager(
       application.applicationContext,
@@ -999,6 +1001,7 @@ class ChatViewModel(
             appGraph.seenMessageStore,
             appGraph.transferProgressManager,
             appGraph.meshGraphService,
+            appGraph.peerFingerprintManager,
         )
 
         // Replace our reference and set up the new service

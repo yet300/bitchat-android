@@ -18,7 +18,10 @@ import java.util.concurrent.ConcurrentHashMap
  * - Channel encryption using password-derived keys
  * - Peer fingerprint mapping and identity persistence
  */
-class NoiseEncryptionService(private val context: Context) {
+class NoiseEncryptionService(
+    private val context: Context,
+    private val fingerprintManager: PeerFingerprintManager,
+) {
     
     companion object {
         private const val TAG = "NoiseEncryptionService"
@@ -44,10 +47,7 @@ class NoiseEncryptionService(private val context: Context) {
     
     // Identity management for peer ID rotation support
     private val identityStateManager: SecureIdentityStateManager
-    
-    // Centralized fingerprint management - NO LOCAL STORAGE
-    private val fingerprintManager = PeerFingerprintManager.getInstance()
-    
+
     // Callbacks
     var onPeerAuthenticated: ((String, String) -> Unit)? = null // (peerID, fingerprint)
     var onHandshakeRequired: ((String) -> Unit)? = null // peerID needs handshake

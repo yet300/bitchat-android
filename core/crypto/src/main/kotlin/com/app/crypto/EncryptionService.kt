@@ -3,6 +3,7 @@ package com.app.crypto
 import android.content.Context
 import android.util.Base64
 import android.util.Log
+import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.secure.SecureKeyValueStore
 import com.app.crypto.secure.TinkSecureKeyValueStore
 import com.app.crypto.noise.NoiseEncryptionService
@@ -22,7 +23,10 @@ import java.util.concurrent.ConcurrentHashMap
  * This is the main interface for all encryption/decryption operations in bitchat.
  * It now uses the Noise protocol for secure transport encryption with proper session management.
  */
-open class EncryptionService(private val context: Context) {
+open class EncryptionService(
+    private val context: Context,
+    private val peerFingerprintManager: PeerFingerprintManager,
+) {
     
     companion object {
         private const val TAG = "EncryptionService"
@@ -31,7 +35,7 @@ open class EncryptionService(private val context: Context) {
     }
     
     // Core Noise encryption service
-    private val noiseService: NoiseEncryptionService by lazy { NoiseEncryptionService(context) }
+    private val noiseService: NoiseEncryptionService by lazy { NoiseEncryptionService(context, peerFingerprintManager) }
     
     // Session tracking for established connections
     private val establishedSessions = ConcurrentHashMap<String, String>() // peerID -> fingerprint
