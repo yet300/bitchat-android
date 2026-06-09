@@ -37,8 +37,12 @@ import kotlinx.coroutines.*
  * - BluetoothConnectionManager: BLE connections and GATT operations
  * - PacketProcessor: Incoming packet routing
  */
-class BluetoothMeshService(private val context: Context) {
-    private val debugManager by lazy { try { com.app.transport.debug.DebugSettingsManager.getInstance() } catch (e: Exception) { null } }
+class BluetoothMeshService(
+    private val context: Context,
+    private val debugSettingsManager: com.app.transport.debug.DebugSettingsManager,
+    private val debugPreferenceManager: com.app.transport.debug.DebugPreferenceManager,
+) {
+    private val debugManager = debugSettingsManager
     
     companion object {
         private const val TAG = "BluetoothMeshService"
@@ -55,8 +59,8 @@ class BluetoothMeshService(private val context: Context) {
     private val securityManager = SecurityManager(encryptionService, myPeerID)
     private val storeForwardManager = StoreForwardManager()
     private val messageHandler = MessageHandler(myPeerID, context.applicationContext)
-    val connectionManager = BluetoothConnectionManager(context, myPeerID, fragmentManager) // Made internal for access
-    private val packetProcessor = PacketProcessor(myPeerID)
+    val connectionManager = BluetoothConnectionManager(context, myPeerID, debugSettingsManager, fragmentManager) // Made internal for access
+    private val packetProcessor = PacketProcessor(myPeerID, debugSettingsManager)
     private lateinit var gossipSyncManager: GossipSyncManager
 
     // Service-level notifier for background (no-UI) DMs. The Android implementation
@@ -104,15 +108,15 @@ class BluetoothMeshService(private val context: Context) {
             scope = serviceScope,
             configProvider = object : GossipSyncManager.ConfigProvider {
                 override fun seenCapacity(): Int = try {
-                    com.app.transport.debug.DebugPreferenceManager.getSeenPacketCapacity(500)
+                    debugPreferenceManager.getSeenPacketCapacity(500)
                 } catch (_: Exception) { 500 }
 
                 override fun gcsMaxBytes(): Int = try {
-                    com.app.transport.debug.DebugPreferenceManager.getGcsMaxFilterBytes(400)
+                    debugPreferenceManager.getGcsMaxFilterBytes(400)
                 } catch (_: Exception) { 400 }
 
                 override fun gcsTargetFpr(): Double = try {
-                    com.app.transport.debug.DebugPreferenceManager.getGcsFprPercent(1.0) / 100.0
+                    debugPreferenceManager.getGcsFprPercent(1.0) / 100.0
                 } catch (_: Exception) { 0.01 }
             }
         )
@@ -576,7 +580,7 @@ class BluetoothMeshService(private val context: Context) {
         override fun onPacketReceived(packet: BitchatPacket, peerID: String, device: android.bluetooth.BluetoothDevice?) {
             // Log incoming for debug graphs (do not double-count anywhere else)
             try {
-                com.app.transport.debug.DebugSettingsManager.getInstance().logIncoming(
+                debugManager.logIncoming(
                     packet = packet,
                     fromPeerID = peerID,
                     fromNickname = null,
@@ -599,7 +603,7 @@ class BluetoothMeshService(private val context: Context) {
                     val addr = device.address
                     val peer = connectionManager.addressPeerMap[addr]
                     val nick = peer?.let { peerManager.getPeerNickname(it) } ?: "unknown"
-                    com.app.transport.debug.DebugSettingsManager.getInstance()
+                    debugManager
                         .logPeerConnection(peer ?: "unknown", nick, addr, isInbound = !connectionManager.isClientConnection(addr)!!)
                 } catch (_: Exception) { }
             }
@@ -619,7 +623,7 @@ class BluetoothMeshService(private val context: Context) {
                     // Verbose debug: device disconnected
                     try {
                         val nick = peerManager.getPeerNickname(peer) ?: "unknown"
-                        com.app.transport.debug.DebugSettingsManager.getInstance()
+                        debugManager
                             .logPeerDisconnection(peer, nick, addr)
                     } catch (_: Exception) { }
                 }

@@ -16,8 +16,11 @@ import kotlinx.coroutines.channels.actor
  * Prevents race condition where multiple threads process packets
  * from the same peer simultaneously, causing session management conflicts.
  */
-class PacketProcessor(private val myPeerID: String) {
-    private val debugManager by lazy { try { DebugSettingsManager.getInstance() } catch (e: Exception) { null } }
+class PacketProcessor(
+    private val myPeerID: String,
+    private val debugSettingsManager: DebugSettingsManager,
+) {
+    private val debugManager = debugSettingsManager
     
     companion object {
         private const val TAG = "PacketProcessor"
@@ -33,7 +36,7 @@ class PacketProcessor(private val myPeerID: String) {
     }
     
     // Packet relay manager for centralized relay decisions
-    private val packetRelayManager = PacketRelayManager(myPeerID)
+    private val packetRelayManager = PacketRelayManager(myPeerID, debugSettingsManager)
     
     // Coroutines
     private val processorScope = CoroutineScope(Dispatchers.IO + SupervisorJob())

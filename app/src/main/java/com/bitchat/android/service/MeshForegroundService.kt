@@ -13,6 +13,7 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import com.bitchat.android.BitchatApplication
 import com.bitchat.android.MainActivity
 import com.bitchat.android.R
 import com.app.transport.mesh.BluetoothMeshService
@@ -115,6 +116,7 @@ class MeshForegroundService : Service() {
     private var updateJob: Job? = null
     private val meshService: BluetoothMeshService?
         get() = MeshServiceHolder.meshService
+    private val appGraph get() = (application as BitchatApplication).appGraph
     private val serviceJob = Job()
     private val scope = CoroutineScope(Dispatchers.Default + serviceJob)
     private var isInForeground: Boolean = false
@@ -130,7 +132,7 @@ class MeshForegroundService : Service() {
         if (existing != null) {
             Log.d("MeshForegroundService", "Using existing BluetoothMeshService from holder")
         } else {
-            val created = MeshServiceHolder.getOrCreate(applicationContext)
+            val created = MeshServiceHolder.getOrCreate(applicationContext, appGraph.debugSettingsManager, appGraph.debugPreferenceManager)
             Log.i("MeshForegroundService", "Created new BluetoothMeshService via holder")
             MeshServiceHolder.attach(created)
         }
@@ -229,7 +231,7 @@ class MeshForegroundService : Service() {
         if (!hasBluetoothPermissions()) return
         try {
             android.util.Log.d("MeshForegroundService", "Ensuring mesh service is started")
-            val service = MeshServiceHolder.getOrCreate(applicationContext)
+            val service = MeshServiceHolder.getOrCreate(applicationContext, appGraph.debugSettingsManager, appGraph.debugPreferenceManager)
             service.startServices()
         } catch (e: Exception) {
             android.util.Log.e("MeshForegroundService", "Failed to start mesh service: ${e.message}")

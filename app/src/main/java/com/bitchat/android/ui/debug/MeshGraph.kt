@@ -15,7 +15,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import com.bitchat.android.BitchatApplication
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.app.transport.meshgraph.MeshGraphService
@@ -221,7 +223,8 @@ fun ForceDirectedMeshGraph(
     val colorScheme = MaterialTheme.colorScheme
     
     // Listen for visual events
-    val debugManager = remember { DebugSettingsManager.getInstance() }
+    val appContext = LocalContext.current.applicationContext
+    val debugManager = remember { (appContext as BitchatApplication).appGraph.debugSettingsManager }
     LaunchedEffect(Unit) {
         debugManager.meshVisualEvents.collect { event ->
             when (event) {

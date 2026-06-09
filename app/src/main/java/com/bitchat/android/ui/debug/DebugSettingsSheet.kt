@@ -1,5 +1,6 @@
 package com.bitchat.android.ui.debug
 
+import com.bitchat.android.BitchatApplication
 import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.debug.ConnectedDevice
 import com.app.transport.debug.ConnectionType
@@ -101,7 +102,8 @@ fun DebugSettingsSheet(
     meshService: BluetoothMeshService
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val manager = remember { DebugSettingsManager.getInstance() }
+    val appContext = LocalContext.current.applicationContext
+    val manager = remember { (appContext as BitchatApplication).appGraph.debugSettingsManager }
 
     val verboseLogging by manager.verboseLoggingEnabled.collectAsState()
     val gattServerEnabled by manager.gattServerEnabled.collectAsState()
@@ -165,9 +167,9 @@ fun DebugSettingsSheet(
         onDismissRequest = onDismiss,
     ) {
         // Mark debug sheet visible/invisible to gate heavy work
-        LaunchedEffect(Unit) { DebugSettingsManager.getInstance().setDebugSheetVisible(true) }
+        LaunchedEffect(Unit) { manager.setDebugSheetVisible(true) }
         DisposableEffect(Unit) {
-            onDispose { DebugSettingsManager.getInstance().setDebugSheetVisible(false) }
+            onDispose { manager.setDebugSheetVisible(false) }
         }
         Box(modifier = Modifier.fillMaxWidth()) {
             LazyColumn(

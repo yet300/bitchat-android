@@ -113,7 +113,11 @@ class MainActivity : OrientationAwareActivity() {
         permissionManager = PermissionManager(this)
         // Ensure foreground service is running and get mesh instance from holder
         try { com.bitchat.android.service.MeshForegroundService.start(applicationContext) } catch (_: Exception) { }
-        meshService = com.bitchat.android.service.MeshServiceHolder.getOrCreate(applicationContext)
+        meshService = com.bitchat.android.service.MeshServiceHolder.getOrCreate(
+            applicationContext,
+            (application as BitchatApplication).appGraph.debugSettingsManager,
+            (application as BitchatApplication).appGraph.debugPreferenceManager,
+        )
         bluetoothStatusManager = BluetoothStatusManager(
             activity = this,
             context = this,

@@ -45,7 +45,8 @@ class BluetoothPacketBroadcaster(
     private val connectionScope: CoroutineScope,
     private val connectionTracker: BluetoothConnectionTracker,
     private val fragmentManager: FragmentManager?,
-    private val myPeerID: String
+    private val myPeerID: String,
+    private val debugSettingsManager: DebugSettingsManager
 ) {
     
     companion object {
@@ -78,7 +79,7 @@ class BluetoothPacketBroadcaster(
         try {
             val fromNick = incomingPeer?.let { nicknameResolver?.invoke(it) }
             val toNick = toPeer?.let { nicknameResolver?.invoke(it) }
-            val manager = DebugSettingsManager.getInstance()
+            val manager = debugSettingsManager
             // Always log outgoing for the actual transmission target
             manager.logOutgoing(
                 packetType = typeName,
