@@ -43,6 +43,7 @@ class BluetoothMeshService(
     private val debugSettingsManager: com.app.transport.debug.DebugSettingsManager,
     private val debugPreferenceManager: com.app.transport.debug.DebugPreferenceManager,
     private val seenMessageStore: SeenMessageStore,
+    private val transferProgressManager: TransferProgressManager,
 ) {
     private val debugManager = debugSettingsManager
     
@@ -61,7 +62,7 @@ class BluetoothMeshService(
     private val securityManager = SecurityManager(encryptionService, myPeerID)
     private val storeForwardManager = StoreForwardManager()
     private val messageHandler = MessageHandler(myPeerID, context.applicationContext)
-    val connectionManager = BluetoothConnectionManager(context, myPeerID, debugSettingsManager, fragmentManager) // Made internal for access
+    val connectionManager = BluetoothConnectionManager(context, myPeerID, debugSettingsManager, fragmentManager, transferProgressManager) // Made internal for access
     private val packetProcessor = PacketProcessor(myPeerID, debugSettingsManager)
     private lateinit var gossipSyncManager: GossipSyncManager
 

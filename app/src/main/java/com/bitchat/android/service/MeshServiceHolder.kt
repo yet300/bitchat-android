@@ -5,6 +5,7 @@ import com.app.data.favorites.FavoritesPersistenceService
 import com.app.data.routing.MessageRouter
 import com.app.transport.GeohashReadReceiptRouter
 import com.app.transport.SeenMessageStore
+import com.app.transport.mesh.TransferProgressManager
 import com.app.transport.debug.DebugPreferenceManager
 import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.mesh.BluetoothMeshService
@@ -27,6 +28,7 @@ object MeshServiceHolder {
         debugSettingsManager: DebugSettingsManager,
         debugPreferenceManager: DebugPreferenceManager,
         seenMessageStore: SeenMessageStore,
+        transferProgressManager: TransferProgressManager,
     ): BluetoothMeshService {
         val existing = meshService
         if (existing != null) {
@@ -41,19 +43,19 @@ object MeshServiceHolder {
                     try { existing.stopServices() } catch (e: Exception) {
                         android.util.Log.w(TAG, "Error while stopping non-reusable instance: ${e.message}")
                     }
-                    val created = configure(BluetoothMeshService(context.applicationContext, debugSettingsManager, debugPreferenceManager, seenMessageStore), context)
+                    val created = configure(BluetoothMeshService(context.applicationContext, debugSettingsManager, debugPreferenceManager, seenMessageStore, transferProgressManager), context)
                     android.util.Log.i(TAG, "Created new BluetoothMeshService (replacement)")
                     meshService = created
                     created
                 }
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "Error checking service reusability; creating new instance: ${e.message}")
-                val created = configure(BluetoothMeshService(context.applicationContext, debugSettingsManager, debugPreferenceManager, seenMessageStore), context)
+                val created = configure(BluetoothMeshService(context.applicationContext, debugSettingsManager, debugPreferenceManager, seenMessageStore, transferProgressManager), context)
                 meshService = created
                 created
             }
         }
-        val created = configure(BluetoothMeshService(context.applicationContext, debugSettingsManager, debugPreferenceManager, seenMessageStore), context)
+        val created = configure(BluetoothMeshService(context.applicationContext, debugSettingsManager, debugPreferenceManager, seenMessageStore, transferProgressManager), context)
         android.util.Log.i(TAG, "Created new BluetoothMeshService (no existing instance)")
         meshService = created
         return created

@@ -96,6 +96,8 @@ class ChatViewModel(
         (application as BitchatApplication).appGraph.appStateStore
     private val seenMessageStore =
         (application as BitchatApplication).appGraph.seenMessageStore
+    private val transferProgressManager =
+        (application as BitchatApplication).appGraph.transferProgressManager
     private val identityManager by lazy { SecureIdentityStateManager(getApplication()) }
     private val messageManager = MessageManager(state, appStateStore)
     private val channelManager = ChannelManager(state, messageManager, dataManager, viewModelScope)
@@ -236,7 +238,7 @@ class ChatViewModel(
         }
         // Subscribe to BLE transfer progress and reflect in message deliveryStatus
         viewModelScope.launch {
-            com.app.transport.mesh.TransferProgressManager.events.collect { evt ->
+            transferProgressManager.events.collect { evt ->
                 mediaSendingManager.handleTransferProgressEvent(evt)
             }
         }
@@ -994,6 +996,7 @@ class ChatViewModel(
             appGraph.debugSettingsManager,
             appGraph.debugPreferenceManager,
             appGraph.seenMessageStore,
+            appGraph.transferProgressManager,
         )
 
         // Replace our reference and set up the new service
