@@ -8,6 +8,9 @@ import com.app.data.favorites.FavoritesPersistenceService
 import com.app.transport.NostrConstants
 import com.app.transport.model.ReadReceipt
 import com.app.transport.model.NoisePayloadType
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.*
 import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -16,23 +19,17 @@ import java.util.concurrent.ConcurrentLinkedQueue
  * Minimal Nostr transport for offline sending
  * Direct port from iOS NostrTransport for 100% compatibility
  */
+@SingleIn(AppScope::class)
+@Inject
 class NostrTransport(
     private val context: Context,
-    var senderPeerID: String = ""
+    private val relayManager: NostrRelayManager,
 ) {
-    
+    var senderPeerID: String = ""
+
     companion object {
         private const val TAG = "NostrTransport"
         private const val READ_ACK_INTERVAL = NostrConstants.READ_ACK_INTERVAL_MS // ~3 per second (0.35s interval like iOS)
-        
-        @Volatile
-        private var INSTANCE: NostrTransport? = null
-        
-        fun getInstance(context: Context): NostrTransport {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: NostrTransport(context.applicationContext).also { INSTANCE = it }
-            }
-        }
     }
     
     // Throttle READ receipts to avoid relay rate limits (like iOS)
@@ -123,7 +120,7 @@ class NostrTransport(
                 
                 giftWraps.forEach { event ->
                     Log.d(TAG, "NostrTransport: sending PM giftWrap id=${event.id.take(16)}...")
-                    NostrRelayManager.getInstance(context).sendEvent(event)
+                    relayManager.sendEvent(event)
                 }
                 
             } catch (e: Exception) {
@@ -209,7 +206,7 @@ class NostrTransport(
                 
                 giftWraps.forEach { event ->
                     Log.d(TAG, "NostrTransport: sending READ ack giftWrap id=${event.id.take(16)}...")
-                    NostrRelayManager.getInstance(context).sendEvent(event)
+                    relayManager.sendEvent(event)
                 }
                 
                 scheduleNextReadAck()
@@ -281,7 +278,7 @@ class NostrTransport(
                 
                 giftWraps.forEach { event ->
                     Log.d(TAG, "NostrTransport: sending favorite giftWrap id=${event.id.take(16)}...")
-                    NostrRelayManager.getInstance(context).sendEvent(event)
+                    relayManager.sendEvent(event)
                 }
                 
             } catch (e: Exception) {
@@ -339,7 +336,7 @@ class NostrTransport(
                 
                 giftWraps.forEach { event ->
                     Log.d(TAG, "NostrTransport: sending DELIVERED ack giftWrap id=${event.id.take(16)}...")
-                    NostrRelayManager.getInstance(context).sendEvent(event)
+                    relayManager.sendEvent(event)
                 }
                 
             } catch (e: Exception) {
@@ -376,7 +373,7 @@ class NostrTransport(
                 // Register pending gift wrap for deduplication and send all
                 giftWraps.forEach { event ->
                     NostrRelayManager.registerPendingGiftWrap(event.id)
-                    NostrRelayManager.getInstance(context).sendEvent(event)
+                    relayManager.sendEvent(event)
                 }
                 
             } catch (e: Exception) {
@@ -411,7 +408,7 @@ class NostrTransport(
                 // Register pending gift wrap for deduplication and send all
                 giftWraps.forEach { event ->
                     NostrRelayManager.registerPendingGiftWrap(event.id)
-                    NostrRelayManager.getInstance(context).sendEvent(event)
+                    relayManager.sendEvent(event)
                 }
                 
             } catch (e: Exception) {
@@ -473,7 +470,7 @@ class NostrTransport(
                 giftWraps.forEach { event ->
                     Log.d(TAG, "NostrTransport: sending geohash PM giftWrap id=${event.id.take(16)}...")
                     NostrRelayManager.registerPendingGiftWrap(event.id)
-                    NostrRelayManager.getInstance(context).sendEvent(event)
+                    relayManager.sendEvent(event)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send geohash private message: ${e.message}")

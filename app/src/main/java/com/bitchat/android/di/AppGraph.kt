@@ -18,8 +18,10 @@ import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.nostr.GeohashConversationRegistry
 import com.app.transport.net.TorPreferenceManager
+import com.app.transport.nostr.NostrRelayManager
 import com.app.transport.nostr.PoWPreferenceManager
 import com.app.transport.nostr.RelayDirectory
+import com.app.data.nostr.NostrTransport
 
 /**
  * Public API of the application dependency graph: the domain ports the app (and, in Phase C, the
@@ -53,4 +55,6 @@ interface AppGraph {
     val seenMessageStore: SeenMessageStore
     val transferProgressManager: TransferProgressManager
     val meshGraphService: MeshGraphService
+    val nostrRelayManager: NostrRelayManager
+    val nostrTransport: NostrTransport
 }

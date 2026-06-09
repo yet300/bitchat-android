@@ -6,6 +6,7 @@ import com.app.crypto.EncryptionService
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.data.favorites.FavoritesPersistenceService
+import com.app.data.nostr.NostrTransport
 import com.app.data.routing.MessageRouter
 import com.app.transport.SeenMessageStore
 import com.app.transport.mesh.TransferProgressManager
@@ -76,8 +77,9 @@ object AndroidDataBindings {
     fun provideMessageRouter(
         context: Context,
         mesh: BluetoothMeshService,
+        nostrTransport: NostrTransport,
         geohashConversationRegistry: GeohashConversationRegistry,
         geohashAliasRegistry: GeohashAliasRegistry,
     ): MessageRouter =
-        MessageRouter.getInstance(context, mesh, geohashConversationRegistry, geohashAliasRegistry)
+        MessageRouter.getInstance(context, mesh, nostrTransport, geohashConversationRegistry, geohashAliasRegistry)
 }

@@ -669,7 +669,8 @@ class MainActivity : OrientationAwareActivity() {
                 // Initialize Location Notes Manager (extracted to separate file)
                 com.app.transport.nostr.LocationNotesInitializer.initialize(
                     this@MainActivity,
-                    (application as BitchatApplication).appGraph.relayDirectory
+                    (application as BitchatApplication).appGraph.relayDirectory,
+                    (application as BitchatApplication).appGraph.nostrRelayManager,
                 )
                 
                 // Ensure all permissions are still granted (user might have revoked in settings)

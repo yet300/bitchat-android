@@ -14,7 +14,6 @@ import com.app.crypto.noise.NoiseSession
 import com.app.transport.model.BitchatMessage
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.data.nostr.CurrentGeohashSource
-import com.app.data.nostr.NostrTransport
 import com.app.data.routing.MessageRouter
 import com.app.transport.mesh.BluetoothMeshDelegate
 import com.app.transport.mesh.BluetoothMeshService
@@ -98,6 +97,8 @@ class ChatViewModel(
         (application as BitchatApplication).appGraph.seenMessageStore
     private val transferProgressManager =
         (application as BitchatApplication).appGraph.transferProgressManager
+    private val nostrTransport =
+        (application as BitchatApplication).appGraph.nostrTransport
     private val identityManager by lazy { SecureIdentityStateManager(getApplication()) }
     private val messageManager = MessageManager(state, appStateStore)
     private val channelManager = ChannelManager(state, messageManager, dataManager, viewModelScope)
@@ -311,7 +312,6 @@ class ChatViewModel(
 
         // Ensure NostrTransport knows our mesh peer ID for embedded packets
         try {
-            val nostrTransport = NostrTransport.getInstance(getApplication())
             nostrTransport.senderPeerID = meshService.myPeerID
             nostrTransport.currentGeohashSource = CurrentGeohashSource {
                 (LocationChannelManager.getInstance(getApplication()).selectedChannel.value
@@ -548,6 +548,7 @@ class ChatViewModel(
                 val router = MessageRouter.getInstance(
                     getApplication(),
                     meshService,
+                    nostrTransport,
                     geohashConversationRegistry,
                     geohashAliasRegistry
                 )
@@ -659,7 +660,6 @@ class ChatViewModel(
                             java.util.UUID.randomUUID().toString()
                         )
                     } else {
-                        val nostrTransport = NostrTransport.getInstance(getApplication())
                         nostrTransport.senderPeerID = meshService.myPeerID
                         nostrTransport.sendFavoriteNotification(peerID, isNowFavorite)
                     }
@@ -713,6 +713,7 @@ class ChatViewModel(
                     .getInstance(
                         getApplication(),
                         meshService,
+                        nostrTransport,
                         geohashConversationRegistry,
                         geohashAliasRegistry
                     )

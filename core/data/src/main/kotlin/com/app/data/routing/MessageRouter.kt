@@ -28,19 +28,17 @@ class MessageRouter private constructor(
         fun getInstance(
             context: Context,
             mesh: BluetoothMeshService,
+            nostrTransport: NostrTransport,
             geohashConversationRegistry: GeohashConversationRegistry,
-            geohashAliasRegistry: GeohashAliasRegistry
+            geohashAliasRegistry: GeohashAliasRegistry,
         ): MessageRouter {
             val instance = INSTANCE ?: synchronized(this) {
-                INSTANCE ?: run {
-                    val nostr = NostrTransport.getInstance(context)
-                    MessageRouter(context.applicationContext, mesh, nostr, geohashConversationRegistry, geohashAliasRegistry).also { instance ->
-                        // Register for favorites changes to flush outbox
-                        try {
-                            FavoritesPersistenceService.shared.addListener(instance.favoriteListener)
-                        } catch (_: Exception) {}
-                        INSTANCE = instance
-                    }
+                INSTANCE ?: MessageRouter(context.applicationContext, mesh, nostrTransport, geohashConversationRegistry, geohashAliasRegistry).also { instance ->
+                    // Register for favorites changes to flush outbox
+                    try {
+                        FavoritesPersistenceService.shared.addListener(instance.favoriteListener)
+                    } catch (_: Exception) {}
+                    INSTANCE = instance
                 }
             }
             // Always update mesh reference and sync peer ID

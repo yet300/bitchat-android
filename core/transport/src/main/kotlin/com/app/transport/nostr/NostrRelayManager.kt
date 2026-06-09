@@ -4,6 +4,9 @@ import android.util.Log
 import com.app.common.serialization.JsonConfig
 import com.app.transport.NostrConstants
 import com.app.transport.net.HttpClientProvider
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import io.ktor.client.plugins.websocket.webSocketSession
@@ -24,20 +27,12 @@ import kotlin.math.pow
  * Manages WebSocket connections to Nostr relays
  * Compatible with iOS implementation with Android-specific optimizations
  */
-class NostrRelayManager private constructor() {
-    
+@SingleIn(AppScope::class)
+@Inject
+class NostrRelayManager(private val eventDeduplicator: NostrEventDeduplicator) {
+
     companion object {
-        @JvmStatic
-        val shared = NostrRelayManager()
-        
         private const val TAG = "NostrRelayManager"
-        
-        /**
-         * Get instance for Android compatibility (context-aware calls)
-         */
-        fun getInstance(context: android.content.Context): NostrRelayManager {
-            return shared
-        }
 
         // Default relay list (same as iOS)
         private val DEFAULT_RELAYS = listOf(
@@ -105,9 +100,6 @@ class NostrRelayManager private constructor() {
         val createdAt: Long = System.currentTimeMillis(),
         val originGeohash: String? = null // used for logging and grouping
     )
-    
-    // Event deduplication system
-    private val eventDeduplicator = NostrEventDeduplicator.getInstance()
     
     // Message queue for reliability
     private val messageQueue = mutableListOf<Pair<NostrEvent, List<String>>>()

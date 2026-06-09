@@ -17,7 +17,6 @@ import com.bitchat.android.nostr.GeohashRepository
 import com.bitchat.android.nostr.NostrDirectMessageHandler
 import com.app.transport.nostr.NostrIdentityBridge
 import com.app.transport.nostr.NostrProtocol
-import com.app.transport.nostr.NostrRelayManager
 import com.app.transport.nostr.NostrSubscriptionManager
 import com.bitchat.android.BitchatApplication
 import kotlinx.coroutines.Job
@@ -56,8 +55,12 @@ class GeohashViewModel(
         (application as BitchatApplication).appGraph.relayDirectory
     private val seenMessageStore =
         (application as BitchatApplication).appGraph.seenMessageStore
+    private val nostrRelayManager =
+        (application as BitchatApplication).appGraph.nostrRelayManager
+    private val nostrTransport =
+        (application as BitchatApplication).appGraph.nostrTransport
     private val repo = GeohashRepository(application, state, dataManager)
-    private val subscriptionManager = NostrSubscriptionManager(application, viewModelScope, relayDirectory)
+    private val subscriptionManager = NostrSubscriptionManager(viewModelScope, relayDirectory, nostrRelayManager)
     private val geohashMessageHandler = GeohashMessageHandler(
         application = application,
         state = state,
@@ -79,6 +82,7 @@ class GeohashViewModel(
         geohashConversationRegistry = geohashConversationRegistry,
         geohashAliasRegistry = geohashAliasRegistry,
         seenMessageStore = seenMessageStore,
+        nostrTransport = nostrTransport,
     )
 
     private var currentGeohashSubId: String? = null
@@ -194,7 +198,7 @@ class GeohashViewModel(
         try {
             val identity = NostrIdentityBridge.deriveIdentity(geohash, getApplication())
             val event = NostrProtocol.createGeohashPresenceEvent(geohash, identity)
-            val relayManager = NostrRelayManager.getInstance(getApplication())
+            val relayManager = nostrRelayManager
             // Presence is lightweight, send to geohash relays
             relayManager.sendEventToGeohash(event, geohash, relayDirectory, includeDefaults = false, nRelays = 5)
             Log.v(TAG, "💓 Sent presence heartbeat for $geohash")
@@ -227,7 +231,7 @@ class GeohashViewModel(
                     val identity = NostrIdentityBridge.deriveIdentity(forGeohash = channel.geohash, context = getApplication())
                     val teleported = state.isTeleported.value
                     val event = NostrProtocol.createEphemeralGeohashEvent(content, channel.geohash, identity, powPreferenceManager, nickname, teleported)
-                    val relayManager = NostrRelayManager.getInstance(getApplication())
+                    val relayManager = nostrRelayManager
                     relayManager.sendEventToGeohash(event, channel.geohash, relayDirectory, includeDefaults = false, nRelays = 5)
                 } finally {
                     // Ensure we stop the per-message mining animation regardless of success/failure
