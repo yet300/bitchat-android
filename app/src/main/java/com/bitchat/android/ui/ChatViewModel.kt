@@ -20,6 +20,7 @@ import com.app.data.routing.MessageRouter
 import com.app.transport.mesh.BluetoothMeshDelegate
 import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.nostr.NostrIdentityBridge
+import com.bitchat.android.BitchatApplication
 import com.bitchat.android.service.MeshServiceHolder
 import com.app.transport.VerificationService
 import com.bitchat.android.geohash.ChannelID
@@ -532,7 +533,11 @@ class ChatViewModel(
                 meshService.myPeerID
             ) { messageContent, peerID, recipientNicknameParam, messageId ->
                 // Route via MessageRouter (mesh when connected+established, else Nostr)
-                val router = MessageRouter.getInstance(getApplication(), meshService)
+                val router = MessageRouter.getInstance(
+                    getApplication(),
+                    meshService,
+                    (getApplication() as BitchatApplication).appGraph.geohashConversationRegistry
+                )
                 router.sendPrivate(messageContent, peerID, recipientNicknameParam, messageId)
             }
         } else {
@@ -692,7 +697,11 @@ class ChatViewModel(
             val old = prevStates[peerID]
             if (old != "established" && newState == "established") {
                 MessageRouter
-                    .getInstance(getApplication(), meshService)
+                    .getInstance(
+                        getApplication(),
+                        meshService,
+                        (getApplication() as BitchatApplication).appGraph.geohashConversationRegistry
+                    )
                     .onSessionEstablished(peerID)
             }
         }

@@ -21,7 +21,7 @@ import com.app.transport.nostr.NostrRelayManager
 import com.app.transport.nostr.NostrSubscriptionManager
 import com.app.transport.nostr.PoWPreferenceManager
 import com.app.transport.nostr.GeohashAliasRegistry
-import com.app.transport.nostr.GeohashConversationRegistry
+import com.bitchat.android.BitchatApplication
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
@@ -48,6 +48,8 @@ class GeohashViewModel(
         private val secureRandom = SecureRandom().asKotlinRandom()
     }
 
+    private val geohashConversationRegistry =
+        (application as BitchatApplication).appGraph.geohashConversationRegistry
     private val repo = GeohashRepository(application, state, dataManager)
     private val subscriptionManager = NostrSubscriptionManager(application, viewModelScope)
     private val geohashMessageHandler = GeohashMessageHandler(
@@ -65,7 +67,8 @@ class GeohashViewModel(
         meshDelegateHandler = meshDelegateHandler,
         scope = viewModelScope,
         repo = repo,
-        dataManager = dataManager
+        dataManager = dataManager,
+        geohashConversationRegistry = geohashConversationRegistry
     )
 
     private var currentGeohashSubId: String? = null
@@ -165,7 +168,7 @@ class GeohashViewModel(
     fun panicReset() {
         repo.clearAll()
         GeohashAliasRegistry.clear()
-        GeohashConversationRegistry.clear()
+        geohashConversationRegistry.clear()
         subscriptionManager.disconnect()
         currentGeohashSubId = null
         currentDmSubId = null
@@ -280,7 +283,7 @@ class GeohashViewModel(
         val gh = (current as? com.bitchat.android.geohash.ChannelID.Location)?.channel?.geohash
         if (!gh.isNullOrEmpty()) {
             repo.setConversationGeohash(convKey, gh)
-            GeohashConversationRegistry.set(convKey, gh)
+            geohashConversationRegistry.set(convKey, gh)
         }
         onStartPrivateChat(convKey)
         Log.d(TAG, "🗨️ Started geohash DM with ${pubkeyHex} -> ${convKey} (geohash=${gh})")

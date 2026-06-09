@@ -15,6 +15,7 @@ import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
 import com.app.transport.SeenMessageStore
 import com.bitchat.android.ui.ChatState
+import com.bitchat.android.ui.DataManager
 import com.bitchat.android.ui.MeshDelegateHandler
 import com.bitchat.android.ui.PrivateChatManager
 import kotlinx.coroutines.CoroutineScope
@@ -33,7 +34,8 @@ class NostrDirectMessageHandler(
     private val meshDelegateHandler: MeshDelegateHandler,
     private val scope: CoroutineScope,
     private val repo: GeohashRepository,
-    private val dataManager: com.bitchat.android.ui.DataManager
+    private val dataManager: DataManager,
+    private val geohashConversationRegistry: GeohashConversationRegistry,
 ) {
     companion object { private const val TAG = "NostrDirectMessageHandler" }
 
@@ -90,7 +92,7 @@ class NostrDirectMessageHandler(
                 if (geohash.isNotEmpty()) {
                     // Remember which geohash this conversation belongs to so we can subscribe on-demand
                     repo.setConversationGeohash(convKey, geohash)
-                    GeohashConversationRegistry.set(convKey, geohash)
+                    geohashConversationRegistry.set(convKey, geohash)
                 }
 
                 // Ensure sender appears in geohash people list even if they haven't posted publicly yet
