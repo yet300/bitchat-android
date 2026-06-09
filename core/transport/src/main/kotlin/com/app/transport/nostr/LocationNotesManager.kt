@@ -3,6 +3,9 @@ package com.app.transport.nostr
 import android.util.Log
 import androidx.annotation.MainThread
 import com.app.common.geohash.Geohash
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,20 +16,13 @@ import kotlinx.coroutines.flow.asStateFlow
  * iOS-compatible implementation with StateFlow for Android UI binding
  */
 @MainThread
-class LocationNotesManager private constructor() {
-    
+@SingleIn(AppScope::class)
+@Inject
+class LocationNotesManager {
+
     companion object {
         private const val TAG = "LocationNotesManager"
         private const val MAX_NOTES_IN_MEMORY = 500
-        
-        @Volatile
-        private var INSTANCE: LocationNotesManager? = null
-        
-        fun getInstance(): LocationNotesManager {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: LocationNotesManager().also { INSTANCE = it }
-            }
-        }
     }
     
     /**

@@ -8,7 +8,6 @@ import com.bitchat.android.ui.theme.ThemePreferenceManager
 import dev.zacsweers.metro.createGraphFactory
 import dev.zacsweers.metrox.android.MetroAppComponentProviders
 import dev.zacsweers.metrox.android.MetroApplication
-import com.app.transport.net.ArtiTorManager
 import com.app.transport.nostr.LocationNotesInitializer
 import com.app.transport.nostr.NostrIdentityBridge
 
@@ -31,8 +30,8 @@ class BitchatApplication : Application(), MetroApplication {
 
         // Initialize Tor first so any early network goes over Tor
         try {
-            val torProvider = ArtiTorManager.getInstance()
-            torProvider.init(this, appGraph.torPreferenceManager)
+            val torProvider = appGraph.artiTorManager
+            torProvider.init()
             // Reconnect Nostr relays when Tor resets (wired here so ArtiTorManager stays unaware of nostr)
             torProvider.onConnectionsReset = {
                 appGraph.nostrRelayManager.resetAllConnections()
@@ -43,7 +42,7 @@ class BitchatApplication : Application(), MetroApplication {
         appGraph.relayDirectory.initialize(this)
 
         // Initialize LocationNotesManager dependencies early so sheet subscriptions can start immediately
-        try { LocationNotesInitializer.initialize(this, appGraph.relayDirectory, appGraph.nostrRelayManager) } catch (_: Exception) { }
+        try { LocationNotesInitializer.initialize(this, appGraph.relayDirectory, appGraph.nostrRelayManager, appGraph.locationNotesManager) } catch (_: Exception) { }
 
         // Initialize favorites persistence early so MessageRouter/NostrTransport can use it on startup
         try {

@@ -60,7 +60,7 @@ object AppShutdownCoordinator {
             try { mesh?.stopServices() } catch (_: Exception) { }
 
             // Stop Tor temporarily (do not change user setting)
-            val torProvider = ArtiTorManager.getInstance()
+            val torProvider = (app as com.bitchat.android.BitchatApplication).appGraph.artiTorManager
             val torStop = async {
                 try { torProvider.applyMode(app, TorMode.OFF) } catch (_: Exception) { }
             }

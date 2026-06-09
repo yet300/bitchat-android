@@ -3,6 +3,9 @@ package com.app.transport.net
 import android.app.Application
 import android.util.Log
 import com.app.transport.TorConstants
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import info.guardianproject.arti.ArtiLogListener
 import info.guardianproject.arti.ArtiProxy
 import kotlinx.coroutines.CoroutineScope
@@ -33,7 +36,12 @@ import java.util.concurrent.atomic.AtomicLong
  *
  * Based on the original TorManager implementation.
  */
-class ArtiTorManager private constructor() {
+@SingleIn(AppScope::class)
+@Inject
+class ArtiTorManager(
+    private val application: Application,
+    private val torPreferenceManager: TorPreferenceManager,
+) {
     enum class TorState {
         OFF,
         STARTING,
@@ -58,15 +66,6 @@ class ArtiTorManager private constructor() {
         private const val INACTIVITY_TIMEOUT_MS = TorConstants.INACTIVITY_TIMEOUT_MS
         private const val MAX_RETRY_ATTEMPTS = TorConstants.MAX_RETRY_ATTEMPTS
         private const val STOP_TIMEOUT_MS = TorConstants.STOP_TIMEOUT_MS
-
-        @Volatile
-        private var INSTANCE: ArtiTorManager? = null
-
-        fun getInstance(): ArtiTorManager {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: ArtiTorManager().also { INSTANCE = it }
-            }
-        }
     }
 
     private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -92,7 +91,6 @@ class ArtiTorManager private constructor() {
     private var bindRetryAttempts = 0
     private var inactivityJob: Job? = null
     private var retryJob: Job? = null
-    private var currentApplication: Application? = null
 
     private enum class LifecycleState { STOPPED, STARTING, RUNNING, STOPPING }
 
@@ -119,12 +117,13 @@ class ArtiTorManager private constructor() {
                 socksAddr != null && s.state == TorState.RUNNING
     }
 
-    fun init(application: Application, torPreferenceManager: TorPreferenceManager) {
+    fun init() {
         if (initialized) return
         synchronized(this) {
             if (initialized) return
             initialized = true
-            currentApplication = application
+            // Wire HttpClientProvider SOCKS provider so it never calls getInstance() on us
+            HttpClientProvider.currentSocksProvider = { currentSocksAddress() }
 
             val logListener = ArtiLogListener { logLine ->
                 val text = logLine ?: return@ArtiLogListener
@@ -386,10 +385,8 @@ class ArtiTorManager private constructor() {
                                 TAG,
                                 "Inactivity detected (${timeSinceLastActivity}ms), restarting Arti"
                             )
-                            currentApplication?.let { app ->
-                                appScope.launch {
-                                    restartArti(app)
-                                }
+                            appScope.launch {
+                                restartArti(application)
                             }
                             break
                         }
