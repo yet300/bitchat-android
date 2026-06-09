@@ -14,7 +14,6 @@ import com.app.crypto.noise.NoiseSession
 import com.app.transport.model.BitchatMessage
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.data.nostr.CurrentGeohashSource
-import com.app.data.routing.MessageRouter
 import com.app.transport.mesh.BluetoothMeshDelegate
 import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.nostr.NostrIdentityBridge
@@ -101,6 +100,8 @@ class ChatViewModel(
         (application as BitchatApplication).appGraph.nostrTransport
     private val peerFingerprintManager =
         (application as BitchatApplication).appGraph.peerFingerprintManager
+    private val messageRouter =
+        (application as BitchatApplication).appGraph.messageRouter
     private val identityManager by lazy { SecureIdentityStateManager(getApplication()) }
     private val messageManager = MessageManager(state, appStateStore)
     private val channelManager = ChannelManager(state, messageManager, dataManager, viewModelScope)
@@ -547,14 +548,7 @@ class ChatViewModel(
                 meshService.myPeerID
             ) { messageContent, peerID, recipientNicknameParam, messageId ->
                 // Route via MessageRouter (mesh when connected+established, else Nostr)
-                val router = MessageRouter.getInstance(
-                    getApplication(),
-                    meshService,
-                    nostrTransport,
-                    geohashConversationRegistry,
-                    geohashAliasRegistry
-                )
-                router.sendPrivate(messageContent, peerID, recipientNicknameParam, messageId)
+                messageRouter.sendPrivate(messageContent, peerID, recipientNicknameParam, messageId)
             }
         } else {
             // Check if we're in a location channel
@@ -711,15 +705,7 @@ class ChatViewModel(
         sessionStates.forEach { (peerID, newState) ->
             val old = prevStates[peerID]
             if (old != "established" && newState == "established") {
-                MessageRouter
-                    .getInstance(
-                        getApplication(),
-                        meshService,
-                        nostrTransport,
-                        geohashConversationRegistry,
-                        geohashAliasRegistry
-                    )
-                    .onSessionEstablished(peerID)
+                messageRouter.onSessionEstablished(peerID)
             }
         }
         // Update fingerprint mappings from centralized manager
