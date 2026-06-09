@@ -11,7 +11,6 @@ import androidx.lifecycle.viewModelScope
 import com.app.common.encoding.hexEncodedString
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.crypto.noise.NoiseSession
-import com.app.data.AppStateStore
 import com.app.transport.model.BitchatMessage
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.data.nostr.CurrentGeohashSource
@@ -93,8 +92,10 @@ class ChatViewModel(
         (application as BitchatApplication).appGraph.geohashConversationRegistry
     private val geohashAliasRegistry =
         (application as BitchatApplication).appGraph.geohashAliasRegistry
+    private val appStateStore =
+        (application as BitchatApplication).appGraph.appStateStore
     private val identityManager by lazy { SecureIdentityStateManager(getApplication()) }
-    private val messageManager = MessageManager(state)
+    private val messageManager = MessageManager(state, appStateStore)
     private val channelManager = ChannelManager(state, messageManager, dataManager, viewModelScope)
 
     // Create Noise session delegate for clean dependency injection
@@ -198,19 +199,19 @@ class ChatViewModel(
         loadAndInitialize()
         // Hydrate UI state from process-wide AppStateStore to survive Activity recreation
         viewModelScope.launch {
-            try { AppStateStore.peers.collect { peers ->
+            try { appStateStore.peers.collect { peers ->
                 state.setConnectedPeers(peers)
                 state.setIsConnected(peers.isNotEmpty())
             } } catch (_: Exception) { }
         }
         viewModelScope.launch {
-            try { AppStateStore.publicMessages.collect { msgs ->
+            try { appStateStore.publicMessages.collect { msgs ->
                 // Source of truth is AppStateStore; replace to avoid duplicate keys in LazyColumn
                 state.setMessages(msgs)
             } } catch (_: Exception) { }
         }
         viewModelScope.launch {
-            try { AppStateStore.privateMessages.collect { byPeer ->
+            try { appStateStore.privateMessages.collect { byPeer ->
                 // Replace with store snapshot
                 state.setPrivateChats(byPeer)
                 // Recompute unread set using SeenMessageStore for robustness across Activity recreation
@@ -226,7 +227,7 @@ class ChatViewModel(
             } } catch (_: Exception) { }
         }
         viewModelScope.launch {
-            try { AppStateStore.channelMessages.collect { byChannel ->
+            try { appStateStore.channelMessages.collect { byChannel ->
                 // Replace with store snapshot
                 state.setChannelMessages(byChannel)
             } } catch (_: Exception) { }

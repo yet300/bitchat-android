@@ -173,7 +173,8 @@ class MeshForegroundService : Service() {
                         try { stopForeground(true) } catch (_: Exception) { }
                         isInForeground = false
                     },
-                    stopService = { stopSelf() }
+                    stopService = { stopSelf() },
+                    appStateStore = appGraph.appStateStore,
                 )
                 return START_NOT_STICKY
             }

@@ -22,7 +22,9 @@ import kotlinx.coroutines.flow.map
  */
 @SingleIn(AppScope::class)
 @Inject
-internal class MessageRepositoryImpl : MessageRepository {
+internal class MessageRepositoryImpl(
+    private val appStateStore: AppStateStore,
+) : MessageRepository {
 
     // Ownership (isMine) needs my current mesh peer id from the identity layer (a later Phase B step);
     // until then messages map with a null peer id, i.e. isMine == false.
@@ -30,51 +32,51 @@ internal class MessageRepositoryImpl : MessageRepository {
 
     override fun observeMessages(id: ConversationId): Flow<List<BitMessage>> = when (id) {
         ConversationId.PublicMesh ->
-            AppStateStore.publicMessages.map { it.toDomainList(id) }
+            appStateStore.publicMessages.map { it.toDomainList(id) }
         is ConversationId.Private ->
-            AppStateStore.privateMessages.map { (it[id.peer.raw] ?: emptyList()).toDomainList(id) }
+            appStateStore.privateMessages.map { (it[id.peer.raw] ?: emptyList()).toDomainList(id) }
         is ConversationId.Channel ->
-            AppStateStore.channelMessages.map { (it[id.tag] ?: emptyList()).toDomainList(id) }
+            appStateStore.channelMessages.map { (it[id.tag] ?: emptyList()).toDomainList(id) }
         is ConversationId.Geohash ->
             flowOf(emptyList()) // geo timelines live in GeohashRepository (a later Phase B step)
     }
 
     override suspend fun snapshot(id: ConversationId): List<BitMessage> = when (id) {
-        ConversationId.PublicMesh -> AppStateStore.publicMessages.value.toDomainList(id)
-        is ConversationId.Private -> (AppStateStore.privateMessages.value[id.peer.raw] ?: emptyList()).toDomainList(id)
-        is ConversationId.Channel -> (AppStateStore.channelMessages.value[id.tag] ?: emptyList()).toDomainList(id)
+        ConversationId.PublicMesh -> appStateStore.publicMessages.value.toDomainList(id)
+        is ConversationId.Private -> (appStateStore.privateMessages.value[id.peer.raw] ?: emptyList()).toDomainList(id)
+        is ConversationId.Channel -> (appStateStore.channelMessages.value[id.tag] ?: emptyList()).toDomainList(id)
         is ConversationId.Geohash -> emptyList()
     }
 
     override suspend fun append(id: ConversationId, message: BitMessage) {
         val wire = message.toWire()
         when (id) {
-            ConversationId.PublicMesh -> AppStateStore.addPublicMessage(wire)
-            is ConversationId.Private -> AppStateStore.addPrivateMessage(id.peer.raw, wire)
-            is ConversationId.Channel -> AppStateStore.addChannelMessage(id.tag, wire)
+            ConversationId.PublicMesh -> appStateStore.addPublicMessage(wire)
+            is ConversationId.Private -> appStateStore.addPrivateMessage(id.peer.raw, wire)
+            is ConversationId.Channel -> appStateStore.addChannelMessage(id.tag, wire)
             is ConversationId.Geohash -> Unit // geo timelines handled elsewhere for now
         }
     }
 
     override suspend fun updateDeliveryStatus(messageId: String, status: DeliveryStatus) {
-        AppStateStore.updatePrivateMessageStatus(messageId, status.toWireStatus())
+        appStateStore.updatePrivateMessageStatus(messageId, status.toWireStatus())
     }
 
     override suspend fun remove(messageId: String) {
-        AppStateStore.removeMessage(messageId)
+        appStateStore.removeMessage(messageId)
     }
 
     override suspend fun clear(id: ConversationId) {
         when (id) {
-            ConversationId.PublicMesh -> AppStateStore.clearPublic()
-            is ConversationId.Private -> AppStateStore.clearPrivate(id.peer.raw)
-            is ConversationId.Channel -> AppStateStore.clearChannel(id.tag)
+            ConversationId.PublicMesh -> appStateStore.clearPublic()
+            is ConversationId.Private -> appStateStore.clearPrivate(id.peer.raw)
+            is ConversationId.Channel -> appStateStore.clearChannel(id.tag)
             is ConversationId.Geohash -> Unit
         }
     }
 
     override suspend fun clearAll() {
-        AppStateStore.clear()
+        appStateStore.clear()
     }
 
     private fun List<BitchatMessage>.toDomainList(id: ConversationId): List<BitMessage> =

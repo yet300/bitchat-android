@@ -27,15 +27,16 @@ import kotlin.time.ExperimentalTime
 @Inject
 internal class ConversationRepositoryImpl(
     private val mesh: BluetoothMeshService,
+    private val appStateStore: AppStateStore,
 ) : ConversationRepository {
 
     private val myPeerId: String? = null
 
     override fun observeConversations(): Flow<List<Conversation>> =
         combine(
-            AppStateStore.publicMessages,
-            AppStateStore.privateMessages,
-            AppStateStore.channelMessages,
+            appStateStore.publicMessages,
+            appStateStore.privateMessages,
+            appStateStore.channelMessages,
         ) { pub, priv, chan ->
             buildList {
                 if (pub.isNotEmpty()) {
