@@ -8,6 +8,7 @@ import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.data.routing.MessageRouter
 import com.app.transport.mesh.BluetoothMeshService
+import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.nostr.GeohashConversationRegistry
 import com.bitchat.android.service.MeshServiceHolder
 import com.russhwolf.settings.ObservableSettings
@@ -64,6 +65,7 @@ object AndroidDataBindings {
         context: Context,
         mesh: BluetoothMeshService,
         geohashConversationRegistry: GeohashConversationRegistry,
+        geohashAliasRegistry: GeohashAliasRegistry,
     ): MessageRouter =
-        MessageRouter.getInstance(context, mesh, geohashConversationRegistry)
+        MessageRouter.getInstance(context, mesh, geohashConversationRegistry, geohashAliasRegistry)
 }

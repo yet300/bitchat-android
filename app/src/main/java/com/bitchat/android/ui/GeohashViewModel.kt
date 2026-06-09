@@ -20,7 +20,6 @@ import com.app.transport.nostr.NostrProtocol
 import com.app.transport.nostr.NostrRelayManager
 import com.app.transport.nostr.NostrSubscriptionManager
 import com.app.transport.nostr.PoWPreferenceManager
-import com.app.transport.nostr.GeohashAliasRegistry
 import com.bitchat.android.BitchatApplication
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -50,6 +49,8 @@ class GeohashViewModel(
 
     private val geohashConversationRegistry =
         (application as BitchatApplication).appGraph.geohashConversationRegistry
+    private val geohashAliasRegistry =
+        (application as BitchatApplication).appGraph.geohashAliasRegistry
     private val repo = GeohashRepository(application, state, dataManager)
     private val subscriptionManager = NostrSubscriptionManager(application, viewModelScope)
     private val geohashMessageHandler = GeohashMessageHandler(
@@ -58,7 +59,8 @@ class GeohashViewModel(
         messageManager = messageManager,
         repo = repo,
         scope = viewModelScope,
-        dataManager = dataManager
+        dataManager = dataManager,
+        geohashAliasRegistry = geohashAliasRegistry
     )
     private val dmHandler = NostrDirectMessageHandler(
         application = application,
@@ -68,7 +70,8 @@ class GeohashViewModel(
         scope = viewModelScope,
         repo = repo,
         dataManager = dataManager,
-        geohashConversationRegistry = geohashConversationRegistry
+        geohashConversationRegistry = geohashConversationRegistry,
+        geohashAliasRegistry = geohashAliasRegistry
     )
 
     private var currentGeohashSubId: String? = null
@@ -167,7 +170,7 @@ class GeohashViewModel(
 
     fun panicReset() {
         repo.clearAll()
-        GeohashAliasRegistry.clear()
+        geohashAliasRegistry.clear()
         geohashConversationRegistry.clear()
         subscriptionManager.disconnect()
         currentGeohashSubId = null
@@ -395,7 +398,7 @@ class GeohashViewModel(
                         handler = { event -> dmHandler.onGiftWrap(event, geohash, dmIdentity) }
                     )
                     // Also register alias in global registry for routing convenience
-                    GeohashAliasRegistry.put("nostr_${dmIdentity.publicKeyHex.take(16)}", dmIdentity.publicKeyHex)
+                    geohashAliasRegistry.put("nostr_${dmIdentity.publicKeyHex.take(16)}", dmIdentity.publicKeyHex)
                 }
             }
             null -> {

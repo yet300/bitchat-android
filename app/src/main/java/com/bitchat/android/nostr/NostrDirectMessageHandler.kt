@@ -36,6 +36,7 @@ class NostrDirectMessageHandler(
     private val repo: GeohashRepository,
     private val dataManager: DataManager,
     private val geohashConversationRegistry: GeohashConversationRegistry,
+    private val geohashAliasRegistry: GeohashAliasRegistry,
 ) {
     companion object { private const val TAG = "NostrDirectMessageHandler" }
 
@@ -88,7 +89,7 @@ class NostrDirectMessageHandler(
                 val messageTimestamp = Instant.fromEpochMilliseconds(giftWrap.createdAt * 1000L)
                 val convKey = "nostr_${senderPubkey.take(16)}"
                 repo.putNostrKeyMapping(convKey, senderPubkey)
-                GeohashAliasRegistry.put(convKey, senderPubkey)
+                geohashAliasRegistry.put(convKey, senderPubkey)
                 if (geohash.isNotEmpty()) {
                     // Remember which geohash this conversation belongs to so we can subscribe on-demand
                     repo.setConversationGeohash(convKey, geohash)

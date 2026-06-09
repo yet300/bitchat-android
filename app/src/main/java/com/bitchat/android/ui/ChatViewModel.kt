@@ -88,6 +88,11 @@ class ChatViewModel(
 
     // Specialized managers
     private val dataManager = DataManager(application.applicationContext)
+    // Graph-owned geohash registries (temporary Phase-D bridge; retires in Phase C).
+    private val geohashConversationRegistry =
+        (application as BitchatApplication).appGraph.geohashConversationRegistry
+    private val geohashAliasRegistry =
+        (application as BitchatApplication).appGraph.geohashAliasRegistry
     private val identityManager by lazy { SecureIdentityStateManager(getApplication()) }
     private val messageManager = MessageManager(state)
     private val channelManager = ChannelManager(state, messageManager, dataManager, viewModelScope)
@@ -114,7 +119,8 @@ class ChatViewModel(
         identityManager = identityManager,
         state = state,
         notificationManager = notificationManager,
-        messageManager = messageManager
+        messageManager = messageManager,
+        geohashAliasRegistry = geohashAliasRegistry
     )
     val verifiedFingerprints = verificationHandler.verifiedFingerprints
 
@@ -131,7 +137,8 @@ class ChatViewModel(
         coroutineScope = viewModelScope,
         onHapticFeedback = { ChatViewModelUtils.triggerHapticFeedback(application.applicationContext) },
         getMyPeerID = { meshService.myPeerID },
-        getMeshService = { meshService }
+        getMeshService = { meshService },
+        geohashAliasRegistry = geohashAliasRegistry
     )
     
     // New Geohash architecture ViewModel (replaces God object service usage in UI path)
@@ -458,7 +465,7 @@ class ChatViewModel(
                     connectedPeers = state.getConnectedPeersValue(),
                     meshNoiseKeyForPeer = { pid -> meshService.getPeerInfo(pid)?.noisePublicKey },
                     meshHasPeer = { pid -> meshService.getPeerInfo(pid)?.isConnected == true },
-                    nostrPubHexForAlias = { alias -> com.app.transport.nostr.GeohashAliasRegistry.get(alias) },
+                    nostrPubHexForAlias = { alias -> geohashAliasRegistry.get(alias) },
                     findNoiseKeyForNostr = { key -> FavoritesPersistenceService.shared.findNoiseKey(key) }
                 )
                 canonical ?: targetKey
@@ -512,7 +519,7 @@ class ChatViewModel(
                 connectedPeers = state.getConnectedPeersValue(),
                 meshNoiseKeyForPeer = { pid -> meshService.getPeerInfo(pid)?.noisePublicKey },
                 meshHasPeer = { pid -> meshService.getPeerInfo(pid)?.isConnected == true },
-                nostrPubHexForAlias = { alias -> com.app.transport.nostr.GeohashAliasRegistry.get(alias) },
+                nostrPubHexForAlias = { alias -> geohashAliasRegistry.get(alias) },
                 findNoiseKeyForNostr = { key -> FavoritesPersistenceService.shared.findNoiseKey(key) }
             ).also { canonical ->
                 if (canonical != state.getSelectedPrivateChatPeerValue()) {
@@ -536,7 +543,8 @@ class ChatViewModel(
                 val router = MessageRouter.getInstance(
                     getApplication(),
                     meshService,
-                    (getApplication() as BitchatApplication).appGraph.geohashConversationRegistry
+                    geohashConversationRegistry,
+                    geohashAliasRegistry
                 )
                 router.sendPrivate(messageContent, peerID, recipientNicknameParam, messageId)
             }
@@ -700,7 +708,8 @@ class ChatViewModel(
                     .getInstance(
                         getApplication(),
                         meshService,
-                        (getApplication() as BitchatApplication).appGraph.geohashConversationRegistry
+                        geohashConversationRegistry,
+                        geohashAliasRegistry
                     )
                     .onSessionEstablished(peerID)
             }

@@ -27,7 +27,8 @@ class MeshDelegateHandler(
     private val coroutineScope: CoroutineScope,
     private val onHapticFeedback: () -> Unit,
     private val getMyPeerID: () -> String,
-    private val getMeshService: () -> BluetoothMeshService
+    private val getMeshService: () -> BluetoothMeshService,
+    private val geohashAliasRegistry: GeohashAliasRegistry,
 ) : BluetoothMeshDelegate {
 
     override fun didReceiveMessage(message: BitchatMessage) {
@@ -128,8 +129,8 @@ class MeshDelegateHandler(
                         meshHasPeer = { pid -> peers.contains(pid) },
                         nostrPubHexForAlias = { alias ->
                             // Use GeohashAliasRegistry for geohash aliases, but for mesh favorites, derive from favorites mapping
-                            if (GeohashAliasRegistry.contains(alias)) {
-                                GeohashAliasRegistry.get(alias)
+                            if (geohashAliasRegistry.contains(alias)) {
+                                geohashAliasRegistry.get(alias)
                             } else {
                                 // Best-effort: derive pub hex from favorites mapping for mesh nostr_ aliases
                                 val prefix = alias.removePrefix("nostr_")
