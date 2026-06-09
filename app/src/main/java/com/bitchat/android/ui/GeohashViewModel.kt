@@ -52,8 +52,10 @@ class GeohashViewModel(
         (application as BitchatApplication).appGraph.geohashAliasRegistry
     private val powPreferenceManager =
         (application as BitchatApplication).appGraph.powPreferenceManager
+    private val relayDirectory =
+        (application as BitchatApplication).appGraph.relayDirectory
     private val repo = GeohashRepository(application, state, dataManager)
-    private val subscriptionManager = NostrSubscriptionManager(application, viewModelScope)
+    private val subscriptionManager = NostrSubscriptionManager(application, viewModelScope, relayDirectory)
     private val geohashMessageHandler = GeohashMessageHandler(
         application = application,
         state = state,
@@ -191,7 +193,7 @@ class GeohashViewModel(
             val event = NostrProtocol.createGeohashPresenceEvent(geohash, identity)
             val relayManager = NostrRelayManager.getInstance(getApplication())
             // Presence is lightweight, send to geohash relays
-            relayManager.sendEventToGeohash(event, geohash, includeDefaults = false, nRelays = 5)
+            relayManager.sendEventToGeohash(event, geohash, relayDirectory, includeDefaults = false, nRelays = 5)
             Log.v(TAG, "💓 Sent presence heartbeat for $geohash")
         } catch (e: Exception) {
             Log.w(TAG, "Failed to send presence for $geohash: ${e.message}")
@@ -223,7 +225,7 @@ class GeohashViewModel(
                     val teleported = state.isTeleported.value
                     val event = NostrProtocol.createEphemeralGeohashEvent(content, channel.geohash, identity, powPreferenceManager, nickname, teleported)
                     val relayManager = NostrRelayManager.getInstance(getApplication())
-                    relayManager.sendEventToGeohash(event, channel.geohash, includeDefaults = false, nRelays = 5)
+                    relayManager.sendEventToGeohash(event, channel.geohash, relayDirectory, includeDefaults = false, nRelays = 5)
                 } finally {
                     // Ensure we stop the per-message mining animation regardless of success/failure
                     if (startedMining) {

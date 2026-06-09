@@ -11,7 +11,8 @@ import kotlinx.coroutines.launch
  */
 class NostrSubscriptionManager(
     private val application: Application,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val relayDirectory: RelayDirectory
 ) {
     companion object { private const val TAG = "NostrSubscriptionManager" }
 
@@ -30,7 +31,7 @@ class NostrSubscriptionManager(
     fun subscribeGeohash(geohash: String, sinceMs: Long, limit: Int, id: String, handler: (NostrEvent) -> Unit) {
         scope.launch {
             val filter = NostrFilter.geohashEphemeral(geohash, sinceMs, limit)
-            relayManager.subscribeForGeohash(geohash, filter, id, handler, includeDefaults = false, nRelays = 5)
+            relayManager.subscribeForGeohash(geohash, filter, relayDirectory, id, handler, includeDefaults = false, nRelays = 5)
         }
     }
 

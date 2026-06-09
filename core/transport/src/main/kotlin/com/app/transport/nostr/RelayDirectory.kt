@@ -2,10 +2,12 @@ package com.app.transport.nostr
 
 import android.app.Application
 import android.util.Log
-import com.app.common.appSettings
 import com.app.common.geohash.Geohash
+import com.app.domain.repository.SettingsStore
 import com.app.transport.net.HttpClientProvider
-import com.russhwolf.settings.Settings
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -28,14 +30,21 @@ import kotlinx.coroutines.withContext
 
 /**
  * Loads relay coordinates from assets and provides nearest-relay lookup by geohash.
+ *
+ * App-scoped singleton: the last-update timestamp is persisted through the domain [SettingsStore]
+ * port; the relay list lives in memory and is (re)loaded by [initialize].
  */
-object RelayDirectory {
+@SingleIn(AppScope::class)
+@Inject
+class RelayDirectory(
+    private val settings: SettingsStore,
+) {
 
-    private const val TAG = "RelayDirectory"
-    private const val ASSET_FILE_URL = "https://raw.githubusercontent.com/permissionlesstech/georelays/refs/heads/main/nostr_relays.csv"
-    private const val ASSET_FILE = "nostr_relays.csv"
-    private const val DOWNLOADED_FILE = "nostr_relays_latest.csv"
-    private const val KEY_LAST_UPDATE_MS = "last_update_ms"
+    private val TAG = "RelayDirectory"
+    private val ASSET_FILE_URL = "https://raw.githubusercontent.com/permissionlesstech/georelays/refs/heads/main/nostr_relays.csv"
+    private val ASSET_FILE = "nostr_relays.csv"
+    private val DOWNLOADED_FILE = "nostr_relays_latest.csv"
+    private val KEY_LAST_UPDATE_MS = "last_update_ms"
     private val ONE_DAY_MS = TimeUnit.DAYS.toMillis(1)
 
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -74,7 +83,7 @@ object RelayDirectory {
 
                 // Trigger an immediate fetch if the data is stale (older than 24h)
                 ioScope.launch {
-                    if (isStale(application)) {
+                    if (isStale()) {
                         fetchAndMaybeSwap(application)
                     }
                 }
@@ -127,14 +136,11 @@ object RelayDirectory {
 
     // ===== Implementation details =====
 
-    private fun getPrefs(application: Application): Settings =
-        appSettings(application)
-
     private fun getDownloadedFile(application: Application): File =
         File(application.filesDir, DOWNLOADED_FILE)
 
-    private fun isStale(application: Application): Boolean {
-        val last = getPrefs(application).getLong(KEY_LAST_UPDATE_MS, 0L)
+    private fun isStale(): Boolean {
+        val last = settings.getLong(KEY_LAST_UPDATE_MS, 0L)
         val now = System.currentTimeMillis()
         return now - last >= ONE_DAY_MS
     }
@@ -143,7 +149,7 @@ object RelayDirectory {
         ioScope.launch {
             while (true) {
                 try {
-                    if (isStale(application)) {
+                    if (isStale()) {
                         fetchAndMaybeSwap(application)
                     }
                 } catch (e: Exception) {
@@ -187,9 +193,9 @@ object RelayDirectory {
                 relays.addAll(parsed)
             }
 
-            getPrefs(application).putLong(KEY_LAST_UPDATE_MS, System.currentTimeMillis())
+            settings.putLong(KEY_LAST_UPDATE_MS, System.currentTimeMillis())
 
-            Log.i(TAG, "✅ Using downloaded relay list (${dest.absolutePath}), entries=$entries, sha256=$hash, updatedAtMs=${getPrefs(application).getLong(KEY_LAST_UPDATE_MS, 0L)}")
+            Log.i(TAG, "✅ Using downloaded relay list (${dest.absolutePath}), entries=$entries, sha256=$hash, updatedAtMs=${settings.getLong(KEY_LAST_UPDATE_MS, 0L)}")
         } catch (e: Exception) {
             Log.w(TAG, "Failed to fetch and swap relay list: ${e.message}")
         }

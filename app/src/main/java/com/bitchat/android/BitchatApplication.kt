@@ -2,7 +2,6 @@ package com.bitchat.android
 
 import android.app.Application
 import com.app.data.favorites.FavoritesPersistenceService
-import com.app.transport.nostr.RelayDirectory
 import com.bitchat.android.di.AndroidAppGraph
 import com.bitchat.android.di.AppGraph
 import com.bitchat.android.ui.theme.ThemePreferenceManager
@@ -42,10 +41,10 @@ class BitchatApplication : Application(), MetroApplication {
         } catch (_: Exception){}
 
         // Initialize relay directory (loads assets/nostr_relays.csv)
-        RelayDirectory.initialize(this)
+        appGraph.relayDirectory.initialize(this)
 
         // Initialize LocationNotesManager dependencies early so sheet subscriptions can start immediately
-        try { LocationNotesInitializer.initialize(this) } catch (_: Exception) { }
+        try { LocationNotesInitializer.initialize(this, appGraph.relayDirectory) } catch (_: Exception) { }
 
         // Initialize favorites persistence early so MessageRouter/NostrTransport can use it on startup
         try {
