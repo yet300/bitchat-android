@@ -46,7 +46,8 @@ class BluetoothPacketBroadcaster(
     private val connectionTracker: BluetoothConnectionTracker,
     private val fragmentManager: FragmentManager?,
     private val myPeerID: String,
-    private val debugSettingsManager: DebugSettingsManager
+    private val debugSettingsManager: DebugSettingsManager,
+    private val transferProgressManager: TransferProgressManager,
 ) {
     
     companion object {
@@ -166,7 +167,7 @@ class BluetoothPacketBroadcaster(
                 }
                 Log.d(TAG, "Fragmenting packet into ${fragments.size} fragments")
                 if (transferId != null) {
-                    TransferProgressManager.start(transferId, fragments.size)
+                    transferProgressManager.start(transferId, fragments.size)
                 }
                 val job = connectionScope.launch {
                     var sent = 0
@@ -179,8 +180,8 @@ class BluetoothPacketBroadcaster(
                         delay(20)
                         if (transferId != null) {
                             sent += 1
-                            TransferProgressManager.progress(transferId, sent, fragments.size)
-                            if (sent == fragments.size) TransferProgressManager.complete(transferId, fragments.size)
+                            transferProgressManager.progress(transferId, sent, fragments.size)
+                            if (sent == fragments.size) transferProgressManager.complete(transferId, fragments.size)
                         }
                     }
                 }
@@ -194,12 +195,12 @@ class BluetoothPacketBroadcaster(
         
         // Send single packet if no fragmentation needed
         if (transferId != null) {
-            TransferProgressManager.start(transferId, 1)
+            transferProgressManager.start(transferId, 1)
         }
         broadcastSinglePacket(routed, gattServer, characteristic)
         if (transferId != null) {
-            TransferProgressManager.progress(transferId, 1, 1)
-            TransferProgressManager.complete(transferId, 1)
+            transferProgressManager.progress(transferId, 1, 1)
+            transferProgressManager.complete(transferId, 1)
         }
     }
 
@@ -228,7 +229,7 @@ class BluetoothPacketBroadcaster(
         // Prefer caller-provided transferId (e.g., for encrypted media), else derive for FILE_TRANSFER
         val transferId = routed.transferId ?: (if (isFile) sha256Hex(packet.payload) else null)
         if (transferId != null) {
-            TransferProgressManager.start(transferId, 1)
+            transferProgressManager.start(transferId, 1)
         }
         val typeName = MessageType.fromValue(packet.type)?.name ?: packet.type.toString()
         val senderPeerID = routed.peerID ?: packet.senderID.toHexString()
@@ -245,8 +246,8 @@ class BluetoothPacketBroadcaster(
             if (notifyDevice(serverTarget, data, gattServer, characteristic)) {
                 logPacketRelay(typeName, senderPeerID, senderNick, incomingPeer, incomingAddr, targetPeerID, serverTarget.address, packet.ttl, packet.version, routeInfo)
                 if (transferId != null) {
-                    TransferProgressManager.progress(transferId, 1, 1)
-                    TransferProgressManager.complete(transferId, 1)
+                    transferProgressManager.progress(transferId, 1, 1)
+                    transferProgressManager.complete(transferId, 1)
                 }
                 return true
             }
@@ -259,8 +260,8 @@ class BluetoothPacketBroadcaster(
             if (writeToDeviceConn(clientTarget, data)) {
                 logPacketRelay(typeName, senderPeerID, senderNick, incomingPeer, incomingAddr, targetPeerID, clientTarget.device.address, packet.ttl, packet.version, routeInfo)
                 if (transferId != null) {
-                    TransferProgressManager.progress(transferId, 1, 1)
-                    TransferProgressManager.complete(transferId, 1)
+                    transferProgressManager.progress(transferId, 1, 1)
+                    transferProgressManager.complete(transferId, 1)
                 }
                 return true
             }

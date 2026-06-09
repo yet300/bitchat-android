@@ -19,7 +19,8 @@ class BluetoothConnectionManager(
     private val context: Context, 
     private val myPeerID: String,
     private val debugSettingsManager: DebugSettingsManager,
-    private val fragmentManager: FragmentManager? = null
+    private val fragmentManager: FragmentManager? = null,
+    private val transferProgressManager: TransferProgressManager,
 ) : PowerManagerDelegate {
     
     companion object {
@@ -40,7 +41,7 @@ class BluetoothConnectionManager(
     // Component managers
     private val permissionManager = BluetoothPermissionManager(context)
     private val connectionTracker = BluetoothConnectionTracker(connectionScope, powerManager)
-    private val packetBroadcaster = BluetoothPacketBroadcaster(connectionScope, connectionTracker, fragmentManager, myPeerID, debugSettingsManager)
+    private val packetBroadcaster = BluetoothPacketBroadcaster(connectionScope, connectionTracker, fragmentManager, myPeerID, debugSettingsManager, transferProgressManager)
     
     // Delegate for component managers to call back to main manager
     private val componentDelegate = object : BluetoothConnectionManagerDelegate {
