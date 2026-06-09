@@ -10,14 +10,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.app.transport.nostr.NostrProofOfWork
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bitchat.android.BitchatApplication
 import com.bitchat.android.R
-import com.app.transport.nostr.PoWPreferenceManager
 
 /**
  * Shows the current Proof of Work status and settings
@@ -27,9 +28,11 @@ fun PoWStatusIndicator(
     modifier: Modifier = Modifier,
     style: PoWIndicatorStyle = PoWIndicatorStyle.COMPACT
 ) {
-    val powEnabled by PoWPreferenceManager.powEnabled.collectAsStateWithLifecycle()
-    val powDifficulty by PoWPreferenceManager.powDifficulty.collectAsStateWithLifecycle()
-    val isMining by PoWPreferenceManager.isMining.collectAsStateWithLifecycle()
+    val powPreferenceManager =
+        (LocalContext.current.applicationContext as BitchatApplication).appGraph.powPreferenceManager
+    val powEnabled by powPreferenceManager.powEnabled.collectAsStateWithLifecycle()
+    val powDifficulty by powPreferenceManager.powDifficulty.collectAsStateWithLifecycle()
+    val isMining by powPreferenceManager.isMining.collectAsStateWithLifecycle()
     val colorScheme = MaterialTheme.colorScheme
     val isDark = colorScheme.background.red + colorScheme.background.green + colorScheme.background.blue < 1.5f
     

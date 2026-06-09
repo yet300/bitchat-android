@@ -27,7 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.app.transport.nostr.NostrProofOfWork
-import com.app.transport.nostr.PoWPreferenceManager
+import com.bitchat.android.BitchatApplication
 import androidx.compose.ui.res.stringResource
 import com.bitchat.android.R
 import com.bitchat.android.core.ui.component.button.CloseButton
@@ -203,7 +203,9 @@ fun AboutSheet(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    
+    val powPreferenceManager =
+        (context.applicationContext as BitchatApplication).appGraph.powPreferenceManager
+
     // Get version name from package info
     val versionName = remember {
         try {
@@ -365,9 +367,8 @@ fun AboutSheet(
 
                     // Settings Section - Unified Card with Toggles
                     item(key = "settings") {
-                        LaunchedEffect(Unit) { PoWPreferenceManager.init(context) }
-                        val powEnabled by PoWPreferenceManager.powEnabled.collectAsState()
-                        val powDifficulty by PoWPreferenceManager.powDifficulty.collectAsState()
+                        val powEnabled by powPreferenceManager.powEnabled.collectAsState()
+                        val powDifficulty by powPreferenceManager.powDifficulty.collectAsState()
                         var backgroundEnabled by remember { mutableStateOf(com.bitchat.android.service.MeshServicePreferences.isBackgroundEnabled(true)) }
                         val torMode = remember { mutableStateOf(TorPreferenceManager.get(context)) }
                         val torProvider = remember { ArtiTorManager.getInstance() }
@@ -416,7 +417,7 @@ fun AboutSheet(
                                         title = stringResource(R.string.about_pow),
                                         subtitle = stringResource(R.string.about_pow_tip),
                                         checked = powEnabled,
-                                        onCheckedChange = { PoWPreferenceManager.setPowEnabled(it) }
+                                        onCheckedChange = { powPreferenceManager.setPowEnabled(it) }
                                     )
                                     
                                     HorizontalDivider(
@@ -470,9 +471,9 @@ fun AboutSheet(
 
                     // PoW Difficulty Slider (when enabled)
                     item(key = "pow_slider") {
-                        val powEnabled by PoWPreferenceManager.powEnabled.collectAsState()
-                        val powDifficulty by PoWPreferenceManager.powDifficulty.collectAsState()
-                        
+                        val powEnabled by powPreferenceManager.powEnabled.collectAsState()
+                        val powDifficulty by powPreferenceManager.powDifficulty.collectAsState()
+
                         if (powEnabled) {
                             Column(modifier = Modifier.padding(horizontal = 20.dp)) {
                                 Surface(
@@ -505,7 +506,7 @@ fun AboutSheet(
                                         
                                         Slider(
                                             value = powDifficulty.toFloat(),
-                                            onValueChange = { PoWPreferenceManager.setPowDifficulty(it.toInt()) },
+                                            onValueChange = { powPreferenceManager.setPowDifficulty(it.toInt()) },
                                             valueRange = 0f..32f,
                                             steps = 31,
                                             colors = SliderDefaults.colors(

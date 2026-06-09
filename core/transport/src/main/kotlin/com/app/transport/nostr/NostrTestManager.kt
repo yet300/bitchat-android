@@ -11,7 +11,10 @@ import kotlin.time.Instant
  * Use this to verify the Nostr client works correctly
  */
 @OptIn(ExperimentalTime::class)
-class NostrTestManager(private val context: Context) {
+class NostrTestManager(
+    private val context: Context,
+    private val powPreferenceManager: PoWPreferenceManager,
+) {
     
     companion object {
         private const val TAG = "NostrTestManager"
@@ -57,7 +60,7 @@ class NostrTestManager(private val context: Context) {
     private suspend fun testClientInitialization() {
         Log.d(TAG, "Testing client initialization...")
         
-        nostrClient = NostrClient.getInstance(context)
+        nostrClient = NostrClient.getInstance(context, powPreferenceManager)
         nostrClient.initialize()
         
         // Wait for initialization

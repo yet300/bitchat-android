@@ -19,7 +19,6 @@ import com.app.transport.nostr.NostrIdentityBridge
 import com.app.transport.nostr.NostrProtocol
 import com.app.transport.nostr.NostrRelayManager
 import com.app.transport.nostr.NostrSubscriptionManager
-import com.app.transport.nostr.PoWPreferenceManager
 import com.bitchat.android.BitchatApplication
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -51,6 +50,8 @@ class GeohashViewModel(
         (application as BitchatApplication).appGraph.geohashConversationRegistry
     private val geohashAliasRegistry =
         (application as BitchatApplication).appGraph.geohashAliasRegistry
+    private val powPreferenceManager =
+        (application as BitchatApplication).appGraph.powPreferenceManager
     private val repo = GeohashRepository(application, state, dataManager)
     private val subscriptionManager = NostrSubscriptionManager(application, viewModelScope)
     private val geohashMessageHandler = GeohashMessageHandler(
@@ -60,7 +61,8 @@ class GeohashViewModel(
         repo = repo,
         scope = viewModelScope,
         dataManager = dataManager,
-        geohashAliasRegistry = geohashAliasRegistry
+        geohashAliasRegistry = geohashAliasRegistry,
+        powPreferenceManager = powPreferenceManager
     )
     private val dmHandler = NostrDirectMessageHandler(
         application = application,
@@ -200,7 +202,7 @@ class GeohashViewModel(
         viewModelScope.launch {
             try {
                 val tempId = "temp_${System.currentTimeMillis()}_${kotlin.random.Random.nextInt(1000)}"
-                val pow = PoWPreferenceManager.getCurrentSettings()
+                val pow = powPreferenceManager.getCurrentSettings()
                 val localMsg = BitchatMessage(
                     id = tempId,
                     sender = nickname ?: myPeerID,
@@ -219,7 +221,7 @@ class GeohashViewModel(
                 try {
                     val identity = NostrIdentityBridge.deriveIdentity(forGeohash = channel.geohash, context = getApplication())
                     val teleported = state.isTeleported.value
-                    val event = NostrProtocol.createEphemeralGeohashEvent(content, channel.geohash, identity, nickname, teleported)
+                    val event = NostrProtocol.createEphemeralGeohashEvent(content, channel.geohash, identity, powPreferenceManager, nickname, teleported)
                     val relayManager = NostrRelayManager.getInstance(getApplication())
                     relayManager.sendEventToGeohash(event, channel.geohash, includeDefaults = false, nRelays = 5)
                 } finally {

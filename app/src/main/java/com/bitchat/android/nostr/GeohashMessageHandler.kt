@@ -27,7 +27,8 @@ class GeohashMessageHandler(
     private val repo: GeohashRepository,
     private val scope: CoroutineScope,
     private val dataManager: com.bitchat.android.ui.DataManager,
-    private val geohashAliasRegistry: com.app.transport.nostr.GeohashAliasRegistry
+    private val geohashAliasRegistry: com.app.transport.nostr.GeohashAliasRegistry,
+    private val powPreferenceManager: PoWPreferenceManager
 ) {
     companion object { private const val TAG = "GeohashMessageHandler" }
 
@@ -57,7 +58,7 @@ class GeohashMessageHandler(
 
                 // PoW validation (if enabled) - apply to chat messages primarily
                 if (event.kind == NostrKind.EPHEMERAL_EVENT) {
-                    val pow = PoWPreferenceManager.getCurrentSettings()
+                    val pow = powPreferenceManager.getCurrentSettings()
                     if (pow.enabled && pow.difficulty > 0) {
                         if (!NostrProofOfWork.validateDifficulty(event, pow.difficulty)) return@launch
                     }
