@@ -14,6 +14,7 @@ import kotlin.time.Instant
 class NostrTestManager(
     private val context: Context,
     private val powPreferenceManager: PoWPreferenceManager,
+    private val relayManager: NostrRelayManager,
 ) {
     
     companion object {
@@ -60,7 +61,7 @@ class NostrTestManager(
     private suspend fun testClientInitialization() {
         Log.d(TAG, "Testing client initialization...")
         
-        nostrClient = NostrClient.getInstance(context, powPreferenceManager)
+        nostrClient = NostrClient(context, powPreferenceManager, relayManager)
         nostrClient.initialize()
         
         // Wait for initialization

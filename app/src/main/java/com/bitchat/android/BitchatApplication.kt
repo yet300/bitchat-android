@@ -11,7 +11,6 @@ import dev.zacsweers.metrox.android.MetroApplication
 import com.app.transport.net.ArtiTorManager
 import com.app.transport.nostr.LocationNotesInitializer
 import com.app.transport.nostr.NostrIdentityBridge
-import com.app.transport.nostr.NostrRelayManager
 
 /**
  * Main application class for bitchat Android
@@ -36,7 +35,7 @@ class BitchatApplication : Application(), MetroApplication {
             torProvider.init(this, appGraph.torPreferenceManager)
             // Reconnect Nostr relays when Tor resets (wired here so ArtiTorManager stays unaware of nostr)
             torProvider.onConnectionsReset = {
-                NostrRelayManager.shared.resetAllConnections()
+                appGraph.nostrRelayManager.resetAllConnections()
             }
         } catch (_: Exception){}
 
@@ -44,7 +43,7 @@ class BitchatApplication : Application(), MetroApplication {
         appGraph.relayDirectory.initialize(this)
 
         // Initialize LocationNotesManager dependencies early so sheet subscriptions can start immediately
-        try { LocationNotesInitializer.initialize(this, appGraph.relayDirectory) } catch (_: Exception) { }
+        try { LocationNotesInitializer.initialize(this, appGraph.relayDirectory, appGraph.nostrRelayManager) } catch (_: Exception) { }
 
         // Initialize favorites persistence early so MessageRouter/NostrTransport can use it on startup
         try {

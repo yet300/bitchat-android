@@ -17,20 +17,20 @@ object LocationNotesInitializer {
      * @param context Application context
      * @return true if initialization succeeded, false otherwise
      */
-    fun initialize(context: Context, relayDirectory: RelayDirectory): Boolean {
+    fun initialize(context: Context, relayDirectory: RelayDirectory, relayManager: NostrRelayManager): Boolean {
         return try {
             LocationNotesManager.getInstance().initialize(
-                relayManager = { NostrRelayManager.getInstance(context) },
+                relayManager = { relayManager },
                 subscribe = { filter, id, handler ->
                     // CRITICAL FIX: Extract geohash properly from filter using getGeohash() method
                     val geohashFromFilter = filter.getGeohash() ?: run {
                         Log.e(TAG, "❌ Cannot extract geohash from filter for location notes")
                         return@initialize id // Return subscription ID even on error
                     }
-                    
+
                     Log.d(TAG, "📍 Location Notes subscribing to geohash: $geohashFromFilter")
-                    
-                    NostrRelayManager.getInstance(context).subscribeForGeohash(
+
+                    relayManager.subscribeForGeohash(
                         geohash = geohashFromFilter,
                         filter = filter,
                         relayDirectory = relayDirectory,
@@ -41,13 +41,13 @@ object LocationNotesInitializer {
                     )
                 },
                 unsubscribe = { id ->
-                    NostrRelayManager.getInstance(context).unsubscribe(id)
+                    relayManager.unsubscribe(id)
                 },
                 sendEvent = { event, relayUrls ->
                     if (relayUrls != null) {
-                        NostrRelayManager.getInstance(context).sendEvent(event, relayUrls)
+                        relayManager.sendEvent(event, relayUrls)
                     } else {
-                        NostrRelayManager.getInstance(context).sendEvent(event)
+                        relayManager.sendEvent(event)
                     }
                 },
                 deriveIdentity = { geohash ->

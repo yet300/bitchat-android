@@ -2,6 +2,9 @@ package com.app.transport.nostr
 
 import android.content.Context
 import android.util.Log
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -11,26 +14,18 @@ import kotlinx.coroutines.flow.asStateFlow
  * High-level Nostr client that manages identity, connections, and messaging
  * Provides a simple API for the rest of the application
  */
-class NostrClient private constructor(
+@SingleIn(AppScope::class)
+@Inject
+class NostrClient(
     private val context: Context,
     private val powPreferenceManager: PoWPreferenceManager,
+    private val relayManager: NostrRelayManager,
 ) {
 
     companion object {
         private const val TAG = "NostrClient"
-
-        @Volatile
-        private var INSTANCE: NostrClient? = null
-
-        fun getInstance(context: Context, powPreferenceManager: PoWPreferenceManager): NostrClient {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: NostrClient(context.applicationContext, powPreferenceManager).also { INSTANCE = it }
-            }
-        }
     }
-    
-    // Core components
-    private val relayManager = NostrRelayManager.shared
+
     private var currentIdentity: NostrIdentity? = null
     
     // Client state

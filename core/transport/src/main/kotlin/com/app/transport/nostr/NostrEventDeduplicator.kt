@@ -2,6 +2,9 @@ package com.app.transport.nostr
 
 import android.util.Log
 import com.app.transport.NostrConstants
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -18,24 +21,14 @@ import java.util.concurrent.ConcurrentHashMap
  * - Efficient O(1) lookup and insertion
  * - Memory-bounded to prevent unbounded growth
  */
+@SingleIn(AppScope::class)
+@Inject
 class NostrEventDeduplicator(
     private val maxCapacity: Int = DEFAULT_CAPACITY
 ) {
     companion object {
         private const val TAG = "NostrDeduplicator"
         private const val DEFAULT_CAPACITY = NostrConstants.DEFAULT_DEDUP_CAPACITY
-        
-        @Volatile
-        private var INSTANCE: NostrEventDeduplicator? = null
-        
-        /**
-         * Get the singleton instance of the deduplicator
-         */
-        fun getInstance(): NostrEventDeduplicator {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: NostrEventDeduplicator().also { INSTANCE = it }
-            }
-        }
     }
     
     /**
