@@ -33,9 +33,10 @@ import com.bitchat.android.core.ui.component.sheet.BitchatBottomSheet
 import com.bitchat.android.core.ui.component.sheet.BitchatSheetCenterTopBar
 import com.bitchat.android.core.ui.component.sheet.BitchatSheetTitle
 import com.bitchat.android.core.ui.component.sheet.BitchatSheetTopBar
+import androidx.compose.ui.platform.LocalContext
 import com.bitchat.android.geohash.ChannelID
 import com.app.transport.nostr.GeohashAliasRegistry
-import com.app.transport.nostr.GeohashConversationRegistry
+import com.bitchat.android.BitchatApplication
 import com.bitchat.android.ui.theme.BASE_FONT_SIZE
 import kotlin.time.ExperimentalTime
 
@@ -774,12 +775,14 @@ fun PrivateChatSheet(
     }
 
     val isNostrPeer = peerID.startsWith("nostr_") || peerID.startsWith("nostr:")
+    val geohashConversationRegistry =
+        (LocalContext.current.applicationContext as BitchatApplication).appGraph.geohashConversationRegistry
 
     // Compute display name and title text reactively
     val displayName = peerNicknames[peerID] ?: peerID.take(12)
     val titleText = remember(peerID, peerNicknames) {
         if (isNostrPeer) {
-            val gh = GeohashConversationRegistry.get(peerID) ?: "geohash"
+            val gh = geohashConversationRegistry.get(peerID) ?: "geohash"
             val fullPubkey = GeohashAliasRegistry.get(peerID) ?: ""
             val name = if (fullPubkey.isNotEmpty()) {
                 viewModel.geohashViewModel.displayNameForGeohashConversation(fullPubkey, gh)

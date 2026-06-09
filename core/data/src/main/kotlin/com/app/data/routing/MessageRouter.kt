@@ -17,17 +17,22 @@ import com.app.data.nostr.NostrTransport
 class MessageRouter private constructor(
     private val context: Context,
     private var mesh: BluetoothMeshService,
-    private val nostr: NostrTransport
+    private val nostr: NostrTransport,
+    private val geohashConversationRegistry: GeohashConversationRegistry,
 ) {
     companion object {
         private const val TAG = "MessageRouter"
         @Volatile private var INSTANCE: MessageRouter? = null
         fun tryGetInstance(): MessageRouter? = INSTANCE
-        fun getInstance(context: Context, mesh: BluetoothMeshService): MessageRouter {
+        fun getInstance(
+            context: Context,
+            mesh: BluetoothMeshService,
+            geohashConversationRegistry: GeohashConversationRegistry
+        ): MessageRouter {
             val instance = INSTANCE ?: synchronized(this) {
                 INSTANCE ?: run {
                     val nostr = NostrTransport.getInstance(context)
-                    MessageRouter(context.applicationContext, mesh, nostr).also { instance ->
+                    MessageRouter(context.applicationContext, mesh, nostr, geohashConversationRegistry).also { instance ->
                         // Register for favorites changes to flush outbox
                         try {
                             FavoritesPersistenceService.shared.addListener(instance.favoriteListener)
@@ -67,7 +72,7 @@ class MessageRouter private constructor(
             val recipientHex = GeohashAliasRegistry.get(toPeerID)
             if (recipientHex != null) {
                 // Resolve the conversation's source geohash, so we can send from anywhere
-                val sourceGeohash = GeohashConversationRegistry.get(toPeerID)
+                val sourceGeohash = geohashConversationRegistry.get(toPeerID)
 
                 // If repository knows the source geohash, pass it so NostrTransport derives the correct identity
                 nostr.sendPrivateMessageGeohash(content, recipientHex, messageID, sourceGeohash)

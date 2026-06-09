@@ -11,7 +11,6 @@ import dev.zacsweers.metrox.android.MetroAppComponentProviders
 import dev.zacsweers.metrox.android.MetroApplication
 import com.app.transport.net.ArtiTorManager
 import com.app.transport.nostr.GeohashAliasRegistry
-import com.app.transport.nostr.GeohashConversationRegistry
 import com.app.transport.nostr.LocationNotesInitializer
 import com.app.transport.nostr.NostrIdentityBridge
 import com.app.transport.nostr.NostrRelayManager
@@ -68,7 +67,6 @@ class BitchatApplication : Application(), MetroApplication {
         // Initialize Geohash Registries for persistence
         try {
             GeohashAliasRegistry.initialize(this)
-            GeohashConversationRegistry.initialize(this)
         } catch (_: Exception) { }
 
         // Initialize mesh service preferences

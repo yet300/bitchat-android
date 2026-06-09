@@ -9,6 +9,7 @@ import com.app.domain.repository.MessageTransport
 import com.app.domain.repository.PeerRepository
 import com.app.domain.repository.SearchRepository
 import com.app.domain.repository.SettingsRepository
+import com.app.transport.nostr.GeohashConversationRegistry
 
 /**
  * Public API of the application dependency graph: the domain ports the app (and, in Phase C, the
@@ -26,4 +27,9 @@ interface AppGraph {
     val searchRepository: SearchRepository
     val identityRepository: IdentityRepository
     val messageTransport: MessageTransport
+
+    // Temporary Phase-D bridges: transport prefs/registries migrated onto SettingsStore are exposed
+    // here so the not-yet-graph :app consumers (god-classes, Composables) can resolve the single
+    // graph-owned instance. These accessors retire as the consumers dissolve in Phase C.
+    val geohashConversationRegistry: GeohashConversationRegistry
 }

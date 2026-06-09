@@ -8,6 +8,7 @@ import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.data.routing.MessageRouter
 import com.app.transport.mesh.BluetoothMeshService
+import com.app.transport.nostr.GeohashConversationRegistry
 import com.bitchat.android.service.MeshServiceHolder
 import com.russhwolf.settings.ObservableSettings
 import dev.zacsweers.metro.AppScope
@@ -59,6 +60,10 @@ object AndroidDataBindings {
 
     @Provides
     @SingleIn(AppScope::class)
-    fun provideMessageRouter(context: Context, mesh: BluetoothMeshService): MessageRouter =
-        MessageRouter.getInstance(context, mesh)
+    fun provideMessageRouter(
+        context: Context,
+        mesh: BluetoothMeshService,
+        geohashConversationRegistry: GeohashConversationRegistry,
+    ): MessageRouter =
+        MessageRouter.getInstance(context, mesh, geohashConversationRegistry)
 }
