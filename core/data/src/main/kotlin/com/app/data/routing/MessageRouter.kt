@@ -20,6 +20,7 @@ class MessageRouter private constructor(
     private val nostr: NostrTransport,
     private val geohashConversationRegistry: GeohashConversationRegistry,
     private val geohashAliasRegistry: GeohashAliasRegistry,
+    private val favoritesService: FavoritesPersistenceService,
 ) {
     companion object {
         private const val TAG = "MessageRouter"
@@ -31,13 +32,12 @@ class MessageRouter private constructor(
             nostrTransport: NostrTransport,
             geohashConversationRegistry: GeohashConversationRegistry,
             geohashAliasRegistry: GeohashAliasRegistry,
+            favoritesService: FavoritesPersistenceService,
         ): MessageRouter {
             val instance = INSTANCE ?: synchronized(this) {
-                INSTANCE ?: MessageRouter(context.applicationContext, mesh, nostrTransport, geohashConversationRegistry, geohashAliasRegistry).also { instance ->
+                INSTANCE ?: MessageRouter(context.applicationContext, mesh, nostrTransport, geohashConversationRegistry, geohashAliasRegistry, favoritesService).also { instance ->
                     // Register for favorites changes to flush outbox
-                    try {
-                        FavoritesPersistenceService.shared.addListener(instance.favoriteListener)
-                    } catch (_: Exception) {}
+                    favoritesService.addListener(instance.favoriteListener)
                     INSTANCE = instance
                 }
             }
@@ -175,11 +175,11 @@ class MessageRouter private constructor(
             // Full Noise key hex
             if (peerID.length == 64 && peerID.matches(Regex("^[0-9a-fA-F]+$"))) {
                 val noiseKey = hexToBytes(peerID)
-                val fav = FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey)
+                val fav = favoritesService.getFavoriteStatus(noiseKey)
                 fav?.isMutual == true && fav.peerNostrPublicKey != null
             } else if (peerID.length == 16 && peerID.matches(Regex("^[0-9a-fA-F]+$"))) {
                 // Ephemeral 16-hex mesh ID: resolve via prefix match in favorites
-                val fav = FavoritesPersistenceService.shared.getFavoriteStatus(peerID)
+                val fav = favoritesService.getFavoriteStatus(peerID)
                 fav?.isMutual == true && fav.peerNostrPublicKey != null
             } else {
                 false

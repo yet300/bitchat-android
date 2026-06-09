@@ -102,6 +102,8 @@ class ChatViewModel(
         (application as BitchatApplication).appGraph.peerFingerprintManager
     private val messageRouter =
         (application as BitchatApplication).appGraph.messageRouter
+    private val favoritesService =
+        (application as BitchatApplication).appGraph.favoritesPersistenceService
     private val identityManager by lazy { SecureIdentityStateManager(getApplication()) }
     private val messageManager = MessageManager(state, appStateStore)
     private val channelManager = ChannelManager(state, messageManager, dataManager, viewModelScope)
@@ -113,7 +115,7 @@ class ChatViewModel(
         override fun getMyPeerID(): String = meshService.myPeerID
     }
 
-    val privateChatManager = PrivateChatManager(state, messageManager, dataManager, noiseSessionDelegate, peerFingerprintManager)
+    val privateChatManager = PrivateChatManager(state, messageManager, dataManager, noiseSessionDelegate, peerFingerprintManager, favoritesService)
     private val commandProcessor = CommandProcessor(state, messageManager, channelManager, privateChatManager)
     private val notificationManager = NotificationManager(
       application.applicationContext,
@@ -129,7 +131,8 @@ class ChatViewModel(
         state = state,
         notificationManager = notificationManager,
         messageManager = messageManager,
-        geohashAliasRegistry = geohashAliasRegistry
+        geohashAliasRegistry = geohashAliasRegistry,
+        favoritesService = favoritesService,
     )
     val verifiedFingerprints = verificationHandler.verifiedFingerprints
 
@@ -147,7 +150,8 @@ class ChatViewModel(
         onHapticFeedback = { ChatViewModelUtils.triggerHapticFeedback(application.applicationContext) },
         getMyPeerID = { meshService.myPeerID },
         getMeshService = { meshService },
-        geohashAliasRegistry = geohashAliasRegistry
+        geohashAliasRegistry = geohashAliasRegistry,
+        favoritesService = favoritesService,
     )
     
     // New Geohash architecture ViewModel (replaces God object service usage in UI path)
@@ -305,9 +309,6 @@ class ChatViewModel(
         
         // Initialize new geohash architecture
         geohashViewModel.initialize()
-
-        // Initialize favorites persistence service
-        FavoritesPersistenceService.initialize(getApplication())
 
         // Load verified fingerprints from secure storage
         verificationHandler.loadVerifiedFingerprints()
@@ -474,7 +475,7 @@ class ChatViewModel(
                     meshNoiseKeyForPeer = { pid -> meshService.getPeerInfo(pid)?.noisePublicKey },
                     meshHasPeer = { pid -> meshService.getPeerInfo(pid)?.isConnected == true },
                     nostrPubHexForAlias = { alias -> geohashAliasRegistry.get(alias) },
-                    findNoiseKeyForNostr = { key -> FavoritesPersistenceService.shared.findNoiseKey(key) }
+                    findNoiseKeyForNostr = { key -> favoritesService.findNoiseKey(key) }
                 )
                 canonical ?: targetKey
             }
@@ -528,7 +529,7 @@ class ChatViewModel(
                 meshNoiseKeyForPeer = { pid -> meshService.getPeerInfo(pid)?.noisePublicKey },
                 meshHasPeer = { pid -> meshService.getPeerInfo(pid)?.isConnected == true },
                 nostrPubHexForAlias = { alias -> geohashAliasRegistry.get(alias) },
-                findNoiseKeyForNostr = { key -> FavoritesPersistenceService.shared.findNoiseKey(key) }
+                findNoiseKeyForNostr = { key -> favoritesService.findNoiseKey(key) }
             ).also { canonical ->
                 if (canonical != state.getSelectedPrivateChatPeerValue()) {
                     privateChatManager.startPrivateChat(canonical, meshService)
@@ -624,7 +625,7 @@ class ChatViewModel(
                     try {
                         noiseKey = peerID.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
                         // Prefer nickname from favorites store if available
-                        val rel = FavoritesPersistenceService.shared.getFavoriteStatus(noiseKey!!)
+                        val rel = favoritesService.getFavoriteStatus(noiseKey!!)
                         if (rel != null) nickname = rel.peerNickname
                     } catch (_: Exception) { }
                 }
@@ -636,7 +637,7 @@ class ChatViewModel(
                 val fingerprint = identityManager.generateFingerprint(noiseKey!!)
                 val isNowFavorite = dataManager.favoritePeers.contains(fingerprint)
 
-                FavoritesPersistenceService.shared.updateFavoriteStatus(
+                favoritesService.updateFavoriteStatus(
                     noisePublicKey = noiseKey!!,
                     nickname = nickname,
                     isFavorite = isNowFavorite
@@ -1041,7 +1042,7 @@ class ChatViewModel(
 
             // Clear FavoritesPersistenceService persistent relationships
             try {
-                FavoritesPersistenceService.shared.clearAllFavorites()
+                favoritesService.clearAllFavorites()
                 Log.d(TAG, "✅ Cleared FavoritesPersistenceService relationships")
             } catch (_: Exception) { }
             

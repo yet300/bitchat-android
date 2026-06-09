@@ -55,6 +55,7 @@ fun MeshPeerListSheet(
     modifier: Modifier = Modifier
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val favoritesService = (LocalContext.current.applicationContext as BitchatApplication).appGraph.favoritesPersistenceService
 
     val connectedPeers by viewModel.connectedPeers.collectAsStateWithLifecycle()
     val joinedChannels by viewModel.joinedChannels.collectAsStateWithLifecycle()
@@ -286,6 +287,7 @@ fun PeopleSection(
     viewModel: ChatViewModel,
     onPrivateChatStart: (String) -> Unit
 ) {
+    val favoritesService = (LocalContext.current.applicationContext as BitchatApplication).appGraph.favoritesPersistenceService
     Column(modifier = modifier) {
         Text(
             text = stringResource(id = R.string.people).uppercase(),
@@ -369,7 +371,7 @@ fun PeopleSection(
         }
 
         // Offline favorites (exclude ones mapped to connected)
-        val offlineFavorites = FavoritesPersistenceService.shared.getOurFavorites()
+        val offlineFavorites = favoritesService.getOurFavorites()
         offlineFavorites.forEach { fav ->
             val favPeerID = fav.peerNoisePublicKey.joinToString("") { b -> "%02x".format(b) }
             val isMappedToConnected = noiseHexByPeerID.values.any { it.equals(favPeerID, ignoreCase = true) }
@@ -446,7 +448,7 @@ fun PeopleSection(
 
             // Resolve potential Nostr conversation key for this favorite (for unread detection)
             val nostrConvKey: String? = try {
-                val npubOrHex = FavoritesPersistenceService.shared.findNostrPubkey(fav.peerNoisePublicKey)
+                val npubOrHex = favoritesService.findNostrPubkey(fav.peerNoisePublicKey)
                 if (npubOrHex != null) {
                     val hex = if (npubOrHex.startsWith("npub")) {
                         val (hrp, data) = com.app.transport.nostr.Bech32.decode(npubOrHex)

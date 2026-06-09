@@ -11,6 +11,7 @@ import com.app.domain.repository.SearchRepository
 import com.app.domain.repository.SettingsRepository
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.data.AppStateStore
+import com.app.data.favorites.FavoritesPersistenceService
 import com.app.data.routing.MessageRouter
 import com.app.transport.SeenMessageStore
 import com.app.transport.mesh.TransferProgressManager
@@ -66,4 +67,5 @@ interface AppGraph {
     // temporary Phase-D/DI-core bridge, retires Phase C
     val peerFingerprintManager: PeerFingerprintManager
     val messageRouter: MessageRouter
+    val favoritesPersistenceService: FavoritesPersistenceService
 }
