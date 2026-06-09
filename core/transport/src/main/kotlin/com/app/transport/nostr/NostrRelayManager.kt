@@ -133,9 +133,14 @@ class NostrRelayManager private constructor() {
     /**
      * Compute and connect to relays for a given geohash (nearest + optional defaults), cache the mapping.
      */
-    fun ensureGeohashRelaysConnected(geohash: String, nRelays: Int = 5, includeDefaults: Boolean = false) {
+    fun ensureGeohashRelaysConnected(
+        geohash: String,
+        relayDirectory: RelayDirectory,
+        nRelays: Int = 5,
+        includeDefaults: Boolean = false
+    ) {
         try {
-            val nearest = RelayDirectory.closestRelaysForGeohash(geohash, nRelays)
+            val nearest = relayDirectory.closestRelaysForGeohash(geohash, nRelays)
             val selected = if (includeDefaults) {
                 (nearest + Companion.defaultRelays()).toSet()
             } else nearest.toSet()
@@ -164,12 +169,13 @@ class NostrRelayManager private constructor() {
     fun subscribeForGeohash(
         geohash: String,
         filter: NostrFilter,
+        relayDirectory: RelayDirectory,
         id: String = generateSubscriptionId(),
         handler: (NostrEvent) -> Unit,
         includeDefaults: Boolean = false,
         nRelays: Int = 5
     ): String {
-        ensureGeohashRelaysConnected(geohash, nRelays, includeDefaults)
+        ensureGeohashRelaysConnected(geohash, relayDirectory, nRelays, includeDefaults)
         val relayUrls = getRelaysForGeohash(geohash)
         Log.d(TAG, "📡 Subscribing id=$id for geohash=$geohash on ${relayUrls.size} relays")
         return subscribe(
@@ -188,8 +194,14 @@ class NostrRelayManager private constructor() {
     /**
      * Send an event specifically to a geohash's relays (+ optional defaults).
      */
-    fun sendEventToGeohash(event: NostrEvent, geohash: String, includeDefaults: Boolean = false, nRelays: Int = 5) {
-        ensureGeohashRelaysConnected(geohash, nRelays, includeDefaults)
+    fun sendEventToGeohash(
+        event: NostrEvent,
+        geohash: String,
+        relayDirectory: RelayDirectory,
+        includeDefaults: Boolean = false,
+        nRelays: Int = 5
+    ) {
+        ensureGeohashRelaysConnected(geohash, relayDirectory, nRelays, includeDefaults)
         val relayUrls = getRelaysForGeohash(geohash)
         if (relayUrls.isEmpty()) {
             Log.w(TAG, "No target relays to send event for geohash=$geohash; falling back to defaults")

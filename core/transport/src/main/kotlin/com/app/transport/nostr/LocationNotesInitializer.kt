@@ -17,7 +17,7 @@ object LocationNotesInitializer {
      * @param context Application context
      * @return true if initialization succeeded, false otherwise
      */
-    fun initialize(context: Context): Boolean {
+    fun initialize(context: Context, relayDirectory: RelayDirectory): Boolean {
         return try {
             LocationNotesManager.getInstance().initialize(
                 relayManager = { NostrRelayManager.getInstance(context) },
@@ -33,6 +33,7 @@ object LocationNotesInitializer {
                     NostrRelayManager.getInstance(context).subscribeForGeohash(
                         geohash = geohashFromFilter,
                         filter = filter,
+                        relayDirectory = relayDirectory,
                         id = id,
                         handler = handler,
                         includeDefaults = true,

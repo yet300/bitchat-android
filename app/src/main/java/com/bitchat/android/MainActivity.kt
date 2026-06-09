@@ -663,7 +663,10 @@ class MainActivity : OrientationAwareActivity() {
                 Log.d("MainActivity", "Permissions verified, initializing chat system")
 
                 // Initialize Location Notes Manager (extracted to separate file)
-                com.app.transport.nostr.LocationNotesInitializer.initialize(this@MainActivity)
+                com.app.transport.nostr.LocationNotesInitializer.initialize(
+                    this@MainActivity,
+                    (application as BitchatApplication).appGraph.relayDirectory
+                )
                 
                 // Ensure all permissions are still granted (user might have revoked in settings)
                 if (!permissionManager.areAllPermissionsGranted()) {

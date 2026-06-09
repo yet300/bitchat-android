@@ -193,7 +193,7 @@ class LocationNotesManager private constructor() {
     /**
      * Send a new location note
      */
-    fun send(content: String, nickname: String?) {
+    fun send(content: String, nickname: String?, relayDirectory: RelayDirectory) {
         val currentGeohash = _geohash.value
         if (currentGeohash == null) {
             Log.w(TAG, "Cannot send note - no geohash set")
@@ -209,7 +209,7 @@ class LocationNotesManager private constructor() {
         // CRITICAL FIX: Get geo-specific relays for sending (matching iOS pattern)
         // iOS: let relays = dependencies.relayLookup(geohash, TransportConfig.nostrGeoRelayCount)
         val relays = try {
-            RelayDirectory.closestRelaysForGeohash(currentGeohash, 5)
+            relayDirectory.closestRelaysForGeohash(currentGeohash, 5)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to lookup relays for geohash $currentGeohash: ${e.message}")
             emptyList()

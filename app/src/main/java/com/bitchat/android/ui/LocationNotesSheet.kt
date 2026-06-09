@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
+import com.bitchat.android.BitchatApplication
 import com.bitchat.android.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -62,6 +63,7 @@ fun LocationNotesSheet(
     // Managers
     val notesManager = remember { LocationNotesManager.getInstance() }
     val locationManager = remember { LocationChannelManager.getInstance(context) }
+    val relayDirectory = (context.applicationContext as BitchatApplication).appGraph.relayDirectory
     
     // State
     val notes by notesManager.notes.collectAsStateWithLifecycle()
@@ -209,7 +211,7 @@ fun LocationNotesSheet(
                         onSend = {
                             val content = draft.trim()
                             if (content.isNotEmpty()) {
-                                notesManager.send(content, nickname)
+                                notesManager.send(content, nickname, relayDirectory)
                                 draft = ""
                             }
                         }
