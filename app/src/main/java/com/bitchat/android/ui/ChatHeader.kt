@@ -29,7 +29,9 @@ import androidx.compose.ui.unit.sp
 import com.bitchat.android.core.ui.utils.singleOrTripleClickable
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bitchat.android.BitchatApplication
 
 /**
  * Header components for ChatScreen
@@ -43,7 +45,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 fun TorStatusDot(
     modifier: Modifier = Modifier
 ) {
-    val torProvider = remember { com.app.transport.net.ArtiTorManager.getInstance() }
+    val torProvider = (LocalContext.current.applicationContext as BitchatApplication).appGraph.artiTorManager
     val torStatus by torProvider.statusFlow.collectAsState()
     
     if (torStatus.mode != com.app.transport.net.TorMode.OFF) {

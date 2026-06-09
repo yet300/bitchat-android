@@ -671,6 +671,7 @@ class MainActivity : OrientationAwareActivity() {
                     this@MainActivity,
                     (application as BitchatApplication).appGraph.relayDirectory,
                     (application as BitchatApplication).appGraph.nostrRelayManager,
+                    (application as BitchatApplication).appGraph.locationNotesManager,
                 )
                 
                 // Ensure all permissions are still granted (user might have revoked in settings)

@@ -19,6 +19,12 @@ object HttpClientProvider {
     private val httpClientRef = AtomicReference<HttpClient?>(null)
     private val wsClientRef = AtomicReference<HttpClient?>(null)
 
+    /**
+     * Set by ArtiTorManager.init() so this object never calls getInstance() directly.
+     * Retires when HttpClientProvider is graph-owned (Phase C).
+     */
+    var currentSocksProvider: (() -> java.net.InetSocketAddress?)? = null
+
     fun reset() {
         httpClientRef.getAndSet(null)?.close()
         wsClientRef.getAndSet(null)?.close()
@@ -57,10 +63,10 @@ object HttpClientProvider {
         return cacheOrClose(wsClientRef, created)
     }
 
-    // If a SOCKS address is defined, always use it. ArtiTorManager sets this as soon as Tor mode is
-    // ON, even before bootstrap, to prevent any direct connections from occurring.
+    // If a SOCKS address is defined, always use it. ArtiTorManager sets currentSocksProvider as
+    // soon as Tor mode is ON, even before bootstrap, to prevent any direct connections from occurring.
     private fun OkHttpConfig.applyTorProxy() {
-        val socks = ArtiTorManager.getInstance().currentSocksAddress()
+        val socks = currentSocksProvider?.invoke()
         if (socks != null) {
             proxy = Proxy(Proxy.Type.SOCKS, socks)
         }

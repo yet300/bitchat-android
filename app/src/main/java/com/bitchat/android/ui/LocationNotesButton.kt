@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.bitchat.android.R
 import com.bitchat.android.geohash.ChannelID
 import com.bitchat.android.geohash.LocationChannelManager
-import com.app.transport.nostr.LocationNotesManager
+import com.bitchat.android.BitchatApplication
 
 /**
  * Location Notes button component for MainHeader
@@ -45,7 +45,7 @@ fun LocationNotesButton(
     val locationEnabled = locationPermissionGranted && locationServicesEnabled
     
     // Get notes count from LocationNotesManager
-    val notesManager = remember { LocationNotesManager.getInstance() }
+    val notesManager = (LocalContext.current.applicationContext as BitchatApplication).appGraph.locationNotesManager
     val notes by notesManager.notes.collectAsStateWithLifecycle()
     val notesCount = notes.size
 

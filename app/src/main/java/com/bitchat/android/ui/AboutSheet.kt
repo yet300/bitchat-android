@@ -372,7 +372,7 @@ fun AboutSheet(
                         val powDifficulty by powPreferenceManager.powDifficulty.collectAsState()
                         var backgroundEnabled by remember { mutableStateOf(com.bitchat.android.service.MeshServicePreferences.isBackgroundEnabled(true)) }
                         val torMode = remember { mutableStateOf(torPreferenceManager.get()) }
-                        val torProvider = remember { ArtiTorManager.getInstance() }
+                        val torProvider = (LocalContext.current.applicationContext as BitchatApplication).appGraph.artiTorManager
                         val torStatus by torProvider.statusFlow.collectAsState()
                         val torAvailable = remember { torProvider.isTorAvailable() }
 
@@ -539,7 +539,7 @@ fun AboutSheet(
                     // Tor Status (when enabled)
                     item(key = "tor_status") {
                         val torMode = remember { mutableStateOf(torPreferenceManager.get()) }
-                        val torProvider = remember { ArtiTorManager.getInstance() }
+                        val torProvider = (androidx.compose.ui.platform.LocalContext.current.applicationContext as com.bitchat.android.BitchatApplication).appGraph.artiTorManager
                         val torStatus by torProvider.statusFlow.collectAsState()
                         
                         if (torMode.value == TorMode.ON) {

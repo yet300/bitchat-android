@@ -61,7 +61,7 @@ fun LocationNotesSheet(
     val accentGreen = if (isDark) Color.Green else Color(0xFF008000) // dark: green, light: dark green (0, 0.5, 0)
     
     // Managers
-    val notesManager = remember { LocationNotesManager.getInstance() }
+    val notesManager = (LocalContext.current.applicationContext as BitchatApplication).appGraph.locationNotesManager
     val locationManager = remember { LocationChannelManager.getInstance(context) }
     val relayDirectory = (context.applicationContext as BitchatApplication).appGraph.relayDirectory
     

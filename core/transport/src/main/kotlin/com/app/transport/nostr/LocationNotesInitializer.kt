@@ -17,9 +17,9 @@ object LocationNotesInitializer {
      * @param context Application context
      * @return true if initialization succeeded, false otherwise
      */
-    fun initialize(context: Context, relayDirectory: RelayDirectory, relayManager: NostrRelayManager): Boolean {
+    fun initialize(context: Context, relayDirectory: RelayDirectory, relayManager: NostrRelayManager, locationNotesManager: LocationNotesManager): Boolean {
         return try {
-            LocationNotesManager.getInstance().initialize(
+            locationNotesManager.initialize(
                 relayManager = { relayManager },
                 subscribe = { filter, id, handler ->
                     // CRITICAL FIX: Extract geohash properly from filter using getGeohash() method

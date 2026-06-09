@@ -1,5 +1,6 @@
 package com.bitchat.android.di
 
+import android.app.Application
 import android.content.Context
 import com.app.data.appSettings
 import com.app.crypto.EncryptionService
@@ -35,6 +36,10 @@ import dev.zacsweers.metro.SingleIn
 @ContributesTo(AppScope::class)
 @BindingContainer
 object AndroidDataBindings {
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideApplication(context: Context): Application = context.applicationContext as Application
 
     @Provides
     @SingleIn(AppScope::class)
