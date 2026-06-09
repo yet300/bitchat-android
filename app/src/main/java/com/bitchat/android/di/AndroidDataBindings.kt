@@ -6,17 +6,12 @@ import com.app.data.appSettings
 import com.app.crypto.EncryptionService
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.identity.SecureIdentityStateManager
-import com.app.data.favorites.FavoritesPersistenceService
-import com.app.data.nostr.NostrTransport
-import com.app.data.routing.MessageRouter
 import com.app.transport.SeenMessageStore
 import com.app.transport.mesh.TransferProgressManager
 import com.app.transport.meshgraph.MeshGraphService
 import com.app.transport.debug.DebugPreferenceManager
 import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.mesh.BluetoothMeshService
-import com.app.transport.nostr.GeohashAliasRegistry
-import com.app.transport.nostr.GeohashConversationRegistry
 import com.bitchat.android.service.MeshServiceHolder
 import com.russhwolf.settings.ObservableSettings
 import dev.zacsweers.metro.AppScope
@@ -67,15 +62,5 @@ object AndroidDataBindings {
     ): BluetoothMeshService =
         MeshServiceHolder.getOrCreate(context, debugSettingsManager, debugPreferenceManager, seenMessageStore, transferProgressManager, meshGraphService, peerFingerprintManager)
 
-    @Provides
-    @SingleIn(AppScope::class)
-    fun provideMessageRouter(
-        context: Context,
-        mesh: BluetoothMeshService,
-        nostrTransport: NostrTransport,
-        geohashConversationRegistry: GeohashConversationRegistry,
-        geohashAliasRegistry: GeohashAliasRegistry,
-        favoritesService: FavoritesPersistenceService,
-    ): MessageRouter =
-        MessageRouter.getInstance(context, mesh, nostrTransport, geohashConversationRegistry, geohashAliasRegistry, favoritesService)
+
 }
