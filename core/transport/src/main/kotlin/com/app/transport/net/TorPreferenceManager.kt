@@ -1,29 +1,40 @@
 package com.app.transport.net
 
-import android.content.Context
-import com.app.common.appSettings
+import com.app.domain.repository.SettingsStore
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-object TorPreferenceManager {
-    private const val KEY_TOR_MODE = "tor_mode"
+/**
+ * Persists the user's Tor [TorMode] preference through the domain [SettingsStore] port.
+ *
+ * App-scoped singleton: the current value is loaded once on construction and exposed reactively
+ * via [modeFlow] for the Tor manager / settings UI.
+ */
+@SingleIn(AppScope::class)
+@Inject
+class TorPreferenceManager(
+    private val settings: SettingsStore,
+) {
 
-    private val _modeFlow = MutableStateFlow(TorMode.ON)
+    private val _modeFlow = MutableStateFlow(read())
     val modeFlow: StateFlow<TorMode> = _modeFlow
 
-    fun init(context: Context) {
-        _modeFlow.value = read(context)
-    }
-
-    fun set(context: Context, mode: TorMode) {
-        appSettings(context).putString(KEY_TOR_MODE, mode.name)
+    fun set(mode: TorMode) {
+        settings.putString(KEY_TOR_MODE, mode.name)
         _modeFlow.value = mode
     }
 
-    fun get(context: Context): TorMode = read(context)
+    fun get(): TorMode = read()
 
-    private fun read(context: Context): TorMode {
-        val saved = appSettings(context).getString(KEY_TOR_MODE, TorMode.ON.name)
+    private fun read(): TorMode {
+        val saved = settings.getString(KEY_TOR_MODE, TorMode.ON.name)
         return runCatching { TorMode.valueOf(saved) }.getOrDefault(TorMode.ON)
+    }
+
+    private companion object {
+        const val KEY_TOR_MODE = "tor_mode"
     }
 }

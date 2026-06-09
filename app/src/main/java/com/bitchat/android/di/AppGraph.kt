@@ -13,6 +13,7 @@ import com.app.transport.debug.DebugPreferenceManager
 import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.nostr.GeohashConversationRegistry
+import com.app.transport.net.TorPreferenceManager
 import com.app.transport.nostr.PoWPreferenceManager
 import com.app.transport.nostr.RelayDirectory
 
@@ -42,4 +43,5 @@ interface AppGraph {
     val debugPreferenceManager: DebugPreferenceManager
     val powPreferenceManager: PoWPreferenceManager
     val relayDirectory: RelayDirectory
+    val torPreferenceManager: TorPreferenceManager
 }

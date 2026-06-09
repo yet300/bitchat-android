@@ -33,7 +33,7 @@ class BitchatApplication : Application(), MetroApplication {
         // Initialize Tor first so any early network goes over Tor
         try {
             val torProvider = ArtiTorManager.getInstance()
-            torProvider.init(this)
+            torProvider.init(this, appGraph.torPreferenceManager)
             // Reconnect Nostr relays when Tor resets (wired here so ArtiTorManager stays unaware of nostr)
             torProvider.onConnectionsReset = {
                 NostrRelayManager.shared.resetAllConnections()

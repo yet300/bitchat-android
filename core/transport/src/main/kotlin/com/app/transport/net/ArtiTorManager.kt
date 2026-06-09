@@ -119,13 +119,12 @@ class ArtiTorManager private constructor() {
                 socksAddr != null && s.state == TorState.RUNNING
     }
 
-    fun init(application: Application) {
+    fun init(application: Application, torPreferenceManager: TorPreferenceManager) {
         if (initialized) return
         synchronized(this) {
             if (initialized) return
             initialized = true
             currentApplication = application
-            TorPreferenceManager.init(application)
 
             val logListener = ArtiLogListener { logLine ->
                 val text = logLine ?: return@ArtiLogListener
@@ -142,7 +141,7 @@ class ArtiTorManager private constructor() {
                 .setLogListener(logListener)
                 .build()
 
-            val savedMode = TorPreferenceManager.get(application)
+            val savedMode = torPreferenceManager.get()
             if (savedMode == TorMode.ON) {
                 if (currentSocksPort < DEFAULT_SOCKS_PORT) {
                     currentSocksPort = DEFAULT_SOCKS_PORT
@@ -159,7 +158,7 @@ class ArtiTorManager private constructor() {
             }
 
             appScope.launch {
-                TorPreferenceManager.modeFlow.collect { mode ->
+                torPreferenceManager.modeFlow.collect { mode ->
                     applyMode(application, mode)
                 }
             }
