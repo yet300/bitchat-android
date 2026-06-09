@@ -8,4 +8,6 @@ dependencies {
     implementation(projects.core.common)
     implementation(projects.core.crypto)
     implementation(projects.core.transport)
+
+    implementation(libs.bundles.multiplatform.settings)
 }

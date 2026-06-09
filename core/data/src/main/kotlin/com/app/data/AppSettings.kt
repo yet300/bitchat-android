@@ -1,4 +1,4 @@
-package com.app.common
+package com.app.data
 
 import android.content.Context
 import com.russhwolf.settings.ObservableSettings
