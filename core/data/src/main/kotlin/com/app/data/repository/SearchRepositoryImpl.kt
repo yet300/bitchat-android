@@ -28,18 +28,19 @@ import kotlinx.serialization.builtins.serializer
 internal class SearchRepositoryImpl(
     private val settings: SettingsStore,
     private val favorites: FavoritesPersistenceService,
+    private val appStateStore: AppStateStore,
 ) : SearchRepository {
 
     override suspend fun searchMessages(query: String): List<BitMessage> {
         val matches = ArrayList<BitMessage>()
-        AppStateStore.publicMessages.value
+        appStateStore.publicMessages.value
             .filterByContent(query)
             .mapTo(matches) { it.toDomain(ConversationId.PublicMesh, MY_PEER_ID) }
-        AppStateStore.privateMessages.value.forEach { (peerId, list) ->
+        appStateStore.privateMessages.value.forEach { (peerId, list) ->
             val id = ConversationId.Private(PeerId(peerId))
             list.filterByContent(query).mapTo(matches) { it.toDomain(id, MY_PEER_ID) }
         }
-        AppStateStore.channelMessages.value.forEach { (tag, list) ->
+        appStateStore.channelMessages.value.forEach { (tag, list) ->
             val id = ConversationId.Channel(tag)
             list.filterByContent(query).mapTo(matches) { it.toDomain(id, MY_PEER_ID) }
         }

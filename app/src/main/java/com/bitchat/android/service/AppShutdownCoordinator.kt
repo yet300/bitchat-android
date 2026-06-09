@@ -43,7 +43,8 @@ object AppShutdownCoordinator {
         mesh: BluetoothMeshService?,
         notificationManager: NotificationManagerCompat,
         stopForeground: () -> Unit,
-        stopService: () -> Unit
+        stopService: () -> Unit,
+        appStateStore: AppStateStore,
     ) {
         val token = shutdownToken.incrementAndGet()
         shutdownJob?.cancel()
@@ -65,7 +66,7 @@ object AppShutdownCoordinator {
             }
 
             // Clear AppState in-memory store
-            try { AppStateStore.clear() } catch (_: Exception) { }
+            try { appStateStore.clear() } catch (_: Exception) { }
 
             // Stop foreground and clear notification
             try { stopForeground() } catch (_: Exception) { }

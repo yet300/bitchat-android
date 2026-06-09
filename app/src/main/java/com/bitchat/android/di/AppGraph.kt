@@ -9,6 +9,7 @@ import com.app.domain.repository.MessageTransport
 import com.app.domain.repository.PeerRepository
 import com.app.domain.repository.SearchRepository
 import com.app.domain.repository.SettingsRepository
+import com.app.data.AppStateStore
 import com.app.transport.debug.DebugPreferenceManager
 import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.nostr.GeohashAliasRegistry
@@ -44,4 +45,5 @@ interface AppGraph {
     val powPreferenceManager: PoWPreferenceManager
     val relayDirectory: RelayDirectory
     val torPreferenceManager: TorPreferenceManager
+    val appStateStore: AppStateStore
 }

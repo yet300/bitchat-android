@@ -11,7 +11,10 @@ import kotlin.time.ExperimentalTime
 /**
  * Handles all message-related operations including deduplication and organization
  */
-class MessageManager(private val state: ChatState) {
+class MessageManager(
+    private val state: ChatState,
+    private val appStateStore: AppStateStore,
+) {
     
     // Message deduplication - FIXED: Prevent duplicate messages from dual connection paths
     private val processedUIMessages = Collections.synchronizedSet(mutableSetOf<String>())
@@ -26,7 +29,7 @@ class MessageManager(private val state: ChatState) {
         currentMessages.add(message)
         state.setMessages(currentMessages)
         // Reflect into process-wide store so snapshot replacements don't drop local outgoing messages
-        try { AppStateStore.addPublicMessage(message) } catch (_: Exception) { }
+        try { appStateStore.addPublicMessage(message) } catch (_: Exception) { }
     }
 
     // Log a system message into the main chat (visible to user)
@@ -58,7 +61,7 @@ class MessageManager(private val state: ChatState) {
         currentChannelMessages[channel] = channelMessageList
         state.setChannelMessages(currentChannelMessages)
         // Reflect into process-wide store
-        try { AppStateStore.addChannelMessage(channel, message) } catch (_: Exception) { }
+        try { appStateStore.addChannelMessage(channel, message) } catch (_: Exception) { }
         
         // Update unread count if not currently viewing this channel
         // Consider both classic channels (state.currentChannel) and geohash location channel selection
@@ -113,7 +116,7 @@ class MessageManager(private val state: ChatState) {
         currentPrivateChats[peerID] = chatMessages
         state.setPrivateChats(currentPrivateChats)
         // Reflect into process-wide store
-        try { AppStateStore.addPrivateMessage(peerID, message) } catch (_: Exception) { }
+        try { appStateStore.addPrivateMessage(peerID, message) } catch (_: Exception) { }
         
         // Mark as unread if not currently viewing this chat
         if (state.getSelectedPrivateChatPeerValue() != peerID && message.sender != state.getNicknameValue()) {
@@ -134,7 +137,7 @@ class MessageManager(private val state: ChatState) {
         currentPrivateChats[peerID] = chatMessages
         state.setPrivateChats(currentPrivateChats)
         // Reflect into process-wide store
-        try { AppStateStore.addPrivateMessage(peerID, message) } catch (_: Exception) { }
+        try { appStateStore.addPrivateMessage(peerID, message) } catch (_: Exception) { }
     }
     
     fun clearPrivateMessages(peerID: String) {
@@ -254,7 +257,7 @@ class MessageManager(private val state: ChatState) {
         if (updated) {
             state.setPrivateChats(updatedPrivateChats)
             // Keep process-wide store in sync to prevent snapshot overwrites resetting status
-            try { AppStateStore.updatePrivateMessageStatus(messageID, status) } catch (_: Exception) { }
+            try { appStateStore.updatePrivateMessageStatus(messageID, status) } catch (_: Exception) { }
         }
         
         // Update in main messages

@@ -1,7 +1,6 @@
 package com.bitchat.android.service
 
 import android.content.Context
-import com.app.data.AppStateStore
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.data.routing.MessageRouter
 import com.app.transport.GeohashReadReceiptRouter
@@ -70,7 +69,7 @@ object MeshServiceHolder {
             com.bitchat.android.services.NicknameProvider.getNickname(appCtx, fallback)
         }
         // Process-wide in-memory store the UI hydrates from.
-        service.incomingSink = AppStateStore
+        service.incomingSink = (appCtx as BitchatApplication).appGraph.appStateStore
         // Noise<->Nostr favorite mapping, backed by favorites persistence.
         service.favoriteNostrLink = object : com.app.transport.FavoriteNostrLink {
             override fun updatePeerFavoritedUs(noiseKey: ByteArray, theyFavoritedUs: Boolean) {

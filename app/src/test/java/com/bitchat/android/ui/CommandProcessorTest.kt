@@ -24,7 +24,7 @@ class CommandProcessorTest() {
   private val chatState = ChatState(scope = testScope)
   private lateinit var commandProcessor: CommandProcessor
 
-  val messageManager: MessageManager = MessageManager(state = chatState)
+  val messageManager: MessageManager = MessageManager(state = chatState, appStateStore = com.app.data.AppStateStore())
   val channelManager: ChannelManager = ChannelManager(
     state = chatState,
     messageManager = messageManager,

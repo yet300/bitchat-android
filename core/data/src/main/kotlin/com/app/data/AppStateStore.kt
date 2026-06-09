@@ -7,6 +7,9 @@ import kotlin.time.ExperimentalTime
 import com.app.transport.IncomingMessageSink
 import com.app.transport.model.BitchatMessage
 import com.app.transport.model.DeliveryStatus
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,8 +17,13 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * Process-wide in-memory state store that survives Activity recreation.
  * The foreground Mesh service updates this store; UI subscribes/hydrates from it.
+ *
+ * App-scoped graph singleton: the data-layer repositories inject it directly; the not-yet-graph
+ * :app consumers (mesh sink wiring, god-classes) resolve the single instance via the graph.
  */
-object AppStateStore : IncomingMessageSink {
+@SingleIn(AppScope::class)
+@Inject
+class AppStateStore : IncomingMessageSink {
     // Global de-dup set by message id to avoid duplicate keys in Compose lists
     private val seenMessageIds = mutableSetOf<String>()
     // Connected peer IDs (mesh ephemeral IDs)

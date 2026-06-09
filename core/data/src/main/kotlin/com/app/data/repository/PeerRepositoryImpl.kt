@@ -19,23 +19,24 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**
- * Mesh peer state. The connected-peer-id stream is [AppStateStore.peers] (the mesh sink calls
+ * Mesh peer state. The connected-peer-id stream is [appStateStore.peers] (the mesh sink calls
  * `setPeers`); the rich per-peer info comes from the injected [BluetoothMeshService].
  */
 @SingleIn(AppScope::class)
 @Inject
 internal class PeerRepositoryImpl(
     private val mesh: BluetoothMeshService,
+    private val appStateStore: AppStateStore,
 ) : PeerRepository {
 
     override fun observePeers(): Flow<List<Peer>> =
-        AppStateStore.peers.map { ids -> ids.mapNotNull(::toPeer) }
+        appStateStore.peers.map { ids -> ids.mapNotNull(::toPeer) }
 
     override fun observeConnectionState(): Flow<Boolean> =
-        AppStateStore.peers.map { it.isNotEmpty() }
+        appStateStore.peers.map { it.isNotEmpty() }
 
     override suspend fun snapshot(): List<Peer> =
-        AppStateStore.peers.value.mapNotNull(::toPeer)
+        appStateStore.peers.value.mapNotNull(::toPeer)
 
     override suspend fun peer(id: PeerId): Peer? = toPeer(id.raw)
 
