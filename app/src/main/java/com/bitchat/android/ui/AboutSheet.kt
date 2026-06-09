@@ -33,7 +33,6 @@ import com.bitchat.android.R
 import com.bitchat.android.core.ui.component.button.CloseButton
 import com.bitchat.android.core.ui.component.sheet.BitchatBottomSheet
 import com.app.transport.net.TorMode
-import com.app.transport.net.TorPreferenceManager
 import com.app.transport.net.ArtiTorManager
 
 /**
@@ -205,6 +204,8 @@ fun AboutSheet(
     val context = LocalContext.current
     val powPreferenceManager =
         (context.applicationContext as BitchatApplication).appGraph.powPreferenceManager
+    val torPreferenceManager =
+        (context.applicationContext as BitchatApplication).appGraph.torPreferenceManager
 
     // Get version name from package info
     val versionName = remember {
@@ -370,7 +371,7 @@ fun AboutSheet(
                         val powEnabled by powPreferenceManager.powEnabled.collectAsState()
                         val powDifficulty by powPreferenceManager.powDifficulty.collectAsState()
                         var backgroundEnabled by remember { mutableStateOf(com.bitchat.android.service.MeshServicePreferences.isBackgroundEnabled(true)) }
-                        val torMode = remember { mutableStateOf(TorPreferenceManager.get(context)) }
+                        val torMode = remember { mutableStateOf(torPreferenceManager.get()) }
                         val torProvider = remember { ArtiTorManager.getInstance() }
                         val torStatus by torProvider.statusFlow.collectAsState()
                         val torAvailable = remember { torProvider.isTorAvailable() }
@@ -434,7 +435,7 @@ fun AboutSheet(
                                         onCheckedChange = { enabled ->
                                             if (torAvailable) {
                                                 torMode.value = if (enabled) TorMode.ON else TorMode.OFF
-                                                TorPreferenceManager.set(context, torMode.value)
+                                                torPreferenceManager.set(torMode.value)
                                             }
                                         },
                                         enabled = torAvailable,
@@ -537,7 +538,7 @@ fun AboutSheet(
 
                     // Tor Status (when enabled)
                     item(key = "tor_status") {
-                        val torMode = remember { mutableStateOf(TorPreferenceManager.get(context)) }
+                        val torMode = remember { mutableStateOf(torPreferenceManager.get()) }
                         val torProvider = remember { ArtiTorManager.getInstance() }
                         val torStatus by torProvider.statusFlow.collectAsState()
                         
