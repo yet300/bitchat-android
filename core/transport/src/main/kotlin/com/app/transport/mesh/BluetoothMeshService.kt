@@ -4,7 +4,6 @@ import android.content.Context
 import android.util.Log
 import com.app.crypto.EncryptionService
 import com.app.transport.model.BitchatMessage
-import com.app.transport.protocol.MessagePadding
 import com.app.transport.model.RoutedPacket
 import com.app.transport.model.IdentityAnnouncement
 import com.app.transport.model.NoisePayload
@@ -23,6 +22,8 @@ import com.app.transport.IncomingMessageSink
 import com.app.transport.FavoriteNostrLink
 import com.app.transport.GeohashReadReceiptRouter
 import com.app.transport.SeenMessageStore
+import com.app.transport.meshgraph.MeshGraphService
+import com.app.transport.meshgraph.RoutePlanner
 import kotlinx.coroutines.*
 
 /**
@@ -44,6 +45,7 @@ class BluetoothMeshService(
     private val debugPreferenceManager: com.app.transport.debug.DebugPreferenceManager,
     private val seenMessageStore: SeenMessageStore,
     private val transferProgressManager: TransferProgressManager,
+    private val meshGraphService: MeshGraphService,
 ) {
     private val debugManager = debugSettingsManager
     
@@ -61,7 +63,7 @@ class BluetoothMeshService(
     private val fragmentManager = FragmentManager()
     private val securityManager = SecurityManager(encryptionService, myPeerID)
     private val storeForwardManager = StoreForwardManager()
-    private val messageHandler = MessageHandler(myPeerID, context.applicationContext)
+    private val messageHandler = MessageHandler(myPeerID, context.applicationContext, meshGraphService)
     val connectionManager = BluetoothConnectionManager(context, myPeerID, debugSettingsManager, fragmentManager, transferProgressManager) // Made internal for access
     private val packetProcessor = PacketProcessor(myPeerID, debugSettingsManager)
     private lateinit var gossipSyncManager: GossipSyncManager
@@ -207,7 +209,7 @@ class BluetoothMeshService(
             override fun onPeerRemoved(peerID: String) {
                 try { gossipSyncManager.removeAnnouncementForPeer(peerID) } catch (_: Exception) { }
                 // Remove from mesh graph topology to prevent routing through stale peers
-                try { com.app.transport.meshgraph.MeshGraphService.getInstance().removePeer(peerID) } catch (_: Exception) { }
+                try { meshGraphService.removePeer(peerID) } catch (_: Exception) { }
 
                 // Also drop any Noise session state for this peer when they go offline
                 try {
@@ -1071,7 +1073,7 @@ class BluetoothMeshService(
                 }
                 // Always update our own node in the mesh graph with the neighbor list we used
                 try {
-                    com.app.transport.meshgraph.MeshGraphService.getInstance()
+                    meshGraphService
                         .updateFromAnnouncement(myPeerID, nickname, directPeers, System.currentTimeMillis().toULong())
                 } catch (_: Exception) { }
             } catch (_: Exception) { }
@@ -1134,7 +1136,7 @@ class BluetoothMeshService(
             }
             // Always update our own node in the mesh graph with the neighbor list we used
             try {
-                com.app.transport.meshgraph.MeshGraphService.getInstance()
+                meshGraphService
                     .updateFromAnnouncement(myPeerID, nickname, directPeers, System.currentTimeMillis().toULong())
             } catch (_: Exception) { }
         } catch (_: Exception) { }
@@ -1360,7 +1362,7 @@ class BluetoothMeshService(
                 val rec = packet.recipientID
                 if (rec != null && !rec.contentEquals(SpecialRecipients.BROADCAST)) {
                     val dest = rec.joinToString("") { b -> "%02x".format(b) }
-                    val path = com.app.transport.meshgraph.RoutePlanner.shortestPath(myPeerID, dest)
+                    val path = RoutePlanner.shortestPath(myPeerID, dest, meshGraphService)
                     if (path != null && path.size >= 3) {
                         // Exclude first (sender) and last (recipient); only intermediates
                         val intermediates = path.subList(1, path.size - 1)

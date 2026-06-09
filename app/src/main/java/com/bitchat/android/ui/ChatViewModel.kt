@@ -997,6 +997,7 @@ class ChatViewModel(
             appGraph.debugPreferenceManager,
             appGraph.seenMessageStore,
             appGraph.transferProgressManager,
+            appGraph.meshGraphService,
         )
 
         // Replace our reference and set up the new service
