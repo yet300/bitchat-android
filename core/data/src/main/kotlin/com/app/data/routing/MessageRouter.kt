@@ -19,6 +19,7 @@ class MessageRouter private constructor(
     private var mesh: BluetoothMeshService,
     private val nostr: NostrTransport,
     private val geohashConversationRegistry: GeohashConversationRegistry,
+    private val geohashAliasRegistry: GeohashAliasRegistry,
 ) {
     companion object {
         private const val TAG = "MessageRouter"
@@ -27,12 +28,13 @@ class MessageRouter private constructor(
         fun getInstance(
             context: Context,
             mesh: BluetoothMeshService,
-            geohashConversationRegistry: GeohashConversationRegistry
+            geohashConversationRegistry: GeohashConversationRegistry,
+            geohashAliasRegistry: GeohashAliasRegistry
         ): MessageRouter {
             val instance = INSTANCE ?: synchronized(this) {
                 INSTANCE ?: run {
                     val nostr = NostrTransport.getInstance(context)
-                    MessageRouter(context.applicationContext, mesh, nostr, geohashConversationRegistry).also { instance ->
+                    MessageRouter(context.applicationContext, mesh, nostr, geohashConversationRegistry, geohashAliasRegistry).also { instance ->
                         // Register for favorites changes to flush outbox
                         try {
                             FavoritesPersistenceService.shared.addListener(instance.favoriteListener)
@@ -67,9 +69,9 @@ class MessageRouter private constructor(
 
     fun sendPrivate(content: String, toPeerID: String, recipientNickname: String, messageID: String) {
         // First: if this is a geohash DM alias (nostr_<pub16>), route via Nostr using global registry
-        if (GeohashAliasRegistry.contains(toPeerID)) {
+        if (geohashAliasRegistry.contains(toPeerID)) {
             Log.d(TAG, "Routing PM via Nostr (geohash) to alias ${toPeerID.take(12)}… id=${messageID.take(8)}…")
-            val recipientHex = GeohashAliasRegistry.get(toPeerID)
+            val recipientHex = geohashAliasRegistry.get(toPeerID)
             if (recipientHex != null) {
                 // Resolve the conversation's source geohash, so we can send from anywhere
                 val sourceGeohash = geohashConversationRegistry.get(toPeerID)
@@ -110,8 +112,8 @@ class MessageRouter private constructor(
     fun sendDeliveryAck(messageID: String, toPeerID: String) {
         // Mesh delivery ACKs are sent by the receiver automatically.
         // Only route via Nostr when mesh path isn't available or when this is a geohash alias
-        if (GeohashAliasRegistry.contains(toPeerID)) {
-            val recipientHex = GeohashAliasRegistry.get(toPeerID)
+        if (geohashAliasRegistry.contains(toPeerID)) {
+            val recipientHex = geohashAliasRegistry.get(toPeerID)
             if (recipientHex != null) {
                 nostr.sendDeliveryAckGeohash(messageID, recipientHex, try { NostrIdentityBridge.getCurrentNostrIdentity(context)!! } catch (_: Exception) { return })
                 return

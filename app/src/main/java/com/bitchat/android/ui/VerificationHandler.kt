@@ -33,7 +33,8 @@ class VerificationHandler(
     private val identityManager: SecureIdentityStateManager,
     private val state: ChatState,
     private val notificationManager: NotificationManager,
-    private val messageManager: MessageManager
+    private val messageManager: MessageManager,
+    private val geohashAliasRegistry: GeohashAliasRegistry,
 ) {
     // Helper to get current mesh service (may change after panic clear)
     private val meshService: BluetoothMeshService
@@ -208,7 +209,7 @@ class VerificationHandler(
                     favorite?.peerNoisePublicKey?.let { fingerprintFromNoiseBytes(it) }
                 }
                 peerID.startsWith("nostr_") -> {
-                    val pubHex = GeohashAliasRegistry.get(peerID)
+                    val pubHex = geohashAliasRegistry.get(peerID)
                     val noiseKey = pubHex?.let {
                         FavoritesPersistenceService.shared.findNoiseKey(it)
                     }
@@ -219,7 +220,7 @@ class VerificationHandler(
                 }
                 peerID.startsWith("nostr:") -> {
                     val prefix = peerID.removePrefix("nostr:").lowercase()
-                    val pubHex = GeohashAliasRegistry
+                    val pubHex = geohashAliasRegistry
                         .snapshot()
                         .values
                         .firstOrNull { it.lowercase().startsWith(prefix) }

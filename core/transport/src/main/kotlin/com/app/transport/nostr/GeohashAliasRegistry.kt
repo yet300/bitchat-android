@@ -1,9 +1,10 @@
 package com.app.transport.nostr
 
-import android.content.Context
-import com.app.common.appSettings
 import com.app.common.serialization.JsonConfig
-import com.russhwolf.settings.Settings
+import com.app.domain.repository.SettingsStore
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import java.util.concurrent.ConcurrentHashMap
@@ -11,29 +12,30 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * GeohashAliasRegistry
  * - Global, thread-safe registry for alias->Nostr pubkey mappings (e.g., nostr_<pub16> -> pubkeyHex)
- * - Persisted as a single JSON map under [KEY] in the shared app settings store.
+ * - Persisted as a single JSON map under [KEY] through the [SettingsStore] port.
+ *
+ * App-scoped singleton: the in-memory map is loaded once on construction and persisted on writes.
  */
-object GeohashAliasRegistry {
+@SingleIn(AppScope::class)
+@Inject
+class GeohashAliasRegistry(
+    private val settings: SettingsStore,
+) {
     private val map: MutableMap<String, String> = ConcurrentHashMap()
-    private const val KEY = "geohash_alias_registry"
     private val serializer = MapSerializer(String.serializer(), String.serializer())
-    private var settings: Settings? = null
 
-    fun initialize(context: Context) {
-        if (settings == null) {
-            settings = appSettings(context)
-            load()
-        }
+    init {
+        load()
     }
 
     private fun load() {
-        val json = settings?.getStringOrNull(KEY) ?: return
+        val json = settings.getStringOrNull(KEY) ?: return
         runCatching { JsonConfig.json.decodeFromString(serializer, json) }
             .getOrNull()?.let { map.putAll(it) }
     }
 
     private fun persist() {
-        settings?.putString(KEY, JsonConfig.json.encodeToString(serializer, HashMap(map)))
+        settings.putString(KEY, JsonConfig.json.encodeToString(serializer, HashMap(map)))
     }
 
     fun put(alias: String, pubkeyHex: String) {
@@ -49,6 +51,10 @@ object GeohashAliasRegistry {
 
     fun clear() {
         map.clear()
-        settings?.remove(KEY)
+        settings.remove(KEY)
+    }
+
+    private companion object {
+        const val KEY = "geohash_alias_registry"
     }
 }

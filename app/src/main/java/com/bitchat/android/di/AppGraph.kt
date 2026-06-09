@@ -9,6 +9,7 @@ import com.app.domain.repository.MessageTransport
 import com.app.domain.repository.PeerRepository
 import com.app.domain.repository.SearchRepository
 import com.app.domain.repository.SettingsRepository
+import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.nostr.GeohashConversationRegistry
 
 /**
@@ -32,4 +33,5 @@ interface AppGraph {
     // here so the not-yet-graph :app consumers (god-classes, Composables) can resolve the single
     // graph-owned instance. These accessors retire as the consumers dissolve in Phase C.
     val geohashConversationRegistry: GeohashConversationRegistry
+    val geohashAliasRegistry: GeohashAliasRegistry
 }
