@@ -13,6 +13,7 @@ import com.app.transport.debug.DebugPreferenceManager
 import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.nostr.GeohashConversationRegistry
+import com.app.transport.nostr.PoWPreferenceManager
 
 /**
  * Public API of the application dependency graph: the domain ports the app (and, in Phase C, the
@@ -38,4 +39,5 @@ interface AppGraph {
     val geohashAliasRegistry: GeohashAliasRegistry
     val debugSettingsManager: DebugSettingsManager
     val debugPreferenceManager: DebugPreferenceManager
+    val powPreferenceManager: PoWPreferenceManager
 }

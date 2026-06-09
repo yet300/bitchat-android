@@ -40,7 +40,6 @@ import com.bitchat.android.ui.ChatScreen
 import com.bitchat.android.ui.ChatViewModel
 import com.bitchat.android.ui.OrientationAwareActivity
 import com.bitchat.android.ui.theme.BitchatTheme
-import com.app.transport.nostr.PoWPreferenceManager
 import com.app.transport.VerificationService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -662,11 +661,7 @@ class MainActivity : OrientationAwareActivity() {
                 delay(1000) // Give the system time to process permission grants
                 
                 Log.d("MainActivity", "Permissions verified, initializing chat system")
-                
-                // Initialize PoW preferences early in the initialization process
-                PoWPreferenceManager.init(this@MainActivity)
-                Log.d("MainActivity", "PoW preferences initialized")
-                
+
                 // Initialize Location Notes Manager (extracted to separate file)
                 com.app.transport.nostr.LocationNotesInitializer.initialize(this@MainActivity)
                 

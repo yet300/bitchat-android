@@ -11,17 +11,20 @@ import kotlinx.coroutines.flow.asStateFlow
  * High-level Nostr client that manages identity, connections, and messaging
  * Provides a simple API for the rest of the application
  */
-class NostrClient private constructor(private val context: Context) {
-    
+class NostrClient private constructor(
+    private val context: Context,
+    private val powPreferenceManager: PoWPreferenceManager,
+) {
+
     companion object {
         private const val TAG = "NostrClient"
-        
+
         @Volatile
         private var INSTANCE: NostrClient? = null
-        
-        fun getInstance(context: Context): NostrClient {
+
+        fun getInstance(context: Context, powPreferenceManager: PoWPreferenceManager): NostrClient {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: NostrClient(context.applicationContext).also { INSTANCE = it }
+                INSTANCE ?: NostrClient(context.applicationContext, powPreferenceManager).also { INSTANCE = it }
             }
         }
     }
@@ -175,6 +178,7 @@ class NostrClient private constructor(private val context: Context) {
                     content = content,
                     geohash = geohash,
                     senderIdentity = geohashIdentity,
+                    powPreferenceManager = powPreferenceManager,
                     nickname = nickname
                 )
                 
@@ -283,7 +287,7 @@ class NostrClient private constructor(private val context: Context) {
     ) {
         try {
             // Check Proof of Work validation for incoming geohash events
-            val powSettings = PoWPreferenceManager.getCurrentSettings()
+            val powSettings = powPreferenceManager.getCurrentSettings()
             if (powSettings.enabled && powSettings.difficulty > 0) {
                 if (!NostrProofOfWork.validateDifficulty(event, powSettings.difficulty)) {
                     Log.w(TAG, "🚫 Rejecting geohash event ${event.id.take(8)}... due to insufficient PoW (required: ${powSettings.difficulty})")
