@@ -54,6 +54,8 @@ class GeohashViewModel(
         (application as BitchatApplication).appGraph.powPreferenceManager
     private val relayDirectory =
         (application as BitchatApplication).appGraph.relayDirectory
+    private val seenMessageStore =
+        (application as BitchatApplication).appGraph.seenMessageStore
     private val repo = GeohashRepository(application, state, dataManager)
     private val subscriptionManager = NostrSubscriptionManager(application, viewModelScope, relayDirectory)
     private val geohashMessageHandler = GeohashMessageHandler(
@@ -75,7 +77,8 @@ class GeohashViewModel(
         repo = repo,
         dataManager = dataManager,
         geohashConversationRegistry = geohashConversationRegistry,
-        geohashAliasRegistry = geohashAliasRegistry
+        geohashAliasRegistry = geohashAliasRegistry,
+        seenMessageStore = seenMessageStore,
     )
 
     private var currentGeohashSubId: String? = null

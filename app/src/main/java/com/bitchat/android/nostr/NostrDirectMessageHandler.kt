@@ -37,10 +37,11 @@ class NostrDirectMessageHandler(
     private val dataManager: DataManager,
     private val geohashConversationRegistry: GeohashConversationRegistry,
     private val geohashAliasRegistry: GeohashAliasRegistry,
+    private val seenMessageStore: SeenMessageStore,
 ) {
     companion object { private const val TAG = "NostrDirectMessageHandler" }
 
-    private val seenStore by lazy { SeenMessageStore.getInstance(application) }
+    private val seenStore get() = seenMessageStore
 
     // Simple event deduplication
     private val processedIds = ArrayDeque<String>()

@@ -116,6 +116,7 @@ class MainActivity : OrientationAwareActivity() {
             applicationContext,
             (application as BitchatApplication).appGraph.debugSettingsManager,
             (application as BitchatApplication).appGraph.debugPreferenceManager,
+            (application as BitchatApplication).appGraph.seenMessageStore,
         )
         bluetoothStatusManager = BluetoothStatusManager(
             activity = this,

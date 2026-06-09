@@ -7,6 +7,7 @@ import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.data.routing.MessageRouter
+import com.app.transport.SeenMessageStore
 import com.app.transport.debug.DebugPreferenceManager
 import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.mesh.BluetoothMeshService
@@ -62,8 +63,9 @@ object AndroidDataBindings {
         context: Context,
         debugSettingsManager: DebugSettingsManager,
         debugPreferenceManager: DebugPreferenceManager,
+        seenMessageStore: SeenMessageStore,
     ): BluetoothMeshService =
-        MeshServiceHolder.getOrCreate(context, debugSettingsManager, debugPreferenceManager)
+        MeshServiceHolder.getOrCreate(context, debugSettingsManager, debugPreferenceManager, seenMessageStore)
 
     @Provides
     @SingleIn(AppScope::class)

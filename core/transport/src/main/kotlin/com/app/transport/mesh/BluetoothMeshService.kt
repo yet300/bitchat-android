@@ -22,6 +22,7 @@ import com.app.transport.VerificationService
 import com.app.transport.IncomingMessageSink
 import com.app.transport.FavoriteNostrLink
 import com.app.transport.GeohashReadReceiptRouter
+import com.app.transport.SeenMessageStore
 import kotlinx.coroutines.*
 
 /**
@@ -41,6 +42,7 @@ class BluetoothMeshService(
     private val context: Context,
     private val debugSettingsManager: com.app.transport.debug.DebugSettingsManager,
     private val debugPreferenceManager: com.app.transport.debug.DebugPreferenceManager,
+    private val seenMessageStore: SeenMessageStore,
 ) {
     private val debugManager = debugSettingsManager
     
@@ -945,8 +947,7 @@ class BluetoothMeshService(
 
             try {
                 // Avoid duplicate read receipts: check persistent store first
-                val seenStore = try { com.app.transport.SeenMessageStore.getInstance(context.applicationContext) } catch (_: Exception) { null }
-                if (seenStore?.hasRead(messageID) == true) {
+                if (seenMessageStore.hasRead(messageID)) {
                     Log.d(TAG, "Skipping read receipt for $messageID - already marked read")
                     return@launch
                 }
@@ -978,7 +979,7 @@ class BluetoothMeshService(
                 Log.d(TAG, "📤 Sent read receipt to $recipientPeerID for message $messageID")
 
                 // Persist as read after successful send
-                try { seenStore?.markRead(messageID) } catch (_: Exception) { }
+                seenMessageStore.markRead(messageID)
 
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send read receipt to $recipientPeerID: ${e.message}")
