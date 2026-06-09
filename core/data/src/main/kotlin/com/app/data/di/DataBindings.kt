@@ -9,7 +9,9 @@ import com.app.data.repository.PeerRepositoryImpl
 import com.app.data.repository.SearchRepositoryImpl
 import com.app.data.repository.SettingsRepositoryImpl
 import com.app.data.repository.SettingsStoreImpl
+import com.app.data.routing.RoutingCore
 import com.app.data.routing.RoutingMessageTransport
+import com.app.data.routing.RouteSelector
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationRepository
@@ -62,4 +64,7 @@ abstract class DataBindings {
 
     @Binds
     internal abstract val RoutingMessageTransport.bindTransport: MessageTransport
+
+    @Binds
+    internal abstract val RouteSelector.bindRoutingCore: RoutingCore
 }
