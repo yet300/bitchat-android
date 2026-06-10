@@ -9,35 +9,15 @@ import com.app.transport.routing.OutgoingEnvelope
  *
  * Keeps the existing call-site API ([sendPrivate], [sendReadReceipt], [sendDeliveryAck],
  * [sendFavoriteNotification], [onSessionEstablished], [onPeersUpdated]) so god-class
- * callers (ChatViewModel, MeshServiceHolder) need no changes until Phase C dissolves them.
+ * callers (ChatViewModel) need no changes until Phase C dissolves them.
  *
  * All routing logic has moved to [RouteSelector] + [MeshRouteStrategy]/[NostrRouteStrategy].
  * The former if/else branching (duplicated 4×) is gone — the Shotgun Surgery smell is fixed.
  */
-class MessageRouter private constructor(
+class MessageRouter(
     private val routingCore: RoutingCore,
     private val mesh: BluetoothMeshService,
 ) {
-    companion object {
-        private const val TAG = "MessageRouter"
-        @Volatile private var INSTANCE: MessageRouter? = null
-
-        /** Returns the graph-owned singleton if it has been created, or null. */
-        fun tryGetInstance(): MessageRouter? = INSTANCE
-
-        /**
-         * Graph entry-point called by [com.bitchat.android.di.AndroidDataBindings].
-         * Stores the graph-owned instance so [tryGetInstance] works for legacy call-sites.
-         */
-        fun getInstance(
-            routingCore: RoutingCore,
-            mesh: BluetoothMeshService,
-        ): MessageRouter {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: MessageRouter(routingCore, mesh).also { INSTANCE = it }
-            }
-        }
-    }
 
     // -------------------------------------------------------------------------
     // Send API — each method is now a single-line delegation to RouteSelector

@@ -30,6 +30,7 @@ class MeshDelegateHandler(
     private val getMeshService: () -> BluetoothMeshService,
     private val geohashAliasRegistry: GeohashAliasRegistry,
     private val favoritesService: FavoritesPersistenceService,
+    private val messageRouter: MessageRouter,
 ) : BluetoothMeshDelegate {
 
     override fun didReceiveMessage(message: BitchatMessage) {
@@ -109,7 +110,7 @@ class MeshDelegateHandler(
             state.setIsConnected(peers.isNotEmpty())
             notificationManager.showActiveUserNotification(peers)
             // Flush router outbox for any peers that just connected (and their noiseHex aliases)
-            runCatching { MessageRouter.tryGetInstance()?.onPeersUpdated(peers) }
+            runCatching { messageRouter.onPeersUpdated(peers) }
 
             // Clean up channel members who disconnected
             channelManager.cleanupDisconnectedMembers(peers, getMyPeerID())
