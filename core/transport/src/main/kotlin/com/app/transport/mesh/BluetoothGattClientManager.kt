@@ -18,7 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
-import com.app.transport.debug.DebugSettingsManager
+import com.app.transport.MeshTelemetry
 import com.app.transport.debug.DebugScanResult
 
 /**
@@ -31,7 +31,7 @@ class BluetoothGattClientManager(
     private val permissionManager: BluetoothPermissionManager,
     private val powerManager: PowerManager,
     private val delegate: BluetoothConnectionManagerDelegate?,
-    private val debugSettingsManager: DebugSettingsManager
+    private val debugSettingsManager: MeshTelemetry
 ) {
     
     companion object {

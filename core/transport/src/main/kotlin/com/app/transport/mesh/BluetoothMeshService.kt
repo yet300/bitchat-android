@@ -16,6 +16,7 @@ import com.app.transport.model.RequestSyncPacket
 import com.app.transport.sync.GossipSyncManager
 import com.app.common.encoding.toHexString
 import com.app.transport.MeshConstants
+import com.app.transport.MeshTelemetry
 import com.app.transport.NicknameSource
 import com.app.transport.notification.ServiceNotifier
 import com.app.transport.VerificationService
@@ -43,7 +44,7 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 class BluetoothMeshService(
     private val context: Context,
-    private val debugSettingsManager: com.app.transport.debug.DebugSettingsManager,
+    private val debugSettingsManager: MeshTelemetry,
     private val debugPreferenceManager: com.app.transport.debug.DebugPreferenceManager,
     private val seenMessageStore: SeenMessageStore,
     private val transferProgressManager: TransferProgressManager,

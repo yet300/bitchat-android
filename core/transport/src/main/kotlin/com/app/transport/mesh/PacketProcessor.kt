@@ -1,7 +1,7 @@
 package com.app.transport.mesh
 
 import android.util.Log
-import com.app.transport.debug.DebugSettingsManager
+import com.app.transport.MeshTelemetry
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
 import com.app.transport.model.RoutedPacket
@@ -18,7 +18,7 @@ import kotlinx.coroutines.channels.actor
  */
 class PacketProcessor(
     private val myPeerID: String,
-    private val debugSettingsManager: DebugSettingsManager,
+    private val debugSettingsManager: MeshTelemetry,
 ) {
     private val debugManager = debugSettingsManager
     

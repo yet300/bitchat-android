@@ -3,7 +3,7 @@ package com.app.transport.mesh
 import android.bluetooth.*
 import android.content.Context
 import android.util.Log
-import com.app.transport.debug.DebugSettingsManager
+import com.app.transport.MeshTelemetry
 import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
 import kotlinx.coroutines.*
@@ -18,7 +18,7 @@ import kotlinx.coroutines.flow.combine
 class BluetoothConnectionManager(
     private val context: Context, 
     private val myPeerID: String,
-    private val debugSettingsManager: DebugSettingsManager,
+    private val debugSettingsManager: MeshTelemetry,
     private val fragmentManager: FragmentManager? = null,
     private val transferProgressManager: TransferProgressManager,
 ) : PowerManagerDelegate {
