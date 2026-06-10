@@ -101,8 +101,9 @@ class NostrRelayManager(private val eventDeduplicator: NostrEventDeduplicator) {
         val originGeohash: String? = null // used for logging and grouping
     )
     
-    // Message queue for reliability
-    private val messageQueue = mutableListOf<Pair<NostrEvent, List<String>>>()
+    // Pending-relay queue: each entry tracks the relay URLs that still need to receive the event.
+    // Entries are removed once all target relays have acknowledged a successful send.
+    private val messageQueue = mutableListOf<Pair<NostrEvent, MutableList<String>>>()
     private val messageQueueLock = Any()
     
     // Coroutine scope for background operations
@@ -291,9 +292,9 @@ class NostrRelayManager(private val eventDeduplicator: NostrEventDeduplicator) {
     fun sendEvent(event: NostrEvent, relayUrls: List<String>? = null) {
         val targetRelays = relayUrls ?: relaysList.map { it.url }
         
-        // Add to queue for reliability
+        // Add to pending queue; entries are removed once delivered to all target relays.
         synchronized(messageQueueLock) {
-            messageQueue.add(Pair(event, targetRelays))
+            messageQueue.add(Pair(event, targetRelays.toMutableList()))
         }
         
         // Attempt immediate send
@@ -881,13 +882,18 @@ class NostrRelayManager(private val eventDeduplicator: NostrEventDeduplicator) {
         // Restore all active subscriptions for this relay
         restoreSubscriptionsForRelay(relayUrl, session)
 
-        // Process any queued messages for this relay
+        // Deliver any queued events destined for this relay, then remove the relay from
+        // each entry's pending list. Once an entry has no remaining target relays, remove it.
         synchronized(messageQueueLock) {
             val iterator = messageQueue.iterator()
             while (iterator.hasNext()) {
-                val (event, targetRelays) = iterator.next()
-                if (relayUrl in targetRelays) {
+                val (event, pendingRelays) = iterator.next()
+                if (relayUrl in pendingRelays) {
                     sendToRelay(event, session, relayUrl)
+                    pendingRelays.remove(relayUrl)
+                    if (pendingRelays.isEmpty()) {
+                        iterator.remove()
+                    }
                 }
             }
         }

@@ -82,9 +82,9 @@ internal class MeshNetwork(
         }
     }
 
-    /** Cancel an in-progress transfer on the bearer that owns [transferId]. */
+    /** Cancel an in-progress transfer on ALL bearers that own [transferId]. */
     fun cancelTransfer(transferId: String): Boolean =
-        bearers.any { it.cancelTransfer(transferId) }
+        bearers.fold(false) { cancelled, bearer -> bearer.cancelTransfer(transferId) || cancelled }
 
     // -----------------------------------------------------------------
     // Diagnostics

@@ -5,6 +5,7 @@ import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.routing.OutgoingEnvelope
 import com.app.transport.routing.Reachability
 import com.app.transport.routing.RouteStrategy
+import com.app.transport.routing.SendOutcome
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -51,11 +52,13 @@ internal class RouteSelector(
 
     /** Dispatches [envelope] via the best available strategy, or queues it. */
     override fun route(envelope: OutgoingEnvelope) {
-        val strategy = strategies.firstOrNull { it.reachability(envelope.peerID) != Reachability.Unreachable }
-        if (strategy != null) {
-            Log.d(TAG, "Routing ${envelope::class.simpleName} to ${envelope.peerID.take(8)}… via ${strategy::class.simpleName}")
-            strategy.send(envelope)
-        } else {
+        val eligible = strategies.filter { it.reachability(envelope.peerID) != Reachability.Unreachable }
+        val dispatched = eligible.firstOrNull { strategy ->
+            val outcome = strategy.send(envelope)
+            Log.d(TAG, "Routing ${envelope::class.simpleName} to ${envelope.peerID.take(8)}… via ${strategy::class.simpleName} → $outcome")
+            outcome !is SendOutcome.Failed
+        }
+        if (dispatched == null) {
             Log.d(TAG, "No route for ${envelope.peerID.take(8)}…; queuing ${envelope::class.simpleName}")
             outbox.enqueue(envelope)
             if (envelope is OutgoingEnvelope.Private) {
