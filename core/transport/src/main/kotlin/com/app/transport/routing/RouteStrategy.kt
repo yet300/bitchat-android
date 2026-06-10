@@ -16,8 +16,13 @@ enum class Reachability {
  * Outcome of a send attempt.
  */
 sealed class SendOutcome {
-    /** Message was successfully dispatched. */
+    /** The underlying send call completed — the message left this device. */
     object Sent : SendOutcome()
+    /**
+     * The message was handed to a fire-and-forget pipeline (internal coroutine /
+     * BLE actor); delivery is neither confirmed nor observable at this layer.
+     */
+    object Accepted : SendOutcome()
     /** Message was queued for later delivery. */
     object Queued : SendOutcome()
     /** Send failed with a reason. */
@@ -47,6 +52,9 @@ interface RouteStrategy {
     /**
      * Dispatches [envelope] to the peer. Called only when
      * [reachability] returned something other than [Reachability.Unreachable].
+     *
+     * Honest contract: return [SendOutcome.Sent] only after the underlying call has
+     * completed; fire-and-forget paths return [SendOutcome.Accepted].
      */
-    fun send(envelope: OutgoingEnvelope): SendOutcome
+    suspend fun send(envelope: OutgoingEnvelope): SendOutcome
 }

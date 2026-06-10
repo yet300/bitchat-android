@@ -9,9 +9,12 @@ import com.app.data.repository.PeerRepositoryImpl
 import com.app.data.repository.SearchRepositoryImpl
 import com.app.data.repository.SettingsRepositoryImpl
 import com.app.data.repository.SettingsStoreImpl
+import com.app.data.routing.MeshRouteStrategy
+import com.app.data.routing.NostrRouteStrategy
 import com.app.data.routing.RoutingCore
 import com.app.data.routing.RoutingMessageTransport
 import com.app.data.routing.RouteSelector
+import com.app.transport.routing.RouteStrategy
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationRepository
@@ -24,6 +27,7 @@ import com.app.domain.repository.SettingsRepository
 import com.app.domain.repository.SettingsStore
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Binds
+import dev.zacsweers.metro.IntoSet
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 
@@ -67,4 +71,13 @@ abstract class DataBindings {
 
     @Binds
     internal abstract val RouteSelector.bindRoutingCore: RoutingCore
+
+    // §6 Tier-2 strategies, multibound into Set<RouteStrategy> (impls stay internal — DIP)
+    @Binds
+    @IntoSet
+    internal abstract val MeshRouteStrategy.bindMeshRouteStrategy: RouteStrategy
+
+    @Binds
+    @IntoSet
+    internal abstract val NostrRouteStrategy.bindNostrRouteStrategy: RouteStrategy
 }

@@ -12,6 +12,8 @@ import com.app.transport.NicknameSource
 import com.app.transport.model.ReadReceipt
 import com.app.transport.notification.ServiceNotifier
 import com.app.transport.nostr.GeohashAliasRegistry
+import com.app.transport.nostr.NostrIdentityBridge
+import com.app.transport.routing.NostrIdentityProvider
 import com.bitchat.android.services.NicknameProvider
 import com.bitchat.android.ui.NotificationManager
 import com.bitchat.android.util.NotificationIntervalManager
@@ -66,6 +68,20 @@ object AndroidAppBindings {
                 favoritesService.findNostrPubkey(noiseKey)
             override fun isFavorite(noiseKey: ByteArray): Boolean =
                 favoritesService.getFavoriteStatus(noiseKey)?.isFavorite == true
+        }
+
+    /**
+     * Current Nostr identity for the routing strategies — wraps the static
+     * NostrIdentityBridge so :core:data stays Context-free.
+     */
+    @Provides
+    fun provideNostrIdentityProvider(context: Context): NostrIdentityProvider =
+        NostrIdentityProvider {
+            try {
+                NostrIdentityBridge.getCurrentNostrIdentity(context)
+            } catch (_: Exception) {
+                null
+            }
         }
 
     /**
