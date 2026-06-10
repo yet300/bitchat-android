@@ -81,15 +81,25 @@ class BleBearer(
     /** Live set of BLE peers mapped from the [addressPeerMap]. */
     override val neighbors: StateFlow<Set<PeerLink>> = _neighbors.asStateFlow()
 
+    // -----------------------------------------------------------------
+    // Link events
+    // -----------------------------------------------------------------
+
+    private val _events = MutableSharedFlow<BearerEvent>(extraBufferCapacity = 64)
+
+    /** Link-level connect / disconnect / RSSI events (no platform types leak out). */
+    override val events: Flow<BearerEvent> = _events.asSharedFlow()
+
     /**
-     * Called by [BluetoothMeshService] when it binds a device address to a
-     * logical peerID (from an announce packet with max TTL).
-     * Keeps [neighbors] in sync so [MeshNetwork] can route unicasts.
+     * Engine-driven binding of a BLE device address to a logical peerID (announce
+     * received with max TTL ⇒ direct neighbor). The bearer owns the address↔peer map.
      */
-    fun notifyPeerMapped(peerID: String, deviceAddress: String, isInbound: Boolean) {
+    override fun bindPeer(peerID: String, linkAddress: String) {
+        connectionManager.addressPeerMap[linkAddress] = peerID
+        val isInbound = connectionManager.isClientConnection(linkAddress) == false
         _neighbors.value = _neighbors.value
-            .filterNot { it.deviceAddress == deviceAddress }
-            .toSet() + PeerLink(peerID, deviceAddress, isInbound)
+            .filterNot { it.deviceAddress == linkAddress }
+            .toSet() + PeerLink(peerID, linkAddress, isInbound)
     }
 
     /** Called by [BluetoothMeshService] when a BLE device disconnects. */
@@ -131,11 +141,13 @@ class BleBearer(
             }
 
             override fun onDeviceConnected(device: BluetoothDevice) {
+                _events.tryEmit(BearerEvent.LinkConnected(device.address))
                 externalDelegate?.onDeviceConnected(device)
             }
 
             override fun onDeviceDisconnected(device: BluetoothDevice) {
                 notifyPeerDisconnected(device.address)
+                _events.tryEmit(BearerEvent.LinkDisconnected(device.address))
                 externalDelegate?.onDeviceDisconnected(device)
             }
 
@@ -145,6 +157,7 @@ class BleBearer(
                     if (link.deviceAddress == deviceAddress) link.copy(rssi = rssi) else link
                 }.toSet()
                 _neighbors.value = updated
+                _events.tryEmit(BearerEvent.RssiChanged(deviceAddress, rssi))
                 externalDelegate?.onRSSIUpdated(deviceAddress, rssi)
             }
         }
@@ -185,13 +198,6 @@ class BleBearer(
 
     /** Device-address → peerID map maintained by [BluetoothConnectionTracker]. */
     val addressPeerMap get() = connectionManager.addressPeerMap
-
-    /**
-     * Send a raw [BitchatPacket] to a peer by peerID (used by
-     * [GossipSyncManager] delegate which operates at the packet level).
-     */
-    fun sendPacketToPeer(peerID: String, packet: BitchatPacket): Boolean =
-        connectionManager.sendPacketToPeer(peerID, packet)
 
     /** Whether [addr] is a client-side (outbound) BLE connection. */
     fun isClientConnection(addr: String): Boolean? = connectionManager.isClientConnection(addr)

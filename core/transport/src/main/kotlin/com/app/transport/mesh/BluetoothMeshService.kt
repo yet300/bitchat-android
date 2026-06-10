@@ -143,7 +143,7 @@ class BluetoothMeshService(
                 bleBearer.broadcast(RoutedPacket(packet))
             }
             override fun sendPacketToPeer(peerID: String, packet: BitchatPacket) {
-                bleBearer.sendPacketToPeer(peerID, packet)
+                bleBearer.sendToPeer(peerID, RoutedPacket(packet))
             }
             override fun signPacketForBroadcast(packet: BitchatPacket): BitchatPacket {
                 return signPacketBeforeBroadcast(packet)
@@ -572,11 +572,9 @@ class BluetoothMeshService(
                         val isDirect = routed.packet.ttl == MeshConstants.MESSAGE_TTL_HOPS
                         
                         if (isDirect) {
-                            // Bind or rebind this device address to the announcing peer
-                            bleBearer.addressPeerMap[deviceAddress] = pid
-                            // Keep MeshBearer.neighbors in sync for MeshNetwork routing
-                            val inbound = bleBearer.isClientConnection(deviceAddress) == false
-                            bleBearer.notifyPeerMapped(pid, deviceAddress, inbound)
+                            // Engine decision: announce with max TTL ⇒ direct neighbor.
+                            // The bearer owns the address↔peer map and neighbors state.
+                            bleBearer.bindPeer(pid, deviceAddress)
                             Log.d(TAG, "Mapped device $deviceAddress to peer $pid (TTL=${routed.packet.ttl})")
 
                             // Mark as directly connected - refresh UI state

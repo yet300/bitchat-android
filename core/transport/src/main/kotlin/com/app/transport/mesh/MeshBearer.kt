@@ -5,6 +5,17 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
+ * Link-level event on a bearer medium. Addresses are bearer-specific link addresses
+ * (BLE MAC, Wi-Fi Aware peer handle …) — peerID binding happens separately via
+ * [MeshBearer.bindPeer] once the engine identifies the peer behind a link.
+ */
+sealed interface BearerEvent {
+    data class LinkConnected(val linkAddress: String) : BearerEvent
+    data class LinkDisconnected(val linkAddress: String) : BearerEvent
+    data class RssiChanged(val linkAddress: String, val rssi: Int) : BearerEvent
+}
+
+/**
  * SPI for a single-medium transport channel in the mesh network.
  *
  * Adding a new physical medium (BLE, Wi-Fi Aware, TCP relay …) means:
@@ -52,4 +63,18 @@ interface MeshBearer {
      * can unicast to a given destination.
      */
     val neighbors: StateFlow<Set<PeerLink>>
+
+    /**
+     * Bind [linkAddress] to a logical [peerID]. The ENGINE decides when a link is a
+     * direct neighbor (announce received with max TTL) and calls this; the BEARER owns
+     * the address↔peer map. Bearers must ignore link addresses they do not track.
+     */
+    fun bindPeer(peerID: String, linkAddress: String)
+
+    /**
+     * Hot stream of link-level events on this medium (connect / disconnect / RSSI).
+     * Replaces the legacy delegate callbacks that leaked platform types (e.g.
+     * android.bluetooth.BluetoothDevice) out of the bearer.
+     */
+    val events: Flow<BearerEvent>
 }

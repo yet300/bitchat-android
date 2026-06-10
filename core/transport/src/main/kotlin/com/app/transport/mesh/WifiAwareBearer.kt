@@ -37,6 +37,10 @@ class WifiAwareBearer(
 
     override val neighbors: StateFlow<Set<PeerLink>> = MutableStateFlow(emptySet())
 
+    override val events: Flow<BearerEvent> = emptyFlow()
+
+    override fun bindPeer(peerID: String, linkAddress: String) = Unit  // No links tracked yet
+
     override fun start(): Boolean = false   // Not yet implemented
 
     override fun stop() = Unit
