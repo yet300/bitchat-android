@@ -1,6 +1,7 @@
 package com.app.data.routing
 
 import android.content.Context
+import com.app.data.mesh.MeshNetwork
 import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.nostr.NostrIdentityBridge
 import com.app.transport.routing.OutgoingEnvelope
@@ -18,16 +19,27 @@ import dev.zacsweers.metro.Inject
 @Inject
 internal class MeshRouteStrategy(
     private val mesh: BluetoothMeshService,
+    private val meshNetwork: MeshNetwork,
     private val context: Context,
 ) : RouteStrategy {
 
     override val priority = 100
 
-    override fun reachability(peerID: String): Reachability =
-        if (mesh.getPeerInfo(peerID)?.isConnected == true && mesh.hasEstablishedSession(peerID))
+    /**
+     * A peer is directly reachable when at least one bearer lists it in its neighbors
+     * AND a Noise session has been established.
+     *
+     * Falls back to BMS.getPeerInfo().isConnected for the brief window between BLE connection
+     * and the first announce that populates MeshBearer.neighbors.
+     */
+    override fun reachability(peerID: String): Reachability {
+        val connected = meshNetwork.allNeighbors.any { it.peerID == peerID }
+            || mesh.getPeerInfo(peerID)?.isConnected == true
+        return if (connected && mesh.hasEstablishedSession(peerID))
             Reachability.Direct
         else
             Reachability.Unreachable
+    }
 
     override fun send(envelope: OutgoingEnvelope): SendOutcome {
         return when (envelope) {
