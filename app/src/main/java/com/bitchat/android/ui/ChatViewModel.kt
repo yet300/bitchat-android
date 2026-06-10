@@ -12,7 +12,6 @@ import com.app.common.encoding.hexEncodedString
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.crypto.noise.NoiseSession
 import com.app.transport.model.BitchatMessage
-import com.app.data.favorites.FavoritesPersistenceService
 import com.app.data.nostr.CurrentGeohashSource
 import com.app.transport.mesh.BluetoothMeshDelegate
 import com.app.transport.mesh.BluetoothMeshService
@@ -152,6 +151,7 @@ class ChatViewModel(
         getMeshService = { meshService },
         geohashAliasRegistry = geohashAliasRegistry,
         favoritesService = favoritesService,
+        messageRouter = messageRouter,
     )
     
     // New Geohash architecture ViewModel (replaces God object service usage in UI path)

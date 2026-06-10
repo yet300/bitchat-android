@@ -31,5 +31,5 @@ object DataProviders {
     fun provideMessageRouter(
         routingCore: RoutingCore,
         mesh: BluetoothMeshService,
-    ): MessageRouter = MessageRouter.getInstance(routingCore, mesh)
+    ): MessageRouter = MessageRouter(routingCore, mesh)
 }

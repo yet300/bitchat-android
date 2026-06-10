@@ -1,8 +1,6 @@
 package com.bitchat.android.service
 
 import android.content.Context
-import com.app.data.routing.MessageRouter
-import com.app.transport.GeohashReadReceiptRouter
 import com.app.transport.SeenMessageStore
 import com.app.transport.mesh.TransferProgressManager
 import com.app.transport.meshgraph.MeshGraphService
@@ -12,7 +10,6 @@ import com.app.crypto.EncryptionService
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.transport.mesh.BluetoothMeshService
 import com.bitchat.android.BitchatApplication
-import com.app.transport.model.ReadReceipt
 
 /**
  * Process-wide holder to share a single BluetoothMeshService instance
@@ -48,69 +45,55 @@ object MeshServiceHolder {
                     try { existing.stopServices() } catch (e: Exception) {
                         android.util.Log.w(TAG, "Error while stopping non-reusable instance: ${e.message}")
                     }
-                    val created = configure(BluetoothMeshService(context.applicationContext, debugSettingsManager, debugPreferenceManager, seenMessageStore, transferProgressManager, meshGraphService, peerFingerprintManager, encryptionService), context)
+                    val created = newMeshService(context, debugSettingsManager, debugPreferenceManager, seenMessageStore, transferProgressManager, meshGraphService, peerFingerprintManager, encryptionService)
                     android.util.Log.i(TAG, "Created new BluetoothMeshService (replacement)")
                     meshService = created
                     created
                 }
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "Error checking service reusability; creating new instance: ${e.message}")
-                val created = configure(BluetoothMeshService(context.applicationContext, debugSettingsManager, debugPreferenceManager, seenMessageStore, transferProgressManager, meshGraphService, peerFingerprintManager, encryptionService), context)
+                val created = newMeshService(context, debugSettingsManager, debugPreferenceManager, seenMessageStore, transferProgressManager, meshGraphService, peerFingerprintManager, encryptionService)
                 meshService = created
                 created
             }
         }
-        val created = configure(BluetoothMeshService(context.applicationContext, debugSettingsManager, debugPreferenceManager, seenMessageStore, transferProgressManager, meshGraphService, peerFingerprintManager, encryptionService), context)
+        val created = newMeshService(context, debugSettingsManager, debugPreferenceManager, seenMessageStore, transferProgressManager, meshGraphService, peerFingerprintManager, encryptionService)
         android.util.Log.i(TAG, "Created new BluetoothMeshService (no existing instance)")
         meshService = created
         return created
     }
 
-    /** Wires app-side dependencies (notifications, nickname) into a fresh mesh service. */
-    private fun configure(service: BluetoothMeshService, context: Context): BluetoothMeshService {
-        val appCtx = context.applicationContext
-        val appGraph = (appCtx as BitchatApplication).appGraph
-        service.serviceNotifier = com.bitchat.android.ui.NotificationManager(
-            appCtx,
-            androidx.core.app.NotificationManagerCompat.from(appCtx),
-            com.bitchat.android.util.NotificationIntervalManager()
+    /**
+     * Constructs a BMS with the app-side wiring SPIs resolved from the graph
+     * ([com.bitchat.android.di.AndroidAppBindings]). Transitional: Stage 1.3 deletes this
+     * holder and the graph constructs BMS directly.
+     */
+    private fun newMeshService(
+        context: Context,
+        debugSettingsManager: DebugSettingsManager,
+        debugPreferenceManager: DebugPreferenceManager,
+        seenMessageStore: SeenMessageStore,
+        transferProgressManager: TransferProgressManager,
+        meshGraphService: MeshGraphService,
+        peerFingerprintManager: PeerFingerprintManager,
+        encryptionService: EncryptionService,
+    ): BluetoothMeshService {
+        val appGraph = (context.applicationContext as BitchatApplication).appGraph
+        return BluetoothMeshService(
+            context.applicationContext,
+            debugSettingsManager,
+            debugPreferenceManager,
+            seenMessageStore,
+            transferProgressManager,
+            meshGraphService,
+            peerFingerprintManager,
+            encryptionService,
+            appGraph.serviceNotifier,
+            appGraph.nicknameSource,
+            appGraph.incomingMessageSink,
+            appGraph.favoriteNostrLink,
+            appGraph.geohashReadReceiptRouter,
         )
-        service.nicknameSource = com.app.transport.NicknameSource { fallback ->
-            com.bitchat.android.services.NicknameProvider.getNickname(appCtx, fallback)
-        }
-        // Process-wide in-memory store the UI hydrates from.
-        service.incomingSink = appGraph.appStateStore
-        // Noise<->Nostr favorite mapping, backed by graph-owned favorites service.
-        val favoritesService = appGraph.favoritesPersistenceService
-        service.favoriteNostrLink = object : com.app.transport.FavoriteNostrLink {
-            override fun updatePeerFavoritedUs(noiseKey: ByteArray, theyFavoritedUs: Boolean) {
-                favoritesService.updatePeerFavoritedUs(noiseKey, theyFavoritedUs)
-            }
-            override fun updateNostrPublicKey(noiseKey: ByteArray, nostrPubkey: String) {
-                favoritesService.updateNostrPublicKey(noiseKey, nostrPubkey)
-            }
-            override fun updateNostrPublicKeyForPeerId(peerId: String, nostrPubkey: String) {
-                favoritesService.updateNostrPublicKeyForPeerID(peerId, nostrPubkey)
-            }
-            override fun findNostrPubkey(noiseKey: ByteArray): String? =
-                favoritesService.findNostrPubkey(noiseKey)
-            override fun isFavorite(noiseKey: ByteArray): Boolean =
-                favoritesService.getFavoriteStatus(noiseKey)?.isFavorite == true
-        }
-        // Routes read receipts over the relay when the recipient is a geohash alias.
-        service.geohashReadReceiptRouter = GeohashReadReceiptRouter { messageId, toPeerId ->
-            val router = runCatching { MessageRouter.tryGetInstance() }.getOrNull()
-            val isGeoAlias = runCatching {
-                (appCtx as BitchatApplication).appGraph.geohashAliasRegistry.snapshot().containsKey(toPeerId)
-            }.getOrDefault(false)
-            if (isGeoAlias && router != null) {
-                router.sendReadReceipt(ReadReceipt(messageId), toPeerId)
-                true
-            } else {
-                false
-            }
-        }
-        return service
     }
 
     @Synchronized

@@ -51,6 +51,13 @@ class BluetoothMeshService(
     // Graph-provided: the same instance backs IdentityRepositoryImpl, so Noise session
     // state lives in exactly one place.
     private val encryptionService: EncryptionService,
+    // App-side wiring SPIs, implemented in :app and provided by the graph
+    // (formerly mutable fields configured post-construction by MeshServiceHolder).
+    private val serviceNotifier: ServiceNotifier,
+    private val nicknameSource: NicknameSource,
+    private val incomingSink: IncomingMessageSink,
+    private val favoriteNostrLink: FavoriteNostrLink,
+    private val geohashReadReceiptRouter: GeohashReadReceiptRouter,
 ) {
     private val debugManager = debugSettingsManager
 
@@ -77,27 +84,6 @@ class BluetoothMeshService(
     private val packetProcessor = PacketProcessor(myPeerID, debugSettingsManager)
     private lateinit var gossipSyncManager: GossipSyncManager
 
-    // Service-level notifier for background (no-UI) DMs. The Android implementation
-    // (app resources + NotificationCompat) is injected from the app module.
-    var serviceNotifier: ServiceNotifier? = null
-
-    // Supplies the user's nickname for announcements/leave messages (injected from app).
-    var nicknameSource: NicknameSource? = null
-
-    // Process-wide message/peer store the UI hydrates from (injected from app).
-    var incomingSink: IncomingMessageSink? = null
-
-    // Noise<->Nostr favorite mapping for routing DMs over Nostr (injected from app); propagated to messageHandler.
-    var favoriteNostrLink: FavoriteNostrLink? = null
-        set(value) {
-            field = value
-            messageHandler.favoriteNostrLink = value
-        }
-
-    // Routes geohash-alias read receipts via the relay (injected from app).
-    var geohashReadReceiptRouter: GeohashReadReceiptRouter? = null
-
-
     // Service state management
     private var isActive = false
     
@@ -114,6 +100,7 @@ class BluetoothMeshService(
         VerificationService.configure(encryptionService)
         setupDelegates()
         messageHandler.packetProcessor = packetProcessor
+        messageHandler.favoriteNostrLink = favoriteNostrLink
         //startPeriodicDebugLogging()
 
         // Initialize sync manager (needs serviceScope)
@@ -211,7 +198,7 @@ class BluetoothMeshService(
         peerManager.delegate = object : PeerManagerDelegate {
             override fun onPeerListUpdated(peerIDs: List<String>) {
                 // Update process-wide state first
-                try { incomingSink?.setPeers(peerIDs) } catch (_: Exception) { }
+                try { incomingSink.setPeers(peerIDs) } catch (_: Exception) { }
                 // Then notify UI delegate if attached
                 delegate?.didUpdatePeerList(peerIDs)
             }
@@ -403,8 +390,8 @@ class BluetoothMeshService(
 
                 // Index existing Nostr mapping by the new peerID if we have it
                 try {
-                    favoriteNostrLink?.findNostrPubkey(publicKey)?.let { npub ->
-                        favoriteNostrLink?.updateNostrPublicKeyForPeerId(newPeerID, npub)
+                    favoriteNostrLink.findNostrPubkey(publicKey)?.let { npub ->
+                        favoriteNostrLink.updateNostrPublicKeyForPeerId(newPeerID, npub)
                     }
                 } catch (_: Exception) { }
                 
@@ -428,13 +415,13 @@ class BluetoothMeshService(
                     when {
                         message.isPrivate -> {
                             val peer = message.senderPeerID ?: ""
-                            if (peer.isNotEmpty()) incomingSink?.addPrivateMessage(peer, message)
+                            if (peer.isNotEmpty()) incomingSink.addPrivateMessage(peer, message)
                         }
                         message.channel != null -> {
-                            incomingSink?.addChannelMessage(message.channel!!, message)
+                            incomingSink.addChannelMessage(message.channel, message)
                         }
                         else -> {
-                            incomingSink?.addPublicMessage(message)
+                            incomingSink.addPublicMessage(message)
                         }
                     }
                 } catch (_: Exception) { }
@@ -448,8 +435,8 @@ class BluetoothMeshService(
                         if (senderPeerID != null) {
                             val nick = try { peerManager.getPeerNickname(senderPeerID) } catch (_: Exception) { null } ?: senderPeerID
                             val preview = com.app.transport.notification.NotificationTextUtils.buildPrivateMessagePreview(message)
-                            serviceNotifier?.setAppBackgroundState(true)
-                            serviceNotifier?.showPrivateMessageNotification(senderPeerID, nick, preview)
+                            serviceNotifier.setAppBackgroundState(true)
+                            serviceNotifier.showPrivateMessageNotification(senderPeerID, nick, preview)
                         }
                     } catch (_: Exception) { }
                 }
@@ -956,7 +943,7 @@ class BluetoothMeshService(
             Log.d(TAG, "📖 Sending read receipt for message $messageID to $recipientPeerID")
 
             // Route geohash read receipts via the relay (resolved + routed in the app layer)
-            if (geohashReadReceiptRouter?.routeIfGeohashAlias(messageID, recipientPeerID) == true) {
+            if (geohashReadReceiptRouter.routeIfGeohashAlias(messageID, recipientPeerID)) {
                 return@launch
             }
 
@@ -1052,7 +1039,7 @@ class BluetoothMeshService(
     fun sendBroadcastAnnounce() {
         Log.d(TAG, "Sending broadcast announce")
         serviceScope.launch {
-            val nickname = try { (nicknameSource?.nickname(myPeerID) ?: myPeerID) } catch (_: Exception) { myPeerID }
+            val nickname = try { nicknameSource.nickname(myPeerID) } catch (_: Exception) { myPeerID }
             
             // Get the static public key for the announcement
             val staticKey = encryptionService.getStaticPublicKey()
@@ -1115,7 +1102,7 @@ class BluetoothMeshService(
     fun sendAnnouncementToPeer(peerID: String) {
         if (peerManager.hasAnnouncedToPeer(peerID)) return
         
-        val nickname = try { (nicknameSource?.nickname(myPeerID) ?: myPeerID) } catch (_: Exception) { myPeerID }
+        val nickname = try { nicknameSource.nickname(myPeerID) } catch (_: Exception) { myPeerID }
         
         // Get the static public key for the announcement
         val staticKey = encryptionService.getStaticPublicKey()

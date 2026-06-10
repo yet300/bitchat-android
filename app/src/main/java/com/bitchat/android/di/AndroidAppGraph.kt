@@ -23,6 +23,7 @@ import dev.zacsweers.metrox.android.MetroAppComponentProviders
         CommonBindings::class,
         DataBindings::class,
         AndroidDataBindings::class,
+        AndroidAppBindings::class,
     ],
 )
 interface AndroidAppGraph : AppGraph, MetroAppComponentProviders {
