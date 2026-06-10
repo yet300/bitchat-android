@@ -4,8 +4,7 @@ import android.app.Application
 import android.os.Process
 import androidx.core.app.NotificationManagerCompat
 import com.app.data.AppStateStore
-import com.app.transport.mesh.BluetoothMeshService
-import com.app.transport.net.ArtiTorManager
+import com.app.transport.mesh.MeshLifecycleController
 import com.app.transport.net.TorMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -40,7 +39,7 @@ object AppShutdownCoordinator {
 
     fun requestFullShutdownAndKill(
         app: Application,
-        mesh: BluetoothMeshService?,
+        mesh: MeshLifecycleController?,
         notificationManager: NotificationManagerCompat,
         stopForeground: () -> Unit,
         stopService: () -> Unit,
@@ -57,7 +56,7 @@ object AppShutdownCoordinator {
             } catch (_: Exception) { }
 
             // Stop mesh (best-effort)
-            try { mesh?.stopServices() } catch (_: Exception) { }
+            try { mesh?.stop() } catch (_: Exception) { }
 
             // Stop Tor temporarily (do not change user setting)
             val torProvider = (app as com.bitchat.android.BitchatApplication).appGraph.artiTorManager
