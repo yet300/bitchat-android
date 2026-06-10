@@ -45,6 +45,16 @@ class SeenMessageStore(private val secure: SecureIdentityStateManager) {
         persist()
     }
 
+    /** Marks many ids read with a single persist (conversation-level mark-read). */
+    @Synchronized fun markReadAll(ids: Collection<String>) {
+        if (ids.isEmpty()) return
+        ids.forEach { id ->
+            if (read.remove(id)) read.add(id) else read.add(id)
+        }
+        trim(read)
+        persist()
+    }
+
     @Synchronized fun clear() {
         delivered.clear()
         read.clear()
