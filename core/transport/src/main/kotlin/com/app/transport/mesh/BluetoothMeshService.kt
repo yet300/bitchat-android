@@ -106,6 +106,9 @@ class BluetoothMeshService(
     private var serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     // Tracks whether the current component generation was terminated via stopServices()
     private var terminated = false
+    // In-flight delayed teardown of stopServices(); completed eagerly by startServices()
+    @Volatile
+    private var pendingStopJob: Job? = null
 
     init {
         Log.i(TAG, "Initializing BluetoothMeshService for peer=$myPeerID")
@@ -240,7 +243,8 @@ class BluetoothMeshService(
         Log.w(TAG, "🚨 Resetting mesh service in place — old peerID=$myPeerID")
         isActive = false
         stopComponentsNow()
-        serviceScope.cancel()
+        serviceScope.cancel() // also kills any pending stop teardown
+        pendingStopJob = null
         rebuildComponents()
         startServices()
         sendBroadcastAnnounce()
@@ -694,6 +698,13 @@ class BluetoothMeshService(
             Log.w(TAG, "Mesh service already active, ignoring duplicate start request")
             return
         }
+        // A stop may still be inside its grace window; complete it now so its delayed
+        // teardown cannot kill the generation we are about to start.
+        pendingStopJob?.let { job ->
+            Log.i(TAG, "Restart requested during stop grace window; completing stop first")
+            job.cancel()
+            finishStop()
+        }
         if (terminated) {
             // The previous generation's scope was cancelled by stopServices(); rebuild the
             // engine in place for the same identity instead of refusing to start.
@@ -718,42 +729,43 @@ class BluetoothMeshService(
     }
     
     /**
-     * Stop all mesh services
+     * Stop all mesh services. The teardown runs after a short grace period so the leave
+     * announcement gets out; a startServices() call inside that window completes the stop
+     * synchronously first (see [finishStop]) instead of racing against it.
      */
     fun stopServices() {
         if (!isActive) {
             Log.w(TAG, "Mesh service not active, ignoring stop request")
             return
         }
-        
+
         Log.i(TAG, "Stopping Bluetooth mesh service")
         isActive = false
-        
+
         // Send leave announcement
         sendLeaveAnnouncement()
-        
-        serviceScope.launch {
-            Log.d(TAG, "Stopping subcomponents and cancelling scope...")
+
+        pendingStopJob = serviceScope.launch {
             delay(200) // Give leave message time to send
-            
-            // Stop all components
-            gossipSyncManager.stop()
-            Log.d(TAG, "GossipSyncManager stopped")
-            meshNetwork.stopAll()
-            Log.d(TAG, "Mesh bearers stop requested")
-            peerManager.shutdown()
-            // Graph-owned FragmentManager: clear state but keep its scope alive for revival
-            fragmentManager.clearAllFragments()
-            securityManager.shutdown()
-            storeForwardManager.shutdown()
-            messageHandler.shutdown()
-            packetProcessor.shutdown()
-            
-            // Mark this instance as terminated and cancel its scope so it won't be reused
-            terminated = true
-            serviceScope.cancel()
-            Log.i(TAG, "BluetoothMeshService terminated and scope cancelled")
+            finishStop()
         }
+    }
+
+    /**
+     * Completes a requested stop: shuts components down, marks the generation terminated
+     * and cancels its scope. Idempotent and synchronized — invoked either by the delayed
+     * teardown coroutine or eagerly by [startServices] when a restart arrives inside the
+     * grace window (previously that restart was killed by the in-flight teardown).
+     */
+    @Synchronized
+    private fun finishStop() {
+        if (terminated) return
+        Log.d(TAG, "Stopping subcomponents and cancelling scope...")
+        stopComponentsNow()
+        terminated = true
+        pendingStopJob = null
+        serviceScope.cancel()
+        Log.i(TAG, "BluetoothMeshService terminated and scope cancelled")
     }
 
     // MARK: - MeshLifecycleController (narrow contract for the foreground service)
