@@ -668,7 +668,10 @@ class BluetoothMeshService(
             }
 
             override fun sendToPeer(peerID: String, routed: RoutedPacket): Boolean {
-                return meshNetwork.sendToPeer(peerID, routed)
+                // Direct and Flooded both mean the packet is on the air — the relay must
+                // NOT broadcast again (that would double-flood). Only NoRoute lets the
+                // relay run its own fallback.
+                return meshNetwork.sendToPeer(peerID, routed) != SendPath.NoRoute
             }
             
             override fun handleRequestSync(routed: RoutedPacket) {
