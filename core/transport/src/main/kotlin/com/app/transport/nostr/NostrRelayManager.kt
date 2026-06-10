@@ -101,10 +101,8 @@ class NostrRelayManager(private val eventDeduplicator: NostrEventDeduplicator) {
         val originGeohash: String? = null // used for logging and grouping
     )
     
-    // Pending-relay queue: each entry tracks the relay URLs that still need to receive the event.
-    // Entries are removed once all target relays have acknowledged a successful send.
-    private val messageQueue = mutableListOf<Pair<NostrEvent, MutableList<String>>>()
-    private val messageQueueLock = Any()
+    // Events waiting for disconnected relays; drained per relay on reconnect.
+    private val pendingEvents = PendingEventQueue<NostrEvent>()
     
     // Coroutine scope for background operations
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -291,17 +289,17 @@ class NostrRelayManager(private val eventDeduplicator: NostrEventDeduplicator) {
      */
     fun sendEvent(event: NostrEvent, relayUrls: List<String>? = null) {
         val targetRelays = relayUrls ?: relaysList.map { it.url }
-        
-        // Add to pending queue; entries are removed once delivered to all target relays.
-        synchronized(messageQueueLock) {
-            messageQueue.add(Pair(event, targetRelays.toMutableList()))
+
+        // Connected relays get the event immediately and are never queued; only relays
+        // without a live connection wait in the queue until they reconnect.
+        val (sendNow, dropped) = pendingEvents.submit(event, targetRelays) { connections[it] != null }
+        dropped.forEach {
+            Log.w(TAG, "⚠️ Pending event queue full: dropped oldest event ${it.id.take(16)}…")
         }
-        
-        // Attempt immediate send
+
         scope.launch {
-            targetRelays.forEach { relayUrl ->
-                val webSocket = connections[relayUrl]
-                if (webSocket != null) {
+            sendNow.forEach { relayUrl ->
+                connections[relayUrl]?.let { webSocket ->
                     sendToRelay(event, webSocket, relayUrl)
                 }
             }
@@ -479,9 +477,7 @@ class NostrRelayManager(private val eventDeduplicator: NostrEventDeduplicator) {
             geohashToRelays.clear()
 
             // Clear any queued messages waiting to be sent
-            synchronized(messageQueueLock) {
-                messageQueue.clear()
-            }
+            pendingEvents.clear()
 
             Log.i(TAG, "🧹 Cleared all Nostr subscriptions and routing caches")
         } catch (e: Exception) {
@@ -882,20 +878,12 @@ class NostrRelayManager(private val eventDeduplicator: NostrEventDeduplicator) {
         // Restore all active subscriptions for this relay
         restoreSubscriptionsForRelay(relayUrl, session)
 
-        // Deliver any queued events destined for this relay, then remove the relay from
-        // each entry's pending list. Once an entry has no remaining target relays, remove it.
-        synchronized(messageQueueLock) {
-            val iterator = messageQueue.iterator()
-            while (iterator.hasNext()) {
-                val (event, pendingRelays) = iterator.next()
-                if (relayUrl in pendingRelays) {
-                    sendToRelay(event, session, relayUrl)
-                    pendingRelays.remove(relayUrl)
-                    if (pendingRelays.isEmpty()) {
-                        iterator.remove()
-                    }
-                }
-            }
+        // Deliver any queued events that were waiting for this relay. An event submitted
+        // concurrently with this drain may miss it and stay queued until the next
+        // reconnect — same eventual-delivery guarantee as before, now without re-sending
+        // already-delivered events.
+        pendingEvents.drainFor(relayUrl).forEach { event ->
+            sendToRelay(event, session, relayUrl)
         }
     }
 
