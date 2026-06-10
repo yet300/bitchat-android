@@ -6,6 +6,10 @@ import com.app.data.appSettings
 import com.app.crypto.EncryptionService
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.identity.SecureIdentityStateManager
+import com.app.transport.FavoriteNostrLink
+import com.app.transport.GeohashReadReceiptRouter
+import com.app.transport.IncomingMessageSink
+import com.app.transport.NicknameSource
 import com.app.transport.SeenMessageStore
 import com.app.transport.mesh.TransferProgressManager
 import com.app.transport.meshgraph.MeshGraphService
@@ -14,7 +18,8 @@ import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.mesh.BleBearer
 import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.mesh.MeshBearer
-import com.bitchat.android.service.MeshServiceHolder
+import com.app.transport.mesh.MeshLifecycleController
+import com.app.transport.notification.ServiceNotifier
 import com.russhwolf.settings.ObservableSettings
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.BindingContainer
@@ -74,8 +79,28 @@ object AndroidDataBindings {
         meshGraphService: MeshGraphService,
         peerFingerprintManager: PeerFingerprintManager,
         encryptionService: EncryptionService,
-    ): BluetoothMeshService =
-        MeshServiceHolder.getOrCreate(context, debugSettingsManager, debugPreferenceManager, seenMessageStore, transferProgressManager, meshGraphService, peerFingerprintManager, encryptionService)
+        serviceNotifier: ServiceNotifier,
+        nicknameSource: NicknameSource,
+        incomingSink: IncomingMessageSink,
+        favoriteNostrLink: FavoriteNostrLink,
+        geohashReadReceiptRouter: GeohashReadReceiptRouter,
+    ): BluetoothMeshService = BluetoothMeshService(
+        context.applicationContext,
+        debugSettingsManager,
+        debugPreferenceManager,
+        seenMessageStore,
+        transferProgressManager,
+        meshGraphService,
+        peerFingerprintManager,
+        encryptionService,
+        serviceNotifier,
+        nicknameSource,
+        incomingSink,
+        favoriteNostrLink,
+        geohashReadReceiptRouter,
+    )
 
-
+    /** Narrow lifecycle contract for the foreground service (ISP); same underlying BMS. */
+    @Provides
+    fun provideMeshLifecycleController(mesh: BluetoothMeshService): MeshLifecycleController = mesh
 }

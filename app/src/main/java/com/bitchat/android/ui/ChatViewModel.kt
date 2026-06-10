@@ -17,7 +17,6 @@ import com.app.transport.mesh.BluetoothMeshDelegate
 import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.nostr.NostrIdentityBridge
 import com.bitchat.android.BitchatApplication
-import com.bitchat.android.service.MeshServiceHolder
 import com.app.transport.VerificationService
 import com.bitchat.android.geohash.ChannelID
 import com.bitchat.android.geohash.LocationChannelManager
@@ -38,9 +37,8 @@ class ChatViewModel(
     initialMeshService: BluetoothMeshService
 ) : AndroidViewModel(application), BluetoothMeshDelegate {
 
-    // Made var to support mesh service replacement after panic clear
-    var meshService: BluetoothMeshService = initialMeshService
-        private set
+    // Stable graph-owned instance; panic resets it in place (see recreateMeshServiceAfterPanic)
+    val meshService: BluetoothMeshService = initialMeshService
     private val debugManager = (application as BitchatApplication).appGraph.debugSettingsManager
 
     companion object {
@@ -970,39 +968,19 @@ class ChatViewModel(
     }
 
     /**
-     * Recreate the mesh service with a fresh identity after panic clear.
-     * This ensures the new cryptographic keys are used for a new peer ID.
+     * Reset the mesh service in place after panic clear: the engine re-derives its peer
+     * identity from the already-rotated EncryptionService keys and restarts. The BMS
+     * object (and every graph-held reference to it) stays the same.
      */
     private fun recreateMeshServiceAfterPanic() {
         val oldPeerID = meshService.myPeerID
 
-        // Clear the holder so getOrCreate() returns a fresh instance
-        MeshServiceHolder.clear()
-
-        // Create fresh mesh service with new identity (keys were regenerated in clearAllCryptographicData)
-        val appGraph = (getApplication() as BitchatApplication).appGraph
-        val freshMeshService = MeshServiceHolder.getOrCreate(
-            getApplication(),
-            appGraph.debugSettingsManager,
-            appGraph.debugPreferenceManager,
-            appGraph.seenMessageStore,
-            appGraph.transferProgressManager,
-            appGraph.meshGraphService,
-            appGraph.peerFingerprintManager,
-            appGraph.encryptionService,
-        )
-
-        // Replace our reference and set up the new service
-        meshService = freshMeshService
+        meshService.reset()
         meshService.delegate = this
-
-        // Restart mesh operations with new identity
-        meshService.startServices()
-        meshService.sendBroadcastAnnounce()
 
         Log.d(
             TAG,
-            "✅ Mesh service recreated. Old peerID: $oldPeerID, New peerID: ${meshService.myPeerID}"
+            "✅ Mesh service reset. Old peerID: $oldPeerID, New peerID: ${meshService.myPeerID}"
         )
     }
     

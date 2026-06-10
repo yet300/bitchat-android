@@ -14,13 +14,10 @@ import com.app.crypto.identity.PeerFingerprintManager
 import com.app.data.AppStateStore
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.data.routing.MessageRouter
-import com.app.transport.FavoriteNostrLink
-import com.app.transport.GeohashReadReceiptRouter
-import com.app.transport.IncomingMessageSink
-import com.app.transport.NicknameSource
 import com.app.transport.SeenMessageStore
+import com.app.transport.mesh.BluetoothMeshService
+import com.app.transport.mesh.MeshLifecycleController
 import com.app.transport.mesh.TransferProgressManager
-import com.app.transport.notification.ServiceNotifier
 import com.app.transport.meshgraph.MeshGraphService
 import com.app.transport.debug.DebugPreferenceManager
 import com.app.transport.debug.DebugSettingsManager
@@ -76,12 +73,9 @@ interface AppGraph {
     val messageRouter: MessageRouter
     val favoritesPersistenceService: FavoritesPersistenceService
 
-    // BMS wiring SPIs (implemented in AndroidAppBindings); transitional accessors for
-    // MeshServiceHolder until Stage 1.3 deletes the holder and the graph constructs BMS
-    // directly.
-    val serviceNotifier: ServiceNotifier
-    val nicknameSource: NicknameSource
-    val incomingMessageSink: IncomingMessageSink
-    val favoriteNostrLink: FavoriteNostrLink
-    val geohashReadReceiptRouter: GeohashReadReceiptRouter
+    // Graph-owned mesh engine: full surface for the still-living god-classes
+    // (MainActivity/ChatViewModel, retires Phase C) and the narrow lifecycle contract
+    // for the foreground service (invariant: the service owns the mesh lifecycle).
+    val bluetoothMeshService: BluetoothMeshService
+    val meshLifecycleController: MeshLifecycleController
 }

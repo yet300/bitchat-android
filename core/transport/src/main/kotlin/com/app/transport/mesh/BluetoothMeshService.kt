@@ -58,7 +58,7 @@ class BluetoothMeshService(
     private val incomingSink: IncomingMessageSink,
     private val favoriteNostrLink: FavoriteNostrLink,
     private val geohashReadReceiptRouter: GeohashReadReceiptRouter,
-) {
+) : MeshLifecycleController {
     private val debugManager = debugSettingsManager
 
     companion object {
@@ -66,13 +66,20 @@ class BluetoothMeshService(
         private val MAX_TTL: UByte = MeshConstants.MESSAGE_TTL_HOPS
     }
 
-    // My peer identification - derived from persisted Noise identity fingerprint (first 16 hex chars)
-    val myPeerID: String = encryptionService.getIdentityFingerprint().take(16)
-    private val peerManager = PeerManager(peerFingerprintManager)
-    private val fragmentManager = FragmentManager()
-    private val securityManager = SecurityManager(encryptionService, myPeerID)
-    private val storeForwardManager = StoreForwardManager()
-    private val messageHandler = MessageHandler(myPeerID, context.applicationContext, meshGraphService)
+    // My peer identification - derived from persisted Noise identity fingerprint (first 16
+    // hex chars). Re-derived by reset() after panic rotates the Noise keys; read it live,
+    // do not cache.
+    @Volatile
+    var myPeerID: String = encryptionService.getIdentityFingerprint().take(16)
+        private set
+
+    // Engine components. Rebuilt in place by reset()/revival — the BMS object itself keeps
+    // its graph identity, so @SingleIn consumers never hold a stale reference.
+    private var peerManager = PeerManager(peerFingerprintManager)
+    private var fragmentManager = FragmentManager()
+    private var securityManager = SecurityManager(encryptionService, myPeerID)
+    private var storeForwardManager = StoreForwardManager()
+    private var messageHandler = MessageHandler(myPeerID, context.applicationContext, meshGraphService)
     val bleBearer = BleBearer(context, myPeerID, debugSettingsManager, fragmentManager, transferProgressManager)
 
     /**
@@ -81,23 +88,31 @@ class BluetoothMeshService(
      * accesses GATT server/client controls directly (Phase C will remove this).
      */
     val connectionManager: BluetoothConnectionManager get() = bleBearer.connectionManager
-    private val packetProcessor = PacketProcessor(myPeerID, debugSettingsManager)
+    private var packetProcessor = PacketProcessor(myPeerID, debugSettingsManager)
     private lateinit var gossipSyncManager: GossipSyncManager
 
     // Service state management
     private var isActive = false
-    
+
     // Delegate for message callbacks (maintains same interface)
     var delegate: BluetoothMeshDelegate? = null
-    
+
     // Coroutines
-    private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    // Tracks whether this instance has been terminated via stopServices()
+    private var serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    // Tracks whether the current component generation was terminated via stopServices()
     private var terminated = false
-    
+
     init {
         Log.i(TAG, "Initializing BluetoothMeshService for peer=$myPeerID")
         VerificationService.configure(encryptionService)
+        wireComponents()
+    }
+
+    /**
+     * Wires the current generation of components together. Called from init and again by
+     * [rebuildComponents] after reset/revival.
+     */
+    private fun wireComponents() {
         setupDelegates()
         messageHandler.packetProcessor = packetProcessor
         messageHandler.favoriteNostrLink = favoriteNostrLink
@@ -134,14 +149,62 @@ class BluetoothMeshService(
                 return signPacketBeforeBroadcast(packet)
             }
         }
-        
+
         // Inject dynamic direct connection check into PeerManager
         // Matches iOS logic: checks if we have an active hardware mapping for this peer
         peerManager.isPeerDirectlyConnected = { peerID ->
             bleBearer.addressPeerMap.containsValue(peerID)
         }
-        
+
         Log.d(TAG, "Delegates set up; GossipSyncManager initialized")
+    }
+
+    /** Best-effort synchronous shutdown of the current component generation. */
+    private fun stopComponentsNow() {
+        try { gossipSyncManager.stop() } catch (_: Exception) { }
+        try { bleBearer.stop() } catch (_: Exception) { }
+        try { peerManager.shutdown() } catch (_: Exception) { }
+        try { fragmentManager.shutdown() } catch (_: Exception) { }
+        try { securityManager.shutdown() } catch (_: Exception) { }
+        try { storeForwardManager.shutdown() } catch (_: Exception) { }
+        try { messageHandler.shutdown() } catch (_: Exception) { }
+        try { packetProcessor.shutdown() } catch (_: Exception) { }
+    }
+
+    /**
+     * Builds a fresh component generation for the current EncryptionService identity and
+     * rewires everything. Precondition: the previous generation is stopped and
+     * [serviceScope] cancelled.
+     */
+    private fun rebuildComponents() {
+        serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        myPeerID = encryptionService.getIdentityFingerprint().take(16)
+        peerManager = PeerManager(peerFingerprintManager)
+        fragmentManager = FragmentManager()
+        securityManager = SecurityManager(encryptionService, myPeerID)
+        storeForwardManager = StoreForwardManager()
+        messageHandler = MessageHandler(myPeerID, context.applicationContext, meshGraphService)
+        packetProcessor = PacketProcessor(myPeerID, debugSettingsManager)
+        bleBearer.reset(myPeerID, fragmentManager)
+        wireComponents()
+        terminated = false
+    }
+
+    /**
+     * Reset-in-place for panic mode: stop everything, re-derive the peer identity from the
+     * (already key-rotated) EncryptionService, rebuild the engine and restart. The graph
+     * identity of this BMS object — and of [bleBearer] inside Set<MeshBearer> — never
+     * changes, so no consumer is left holding a dead instance.
+     */
+    fun reset() {
+        Log.w(TAG, "🚨 Resetting mesh service in place — old peerID=$myPeerID")
+        isActive = false
+        stopComponentsNow()
+        serviceScope.cancel()
+        rebuildComponents()
+        startServices()
+        sendBroadcastAnnounce()
+        Log.w(TAG, "✅ Mesh service reset complete — new peerID=$myPeerID")
     }
     
     /**
@@ -652,11 +715,12 @@ class BluetoothMeshService(
             return
         }
         if (terminated) {
-            // This instance's scope was cancelled previously; refuse to start to avoid using dead scopes.
-            Log.e(TAG, "Mesh service instance was terminated; create a new instance instead of restarting")
-            return
+            // The previous generation's scope was cancelled by stopServices(); rebuild the
+            // engine in place for the same identity instead of refusing to start.
+            Log.i(TAG, "Reviving terminated mesh service (in-place rebuild)")
+            rebuildComponents()
         }
-        
+
         Log.i(TAG, "Starting Bluetooth mesh service with peer ID: $myPeerID")
         
         if (bleBearer.start()) {
@@ -711,18 +775,14 @@ class BluetoothMeshService(
         }
     }
 
-    /**
-     * Whether this instance can be safely reused. Returns false after stopServices() or if
-     * any critical internal scope has been cancelled.
-     */
-    fun isReusable(): Boolean {
-        val reusable = !terminated && serviceScope.isActive && bleBearer.isReusable()
-        if (!reusable) {
-            Log.d(TAG, "isReusable=false (terminated=$terminated, scopeActive=${serviceScope.isActive}, connReusable=${bleBearer.isReusable()})")
-        }
-        return reusable
-    }
-    
+    // MARK: - MeshLifecycleController (narrow contract for the foreground service)
+
+    override fun start() = startServices()
+    override fun stop() = stopServices()
+    override val isMeshActive: Boolean get() = isActive
+    override fun activePeerCount(): Int = getActivePeerCount()
+
+
     /**
      * Send public message
      */

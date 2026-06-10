@@ -28,11 +28,11 @@ import kotlinx.coroutines.flow.asStateFlow
  * [BluetoothMeshService] call sites until Phase C dissolves them.
  */
 class BleBearer(
-    context: Context,
+    private val context: Context,
     myPeerID: String,
-    debugSettingsManager: DebugSettingsManager,
+    private val debugSettingsManager: DebugSettingsManager,
     fragmentManager: FragmentManager? = null,
-    transferProgressManager: TransferProgressManager,
+    private val transferProgressManager: TransferProgressManager,
 ) : MeshBearer {
 
     // -----------------------------------------------------------------
@@ -42,11 +42,14 @@ class BleBearer(
     /**
      * The raw [BluetoothConnectionManager] — kept accessible so that
      * [BluetoothMeshService] can still expose it to [DebugSettingsSheet]
-     * until that UI layer is migrated (Phase C).
+     * until that UI layer is migrated (Phase C). Replaced in place by [reset];
+     * the BleBearer object itself keeps its graph identity (it lives inside
+     * the multibound Set<MeshBearer>).
      */
-    val connectionManager = BluetoothConnectionManager(
+    var connectionManager = BluetoothConnectionManager(
         context, myPeerID, debugSettingsManager, fragmentManager, transferProgressManager,
     )
+        private set
 
     // -----------------------------------------------------------------
     // MeshBearer identity
@@ -111,6 +114,10 @@ class BleBearer(
     var externalDelegate: BluetoothConnectionManagerDelegate? = null
 
     init {
+        wireConnectionManager()
+    }
+
+    private fun wireConnectionManager() {
         connectionManager.delegate = object : BluetoothConnectionManagerDelegate {
             override fun onPacketReceived(
                 packet: BitchatPacket,
@@ -141,6 +148,20 @@ class BleBearer(
                 externalDelegate?.onRSSIUpdated(deviceAddress, rssi)
             }
         }
+    }
+
+    /**
+     * Rebuild the internal BLE stack for a new peer identity (panic reset) or after a
+     * terminal stop. The BleBearer object identity is preserved — the graph (including
+     * the multibound Set<MeshBearer>) keeps serving this instance.
+     */
+    fun reset(myPeerID: String, fragmentManager: FragmentManager?) {
+        try { connectionManager.stopServices() } catch (_: Exception) { }
+        _neighbors.value = emptySet()
+        connectionManager = BluetoothConnectionManager(
+            context, myPeerID, debugSettingsManager, fragmentManager, transferProgressManager,
+        )
+        wireConnectionManager()
     }
 
     // -----------------------------------------------------------------
