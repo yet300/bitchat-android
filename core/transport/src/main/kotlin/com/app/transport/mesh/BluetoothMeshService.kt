@@ -48,16 +48,16 @@ class BluetoothMeshService(
     private val transferProgressManager: TransferProgressManager,
     private val meshGraphService: MeshGraphService,
     private val peerFingerprintManager: PeerFingerprintManager,
+    // Graph-provided: the same instance backs IdentityRepositoryImpl, so Noise session
+    // state lives in exactly one place.
+    private val encryptionService: EncryptionService,
 ) {
     private val debugManager = debugSettingsManager
-    
+
     companion object {
         private const val TAG = "BluetoothMeshService"
         private val MAX_TTL: UByte = MeshConstants.MESSAGE_TTL_HOPS
     }
-    
-    // Core components - each handling specific responsibilities
-    private val encryptionService = EncryptionService(context, peerFingerprintManager)
 
     // My peer identification - derived from persisted Noise identity fingerprint (first 16 hex chars)
     val myPeerID: String = encryptionService.getIdentityFingerprint().take(16)

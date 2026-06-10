@@ -989,6 +989,7 @@ class ChatViewModel(
             appGraph.transferProgressManager,
             appGraph.meshGraphService,
             appGraph.peerFingerprintManager,
+            appGraph.encryptionService,
         )
 
         // Replace our reference and set up the new service

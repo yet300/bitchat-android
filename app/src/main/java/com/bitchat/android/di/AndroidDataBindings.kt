@@ -73,8 +73,9 @@ object AndroidDataBindings {
         transferProgressManager: TransferProgressManager,
         meshGraphService: MeshGraphService,
         peerFingerprintManager: PeerFingerprintManager,
+        encryptionService: EncryptionService,
     ): BluetoothMeshService =
-        MeshServiceHolder.getOrCreate(context, debugSettingsManager, debugPreferenceManager, seenMessageStore, transferProgressManager, meshGraphService, peerFingerprintManager)
+        MeshServiceHolder.getOrCreate(context, debugSettingsManager, debugPreferenceManager, seenMessageStore, transferProgressManager, meshGraphService, peerFingerprintManager, encryptionService)
 
 
 }

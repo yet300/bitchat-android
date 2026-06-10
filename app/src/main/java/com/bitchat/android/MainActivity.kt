@@ -121,6 +121,7 @@ class MainActivity : OrientationAwareActivity() {
             appGraph.transferProgressManager,
             appGraph.meshGraphService,
             appGraph.peerFingerprintManager,
+            appGraph.encryptionService,
         )
         bluetoothStatusManager = BluetoothStatusManager(
             activity = this,

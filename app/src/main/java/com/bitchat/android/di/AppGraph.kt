@@ -9,6 +9,7 @@ import com.app.domain.repository.MessageTransport
 import com.app.domain.repository.PeerRepository
 import com.app.domain.repository.SearchRepository
 import com.app.domain.repository.SettingsRepository
+import com.app.crypto.EncryptionService
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.data.AppStateStore
 import com.app.data.favorites.FavoritesPersistenceService
@@ -66,6 +67,7 @@ interface AppGraph {
     val locationNotesManager: LocationNotesManager
     // temporary Phase-D/DI-core bridge, retires Phase C
     val peerFingerprintManager: PeerFingerprintManager
+    val encryptionService: EncryptionService
     val messageRouter: MessageRouter
     val favoritesPersistenceService: FavoritesPersistenceService
 }

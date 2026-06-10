@@ -2,6 +2,7 @@ package com.app.crypto
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.noise.NoiseEncryptionService
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
@@ -20,7 +21,7 @@ class EncryptionServiceTest {
     @Before
     fun setup() {
         context = ApplicationProvider.getApplicationContext()
-        encryptionService = EncryptionService(context)
+        encryptionService = EncryptionService(context, PeerFingerprintManager())
     }
 
     @Test
