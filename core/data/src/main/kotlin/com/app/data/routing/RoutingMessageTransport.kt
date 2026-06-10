@@ -33,15 +33,21 @@ internal class RoutingMessageTransport(
     }
 
     override suspend fun sendGeohash(content: String, channel: GeohashChannel, nickname: String?) {
-        // Public geo-channel posting is still orchestrated in :app (GeohashViewModel -> NostrClient:
-        // identity derivation, relay selection, local echo). It routes through the data layer later.
-        TODO("Geohash public posting not yet routed through the data layer")
+        // TRACKING(Phase B / data-geohash): public geo-channel posting is still orchestrated in
+        // :app (GeohashViewModel -> NostrClient: identity derivation, relay selection, local
+        // echo). No production caller reaches this port yet — fail explicitly, not with a
+        // TODO() NotImplementedError, so a future mis-wiring is diagnosable.
+        throw UnsupportedOperationException(
+            "Geohash public posting is not yet routed through the data layer (lives in :app GeohashViewModel)",
+        )
     }
 
     override suspend fun sendAttachment(attachment: Attachment, target: ConversationId, messageId: String) {
-        // Media attachment orchestration (Attachment -> BitchatFilePacket, broadcast vs private) still
-        // lives in :app (MediaSendingManager). It routes through the data layer later.
-        TODO("Attachment sending not yet routed through the data layer")
+        // TRACKING(Phase B / data-media): media attachment orchestration (Attachment ->
+        // BitchatFilePacket, broadcast vs private) still lives in :app (MediaSendingManager).
+        throw UnsupportedOperationException(
+            "Attachment sending is not yet routed through the data layer (lives in :app MediaSendingManager)",
+        )
     }
 
     override suspend fun cancelTransfer(messageId: String): Boolean =

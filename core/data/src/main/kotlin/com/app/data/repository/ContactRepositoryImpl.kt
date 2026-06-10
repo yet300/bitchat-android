@@ -11,6 +11,7 @@ import com.app.domain.model.PeerId
 import com.app.domain.model.PeerIdentity
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.SettingsStore
+import com.app.transport.nostr.GeohashAliasRegistry
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -31,6 +32,7 @@ internal class ContactRepositoryImpl(
     private val settings: SettingsStore,
     private val favorites: FavoritesPersistenceService,
     private val fingerprints: PeerFingerprintManager,
+    private val geohashAliasRegistry: GeohashAliasRegistry,
 ) : ContactRepository {
 
     override fun observeFavorites(): Flow<Set<Fingerprint>> =
@@ -74,10 +76,12 @@ internal class ContactRepositoryImpl(
     }
 
     override suspend fun noiseKeyHexForNostrAlias(alias: PeerId): String? {
-        // The alias token is only a 16-hex prefix of the Nostr pubkey; full alias->Noise resolution
-        // depends on the Nostr/geohash mapping (GeohashRepository), which still lives in :app and moves
-        // into :core:data in a later Phase B step. Favorites alone can't resolve a prefix here yet.
-        return null
+        // Mirrors ConversationAliasResolver.resolveCanonicalPeerID: the "nostr_" alias maps
+        // to a full Nostr pubkey via the geohash alias registry; favorites then bridge the
+        // pubkey to the peer's stable Noise key.
+        val pubkeyHex = runCatching { geohashAliasRegistry.get(alias.raw) }.getOrNull() ?: return null
+        val noiseKey = runCatching { favorites.findNoiseKey(pubkeyHex) }.getOrNull() ?: return null
+        return noiseKey.toHex()
     }
 
     override suspend fun clearAll() {
