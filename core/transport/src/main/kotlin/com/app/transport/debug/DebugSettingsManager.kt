@@ -2,6 +2,8 @@
 
 package com.app.transport.debug
 
+import com.app.transport.MeshTelemetry
+
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -9,6 +11,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlin.time.Instant
 import kotlin.time.Clock
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import com.app.transport.protocol.BitchatPacket
 import com.app.common.encoding.toHexString
@@ -24,7 +27,7 @@ import kotlin.time.ExperimentalTime
 @Inject
 class DebugSettingsManager(
     private val debugPreferenceManager: DebugPreferenceManager,
-) {
+) : MeshTelemetry {
     // NOTE: This app-scoped singleton is referenced from the mesh layer (threaded through ctors).
     // Keep in transport.debug but avoid Compose deps.
 
@@ -33,13 +36,13 @@ class DebugSettingsManager(
     val verboseLoggingEnabled: StateFlow<Boolean> = _verboseLoggingEnabled.asStateFlow()
     
     private val _gattServerEnabled = MutableStateFlow(true)
-    val gattServerEnabled: StateFlow<Boolean> = _gattServerEnabled.asStateFlow()
+    override val gattServerEnabled: StateFlow<Boolean> = _gattServerEnabled.asStateFlow()
     
     private val _gattClientEnabled = MutableStateFlow(true)
-    val gattClientEnabled: StateFlow<Boolean> = _gattClientEnabled.asStateFlow()
+    override val gattClientEnabled: StateFlow<Boolean> = _gattClientEnabled.asStateFlow()
     
     private val _packetRelayEnabled = MutableStateFlow(true)
-    val packetRelayEnabled: StateFlow<Boolean> = _packetRelayEnabled.asStateFlow()
+    override val packetRelayEnabled: StateFlow<Boolean> = _packetRelayEnabled.asStateFlow()
 
     // Visibility of the debug sheet; gates heavy work
     private val _debugSheetVisible = MutableStateFlow(false)
@@ -48,11 +51,11 @@ class DebugSettingsManager(
 
     // Connection limit overrides (debug)
     private val _maxConnectionsOverall = MutableStateFlow(8)
-    val maxConnectionsOverall: StateFlow<Int> = _maxConnectionsOverall.asStateFlow()
+    override val maxConnectionsOverall: StateFlow<Int> = _maxConnectionsOverall.asStateFlow()
     private val _maxServerConnections = MutableStateFlow(8)
-    val maxServerConnections: StateFlow<Int> = _maxServerConnections.asStateFlow()
+    override val maxServerConnections: StateFlow<Int> = _maxServerConnections.asStateFlow()
     private val _maxClientConnections = MutableStateFlow(8)
-    val maxClientConnections: StateFlow<Int> = _maxClientConnections.asStateFlow()
+    override val maxClientConnections: StateFlow<Int> = _maxClientConnections.asStateFlow()
     
     init {
         // Load persisted defaults (if preference manager already initialized)
@@ -86,16 +89,16 @@ class DebugSettingsManager(
     // Timestamps to compute rolling window stats
     private val relayTimestamps = ConcurrentLinkedQueue<Long>()
     // Per-device and per-peer rolling timestamps for stacked graphs
-    private val perDeviceRelayTimestamps = mutableMapOf<String, ConcurrentLinkedQueue<Long>>()
-    private val perPeerRelayTimestamps = mutableMapOf<String, ConcurrentLinkedQueue<Long>>()
+    private val perDeviceRelayTimestamps = ConcurrentHashMap<String, ConcurrentLinkedQueue<Long>>()
+    private val perPeerRelayTimestamps = ConcurrentHashMap<String, ConcurrentLinkedQueue<Long>>()
 
     // Additional buckets to split incoming vs outgoing
     private val incomingTimestamps = ConcurrentLinkedQueue<Long>()
     private val outgoingTimestamps = ConcurrentLinkedQueue<Long>()
-    private val perDeviceIncoming = mutableMapOf<String, ConcurrentLinkedQueue<Long>>()
-    private val perDeviceOutgoing = mutableMapOf<String, ConcurrentLinkedQueue<Long>>()
-    private val perPeerIncoming = mutableMapOf<String, ConcurrentLinkedQueue<Long>>()
-    private val perPeerOutgoing = mutableMapOf<String, ConcurrentLinkedQueue<Long>>()
+    private val perDeviceIncoming = ConcurrentHashMap<String, ConcurrentLinkedQueue<Long>>()
+    private val perDeviceOutgoing = ConcurrentHashMap<String, ConcurrentLinkedQueue<Long>>()
+    private val perPeerIncoming = ConcurrentHashMap<String, ConcurrentLinkedQueue<Long>>()
+    private val perPeerOutgoing = ConcurrentHashMap<String, ConcurrentLinkedQueue<Long>>()
 
     // Expose current per-second rates (updated when logging/pruning occurs)
     private val _perDeviceLastSecond: MutableStateFlow<Map<String, Int>> = MutableStateFlow(emptyMap())
@@ -305,7 +308,7 @@ class DebugSettingsManager(
         _debugMessages.value = debugMessageQueue.toList()
     }
     
-    fun addScanResult(scanResult: DebugScanResult) {
+    override fun addScanResult(scanResult: DebugScanResult) {
         // De-duplicate by device address; keep most recent
         if (scanResultsQueue.isNotEmpty()) {
             val toRemove = scanResultsQueue.filter { it.deviceAddress == scanResult.deviceAddress }
@@ -362,7 +365,7 @@ class DebugSettingsManager(
     
     // MARK: - Debug Message Creation Helpers
     
-    fun logPeerConnection(peerID: String, nickname: String, deviceID: String, isInbound: Boolean) {
+    override fun logPeerConnection(peerID: String, nickname: String, deviceID: String, isInbound: Boolean) {
         if (verboseLoggingEnabled.value) {
             val direction = if (isInbound) "connected to our server" else "we connected as client"
             addDebugMessage(DebugMessage.PeerEvent(
@@ -371,7 +374,7 @@ class DebugSettingsManager(
         }
     }
     
-    fun logPeerDisconnection(peerID: String, nickname: String, deviceID: String) {
+    override fun logPeerDisconnection(peerID: String, nickname: String, deviceID: String) {
         if (verboseLoggingEnabled.value) {
             addDebugMessage(DebugMessage.PeerEvent(
                 "❌ $nickname ($peerID) disconnected from device $deviceID"
@@ -379,7 +382,7 @@ class DebugSettingsManager(
         }
     }
     
-    fun logIncomingPacket(senderPeerID: String, senderNickname: String?, messageType: String, viaDeviceId: String?) {
+    override fun logIncomingPacket(senderPeerID: String, senderNickname: String?, messageType: String, viaDeviceId: String?) {
         if (verboseLoggingEnabled.value) {
             val who = if (!senderNickname.isNullOrBlank()) "$senderNickname ($senderPeerID)" else senderPeerID
             val routeInfo = if (!viaDeviceId.isNullOrBlank()) " via $viaDeviceId" else " (direct)"
@@ -412,7 +415,7 @@ class DebugSettingsManager(
     
 
     // New, more detailed relay logger used by the mesh/broadcaster
-    fun logPacketRelayDetailed(
+    override fun logPacketRelayDetailed(
         packetType: String,
         senderPeerID: String?,
         senderNickname: String?,
@@ -423,9 +426,9 @@ class DebugSettingsManager(
         toNickname: String?,
         toDeviceAddress: String?,
         ttl: UByte?,
-        isRelay: Boolean = true,
-        packetVersion: UByte = 1u,
-        routeInfo: String? = null
+        isRelay: Boolean,
+        packetVersion: UByte,
+        routeInfo: String?
     ) {
         // Build message only if verbose logging is enabled, but always update stats
         val senderLabel = when {
@@ -490,10 +493,10 @@ class DebugSettingsManager(
 
     // Peer nickname resolver
     private var nicknameResolver: ((String) -> String?)? = null
-    fun setNicknameResolver(resolver: (String) -> String?) { nicknameResolver = resolver }
+    override fun setNicknameResolver(resolver: (String) -> String?) { nicknameResolver = resolver }
     
     // Explicit incoming/outgoing logging to avoid double counting
-    fun logIncoming(packet: BitchatPacket, fromPeerID: String, fromNickname: String?, fromDeviceAddress: String?, myPeerID: String) {
+    override fun logIncoming(packet: BitchatPacket, fromPeerID: String, fromNickname: String?, fromDeviceAddress: String?, myPeerID: String) {
         val packetType = packet.type.toString()
         val packetVersion = packet.version
         val route = packet.route
@@ -538,7 +541,7 @@ class DebugSettingsManager(
         if (visible) updateRelayStatsFromTimestamps()
     }
 
-    fun logOutgoing(packetType: String, toPeerID: String?, toNickname: String?, toDeviceAddress: String?, previousHopPeerID: String? = null, packetVersion: UByte = 1u, routeInfo: String? = null) {
+    override fun logOutgoing(packetType: String, toPeerID: String?, toNickname: String?, toDeviceAddress: String?, previousHopPeerID: String?, packetVersion: UByte, routeInfo: String?) {
         if (verboseLoggingEnabled.value) {
             val who = toNickname ?: toPeerID ?: "unknown"
             val routeStr = if (routeInfo != null) " $routeInfo" else ""

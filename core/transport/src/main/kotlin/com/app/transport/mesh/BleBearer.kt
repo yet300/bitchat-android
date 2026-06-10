@@ -2,7 +2,7 @@ package com.app.transport.mesh
 
 import android.bluetooth.BluetoothDevice
 import android.content.Context
-import com.app.transport.debug.DebugSettingsManager
+import com.app.transport.MeshTelemetry
 import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
 import kotlinx.coroutines.flow.Flow
@@ -29,7 +29,7 @@ import kotlinx.coroutines.flow.asStateFlow
 class BleBearer(
     private val context: Context,
     myPeerID: String,
-    private val debugSettingsManager: DebugSettingsManager,
+    private val debugSettingsManager: MeshTelemetry,
     private val fragmentManager: FragmentManager? = null,
     private val transferProgressManager: TransferProgressManager,
 ) : MeshBearer, BleDebugHandle {
