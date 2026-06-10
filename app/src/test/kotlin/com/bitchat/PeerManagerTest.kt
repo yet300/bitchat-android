@@ -1,13 +1,14 @@
 package com.bitchat
 
-import com.bitchat.android.mesh.PeerManager
+import com.app.crypto.identity.PeerFingerprintManager
+import com.app.transport.mesh.PeerManager
 import junit.framework.TestCase.assertEquals
 import org.junit.Test
 
 
 class PeerManagerTest {
 
-    private val peerManager = PeerManager()
+    private val peerManager = PeerManager(PeerFingerprintManager())
     private val unknownPeer = "unknown"
     private val unknownDevice = "Unknown"
 

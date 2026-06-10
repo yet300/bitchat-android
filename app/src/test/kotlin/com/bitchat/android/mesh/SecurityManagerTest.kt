@@ -2,6 +2,10 @@ package com.bitchat.android.mesh
 
 import android.os.Build
 import com.app.crypto.EncryptionService
+import com.app.crypto.identity.PeerFingerprintManager
+import com.app.transport.mesh.PeerInfo
+import com.app.transport.mesh.SecurityManager
+import com.app.transport.mesh.SecurityManagerDelegate
 import com.app.transport.model.IdentityAnnouncement
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
@@ -37,7 +41,7 @@ class SecurityManagerTest {
     private val otherNoiseKey = ByteArray(32) { 0xB }
 
     // Fake implementation to bypass initialization issues in tests
-    open class FakeEncryptionService : EncryptionService(RuntimeEnvironment.getApplication()) {
+    open class FakeEncryptionService : EncryptionService(RuntimeEnvironment.getApplication(), PeerFingerprintManager()) {
         var shouldVerify: Boolean = true
         var lastVerifySignature: ByteArray? = null
         var lastVerifyKey: ByteArray? = null
@@ -251,7 +255,7 @@ class SecurityManagerTest {
         // 1. Initial Announce (Fresh)
         val packet1 = BitchatPacket(
             type = MessageType.ANNOUNCE.value,
-            ttl = com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS, // 7u
+            ttl = com.app.transport.MeshConstants.MESSAGE_TTL_HOPS, // 7u
             senderID = unknownPeerID,
             payload = payload
         )
@@ -262,11 +266,11 @@ class SecurityManagerTest {
         assertTrue("First ANNOUNCE should be accepted", securityManager.validatePacket(packet1, unknownPeerID))
         
         // 2. Relayed Duplicate (Lower TTL)
-        val packet2 = packet1.copy(ttl = (com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS - 1u).toUByte())
+        val packet2 = packet1.copy(ttl = (com.app.transport.MeshConstants.MESSAGE_TTL_HOPS - 1u).toUByte())
         assertFalse("Relayed duplicate ANNOUNCE should be rejected", securityManager.validatePacket(packet2, unknownPeerID))
         
         // 3. Direct Duplicate (Max TTL)
-        val packet3 = packet1.copy(ttl = com.bitchat.android.util.AppConstants.MESSAGE_TTL_HOPS)
+        val packet3 = packet1.copy(ttl = com.app.transport.MeshConstants.MESSAGE_TTL_HOPS)
         assertTrue("Fresh duplicate ANNOUNCE should be accepted", securityManager.validatePacket(packet3, unknownPeerID))
     }
 

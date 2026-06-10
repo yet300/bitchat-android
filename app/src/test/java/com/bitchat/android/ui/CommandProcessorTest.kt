@@ -2,7 +2,7 @@ package com.bitchat.android.ui
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
-import com.bitchat.android.mesh.BluetoothMeshService
+import com.app.transport.mesh.BluetoothMeshService
 import junit.framework.TestCase.assertEquals
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
@@ -44,7 +44,9 @@ class CommandProcessorTest() {
         state = chatState,
         messageManager = messageManager,
         dataManager = DataManager(context = context),
-        noiseSessionDelegate = mock<NoiseSessionDelegate>()
+        noiseSessionDelegate = mock<NoiseSessionDelegate>(),
+        fingerprintManager = mock(),
+        favoritesService = mock()
       )
     )
   }
