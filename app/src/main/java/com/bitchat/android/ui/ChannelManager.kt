@@ -21,6 +21,10 @@ class ChannelManager(
     private val channelPasswords = mutableMapOf<String, String>()
     private val channelKeyCommitments = mutableMapOf<String, String>()
     private val retentionEnabledChannels = mutableSetOf<String>()
+
+    // Channels whose key was accepted without ciphertext proof (no encrypted history at join
+    // time). The first failed decrypt evicts the key so the user is re-prompted.
+    private val provisionalKeyChannels = mutableSetOf<String>()
     
     // MARK: - Channel Lifecycle
     
@@ -32,7 +36,10 @@ class ChannelManager(
             if (state.getPasswordProtectedChannelsValue().contains(channelTag) && !channelKeys.containsKey(channelTag)) {
                 // Need password verification
                 if (password != null) {
-                    return verifyChannelPassword(channelTag, password)
+                    if (!verifyChannelPassword(channelTag, password)) {
+                        return false
+                    }
+                    // Key stored by verifyChannelPassword; fall through to switch below
                 } else {
                     state.setPasswordPromptChannel(channelTag)
                     state.setShowPasswordPrompt(true)
@@ -98,6 +105,7 @@ class ChannelManager(
         dataManager.removeChannelMembers(channel)
         channelKeys.remove(channel)
         channelPasswords.remove(channel)
+        provisionalKeyChannels.remove(channel)
         dataManager.removeChannelCreator(channel)
         
         saveChannelData()
@@ -116,9 +124,37 @@ class ChannelManager(
     // MARK: - Channel Password and Encryption
     
     private fun verifyChannelPassword(channel: String, password: String): Boolean {
-        val storedKey = channelKeys[channel] ?: return false
         val candidateKey = deriveChannelKey(password, channel)
-        return storedKey.encoded.contentEquals(candidateKey.encoded)
+
+        // Fast path: key already known (creator or previously verified) — compare directly.
+        channelKeys[channel]?.let { storedKey ->
+            return storedKey.encoded.contentEquals(candidateKey.encoded)
+        }
+
+        // Probe-decrypt: prove the password against any received encrypted message of the channel.
+        val encryptedMessages = state.getChannelMessagesValue()[channel]
+            .orEmpty()
+            .filter { it.isEncrypted && it.encryptedContent != null }
+
+        if (encryptedMessages.isEmpty()) {
+            // No ciphertext to verify against yet. Trade-off: accept provisionally (otherwise a
+            // non-creator could never join a protected channel before receiving history) and let
+            // the first failed decrypt evict the key — see decryptChannelMessage().
+            channelKeys[channel] = candidateKey
+            channelPasswords[channel] = password
+            provisionalKeyChannels.add(channel)
+            return true
+        }
+
+        val verified = encryptedMessages.any { message ->
+            decryptChannelMessage(message.encryptedContent!!, channel, candidateKey) != null
+        }
+        if (verified) {
+            channelKeys[channel] = candidateKey
+            channelPasswords[channel] = password
+            provisionalKeyChannels.remove(channel)
+        }
+        return verified
     }
     
     private fun deriveChannelKey(password: String, channelName: String): SecretKeySpec {
@@ -135,7 +171,18 @@ class ChannelManager(
     }
     
     fun decryptChannelMessage(encryptedContent: ByteArray, channel: String): String? {
-        return decryptChannelMessage(encryptedContent, channel, null)
+        val result = decryptChannelMessage(encryptedContent, channel, null)
+        if (result != null) {
+            // Key proven by real traffic — no longer provisional.
+            provisionalKeyChannels.remove(channel)
+        } else if (channel in provisionalKeyChannels) {
+            // Provisionally accepted key failed its first real decrypt: evict it so the next
+            // join attempt re-prompts for the password.
+            channelKeys.remove(channel)
+            channelPasswords.remove(channel)
+            provisionalKeyChannels.remove(channel)
+        }
+        return result
     }
     
     private fun decryptChannelMessage(encryptedContent: ByteArray, channel: String, testKey: SecretKeySpec?): String? {
@@ -259,5 +306,6 @@ class ChannelManager(
         channelPasswords.clear()
         channelKeyCommitments.clear()
         retentionEnabledChannels.clear()
+        provisionalKeyChannels.clear()
     }
 }
