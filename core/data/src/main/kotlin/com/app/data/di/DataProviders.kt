@@ -8,6 +8,9 @@ import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
+import com.app.transport.routing.PeerKeyResolver
+import com.app.transport.routing.SessionInitiator
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * Platform-agnostic @Provides bindings for the routing layer.
@@ -31,5 +34,21 @@ object DataProviders {
     fun provideMessageRouter(
         routingCore: RoutingCore,
         mesh: BluetoothMeshService,
-    ): MessageRouter = MessageRouter(routingCore, mesh)
+        scope: CoroutineScope,
+    ): MessageRouter = MessageRouter(routingCore, mesh, scope)
+
+    /** Narrow mesh ports (ISP) for the routing policy — implemented over BMS. */
+    @Provides
+    fun provideSessionInitiator(mesh: BluetoothMeshService): SessionInitiator =
+        SessionInitiator { peerID -> mesh.initiateNoiseHandshake(peerID) }
+
+    @Provides
+    fun providePeerKeyResolver(mesh: BluetoothMeshService): PeerKeyResolver =
+        PeerKeyResolver { peerID ->
+            try {
+                mesh.getPeerInfo(peerID)?.noisePublicKey?.joinToString("") { b -> "%02x".format(b) }
+            } catch (_: Exception) {
+                null
+            }
+        }
 }

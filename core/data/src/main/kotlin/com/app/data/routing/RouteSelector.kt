@@ -1,14 +1,17 @@
 package com.app.data.routing
 
 import android.util.Log
-import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.routing.OutgoingEnvelope
+import com.app.transport.routing.PeerKeyResolver
 import com.app.transport.routing.Reachability
 import com.app.transport.routing.RouteStrategy
 import com.app.transport.routing.SendOutcome
+import com.app.transport.routing.SessionInitiator
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 /**
  * Routing core (§6 Bearer SPI / Tier-2) implementing [RoutingCore].
@@ -16,23 +19,22 @@ import dev.zacsweers.metro.SingleIn
  * Replaces the repeated if/else in the old MessageRouter with a single, testable
  * "pick-best-strategy" policy:
  *   1. Sort strategies by descending [RouteStrategy.priority].
- *   2. Use the first strategy that reports non-[Reachability.Unreachable].
- *   3. If none can route, enqueue and (for Private) initiate Noise handshake.
+ *   2. Use the first reachable strategy whose send does not fail.
+ *   3. If none can route, enqueue and (for Private) initiate a Noise handshake.
  *
- * Adding a new transport = implement [RouteStrategy] and pass it here —
- * no changes to this class (OCP).
- *
- * [MessageRouter] is kept as a stable public facade that delegates to [RoutingCore],
- * so existing call-sites (god-classes, MeshServiceHolder) do not need updates
- * until Phase C dissolves them.
+ * Strategies arrive as a Metro multibound Set ([dev.zacsweers.metro.ContributesIntoSet]
+ * on each implementation) — adding a transport never touches this class (OCP). The mesh
+ * dependencies are narrow ports ([SessionInitiator], [PeerKeyResolver]), so the policy is
+ * unit-testable with plain fakes.
  */
 @SingleIn(AppScope::class)
 @Inject
 internal class RouteSelector(
-    private val meshStrategy: MeshRouteStrategy,
-    private val nostrStrategy: NostrRouteStrategy,
+    strategySet: Set<RouteStrategy>,
     private val outbox: Outbox,
-    private val mesh: BluetoothMeshService,
+    private val sessionInitiator: SessionInitiator,
+    private val peerKeyResolver: PeerKeyResolver,
+    private val scope: CoroutineScope,
 ) : RoutingCore {
 
     companion object {
@@ -40,10 +42,12 @@ internal class RouteSelector(
     }
 
     private val strategies: List<RouteStrategy> =
-        listOf(meshStrategy, nostrStrategy).sortedByDescending { it.priority }
+        strategySet.sortedByDescending { it.priority }
 
     init {
-        outbox.onFlushNeeded = { peerID -> flushOutboxFor(peerID) }
+        // Outbox flush triggers arrive on non-suspending listener paths; hop onto the
+        // app scope to run the suspending routing policy.
+        outbox.onFlushNeeded = { peerID -> scope.launch { flushOutboxFor(peerID) } }
     }
 
     // -------------------------------------------------------------------------
@@ -51,7 +55,7 @@ internal class RouteSelector(
     // -------------------------------------------------------------------------
 
     /** Dispatches [envelope] via the best available strategy, or queues it. */
-    override fun route(envelope: OutgoingEnvelope) {
+    override suspend fun route(envelope: OutgoingEnvelope) {
         val eligible = strategies.filter { it.reachability(envelope.peerID) != Reachability.Unreachable }
         val dispatched = eligible.firstOrNull { strategy ->
             val outcome = strategy.send(envelope)
@@ -63,30 +67,28 @@ internal class RouteSelector(
             outbox.enqueue(envelope)
             if (envelope is OutgoingEnvelope.Private) {
                 Log.d(TAG, "Initiating Noise handshake for ${envelope.peerID.take(8)}…")
-                mesh.initiateNoiseHandshake(envelope.peerID)
+                sessionInitiator.initiateHandshake(envelope.peerID)
             }
         }
     }
 
     /** Drains and re-routes any queued envelopes for [peerID]. */
-    override fun flushOutboxFor(peerID: String) {
+    override suspend fun flushOutboxFor(peerID: String) {
         outbox.drain(peerID).forEach { route(it) }
         // Also flush by the peer's Noise key hex (64-char) in case it was queued under that key.
-        val noiseHex = try {
-            mesh.getPeerInfo(peerID)?.noisePublicKey?.joinToString("") { b -> "%02x".format(b) }
-        } catch (_: Exception) { null }
+        val noiseHex = try { peerKeyResolver.noiseKeyHexFor(peerID) } catch (_: Exception) { null }
         if (noiseHex != null) {
             outbox.drain(noiseHex).forEach { route(it) }
         }
     }
 
     /** Called when the mesh peer list changes; flushes outbox entries for newly reachable peers. */
-    override fun onPeersUpdated(peers: List<String>) {
+    override suspend fun onPeersUpdated(peers: List<String>) {
         peers.forEach { flushOutboxFor(it) }
     }
 
     /** Called when a Noise session becomes established; flushes queued messages for that peer. */
-    override fun onSessionEstablished(peerID: String) {
+    override suspend fun onSessionEstablished(peerID: String) {
         flushOutboxFor(peerID)
     }
 }
