@@ -11,12 +11,15 @@ import com.app.transport.mesh.TransferProgressManager
 import com.app.transport.meshgraph.MeshGraphService
 import com.app.transport.debug.DebugPreferenceManager
 import com.app.transport.debug.DebugSettingsManager
+import com.app.transport.mesh.BleBearer
 import com.app.transport.mesh.BluetoothMeshService
+import com.app.transport.mesh.MeshBearer
 import com.bitchat.android.service.MeshServiceHolder
 import com.russhwolf.settings.ObservableSettings
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
+import dev.zacsweers.metro.IntoSet
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
 
@@ -48,6 +51,17 @@ object AndroidDataBindings {
     @SingleIn(AppScope::class)
     fun provideSecureIdentityStateManager(context: Context): SecureIdentityStateManager =
         SecureIdentityStateManager(context)
+
+    /**
+     * Contributes the live [BleBearer] instance (owned by [BluetoothMeshService]) into
+     * [Set]<[MeshBearer]> so that [com.app.data.mesh.MeshNetwork] multiplexes real BLE traffic.
+     *
+     * We extract the bearer from the already-graph-managed BMS rather than constructing a
+     * second instance, ensuring both share the same [BluetoothConnectionManager] state.
+     */
+    @Provides
+    @IntoSet
+    fun provideBleBearerIntoSet(mesh: BluetoothMeshService): MeshBearer = mesh.bleBearer
 
     @Provides
     @SingleIn(AppScope::class)
