@@ -116,8 +116,9 @@ class ChannelManager(
     // MARK: - Channel Password and Encryption
     
     private fun verifyChannelPassword(channel: String, password: String): Boolean {
-        // TODO: REMOVE THIS - FOR TESTING ONLY
-        return true
+        val storedKey = channelKeys[channel] ?: return false
+        val candidateKey = deriveChannelKey(password, channel)
+        return storedKey.encoded.contentEquals(candidateKey.encoded)
     }
     
     private fun deriveChannelKey(password: String, channelName: String): SecretKeySpec {
