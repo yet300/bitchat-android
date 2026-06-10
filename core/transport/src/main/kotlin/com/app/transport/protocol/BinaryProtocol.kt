@@ -200,6 +200,25 @@ object BinaryProtocol {
     
     fun encode(packet: BitchatPacket): ByteArray? {
         try {
+            // Fail loudly on inputs the wire format cannot represent — a silently
+            // truncated frame would be misparsed by the decoder on the other side.
+            packet.signature?.let { signature ->
+                if (signature.size != SIGNATURE_SIZE) {
+                    Log.e(
+                        "BinaryProtocol",
+                        "Refusing to encode packet type ${packet.type}: signature is ${signature.size} bytes, expected $SIGNATURE_SIZE",
+                    )
+                    return null
+                }
+            }
+            if (packet.version == 1u.toUByte() && packet.payload.size > 0xFFFF) {
+                Log.e(
+                    "BinaryProtocol",
+                    "Refusing to encode v1 packet type ${packet.type}: payload ${packet.payload.size} bytes exceeds the 65535-byte v1 limit",
+                )
+                return null
+            }
+
             // Try to compress payload if beneficial
             var payload = packet.payload
             var originalPayloadSize: Int? = null
@@ -255,6 +274,11 @@ object BinaryProtocol {
             if (packet.version >= 2u.toUByte()) {
                 buffer.putInt(payloadDataSize)  // 4 bytes for v2+
             } else {
+                if (payloadDataSize > 0xFFFF) {
+                    // Edge case: compressed payload + size prefix overflows the v1 field
+                    Log.e("BinaryProtocol", "Refusing to encode v1 packet type ${packet.type}: payload field $payloadDataSize exceeds 65535")
+                    return null
+                }
                 buffer.putShort(payloadDataSize.toShort())  // 2 bytes for v1
             }
             
