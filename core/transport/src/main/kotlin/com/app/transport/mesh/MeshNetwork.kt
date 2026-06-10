@@ -1,8 +1,6 @@
-package com.app.data.mesh
+package com.app.transport.mesh
 
 import android.util.Log
-import com.app.transport.mesh.MeshBearer
-import com.app.transport.mesh.PeerLink
 import com.app.transport.model.RoutedPacket
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
@@ -18,12 +16,12 @@ import kotlinx.coroutines.flow.merge
  *   1. Implementing [MeshBearer].
  *   2. Registering via Metro `@Binds @IntoSet` — no changes here (OCP).
  *
- * [BluetoothMeshService] will be refactored in Phase C to use [MeshNetwork]
- * instead of calling [com.app.transport.mesh.BleBearer] directly.
+ * Lives in :core:transport (per MIGRATION_PLAN §6 it is a transport-layer entity) so that
+ * [BluetoothMeshService] can consume it as its single data path.
  */
 @SingleIn(AppScope::class)
 @Inject
-internal class MeshNetwork(
+class MeshNetwork(
     private val bearers: Set<MeshBearer>,
 ) {
     companion object {
@@ -37,21 +35,27 @@ internal class MeshNetwork(
     /**
      * Merged stream of packets arriving on ANY registered bearer.
      *
-     * Consumers (e.g. a future PacketProcessor integration) should collect
+     * Consumers (e.g. [BluetoothMeshService]'s packet pipeline) should collect
      * this flow for the lifetime of the component.
      */
     val incoming: Flow<RoutedPacket> = bearers.map { it.incoming }.merge()
+
+    /** Merged stream of link-level events from ALL bearers. */
+    val events: Flow<BearerEvent> = bearers.map { it.events }.merge()
 
     // -----------------------------------------------------------------
     // Outgoing
     // -----------------------------------------------------------------
 
-    /** Start all registered bearers. */
-    fun startAll() {
+    /** Start all registered bearers. Returns true if at least one bearer started. */
+    fun startAll(): Boolean {
+        var anyStarted = false
         bearers.forEach { bearer ->
             val ok = bearer.start()
+            anyStarted = anyStarted || ok
             Log.d(TAG, "Bearer ${bearer.id.id} start → $ok")
         }
+        return anyStarted
     }
 
     /** Stop all registered bearers gracefully. */
@@ -81,6 +85,13 @@ internal class MeshNetwork(
             false
         }
     }
+
+    /**
+     * Bind [linkAddress] to [peerID] on whichever bearer tracks that link.
+     * Bearers ignore addresses they do not own ([MeshBearer.bindPeer] contract).
+     */
+    fun bindPeer(peerID: String, linkAddress: String) =
+        bearers.forEach { it.bindPeer(peerID, linkAddress) }
 
     /** Cancel an in-progress transfer on ALL bearers that own [transferId]. */
     fun cancelTransfer(transferId: String): Boolean =

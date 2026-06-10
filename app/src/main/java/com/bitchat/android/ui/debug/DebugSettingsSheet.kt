@@ -137,7 +137,7 @@ fun DebugSettingsSheet(
         if (isPresented) {
             // Poll device list periodically for now (TODO: add callbacks)
             while (true) {
-                val entries = meshService.connectionManager.getConnectedDeviceEntries()
+                val entries = meshService.bleDebug.connectedDeviceEntries()
                 val mapping = meshService.getDeviceAddressToPeerMapping()
                 val peers = mapping.values.toSet()
                 val nicknames = meshService.getPeerNicknames()
@@ -226,7 +226,7 @@ fun DebugSettingsSheet(
                             Switch(checked = gattServerEnabled, onCheckedChange = {
                                 manager.setGattServerEnabled(it)
                                 scope.launch {
-                                    if (it) meshService.connectionManager.startServer() else meshService.connectionManager.stopServer()
+                                    if (it) meshService.bleDebug.startServer() else meshService.bleDebug.stopServer()
                                 }
                             })
                         }
@@ -246,7 +246,7 @@ fun DebugSettingsSheet(
                             Switch(checked = gattClientEnabled, onCheckedChange = {
                                 manager.setGattClientEnabled(it)
                                 scope.launch {
-                                    if (it) meshService.connectionManager.startClient() else meshService.connectionManager.stopClient()
+                                    if (it) meshService.bleDebug.startClient() else meshService.bleDebug.stopClient()
                                 }
                             })
                         }
@@ -570,7 +570,7 @@ fun DebugSettingsSheet(
                             Icon(Icons.Filled.Devices, contentDescription = null, tint = Color(0xFF4CAF50))
                             Text(stringResource(R.string.debug_connected_devices), fontFamily = FontFamily.Monospace, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                         }
-                        val localAddr = remember { meshService.connectionManager.getLocalAdapterAddress() }
+                        val localAddr = remember { meshService.bleDebug.localAdapterAddress() }
                         Text(stringResource(R.string.debug_our_device_id_fmt, localAddr ?: stringResource(R.string.unknown)), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = colorScheme.onSurface.copy(alpha = 0.7f))
                         if (connectedDevices.isEmpty()) {
                             Text("none", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = colorScheme.onSurface.copy(alpha = 0.6f))
@@ -584,7 +584,7 @@ fun DebugSettingsSheet(
                                             Text("${dev.nickname ?: ""} • " + stringResource(R.string.debug_rssi_fmt, dev.rssi ?: stringResource(R.string.debug_question_mark)) + " • $roleLabel" + (if (dev.isDirectConnection) stringResource(R.string.debug_direct_suffix) else ""), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = colorScheme.onSurface.copy(alpha = 0.7f))
                                         }
                                         Text(stringResource(R.string.debug_disconnect), color = Color(0xFFBF1A1A), fontFamily = FontFamily.Monospace, modifier = Modifier.clickable {
-                                            meshService.connectionManager.disconnectAddress(dev.deviceAddress)
+                                            meshService.bleDebug.disconnectAddress(dev.deviceAddress)
                                         })
                                     }
                                 }
@@ -613,7 +613,7 @@ fun DebugSettingsSheet(
                                             Text(stringResource(R.string.debug_rssi_fmt, res.rssi.toString()), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = colorScheme.onSurface.copy(alpha = 0.7f))
                                         }
                                         Text(stringResource(R.string.debug_connect), color = Color(0xFF00C851), fontFamily = FontFamily.Monospace, modifier = Modifier.clickable {
-                                            meshService.connectionManager.connectToAddress(res.deviceAddress)
+                                            meshService.bleDebug.connectToAddress(res.deviceAddress)
                                         })
                                     }
                                 }
