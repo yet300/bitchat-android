@@ -16,9 +16,11 @@ import com.app.transport.meshgraph.MeshGraphService
 import com.app.transport.debug.DebugPreferenceManager
 import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.mesh.BleBearer
+import com.app.transport.mesh.FragmentManager
 import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.mesh.MeshBearer
 import com.app.transport.mesh.MeshLifecycleController
+import com.app.transport.mesh.MeshNetwork
 import com.app.transport.notification.ServiceNotifier
 import com.russhwolf.settings.ObservableSettings
 import dev.zacsweers.metro.AppScope
@@ -57,16 +59,34 @@ object AndroidDataBindings {
     fun provideSecureIdentityStateManager(context: Context): SecureIdentityStateManager =
         SecureIdentityStateManager(context)
 
+    /** Fragment reassembly state shared by the BLE stack and the BMS engine. */
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideFragmentManager(): FragmentManager = FragmentManager()
+
     /**
-     * Contributes the live [BleBearer] instance (owned by [BluetoothMeshService]) into
-     * [Set]<[MeshBearer]> so that [com.app.data.mesh.MeshNetwork] multiplexes real BLE traffic.
-     *
-     * We extract the bearer from the already-graph-managed BMS rather than constructing a
-     * second instance, ensuring both share the same [BluetoothConnectionManager] state.
+     * Graph-owned [BleBearer]. The same instance is multibound into [Set]<[MeshBearer]>
+     * (below) and injected into [BluetoothMeshService] — no construction inside BMS.
      */
     @Provides
+    @SingleIn(AppScope::class)
+    fun provideBleBearer(
+        context: Context,
+        encryptionService: EncryptionService,
+        debugSettingsManager: DebugSettingsManager,
+        fragmentManager: FragmentManager,
+        transferProgressManager: TransferProgressManager,
+    ): BleBearer = BleBearer(
+        context.applicationContext,
+        encryptionService.getIdentityFingerprint().take(16),
+        debugSettingsManager,
+        fragmentManager,
+        transferProgressManager,
+    )
+
+    @Provides
     @IntoSet
-    fun provideBleBearerIntoSet(mesh: BluetoothMeshService): MeshBearer = mesh.bleBearer
+    fun provideBleBearerIntoSet(bleBearer: BleBearer): MeshBearer = bleBearer
 
     @Provides
     @SingleIn(AppScope::class)
@@ -84,6 +104,9 @@ object AndroidDataBindings {
         incomingSink: IncomingMessageSink,
         favoriteNostrLink: FavoriteNostrLink,
         geohashReadReceiptRouter: GeohashReadReceiptRouter,
+        fragmentManager: FragmentManager,
+        bleBearer: BleBearer,
+        meshNetwork: MeshNetwork,
     ): BluetoothMeshService = BluetoothMeshService(
         context.applicationContext,
         debugSettingsManager,
@@ -98,6 +121,9 @@ object AndroidDataBindings {
         incomingSink,
         favoriteNostrLink,
         geohashReadReceiptRouter,
+        fragmentManager,
+        bleBearer,
+        meshNetwork,
     )
 
     /** Narrow lifecycle contract for the foreground service (ISP); same underlying BMS. */

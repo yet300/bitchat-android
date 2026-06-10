@@ -15,41 +15,43 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * BLE (Bluetooth Low Energy) implementation of [MeshBearer].
  *
- * Wraps [BluetoothConnectionManager] and adapts its callback-based
- * [BluetoothConnectionManagerDelegate] API to the [MeshBearer] interface:
+ * Wraps [BluetoothConnectionManager] and adapts its callback-based delegate API to the
+ * [MeshBearer] interface:
  *
  *   - [incoming] is a hot [Flow] of every packet received from the BLE stack.
- *     Future [MeshNetwork] consumers merge this with other bearers' flows.
- *   - [neighbors] is a [StateFlow] updated on every BLE connect / disconnect.
+ *   - [events] carries link connect / disconnect / RSSI changes — no
+ *     android.bluetooth types leak out of the bearer.
+ *   - [neighbors] is a [StateFlow] of peers bound via [bindPeer].
  *
- * BLE-specific operations that are not part of the generic [MeshBearer]
- * contract (GATT server/client control, address-peer mapping, nickname
- * resolver, debug info) are exposed as direct members for the legacy
- * [BluetoothMeshService] call sites until Phase C dissolves them.
+ * BLE-specific debug controls for the debug sheet are exposed through the narrow
+ * [BleDebugHandle] interface.
  */
 class BleBearer(
     private val context: Context,
     myPeerID: String,
     private val debugSettingsManager: DebugSettingsManager,
-    fragmentManager: FragmentManager? = null,
+    private val fragmentManager: FragmentManager? = null,
     private val transferProgressManager: TransferProgressManager,
-) : MeshBearer {
+) : MeshBearer, BleDebugHandle {
+
+    @Volatile
+    private var myPeerID: String = myPeerID
+
+    @Volatile
+    private var nicknameResolver: ((String) -> String?)? = null
 
     // -----------------------------------------------------------------
     // Underlying BLE stack
     // -----------------------------------------------------------------
 
     /**
-     * The raw [BluetoothConnectionManager] — kept accessible so that
-     * [BluetoothMeshService] can still expose it to [DebugSettingsSheet]
-     * until that UI layer is migrated (Phase C). Replaced in place by [reset];
-     * the BleBearer object itself keeps its graph identity (it lives inside
-     * the multibound Set<MeshBearer>).
+     * The raw [BluetoothConnectionManager] — an internal detail of the BLE stack.
+     * Replaced in place by [reset]; the BleBearer object itself keeps its graph
+     * identity (it lives inside the multibound Set<MeshBearer>).
      */
-    var connectionManager = BluetoothConnectionManager(
+    private var connectionManager = BluetoothConnectionManager(
         context, myPeerID, debugSettingsManager, fragmentManager, transferProgressManager,
     )
-        private set
 
     // -----------------------------------------------------------------
     // MeshBearer identity
@@ -63,13 +65,7 @@ class BleBearer(
 
     private val _incoming = MutableSharedFlow<RoutedPacket>(extraBufferCapacity = 64)
 
-    /**
-     * Hot stream of all packets received by the BLE stack.
-     *
-     * [BluetoothMeshService] currently processes packets through the legacy
-     * [externalDelegate] path.  The flow exists so that [MeshNetwork] can
-     * merge it with other bearers once BMS is refactored (Phase C).
-     */
+    /** Hot stream of all packets received by the BLE stack. */
     override val incoming: Flow<RoutedPacket> = _incoming.asSharedFlow()
 
     // -----------------------------------------------------------------
@@ -78,7 +74,7 @@ class BleBearer(
 
     private val _neighbors = MutableStateFlow<Set<PeerLink>>(emptySet())
 
-    /** Live set of BLE peers mapped from the [addressPeerMap]. */
+    /** Live set of BLE peers bound via [bindPeer]. */
     override val neighbors: StateFlow<Set<PeerLink>> = _neighbors.asStateFlow()
 
     // -----------------------------------------------------------------
@@ -93,35 +89,22 @@ class BleBearer(
     /**
      * Engine-driven binding of a BLE device address to a logical peerID (announce
      * received with max TTL ⇒ direct neighbor). The bearer owns the address↔peer map.
+     *
+     * Binds unconditionally: BLE packets only arrive over BLE links, so any address the
+     * engine saw on [incoming] belongs to this stack. Once a second link-bearing bearer
+     * exists, an ownership check (e.g. tracker lookup) must be added here.
      */
     override fun bindPeer(peerID: String, linkAddress: String) {
         connectionManager.addressPeerMap[linkAddress] = peerID
         val isInbound = connectionManager.isClientConnection(linkAddress) == false
         _neighbors.value = _neighbors.value
             .filterNot { it.deviceAddress == linkAddress }
-            .toSet() + PeerLink(peerID, linkAddress, isInbound)
+            .toSet() + PeerLink(peerID, linkAddress, isInbound = isInbound)
     }
 
-    /** Called by [BluetoothMeshService] when a BLE device disconnects. */
-    fun notifyPeerDisconnected(deviceAddress: String) {
+    private fun notifyPeerDisconnected(deviceAddress: String) {
         _neighbors.value = _neighbors.value.filterNot { it.deviceAddress == deviceAddress }.toSet()
     }
-
-    // -----------------------------------------------------------------
-    // Delegate wiring
-    //
-    // BleBearer owns the connectionManager delegate so that it can feed
-    // the [incoming] flow.  [BluetoothMeshService] registers its own
-    // higher-level handler as [externalDelegate]; BleBearer forwards all
-    // callbacks to it after emitting to the flow.
-    // -----------------------------------------------------------------
-
-    /**
-     * Higher-level delegate set by [BluetoothMeshService].
-     * Receives the same callbacks as before, but now also allows [incoming]
-     * to be consumed independently by [MeshNetwork].
-     */
-    var externalDelegate: BluetoothConnectionManagerDelegate? = null
 
     init {
         wireConnectionManager()
@@ -134,21 +117,44 @@ class BleBearer(
                 peerID: String,
                 device: BluetoothDevice?,
             ) {
-                // Emit to the bearer flow first (non-blocking; drops if buffer full)
+                // Debug telemetry lives with the data it describes (do not double-count elsewhere)
+                try {
+                    debugSettingsManager.logIncoming(
+                        packet = packet,
+                        fromPeerID = peerID,
+                        fromNickname = null,
+                        fromDeviceAddress = device?.address,
+                        myPeerID = myPeerID,
+                    )
+                } catch (_: Exception) { }
+                // Emit to the bearer flow (non-blocking; drops if buffer full)
                 _incoming.tryEmit(RoutedPacket(packet, peerID, device?.address))
-                // Then forward to the legacy BMS handler
-                externalDelegate?.onPacketReceived(packet, peerID, device)
             }
 
             override fun onDeviceConnected(device: BluetoothDevice) {
+                try {
+                    val addr = device.address
+                    val peer = connectionManager.addressPeerMap[addr]
+                    val nick = peer?.let { nicknameResolver?.invoke(it) } ?: "unknown"
+                    val inbound = connectionManager.isClientConnection(addr) == false
+                    debugSettingsManager.logPeerConnection(peer ?: "unknown", nick, addr, inbound)
+                } catch (_: Exception) { }
                 _events.tryEmit(BearerEvent.LinkConnected(device.address))
-                externalDelegate?.onDeviceConnected(device)
             }
 
             override fun onDeviceDisconnected(device: BluetoothDevice) {
-                notifyPeerDisconnected(device.address)
-                _events.tryEmit(BearerEvent.LinkDisconnected(device.address))
-                externalDelegate?.onDeviceDisconnected(device)
+                val addr = device.address
+                val peer = connectionManager.addressPeerMap[addr]
+                // ConnectionTracker has already removed the address mapping; be defensive either way
+                connectionManager.addressPeerMap.remove(addr)
+                notifyPeerDisconnected(addr)
+                if (peer != null) {
+                    try {
+                        val nick = nicknameResolver?.invoke(peer) ?: "unknown"
+                        debugSettingsManager.logPeerDisconnection(peer, nick, addr)
+                    } catch (_: Exception) { }
+                }
+                _events.tryEmit(BearerEvent.LinkDisconnected(addr))
             }
 
             override fun onRSSIUpdated(deviceAddress: String, rssi: Int) {
@@ -158,7 +164,6 @@ class BleBearer(
                 }.toSet()
                 _neighbors.value = updated
                 _events.tryEmit(BearerEvent.RssiChanged(deviceAddress, rssi))
-                externalDelegate?.onRSSIUpdated(deviceAddress, rssi)
             }
         }
     }
@@ -168,13 +173,15 @@ class BleBearer(
      * terminal stop. The BleBearer object identity is preserved — the graph (including
      * the multibound Set<MeshBearer>) keeps serving this instance.
      */
-    fun reset(myPeerID: String, fragmentManager: FragmentManager?) {
+    fun reset(myPeerID: String) {
         try { connectionManager.stopServices() } catch (_: Exception) { }
+        this.myPeerID = myPeerID
         _neighbors.value = emptySet()
         connectionManager = BluetoothConnectionManager(
             context, myPeerID, debugSettingsManager, fragmentManager, transferProgressManager,
         )
         wireConnectionManager()
+        nicknameResolver?.let { connectionManager.setNicknameResolver(it) }
     }
 
     // -----------------------------------------------------------------
@@ -190,25 +197,28 @@ class BleBearer(
         connectionManager.cancelTransfer(transferId)
 
     // -----------------------------------------------------------------
-    // BLE-specific pass-throughs
-    //
-    // Used by [BluetoothMeshService] call sites that are not yet migrated
-    // to the generic [MeshBearer] interface.
+    // BLE-specific extras
     // -----------------------------------------------------------------
 
-    /** Device-address → peerID map maintained by [BluetoothConnectionTracker]. */
-    val addressPeerMap get() = connectionManager.addressPeerMap
-
-    /** Whether [addr] is a client-side (outbound) BLE connection. */
-    fun isClientConnection(addr: String): Boolean? = connectionManager.isClientConnection(addr)
-
     /** Injects a nickname resolver so BLE debug logs show human names. */
-    fun setNicknameResolver(resolver: (String) -> String?) =
+    fun setNicknameResolver(resolver: (String) -> String?) {
+        nicknameResolver = resolver
         connectionManager.setNicknameResolver(resolver)
+    }
 
-    /** Whether this instance can be safely reused after [stop]. */
-    fun isReusable(): Boolean = connectionManager.isReusable()
+    // -----------------------------------------------------------------
+    // BleDebugHandle (debug sheet only)
+    // -----------------------------------------------------------------
 
-    /** Human-readable BLE debug summary delegated to [BluetoothConnectionManager]. */
-    fun getDebugInfo(): String = connectionManager.getDebugInfo()
+    override fun startServer() = connectionManager.startServer()
+    override fun stopServer() = connectionManager.stopServer()
+    override fun startClient() = connectionManager.startClient()
+    override fun stopClient() = connectionManager.stopClient()
+    override fun connectedDeviceEntries(): List<Triple<String, Boolean, Int?>> =
+        connectionManager.getConnectedDeviceEntries()
+    override fun localAdapterAddress(): String? = connectionManager.getLocalAdapterAddress()
+    override fun connectToAddress(address: String): Boolean = connectionManager.connectToAddress(address)
+    override fun disconnectAddress(address: String) = connectionManager.disconnectAddress(address)
+    override fun addressPeerSnapshot(): Map<String, String> = connectionManager.addressPeerMap.toMap()
+    override fun debugInfo(): String = connectionManager.getDebugInfo()
 }

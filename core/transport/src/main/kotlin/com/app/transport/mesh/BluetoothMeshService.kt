@@ -26,6 +26,7 @@ import com.app.transport.SeenMessageStore
 import com.app.transport.meshgraph.MeshGraphService
 import com.app.transport.meshgraph.RoutePlanner
 import kotlinx.coroutines.*
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Bluetooth mesh service - REFACTORED to use component-based architecture
@@ -58,6 +59,12 @@ class BluetoothMeshService(
     private val incomingSink: IncomingMessageSink,
     private val favoriteNostrLink: FavoriteNostrLink,
     private val geohashReadReceiptRouter: GeohashReadReceiptRouter,
+    // Graph-owned engine collaborators: the fragment reassembly state shared with the BLE
+    // stack, the BLE bearer (also multibound into Set<MeshBearer>) and the bearer
+    // multiplexer that is now the single data path for all mesh traffic.
+    private val fragmentManager: FragmentManager,
+    val bleBearer: BleBearer,
+    private val meshNetwork: MeshNetwork,
 ) : MeshLifecycleController {
     private val debugManager = debugSettingsManager
 
@@ -76,18 +83,15 @@ class BluetoothMeshService(
     // Engine components. Rebuilt in place by reset()/revival — the BMS object itself keeps
     // its graph identity, so @SingleIn consumers never hold a stale reference.
     private var peerManager = PeerManager(peerFingerprintManager)
-    private var fragmentManager = FragmentManager()
     private var securityManager = SecurityManager(encryptionService, myPeerID)
     private var storeForwardManager = StoreForwardManager()
     private var messageHandler = MessageHandler(myPeerID, context.applicationContext, meshGraphService)
-    val bleBearer = BleBearer(context, myPeerID, debugSettingsManager, fragmentManager, transferProgressManager)
 
     /**
-     * Direct access to the underlying [BluetoothConnectionManager].
-     * Kept for [com.bitchat.android.ui.debug.DebugSettingsSheet] which still
-     * accesses GATT server/client controls directly (Phase C will remove this).
+     * Narrow BLE debug surface for [com.bitchat.android.ui.debug.DebugSettingsSheet]
+     * (GATT role controls, address diagnostics). Phase C removes this accessor.
      */
-    val connectionManager: BluetoothConnectionManager get() = bleBearer.connectionManager
+    val bleDebug: BleDebugHandle get() = bleBearer
     private var packetProcessor = PacketProcessor(myPeerID, debugSettingsManager)
     private lateinit var gossipSyncManager: GossipSyncManager
 
@@ -140,10 +144,10 @@ class BluetoothMeshService(
         // Wire sync manager delegate
         gossipSyncManager.delegate = object : GossipSyncManager.Delegate {
             override fun sendPacket(packet: BitchatPacket) {
-                bleBearer.broadcast(RoutedPacket(packet))
+                meshNetwork.broadcast(RoutedPacket(packet))
             }
             override fun sendPacketToPeer(peerID: String, packet: BitchatPacket) {
-                bleBearer.sendToPeer(peerID, RoutedPacket(packet))
+                meshNetwork.sendToPeer(peerID, RoutedPacket(packet))
             }
             override fun signPacketForBroadcast(packet: BitchatPacket): BitchatPacket {
                 return signPacketBeforeBroadcast(packet)
@@ -151,20 +155,55 @@ class BluetoothMeshService(
         }
 
         // Inject dynamic direct connection check into PeerManager
-        // Matches iOS logic: checks if we have an active hardware mapping for this peer
+        // Matches iOS logic: a peer is direct when some bearer has a bound link for it
         peerManager.isPeerDirectlyConnected = { peerID ->
-            bleBearer.addressPeerMap.containsValue(peerID)
+            meshNetwork.allNeighbors.any { it.peerID == peerID }
+        }
+
+        // MeshNetwork is the single data path: packets from ALL bearers feed the engine,
+        // link events replace the legacy BluetoothConnectionManagerDelegate callbacks.
+        // Collectors are scoped to the current generation's serviceScope and are
+        // relaunched by rebuildComponents() after reset/revival.
+        serviceScope.launch {
+            meshNetwork.incoming.collect { routed ->
+                packetProcessor.processPacket(routed)
+            }
+        }
+        serviceScope.launch {
+            meshNetwork.events.collect { event -> handleBearerEvent(event) }
         }
 
         Log.d(TAG, "Delegates set up; GossipSyncManager initialized")
     }
 
+    /** Engine reaction to link-level bearer events (formerly externalDelegate callbacks). */
+    private fun handleBearerEvent(event: BearerEvent) {
+        when (event) {
+            is BearerEvent.LinkConnected -> {
+                serviceScope.launch {
+                    Log.d(TAG, "Link connected: ${event.linkAddress}; scheduling announce")
+                    delay(200.milliseconds)
+                    sendBroadcastAnnounce()
+                }
+            }
+            is BearerEvent.LinkDisconnected -> {
+                Log.d(TAG, "Link disconnected: ${event.linkAddress}")
+                try { peerManager.refreshPeerList() } catch (_: Exception) { }
+            }
+            is BearerEvent.RssiChanged -> {
+                meshNetwork.allNeighbors.firstOrNull { it.deviceAddress == event.linkAddress }
+                    ?.let { peerManager.updatePeerRSSI(it.peerID, event.rssi) }
+            }
+        }
+    }
+
     /** Best-effort synchronous shutdown of the current component generation. */
     private fun stopComponentsNow() {
         try { gossipSyncManager.stop() } catch (_: Exception) { }
-        try { bleBearer.stop() } catch (_: Exception) { }
+        try { meshNetwork.stopAll() } catch (_: Exception) { }
         try { peerManager.shutdown() } catch (_: Exception) { }
-        try { fragmentManager.shutdown() } catch (_: Exception) { }
+        // Graph-owned FragmentManager: clear state but keep its scope alive for revival
+        try { fragmentManager.clearAllFragments() } catch (_: Exception) { }
         try { securityManager.shutdown() } catch (_: Exception) { }
         try { storeForwardManager.shutdown() } catch (_: Exception) { }
         try { messageHandler.shutdown() } catch (_: Exception) { }
@@ -180,12 +219,12 @@ class BluetoothMeshService(
         serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         myPeerID = encryptionService.getIdentityFingerprint().take(16)
         peerManager = PeerManager(peerFingerprintManager)
-        fragmentManager = FragmentManager()
+        fragmentManager.clearAllFragments()
         securityManager = SecurityManager(encryptionService, myPeerID)
         storeForwardManager = StoreForwardManager()
         messageHandler = MessageHandler(myPeerID, context.applicationContext, meshGraphService)
         packetProcessor = PacketProcessor(myPeerID, debugSettingsManager)
-        bleBearer.reset(myPeerID, fragmentManager)
+        bleBearer.reset(myPeerID)
         wireComponents()
         terminated = false
     }
@@ -307,7 +346,7 @@ class BluetoothMeshService(
                 )
                 // Sign the handshake response
                 val signedPacket = signPacketBeforeBroadcast(responsePacket)
-                bleBearer.broadcast(RoutedPacket(signedPacket))
+                meshNetwork.broadcast(RoutedPacket(signedPacket))
                 Log.d(TAG, "Sent Noise handshake response to $peerID (${response.size} bytes)")
             }
             
@@ -327,7 +366,7 @@ class BluetoothMeshService(
             }
             
             override fun sendPacket(packet: BitchatPacket) {
-                bleBearer.broadcast(RoutedPacket(packet))
+                meshNetwork.broadcast(RoutedPacket(packet))
             }
         }
         
@@ -370,11 +409,11 @@ class BluetoothMeshService(
             override fun sendPacket(packet: BitchatPacket) {
                 // Sign the packet before broadcasting
                 val signedPacket = signPacketBeforeBroadcast(packet)
-                bleBearer.broadcast(RoutedPacket(signedPacket))
+                meshNetwork.broadcast(RoutedPacket(signedPacket))
             }
             
             override fun relayPacket(routed: RoutedPacket) {
-                bleBearer.broadcast(routed)
+                meshNetwork.broadcast(routed)
             }
             
             override fun getBroadcastRecipient(): ByteArray {
@@ -421,7 +460,7 @@ class BluetoothMeshService(
 
                         // Sign the handshake packet before broadcasting
                         val signedPacket = signPacketBeforeBroadcast(packet)
-                        bleBearer.broadcast(RoutedPacket(signedPacket))
+                        meshNetwork.broadcast(RoutedPacket(signedPacket))
                         Log.d(TAG, "Initiated Noise handshake with $peerID (${handshakeData.size} bytes)")
                     } else {
                         Log.w(TAG, "Failed to generate Noise handshake data for $peerID")
@@ -574,7 +613,7 @@ class BluetoothMeshService(
                         if (isDirect) {
                             // Engine decision: announce with max TTL ⇒ direct neighbor.
                             // The bearer owns the address↔peer map and neighbors state.
-                            bleBearer.bindPeer(pid, deviceAddress)
+                            meshNetwork.bindPeer(pid, deviceAddress)
                             Log.d(TAG, "Mapped device $deviceAddress to peer $pid (TTL=${routed.packet.ttl})")
 
                             // Mark as directly connected - refresh UI state
@@ -625,11 +664,11 @@ class BluetoothMeshService(
             }
             
             override fun relayPacket(routed: RoutedPacket) {
-                bleBearer.broadcast(routed)
+                meshNetwork.broadcast(routed)
             }
 
             override fun sendToPeer(peerID: String, routed: RoutedPacket): Boolean {
-                return bleBearer.sendToPeer(peerID, routed)
+                return meshNetwork.sendToPeer(peerID, routed)
             }
             
             override fun handleRequestSync(routed: RoutedPacket) {
@@ -639,68 +678,7 @@ class BluetoothMeshService(
                 gossipSyncManager.handleRequestSync(fromPeer, req)
             }
         }
-        
-        // BluetoothConnectionManager delegates
-        bleBearer.externalDelegate = object : BluetoothConnectionManagerDelegate {
-        override fun onPacketReceived(packet: BitchatPacket, peerID: String, device: android.bluetooth.BluetoothDevice?) {
-            // Log incoming for debug graphs (do not double-count anywhere else)
-            try {
-                debugManager.logIncoming(
-                    packet = packet,
-                    fromPeerID = peerID,
-                    fromNickname = null,
-                    fromDeviceAddress = device?.address,
-                    myPeerID = myPeerID
-                )
-            } catch (_: Exception) { }
-            packetProcessor.processPacket(RoutedPacket(packet, peerID, device?.address))
-        }
-            
-            override fun onDeviceConnected(device: android.bluetooth.BluetoothDevice) {
-                // Send initial announcements after services are ready
-                serviceScope.launch {
-                    Log.d(TAG, "Device connected: ${device.address}; scheduling announce")
-                    delay(200)
-                    sendBroadcastAnnounce()
-                }
-                // Verbose debug: device connected
-                try {
-                    val addr = device.address
-                    val peer = bleBearer.addressPeerMap[addr]
-                    val nick = peer?.let { peerManager.getPeerNickname(it) } ?: "unknown"
-                    debugManager
-                        .logPeerConnection(peer ?: "unknown", nick, addr, isInbound = !bleBearer.isClientConnection(addr)!!)
-                } catch (_: Exception) { }
-            }
 
-            override fun onDeviceDisconnected(device: android.bluetooth.BluetoothDevice) {
-                Log.d(TAG, "Device disconnected: ${device.address}")
-                val addr = device.address
-                // Remove mapping and, if that was the last direct path for the peer, clear direct flag
-                val peer = bleBearer.addressPeerMap[addr]
-                // ConnectionTracker has already removed the address mapping; be defensive either way
-                bleBearer.addressPeerMap.remove(addr)
-
-                // refresh peer list on disconnect. 
-                try { peerManager.refreshPeerList() } catch (_: Exception) { }
-
-                if (peer != null) {
-                    // Verbose debug: device disconnected
-                    try {
-                        val nick = peerManager.getPeerNickname(peer) ?: "unknown"
-                        debugManager
-                            .logPeerDisconnection(peer, nick, addr)
-                    } catch (_: Exception) { }
-                }
-            }
-            
-            override fun onRSSIUpdated(deviceAddress: String, rssi: Int) {
-                // Find the peer ID for this device address and update RSSI in PeerManager
-                bleBearer.addressPeerMap[deviceAddress]?.let { peerID ->
-                    peerManager.updatePeerRSSI(peerID, rssi)
-                }
-            }
-        }
     }
     
     /**
@@ -721,7 +699,7 @@ class BluetoothMeshService(
 
         Log.i(TAG, "Starting Bluetooth mesh service with peer ID: $myPeerID")
         
-        if (bleBearer.start()) {
+        if (meshNetwork.startAll()) {
             isActive = true
             
             // Start periodic announcements for peer discovery and connectivity
@@ -731,7 +709,7 @@ class BluetoothMeshService(
             gossipSyncManager.start()
             Log.d(TAG, "GossipSyncManager started")
         } else {
-            Log.e(TAG, "Failed to start Bluetooth services")
+            Log.e(TAG, "Failed to start any mesh bearer")
         }
     }
     
@@ -757,10 +735,11 @@ class BluetoothMeshService(
             // Stop all components
             gossipSyncManager.stop()
             Log.d(TAG, "GossipSyncManager stopped")
-            bleBearer.stop()
-            Log.d(TAG, "BluetoothConnectionManager stop requested")
+            meshNetwork.stopAll()
+            Log.d(TAG, "Mesh bearers stop requested")
             peerManager.shutdown()
-            fragmentManager.shutdown()
+            // Graph-owned FragmentManager: clear state but keep its scope alive for revival
+            fragmentManager.clearAllFragments()
             securityManager.shutdown()
             storeForwardManager.shutdown()
             messageHandler.shutdown()
@@ -801,7 +780,7 @@ class BluetoothMeshService(
 
             // Sign the packet before broadcasting
             val signedPacket = signPacketBeforeBroadcast(packet)
-            bleBearer.broadcast(RoutedPacket(signedPacket))
+            meshNetwork.broadcast(RoutedPacket(signedPacket))
             // Track our own broadcast message for sync
             try { gossipSyncManager.onPublicPacketSeen(signedPacket) } catch (_: Exception) { }
         }
@@ -833,7 +812,7 @@ class BluetoothMeshService(
             val signed = signPacketBeforeBroadcast(packet)
             // Use a stable transferId based on the file TLV payload for progress tracking
             val transferId = sha256Hex(payload)
-            bleBearer.broadcast(RoutedPacket(signed, transferId = transferId))
+            meshNetwork.broadcast(RoutedPacket(signed, transferId = transferId))
             try { gossipSyncManager.onPublicPacketSeen(signed) } catch (_: Exception) { }
         }
             } catch (e: Exception) {
@@ -891,7 +870,7 @@ class BluetoothMeshService(
                         val signed = signPacketBeforeBroadcast(packet)
                         // Use a stable transferId based on the unencrypted file TLV payload for progress tracking
                         val transferId = sha256Hex(filePayload)
-                        bleBearer.broadcast(RoutedPacket(signed, transferId = transferId))
+                        meshNetwork.broadcast(RoutedPacket(signed, transferId = transferId))
                         Log.d(TAG, "✅ Sent encrypted file to $recipientPeerID")
                         
                     } catch (e: Exception) {
@@ -910,7 +889,7 @@ class BluetoothMeshService(
     }
 
     fun cancelFileTransfer(transferId: String): Boolean {
-        return bleBearer.cancelTransfer(transferId)
+        return meshNetwork.cancelTransfer(transferId)
     }
 
     // Local helper to hash payloads to a stable hex ID for progress mapping
@@ -971,7 +950,7 @@ class BluetoothMeshService(
                     
                     // Sign the packet before broadcasting
                     val signedPacket = signPacketBeforeBroadcast(packet)
-                    bleBearer.broadcast(RoutedPacket(signedPacket))
+                    meshNetwork.broadcast(RoutedPacket(signedPacket))
                     Log.d(TAG, "📤 Sent encrypted private message to $recipientPeerID (${encrypted.size} bytes)")
                     
                     // FIXED: Don't send didReceiveMessage for our own sent messages
@@ -1035,7 +1014,7 @@ class BluetoothMeshService(
                 
                 // Sign the packet before broadcasting
                 val signedPacket = signPacketBeforeBroadcast(packet)
-                bleBearer.broadcast(RoutedPacket(signedPacket))
+                meshNetwork.broadcast(RoutedPacket(signedPacket))
                 Log.d(TAG, "📤 Sent read receipt to $recipientPeerID for message $messageID")
 
                 // Persist as read after successful send
@@ -1083,7 +1062,7 @@ class BluetoothMeshService(
                 )
 
                 val signedPacket = signPacketBeforeBroadcast(packet)
-                bleBearer.broadcast(RoutedPacket(signedPacket))
+                meshNetwork.broadcast(RoutedPacket(signedPacket))
                 Log.d(TAG, "📤 Sent $label to $recipientPeerID (${payload.data.size} bytes)")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send $label to $recipientPeerID: ${e.message}")
@@ -1147,7 +1126,7 @@ class BluetoothMeshService(
                 announcePacket.copy(signature = signature)
             } ?: announcePacket
             
-            bleBearer.broadcast(RoutedPacket(signedPacket))
+            meshNetwork.broadcast(RoutedPacket(signedPacket))
             Log.d(TAG, "Sent iOS-compatible signed TLV announce (${tlvPayload.size} bytes)")
             // Track announce for sync
             try { gossipSyncManager.onPublicPacketSeen(signedPacket) } catch (_: Exception) { }
@@ -1210,7 +1189,7 @@ class BluetoothMeshService(
             packet.copy(signature = signature)
         } ?: packet
         
-        bleBearer.broadcast(RoutedPacket(signedPacket))
+        meshNetwork.broadcast(RoutedPacket(signedPacket))
         peerManager.markPeerAsAnnouncedTo(peerID)
         Log.d(TAG, "Sent iOS-compatible signed TLV peer announce to $peerID (${tlvPayload.size} bytes)")
 
@@ -1245,7 +1224,7 @@ class BluetoothMeshService(
         
         // Sign the packet before broadcasting
         val signedPacket = signPacketBeforeBroadcast(packet)
-        bleBearer.broadcast(RoutedPacket(signedPacket))
+        meshNetwork.broadcast(RoutedPacket(signedPacket))
     }
     
     /**
@@ -1345,21 +1324,21 @@ class BluetoothMeshService(
      * Get device address for a specific peer ID
      */
     fun getDeviceAddressForPeer(peerID: String): String? {
-        return bleBearer.addressPeerMap.entries.find { it.value == peerID }?.key
+        return bleBearer.addressPeerSnapshot().entries.find { it.value == peerID }?.key
     }
     
     /**
      * Get all device addresses mapped to their peer IDs
      */
     fun getDeviceAddressToPeerMapping(): Map<String, String> {
-        return bleBearer.addressPeerMap.toMap()
+        return bleBearer.addressPeerSnapshot()
     }
     
     /**
      * Print device addresses for all connected peers
      */
     fun printDeviceAddressesForPeers(): String {
-        return peerManager.getDebugInfoWithDeviceAddresses(bleBearer.addressPeerMap)
+        return peerManager.getDebugInfoWithDeviceAddresses(bleBearer.addressPeerSnapshot())
     }
 
     /**
@@ -1370,9 +1349,9 @@ class BluetoothMeshService(
             appendLine("=== Bluetooth Mesh Service Debug Status ===")
             appendLine("My Peer ID: $myPeerID")
             appendLine()
-            appendLine(bleBearer.getDebugInfo())
+            appendLine(bleBearer.debugInfo())
             appendLine()
-            appendLine(peerManager.getDebugInfo(bleBearer.addressPeerMap))
+            appendLine(peerManager.getDebugInfo(bleBearer.addressPeerSnapshot()))
             appendLine()
             appendLine(peerManager.getFingerprintDebugInfo())
             appendLine()

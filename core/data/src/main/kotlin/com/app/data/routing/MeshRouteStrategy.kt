@@ -1,7 +1,7 @@
 package com.app.data.routing
 
 import android.content.Context
-import com.app.data.mesh.MeshNetwork
+import com.app.transport.mesh.MeshNetwork
 import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.nostr.NostrIdentityBridge
 import com.app.transport.routing.OutgoingEnvelope
