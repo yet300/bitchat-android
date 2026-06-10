@@ -2,11 +2,25 @@ package com.app.transport.mesh
 
 import android.util.Log
 import com.app.transport.model.RoutedPacket
+import com.app.transport.sync.PacketIdUtil
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.merge
+
+/** Outcome of [MeshNetwork.sendToPeer] — honest about what actually happened. */
+enum class SendPath {
+    /** A bearer with a bound link to the peer accepted the packet. */
+    Direct,
+
+    /** No bearer claims the peer; the packet was flooded on all bearers as fallback. */
+    Flooded,
+
+    /** No bearer claims the peer and no bearer accepted the broadcast. */
+    NoRoute,
+}
 
 /**
  * Multiplexing layer that distributes send operations across all registered [MeshBearer]
@@ -26,19 +40,45 @@ class MeshNetwork(
 ) {
     companion object {
         private const val TAG = "MeshNetwork"
+
+        /** Capacity of the cross-bearer duplicate-suppression LRU. */
+        private const val SEEN_CAPACITY = 512
     }
 
     // -----------------------------------------------------------------
-    // Incoming: merge all bearer flows into one
+    // Incoming: merge all bearer flows into one, drop cross-bearer dups
     // -----------------------------------------------------------------
 
+    // LRU of recently seen packet ids. Lightweight pre-engine filter only: the same packet
+    // arriving over two bearers (or echoed back by a neighbor) is dropped here;
+    // SecurityManager.validatePacket remains the authoritative duplicate/replay check.
+    private val seenIds = LinkedHashSet<String>()
+    private val seenLock = Any()
+
+    private fun firstSeen(id: String): Boolean = synchronized(seenLock) {
+        if (!seenIds.add(id)) {
+            // Refresh recency so a busy duplicate keeps getting suppressed
+            seenIds.remove(id)
+            seenIds.add(id)
+            return false
+        }
+        if (seenIds.size > SEEN_CAPACITY) {
+            val iterator = seenIds.iterator()
+            iterator.next()
+            iterator.remove()
+        }
+        true
+    }
+
     /**
-     * Merged stream of packets arriving on ANY registered bearer.
+     * Merged stream of packets arriving on ANY registered bearer, with cross-bearer
+     * duplicates (same [PacketIdUtil] id) suppressed.
      *
      * Consumers (e.g. [BluetoothMeshService]'s packet pipeline) should collect
      * this flow for the lifetime of the component.
      */
     val incoming: Flow<RoutedPacket> = bearers.map { it.incoming }.merge()
+        .filter { routed -> firstSeen(PacketIdUtil.computeIdHex(routed.packet)) }
 
     /** Merged stream of link-level events from ALL bearers. */
     val events: Flow<BearerEvent> = bearers.map { it.events }.merge()
@@ -68,22 +108,23 @@ class MeshNetwork(
 
     /**
      * Send [packet] to [peerID] via the first bearer that lists the peer in its
-     * [MeshBearer.neighbors].  Falls back to broadcast-on-all if no bearer claims
-     * direct reachability.
-     *
-     * Returns true if at least one bearer accepted the packet.
+     * [MeshBearer.neighbors]; falls back to flooding all bearers otherwise.
+     * The returned [SendPath] is honest about which of the three actually happened.
      */
-    fun sendToPeer(peerID: String, packet: RoutedPacket): Boolean {
+    fun sendToPeer(peerID: String, packet: RoutedPacket): SendPath {
         val primary = bearers.firstOrNull { bearer ->
             bearer.neighbors.value.any { it.peerID == peerID }
         }
-        return if (primary != null) {
-            primary.sendToPeer(peerID, packet)
-        } else {
-            Log.d(TAG, "No bearer claims $peerID; broadcasting as fallback")
-            bearers.forEach { it.broadcast(packet) }
-            false
+        if (primary != null && primary.sendToPeer(peerID, packet)) {
+            return SendPath.Direct
         }
+        if (bearers.isEmpty()) {
+            Log.w(TAG, "No bearers registered; cannot deliver to $peerID")
+            return SendPath.NoRoute
+        }
+        Log.d(TAG, "No direct link to $peerID; flooding as fallback")
+        bearers.forEach { it.broadcast(packet) }
+        return SendPath.Flooded
     }
 
     /**
