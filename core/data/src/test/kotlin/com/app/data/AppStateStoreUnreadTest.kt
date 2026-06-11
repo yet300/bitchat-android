@@ -96,6 +96,19 @@ class AppStateStoreUnreadTest {
         assertEquals(1, store.unreadCounts.value[key])
     }
 
+    /** Upstream #707: request-sync replays carry different android-side ids but identical content. */
+    @Test
+    fun publicTimelineCollapsesRequestSyncReplayWithDifferentIds() {
+        val original = message("random-id-from-first-delivery", OTHER_PEER_ID)
+        val replay = original.copy(id = "different-random-id-from-replay")
+
+        store.addPublicMessage(original)
+        store.addPublicMessage(replay)
+
+        assertEquals(listOf(original), store.publicMessages.value)
+        assertEquals(1, store.unreadCounts.value[AppStateStore.publicConversationKey()])
+    }
+
     @Test
     fun clearWipesCounters() {
         store.addPublicMessage(message("m1", OTHER_PEER_ID))

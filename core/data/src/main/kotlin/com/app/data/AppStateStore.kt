@@ -49,6 +49,10 @@ class AppStateStore(
     // LRU-capped at SEEN_IDS_CAP: oldest ids are evicted, matching the bounded timelines.
     private val seenMessageIds = LinkedHashSet<String>()
 
+    // Content-derived keys of public messages: request-sync replays arrive with different
+    // android-side ids but identical content (upstream #707); LRU-capped like seen ids.
+    private val seenPublicMessageKeys = LinkedHashSet<String>()
+
     /** Adds [id] to the de-dup LRU. Returns false when the id was already present. */
     private fun rememberSeen(id: String): Boolean {
         if (!seenMessageIds.add(id)) return false
@@ -122,10 +126,29 @@ class AppStateStore(
 
     override fun addPublicMessage(msg: BitchatMessage) {
         synchronized(this) {
+            val publicKey = publicMessageKey(msg)
+            if (seenPublicMessageKeys.contains(publicKey)) return
             if (!rememberSeen(msg.id)) return
+            seenPublicMessageKeys.add(publicKey)
+            if (seenPublicMessageKeys.size > SEEN_IDS_CAP) {
+                val iterator = seenPublicMessageKeys.iterator()
+                iterator.next()
+                iterator.remove()
+            }
             _publicMessages.value = (_publicMessages.value + msg).takeLast(TIMELINE_CAP)
             countUnread(publicConversationKey(), msg)
         }
+    }
+
+    private fun publicMessageKey(msg: BitchatMessage): String {
+        val sender = msg.senderPeerID ?: msg.sender
+        return listOf(
+            sender,
+            msg.timestamp.toEpochMilliseconds().toString(),
+            msg.type.name,
+            msg.channel ?: "",
+            msg.content,
+        ).joinToString("\u001F")
     }
 
     override fun addPrivateMessage(peerID: String, msg: BitchatMessage) {
@@ -214,6 +237,7 @@ class AppStateStore(
     fun clear() {
         synchronized(this) {
             seenMessageIds.clear()
+            seenPublicMessageKeys.clear()
             _peers.value = emptyList()
             _publicMessages.value = emptyList()
             _privateMessages.value = emptyMap()
