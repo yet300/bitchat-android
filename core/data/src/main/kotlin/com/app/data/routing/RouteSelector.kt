@@ -12,6 +12,9 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Routing core (§6 Bearer SPI / Tier-2) implementing [RoutingCore].
@@ -50,12 +53,32 @@ internal class RouteSelector(
         outbox.onFlushNeeded = { peerID -> scope.launch { flushOutboxFor(peerID) } }
     }
 
+    // Per-peer serialization (audit A8): the MessageRouter facade launches every call as
+    // an independent coroutine on a multi-threaded scope, so without this a fresh
+    // sendPrivate could overtake older envelopes being flushed when a session establishes
+    // — visible as message reordering in chat. One mutex per peer key; entries are tiny
+    // and peers bounded in practice.
+    private val peerLocks = ConcurrentHashMap<String, Mutex>()
+
+    private fun lockFor(peerKey: String): Mutex = peerLocks.computeIfAbsent(peerKey) { Mutex() }
+
     // -------------------------------------------------------------------------
     // RoutingCore implementation
     // -------------------------------------------------------------------------
 
-    /** Dispatches [envelope] via the best available strategy, or queues it. */
+    /**
+     * Dispatches [envelope] via the best available strategy, or queues it.
+     * FIFO per peer: anything already queued for the peer is drained (and either sent or
+     * re-queued in order) before the new envelope is dispatched.
+     */
     override suspend fun route(envelope: OutgoingEnvelope) {
+        lockFor(envelope.peerID).withLock {
+            outbox.drain(envelope.peerID).forEach { dispatch(it) }
+            dispatch(envelope)
+        }
+    }
+
+    private suspend fun dispatch(envelope: OutgoingEnvelope) {
         val eligible = strategies.filter { it.reachability(envelope.peerID) != Reachability.Unreachable }
         val dispatched = eligible.firstOrNull { strategy ->
             val outcome = strategy.send(envelope)
@@ -74,11 +97,16 @@ internal class RouteSelector(
 
     /** Drains and re-routes any queued envelopes for [peerID]. */
     override suspend fun flushOutboxFor(peerID: String) {
-        outbox.drain(peerID).forEach { route(it) }
-        // Also flush by the peer's Noise key hex (64-char) in case it was queued under that key.
+        lockFor(peerID).withLock {
+            outbox.drain(peerID).forEach { dispatch(it) }
+        }
+        // Also flush by the peer's Noise key hex (64-char) in case it was queued under that
+        // key. Locks are taken sequentially, never nested — no ordering deadlock.
         val noiseHex = try { peerKeyResolver.noiseKeyHexFor(peerID) } catch (_: Exception) { null }
         if (noiseHex != null) {
-            outbox.drain(noiseHex).forEach { route(it) }
+            lockFor(noiseHex).withLock {
+                outbox.drain(noiseHex).forEach { dispatch(it) }
+            }
         }
     }
 

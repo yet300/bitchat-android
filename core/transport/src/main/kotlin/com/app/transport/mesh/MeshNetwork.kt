@@ -12,6 +12,7 @@ import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.merge
+import java.util.concurrent.ConcurrentHashMap
 
 /** Outcome of [MeshNetwork.sendToPeer] — honest about what actually happened. */
 enum class SendPath {
@@ -98,43 +99,54 @@ class MeshNetwork(
     // Outgoing
     // -----------------------------------------------------------------
 
+    // Bearers whose start() succeeded — outgoing traffic and the NoRoute verdict only
+    // consider these (a registered-but-unstarted stub must not fake a Flooded outcome).
+    private val started = ConcurrentHashMap.newKeySet<BearerId>()
+
     /** Start all registered bearers. Returns true if at least one bearer started. */
     fun startAll(): Boolean {
-        var anyStarted = false
         bearers.forEach { bearer ->
             val ok = bearer.start()
-            anyStarted = anyStarted || ok
+            if (ok) started.add(bearer.id) else started.remove(bearer.id)
             Log.d(TAG, "Bearer ${bearer.id.id} start → $ok")
         }
-        return anyStarted
+        return started.isNotEmpty()
     }
 
     /** Stop all registered bearers gracefully. */
-    fun stopAll() = bearers.forEach { it.stop() }
+    fun stopAll() {
+        bearers.forEach { it.stop() }
+        started.clear()
+    }
+
+    private fun startedBearers(): List<MeshBearer> = bearers.filter { it.id in started }
 
     /**
-     * Broadcast [packet] on ALL bearers (flood to every medium).
+     * Broadcast [packet] on all STARTED bearers (flood to every live medium).
      */
-    fun broadcast(packet: RoutedPacket) = bearers.forEach { it.broadcast(packet) }
+    fun broadcast(packet: RoutedPacket) = startedBearers().forEach { it.broadcast(packet) }
 
     /**
-     * Send [packet] to [peerID] via the first bearer that lists the peer in its
-     * [MeshBearer.neighbors]; falls back to flooding all bearers otherwise.
-     * The returned [SendPath] is honest about which of the three actually happened.
+     * Send [packet] to [peerID] via the first started bearer that lists the peer in its
+     * [MeshBearer.neighbors]; falls back to flooding all started bearers otherwise.
+     * The returned [SendPath] is honest about which of the three actually happened:
+     * [SendPath.NoRoute] means no STARTED bearer accepted the packet — a registered but
+     * never-started bearer (e.g. the Wi-Fi Aware stub) does not count.
      */
     fun sendToPeer(peerID: String, packet: RoutedPacket): SendPath {
-        val primary = bearers.firstOrNull { bearer ->
+        val active = startedBearers()
+        val primary = active.firstOrNull { bearer ->
             bearer.neighbors.value.any { it.peerID == peerID }
         }
         if (primary != null && primary.sendToPeer(peerID, packet)) {
             return SendPath.Direct
         }
-        if (bearers.isEmpty()) {
-            Log.w(TAG, "No bearers registered; cannot deliver to $peerID")
+        if (active.isEmpty()) {
+            Log.w(TAG, "No started bearers; cannot deliver to $peerID")
             return SendPath.NoRoute
         }
         Log.d(TAG, "No direct link to $peerID; flooding as fallback")
-        bearers.forEach { it.broadcast(packet) }
+        active.forEach { it.broadcast(packet) }
         return SendPath.Flooded
     }
 
