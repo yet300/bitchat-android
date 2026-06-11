@@ -24,6 +24,7 @@ import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.nostr.GeohashConversationRegistry
 import com.app.transport.net.ArtiTorManager
+import com.app.transport.net.HttpClientProvider
 import com.app.transport.net.TorPreferenceManager
 import com.app.transport.nostr.LocationNotesManager
 import com.app.transport.nostr.NostrIdentityBridge
@@ -74,6 +75,7 @@ interface AppGraph {
     val nostrIdentityBridge: NostrIdentityBridge
     val nostrTransport: NostrTransport
     val artiTorManager: ArtiTorManager
+    val httpClientProvider: HttpClientProvider
     val locationNotesManager: LocationNotesManager
     // temporary Phase-D/DI-core bridge, retires Phase C
     val peerFingerprintManager: PeerFingerprintManager

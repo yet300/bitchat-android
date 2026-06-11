@@ -29,7 +29,10 @@ import kotlin.math.pow
  */
 @SingleIn(AppScope::class)
 @Inject
-class NostrRelayManager internal constructor(private val eventDeduplicator: NostrEventDeduplicator) {
+class NostrRelayManager internal constructor(
+    private val eventDeduplicator: NostrEventDeduplicator,
+    private val httpClientProvider: HttpClientProvider,
+) {
 
     companion object {
         private const val TAG = "NostrRelayManager"
@@ -113,7 +116,7 @@ class NostrRelayManager internal constructor(private val eventDeduplicator: Nost
     
     // ktor client for WebSocket connections (via provider to honor Tor)
     private val httpClient: HttpClient
-        get() = HttpClientProvider.webSocketClient()
+        get() = httpClientProvider.webSocketClient()
     
     
     // Per-geohash relay selection

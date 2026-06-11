@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicLong
 class ArtiTorManager(
     private val application: Application,
     private val torPreferenceManager: TorPreferenceManager,
+    private val httpClientProvider: HttpClientProvider,
 ) {
     enum class TorState {
         OFF,
@@ -122,8 +123,6 @@ class ArtiTorManager(
         synchronized(this) {
             if (initialized) return
             initialized = true
-            // Wire HttpClientProvider SOCKS provider so it never calls getInstance() on us
-            HttpClientProvider.currentSocksProvider = { currentSocksAddress() }
 
             val logListener = ArtiLogListener { logLine ->
                 val text = logLine ?: return@ArtiLogListener
@@ -148,7 +147,7 @@ class ArtiTorManager(
                 desiredMode = savedMode
                 socksAddr = InetSocketAddress("127.0.0.1", currentSocksPort)
                 try {
-                    HttpClientProvider.reset()
+                    httpClientProvider.reset()
                 } catch (_: Throwable) {
                 }  // Only reset HTTP clients during init
             }
@@ -318,7 +317,7 @@ class ArtiTorManager(
      */
     private fun resetNetworkConnections() {
         try {
-            HttpClientProvider.reset()
+            httpClientProvider.reset()
         } catch (_: Throwable) {
         }
         try {

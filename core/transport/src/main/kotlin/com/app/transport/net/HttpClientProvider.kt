@@ -1,12 +1,25 @@
 package com.app.transport.net
 
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.engine.okhttp.OkHttpConfig
 import io.ktor.client.plugins.websocket.WebSockets
+import java.net.InetSocketAddress
 import java.net.Proxy
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
+
+/**
+ * Live SOCKS proxy address for outbound traffic, or null for direct connections.
+ * Implemented over ArtiTorManager (bound with a Lazy handle to break the construction
+ * cycle: the manager itself calls [HttpClientProvider.reset] on Tor state changes).
+ */
+fun interface SocksAddressSource {
+    fun current(): InetSocketAddress?
+}
 
 /**
  * Centralized ktor [HttpClient] provider so all network traffic honors Tor settings.
@@ -14,16 +27,15 @@ import java.util.concurrent.atomic.AtomicReference
  * Application code uses the multiplatform ktor API; the OkHttp engine stays an implementation
  * detail of this module. OkHttp is the Android engine that supports both WebSockets (Nostr relays)
  * and a SOCKS proxy (Arti/Tor), which is why it backs both clients here.
+ *
+ * Graph-owned: the SOCKS source is injected (formerly a mutable static wired by
+ * ArtiTorManager.init()).
  */
-object HttpClientProvider {
+@SingleIn(AppScope::class)
+@Inject
+class HttpClientProvider(private val socksAddressSource: SocksAddressSource) {
     private val httpClientRef = AtomicReference<HttpClient?>(null)
     private val wsClientRef = AtomicReference<HttpClient?>(null)
-
-    /**
-     * Set by ArtiTorManager.init() so this object never calls getInstance() directly.
-     * Retires when HttpClientProvider is graph-owned (Phase C).
-     */
-    var currentSocksProvider: (() -> java.net.InetSocketAddress?)? = null
 
     fun reset() {
         httpClientRef.getAndSet(null)?.close()
@@ -66,7 +78,7 @@ object HttpClientProvider {
     // If a SOCKS address is defined, always use it. ArtiTorManager sets currentSocksProvider as
     // soon as Tor mode is ON, even before bootstrap, to prevent any direct connections from occurring.
     private fun OkHttpConfig.applyTorProxy() {
-        val socks = currentSocksProvider?.invoke()
+        val socks = socksAddressSource.current()
         if (socks != null) {
             proxy = Proxy(Proxy.Type.SOCKS, socks)
         }

@@ -95,6 +95,15 @@ object AndroidAppBindings {
         }
 
     /**
+     * SOCKS address for Tor-routed traffic. Lazy<ArtiTorManager> breaks the construction
+     * cycle (the manager resets HttpClientProvider's cached clients on Tor state changes);
+     * the address is consulted per connection, by which time the manager exists.
+     */
+    @Provides
+    fun provideSocksAddressSource(arti: Lazy<com.app.transport.net.ArtiTorManager>): com.app.transport.net.SocksAddressSource =
+        com.app.transport.net.SocksAddressSource { arti.value.currentSocksAddress() }
+
+    /**
      * Our own mesh peer id, read live from the Noise identity fingerprint — the same
      * derivation BMS uses, so it stays correct across panic resets with no re-wiring.
      */
