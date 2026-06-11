@@ -1,7 +1,9 @@
 package com.bitchat.android.ui.theme
 
-import android.content.Context
-import com.app.data.appSettings
+import com.russhwolf.settings.ObservableSettings
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -19,22 +21,27 @@ enum class ThemePreference {
 }
 
 /**
- * Simple SharedPreferences-backed manager for theme preference with a StateFlow.
- * Avoids adding DataStore dependency for now.
+ * Graph-owned theme preference with a StateFlow; settings are injected
+ * (formerly an `object` calling the global appSettings()).
  */
-object ThemePreferenceManager {
-    private const val KEY_THEME = "theme_preference"
+@SingleIn(AppScope::class)
+@Inject
+class ThemePreferenceManager(private val settings: ObservableSettings) {
 
-    private val _themeFlow = MutableStateFlow(ThemePreference.System)
-    val themeFlow: StateFlow<ThemePreference> = _themeFlow
-
-    fun init(context: Context) {
-        val saved = appSettings(context).getString(KEY_THEME, ThemePreference.System.name)
-        _themeFlow.value = runCatching { ThemePreference.valueOf(saved) }.getOrDefault(ThemePreference.System)
+    private companion object {
+        const val KEY_THEME = "theme_preference"
     }
 
-    fun set(context: Context, preference: ThemePreference) {
-        appSettings(context).putString(KEY_THEME, preference.name)
+    private val _themeFlow = MutableStateFlow(load())
+    val themeFlow: StateFlow<ThemePreference> = _themeFlow
+
+    private fun load(): ThemePreference {
+        val saved = settings.getString(KEY_THEME, ThemePreference.System.name)
+        return runCatching { ThemePreference.valueOf(saved) }.getOrDefault(ThemePreference.System)
+    }
+
+    fun set(preference: ThemePreference) {
+        settings.putString(KEY_THEME, preference.name)
         _themeFlow.value = preference
     }
 }

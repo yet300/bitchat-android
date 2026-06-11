@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.app.transport.nostr.NostrProofOfWork
 import com.bitchat.android.BitchatApplication
+import com.bitchat.android.di.appGraph
 import androidx.compose.ui.res.stringResource
 import com.bitchat.android.R
 import com.bitchat.android.core.ui.component.button.CloseButton
@@ -331,7 +332,8 @@ fun AboutSheet(
                                 letterSpacing = 0.5.sp,
                                 modifier = Modifier.padding(start = 16.dp, bottom = 8.dp)
                             )
-                            val themePref by com.bitchat.android.ui.theme.ThemePreferenceManager.themeFlow.collectAsState()
+                            val themePrefs = context.appGraph.themePreferenceManager
+                            val themePref by themePrefs.themeFlow.collectAsState()
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
                                 color = colorScheme.surface,
@@ -346,19 +348,19 @@ fun AboutSheet(
                                     ThemeChip(
                                         label = stringResource(R.string.about_system),
                                         selected = themePref.isSystem,
-                                        onClick = { com.bitchat.android.ui.theme.ThemePreferenceManager.set(context, com.bitchat.android.ui.theme.ThemePreference.System) },
+                                        onClick = { themePrefs.set(com.bitchat.android.ui.theme.ThemePreference.System) },
                                         modifier = Modifier.weight(1f)
                                     )
                                     ThemeChip(
                                         label = stringResource(R.string.about_light),
                                         selected = themePref.isLight,
-                                        onClick = { com.bitchat.android.ui.theme.ThemePreferenceManager.set(context, com.bitchat.android.ui.theme.ThemePreference.Light) },
+                                        onClick = { themePrefs.set(com.bitchat.android.ui.theme.ThemePreference.Light) },
                                         modifier = Modifier.weight(1f)
                                     )
                                     ThemeChip(
                                         label = stringResource(R.string.about_dark),
                                         selected = themePref.isDark,
-                                        onClick = { com.bitchat.android.ui.theme.ThemePreferenceManager.set(context, com.bitchat.android.ui.theme.ThemePreference.Dark) },
+                                        onClick = { themePrefs.set(com.bitchat.android.ui.theme.ThemePreference.Dark) },
                                         modifier = Modifier.weight(1f)
                                     )
                                 }
@@ -370,7 +372,8 @@ fun AboutSheet(
                     item(key = "settings") {
                         val powEnabled by powPreferenceManager.powEnabled.collectAsState()
                         val powDifficulty by powPreferenceManager.powDifficulty.collectAsState()
-                        var backgroundEnabled by remember { mutableStateOf(com.bitchat.android.service.MeshServicePreferences.isBackgroundEnabled(true)) }
+                        val meshServicePrefs = LocalContext.current.appGraph.meshServicePreferences
+                        var backgroundEnabled by remember { mutableStateOf(meshServicePrefs.isBackgroundEnabled(true)) }
                         val torMode = remember { mutableStateOf(torPreferenceManager.get()) }
                         val torProvider = (LocalContext.current.applicationContext as BitchatApplication).appGraph.artiTorManager
                         val torStatus by torProvider.statusFlow.collectAsState()
@@ -398,7 +401,7 @@ fun AboutSheet(
                                         checked = backgroundEnabled,
                                         onCheckedChange = { enabled ->
                                             backgroundEnabled = enabled
-                                            com.bitchat.android.service.MeshServicePreferences.setBackgroundEnabled(enabled)
+                                            meshServicePrefs.setBackgroundEnabled(enabled)
                                             if (!enabled) {
                                                 com.bitchat.android.service.MeshForegroundService.stop(context)
                                             } else {

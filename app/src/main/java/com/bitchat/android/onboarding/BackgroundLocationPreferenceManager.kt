@@ -1,19 +1,25 @@
 package com.bitchat.android.onboarding
 
-import android.content.Context
-import com.app.data.appSettings
+import com.russhwolf.settings.ObservableSettings
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 
 /**
- * Preference manager for background location skip choice.
+ * Graph-owned preference for the background-location skip choice
+ * (formerly an `object` calling the global appSettings()).
  */
-object BackgroundLocationPreferenceManager {
-    private const val KEY_BACKGROUND_LOCATION_SKIP = "background_location_skipped"
+@SingleIn(AppScope::class)
+@Inject
+class BackgroundLocationPreferenceManager(private val settings: ObservableSettings) {
 
-    fun setSkipped(context: Context, skipped: Boolean) {
-        appSettings(context).putBoolean(KEY_BACKGROUND_LOCATION_SKIP, skipped)
+    private companion object {
+        const val KEY_BACKGROUND_LOCATION_SKIP = "background_location_skipped"
     }
 
-    fun isSkipped(context: Context): Boolean {
-        return appSettings(context).getBoolean(KEY_BACKGROUND_LOCATION_SKIP, false)
+    fun setSkipped(skipped: Boolean) {
+        settings.putBoolean(KEY_BACKGROUND_LOCATION_SKIP, skipped)
     }
+
+    fun isSkipped(): Boolean = settings.getBoolean(KEY_BACKGROUND_LOCATION_SKIP, false)
 }

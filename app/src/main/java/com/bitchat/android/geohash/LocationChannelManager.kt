@@ -8,8 +8,11 @@ import android.location.Location
 import android.location.LocationManager
 import android.util.Log
 import androidx.core.app.ActivityCompat
-import com.app.data.appSettings
 import com.app.common.geohash.Geohash
+import com.russhwolf.settings.ObservableSettings
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import com.app.common.serialization.JsonConfig
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
@@ -32,19 +35,15 @@ import kotlinx.serialization.SerializationException
  * Manages location permissions, one-shot location retrieval, and computing geohash channels.
  * Direct port from iOS LocationChannelManager for 100% compatibility
  */
-class LocationChannelManager private constructor(private val context: Context) {
-    
+@SingleIn(AppScope::class)
+@Inject
+class LocationChannelManager(
+    private val context: Context,
+    private val settings: ObservableSettings,
+) {
+
     companion object {
         private const val TAG = "LocationChannelManager"
-        
-        @Volatile
-        private var INSTANCE: LocationChannelManager? = null
-        
-        fun getInstance(context: Context): LocationChannelManager {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: LocationChannelManager(context.applicationContext).also { INSTANCE = it }
-            }
-        }
     }
 
     // State enum matching iOS
@@ -58,7 +57,6 @@ class LocationChannelManager private constructor(private val context: Context) {
     private val geocoderProvider: GeocoderProvider = GeocoderFactory.get(context)
     private var lastLocation: Location? = null
     private var geocodingJob: Job? = null
-    private val settings = appSettings(context)
 
     private fun checkSystemLocationEnabled(): Boolean {
         return try {

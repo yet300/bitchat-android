@@ -9,6 +9,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
+import com.bitchat.android.di.appGraph
 import kotlinx.coroutines.launch
 
 /**
@@ -160,7 +161,7 @@ class OnboardingCoordinator(
 
     fun skipBackgroundLocation() {
         Log.d(TAG, "User skipped background location permission")
-        BackgroundLocationPreferenceManager.setSkipped(activity, true)
+        activity.appGraph.backgroundLocationPreferenceManager.setSkipped(true)
         completeOnboarding()
     }
 
@@ -173,7 +174,7 @@ class OnboardingCoordinator(
     private fun shouldRequestBackgroundLocation(): Boolean {
         return permissionManager.needsBackgroundLocationPermission() &&
             !permissionManager.isBackgroundLocationGranted() &&
-            !BackgroundLocationPreferenceManager.isSkipped(activity)
+            !activity.appGraph.backgroundLocationPreferenceManager.isSkipped()
     }
 
     /**

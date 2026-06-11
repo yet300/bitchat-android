@@ -8,20 +8,21 @@ import android.os.PowerManager
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.bitchat.android.R
-import com.app.data.appSettings
+import com.russhwolf.settings.ObservableSettings
 
 /**
  * Centralized permission management for bitchat app
  * Handles all Bluetooth and notification permissions required for the app to function
  */
-class PermissionManager(private val context: Context) {
+class PermissionManager(
+    private val context: Context,
+    private val sharedPrefs: ObservableSettings,
+) {
 
     companion object {
         private const val TAG = "PermissionManager"
         private const val KEY_FIRST_TIME_COMPLETE = "first_time_onboarding_complete"
     }
-
-    private val sharedPrefs = appSettings(context)
 
     /**
      * Check if this is the first time the user is launching the app

@@ -1,5 +1,6 @@
 package com.bitchat.android.ui
 
+import com.bitchat.android.di.appGraph
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
@@ -68,7 +69,7 @@ class GeohashPickerActivity : OrientationAwareActivity() {
             } catch (_: Throwable) {}
         } else {
             // If no initial geohash, try to use the user's coarsest location
-            val locationManager = LocationChannelManager.getInstance(applicationContext)
+            val locationManager = appGraph.locationChannelManager
             val channels = locationManager.availableChannels.value
             if (!channels.isNullOrEmpty()) {
                 val coarsestChannel = channels.minByOrNull { it.geohash.length }

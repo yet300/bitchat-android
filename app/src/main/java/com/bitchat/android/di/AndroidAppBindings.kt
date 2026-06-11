@@ -14,13 +14,14 @@ import com.app.transport.notification.ServiceNotifier
 import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.nostr.NostrIdentityBridge
 import com.app.transport.routing.NostrIdentityProvider
-import com.bitchat.android.services.NicknameProvider
+import com.bitchat.android.ui.DataManager
 import com.bitchat.android.ui.NotificationManager
 import com.bitchat.android.util.NotificationIntervalManager
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
+import com.russhwolf.settings.ObservableSettings
 import dev.zacsweers.metro.SingleIn
 
 /**
@@ -43,8 +44,16 @@ object AndroidAppBindings {
 
     @Provides
     @SingleIn(AppScope::class)
-    fun provideNicknameSource(context: Context): NicknameSource =
-        NicknameSource { fallback -> NicknameProvider.getNickname(context, fallback) }
+    fun provideNicknameSource(settings: ObservableSettings): NicknameSource {
+        val dataManager = DataManager(settings)
+        return NicknameSource { fallback ->
+            try {
+                dataManager.loadNickname().ifBlank { fallback }
+            } catch (_: Exception) {
+                fallback
+            }
+        }
+    }
 
     /** The process-wide in-memory store the UI hydrates from doubles as the incoming sink. */
     @Provides

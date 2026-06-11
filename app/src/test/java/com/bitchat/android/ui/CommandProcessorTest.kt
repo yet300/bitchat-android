@@ -3,6 +3,7 @@ package com.bitchat.android.ui
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.app.transport.mesh.BluetoothMeshService
+import com.russhwolf.settings.SharedPreferencesSettings
 import junit.framework.TestCase.assertEquals
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
@@ -22,13 +23,16 @@ class CommandProcessorTest() {
     private val testDispatcher = UnconfinedTestDispatcher()
     private val testScope = TestScope(testDispatcher)
   private val chatState = ChatState(scope = testScope)
+  private val testSettings = SharedPreferencesSettings(
+    context.getSharedPreferences("test", Context.MODE_PRIVATE)
+  )
   private lateinit var commandProcessor: CommandProcessor
 
   val messageManager: MessageManager = MessageManager(state = chatState, appStateStore = com.app.data.AppStateStore(mock(), mock()))
   val channelManager: ChannelManager = ChannelManager(
     state = chatState,
     messageManager = messageManager,
-    dataManager = DataManager(context = context),
+    dataManager = DataManager(testSettings),
     coroutineScope = testScope
   )
 
@@ -43,7 +47,7 @@ class CommandProcessorTest() {
       privateChatManager = PrivateChatManager(
         state = chatState,
         messageManager = messageManager,
-        dataManager = DataManager(context = context),
+        dataManager = DataManager(testSettings),
         noiseSessionDelegate = mock<NoiseSessionDelegate>(),
         fingerprintManager = mock(),
         favoritesService = mock()

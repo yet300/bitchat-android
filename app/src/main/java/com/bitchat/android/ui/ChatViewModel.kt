@@ -3,6 +3,7 @@
 package com.bitchat.android.ui
 
 
+import com.bitchat.android.di.appGraph
 import android.app.Application
 import android.util.Log
 import androidx.core.app.NotificationManagerCompat
@@ -81,7 +82,7 @@ class ChatViewModel(
     private val messageTransferMap = mutableMapOf<String, String>()
 
     // Specialized managers
-    private val dataManager = DataManager(application.applicationContext)
+    private val dataManager = DataManager((application as BitchatApplication).appGraph.observableSettings)
     // Graph-owned geohash registries (temporary Phase-D bridge; retires in Phase C).
     private val geohashConversationRegistry =
         (application as BitchatApplication).appGraph.geohashConversationRegistry
@@ -316,7 +317,7 @@ class ChatViewModel(
         try {
             nostrTransport.senderPeerID = meshService.myPeerID
             nostrTransport.currentGeohashSource = CurrentGeohashSource {
-                (LocationChannelManager.getInstance(getApplication()).selectedChannel.value
+                (getApplication<Application>().appGraph.locationChannelManager.selectedChannel.value
                         as? ChannelID.Location)?.channel?.geohash
             }
         } catch (_: Exception) { }
@@ -947,7 +948,7 @@ class ChatViewModel(
         try {
             // Clear geohash bookmarks too (panic should remove everything)
             try {
-                val store = com.bitchat.android.geohash.GeohashBookmarksStore.getInstance(getApplication())
+                val store = getApplication<Application>().appGraph.geohashBookmarksStore
                 store.clearAll()
             } catch (_: Exception) { }
 

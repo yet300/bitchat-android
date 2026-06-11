@@ -30,6 +30,13 @@ import com.app.transport.nostr.NostrRelayManager
 import com.app.transport.nostr.PoWPreferenceManager
 import com.app.transport.nostr.RelayDirectory
 import com.app.data.nostr.NostrTransport
+import com.bitchat.android.geohash.GeohashBookmarksStore
+import com.bitchat.android.geohash.LocationChannelManager
+import com.bitchat.android.onboarding.BackgroundLocationPreferenceManager
+import com.bitchat.android.onboarding.BatteryOptimizationPreferenceManager
+import com.bitchat.android.service.MeshServicePreferences
+import com.bitchat.android.ui.theme.ThemePreferenceManager
+import com.russhwolf.settings.ObservableSettings
 
 /**
  * Public API of the application dependency graph: the domain ports the app (and, in Phase C, the
@@ -72,6 +79,16 @@ interface AppGraph {
     val encryptionService: EncryptionService
     val messageRouter: MessageRouter
     val favoritesPersistenceService: FavoritesPersistenceService
+
+    // Settings-backed preference managers (formerly `object`s over the global appSettings()).
+    // Transitional accessors for framework entry points; dissolve into feature stores in Phase C.
+    val observableSettings: ObservableSettings
+    val themePreferenceManager: ThemePreferenceManager
+    val batteryOptimizationPreferenceManager: BatteryOptimizationPreferenceManager
+    val backgroundLocationPreferenceManager: BackgroundLocationPreferenceManager
+    val meshServicePreferences: MeshServicePreferences
+    val locationChannelManager: LocationChannelManager
+    val geohashBookmarksStore: GeohashBookmarksStore
 
     // Graph-owned mesh engine: full surface for the still-living god-classes
     // (MainActivity/ChatViewModel, retires Phase C) and the narrow lifecycle contract

@@ -23,7 +23,6 @@ import com.bitchat.android.onboarding.BluetoothCheckScreen
 import com.bitchat.android.onboarding.BluetoothStatus
 import com.bitchat.android.onboarding.BluetoothStatusManager
 import com.bitchat.android.onboarding.BatteryOptimizationManager
-import com.bitchat.android.onboarding.BatteryOptimizationPreferenceManager
 import com.bitchat.android.onboarding.BatteryOptimizationScreen
 import com.bitchat.android.onboarding.BatteryOptimizationStatus
 import com.bitchat.android.onboarding.BackgroundLocationPermissionScreen
@@ -108,11 +107,11 @@ class MainActivity : OrientationAwareActivity() {
         // Enable edge-to-edge display for modern Android look
         enableEdgeToEdge()
 
+        val appGraph = (application as BitchatApplication).appGraph
         // Initialize permission management
-        permissionManager = PermissionManager(this)
+        permissionManager = PermissionManager(this, appGraph.observableSettings)
         // Ensure foreground service is running and get mesh instance from holder
         try { com.bitchat.android.service.MeshForegroundService.start(applicationContext) } catch (_: Exception) { }
-        val appGraph = (application as BitchatApplication).appGraph
         meshService = appGraph.bluetoothMeshService
         bluetoothStatusManager = BluetoothStatusManager(
             activity = this,
@@ -403,7 +402,7 @@ class MainActivity : OrientationAwareActivity() {
                 Log.d("MainActivity", "Existing user with required permissions")
                 if (permissionManager.needsBackgroundLocationPermission() &&
                     !permissionManager.isBackgroundLocationGranted() &&
-                    !com.bitchat.android.onboarding.BackgroundLocationPreferenceManager.isSkipped(this@MainActivity)
+                    !(application as BitchatApplication).appGraph.backgroundLocationPreferenceManager.isSkipped()
                 ) {
                     mainViewModel.updateOnboardingState(OnboardingState.BACKGROUND_LOCATION_EXPLANATION)
                 } else {
@@ -592,7 +591,7 @@ class MainActivity : OrientationAwareActivity() {
         }
         
         // Check if user has previously skipped battery optimization
-        if (BatteryOptimizationPreferenceManager.isSkipped(this)) {
+        if ((application as BitchatApplication).appGraph.batteryOptimizationPreferenceManager.isSkipped()) {
             android.util.Log.d("MainActivity", "User previously skipped battery optimization, proceeding to permissions")
             proceedWithPermissionCheck()
             return

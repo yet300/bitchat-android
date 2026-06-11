@@ -2,7 +2,6 @@ package com.bitchat.android.di
 
 import android.app.Application
 import android.content.Context
-import com.app.data.appSettings
 import com.app.crypto.EncryptionService
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.identity.SecureIdentityStateManager
@@ -23,6 +22,7 @@ import com.app.transport.mesh.MeshLifecycleController
 import com.app.transport.mesh.MeshNetwork
 import com.app.transport.notification.ServiceNotifier
 import com.russhwolf.settings.ObservableSettings
+import com.russhwolf.settings.SharedPreferencesSettings
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
@@ -46,9 +46,15 @@ object AndroidDataBindings {
     @SingleIn(AppScope::class)
     fun provideApplication(context: Context): Application = context.applicationContext as Application
 
+    /**
+     * Single app-wide [ObservableSettings] for all non-secret preferences (one store,
+     * namespaced keys, never enumerate keys). Secrets stay in the Tink-backed
+     * [com.app.crypto.secure.SecureKeyValueStore], not here.
+     */
     @Provides
     @SingleIn(AppScope::class)
-    fun provideObservableSettings(context: Context): ObservableSettings = appSettings(context)
+    fun provideObservableSettings(context: Context): ObservableSettings =
+        SharedPreferencesSettings(context.getSharedPreferences("bitchat", Context.MODE_PRIVATE))
 
     @Provides
     @SingleIn(AppScope::class)

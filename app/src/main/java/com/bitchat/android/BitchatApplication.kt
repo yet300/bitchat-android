@@ -3,7 +3,6 @@ package com.bitchat.android
 import android.app.Application
 import com.bitchat.android.di.AndroidAppGraph
 import com.bitchat.android.di.AppGraph
-import com.bitchat.android.ui.theme.ThemePreferenceManager
 import dev.zacsweers.metro.createGraphFactory
 import dev.zacsweers.metrox.android.MetroAppComponentProviders
 import dev.zacsweers.metrox.android.MetroApplication
@@ -48,17 +47,8 @@ class BitchatApplication : Application(), MetroApplication {
             NostrIdentityBridge.getCurrentNostrIdentity(this)
         } catch (_: Exception) { }
 
-        // Initialize theme preference
-        ThemePreferenceManager.init(this)
-
-        // DebugPreferenceManager is now graph-owned (@Inject over SettingsStore); no static init needed.
-
-        // Initialize mesh service preferences
-        try { com.bitchat.android.service.MeshServicePreferences.init(this) } catch (_: Exception) { }
-
         // Proactively start the foreground service to keep mesh alive
         try { com.bitchat.android.service.MeshForegroundService.start(this) } catch (_: Exception) { }
 
-        // TorManager already initialized above
     }
 }

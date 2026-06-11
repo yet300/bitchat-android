@@ -1,5 +1,6 @@
 package com.bitchat.android.ui
 
+import com.bitchat.android.di.appGraph
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Description
@@ -36,7 +37,7 @@ fun LocationNotesButton(
     
     // Get channel and permission state
     val selectedLocationChannel by viewModel.selectedLocationChannel.collectAsStateWithLifecycle()
-    val locationManager = remember { LocationChannelManager.getInstance(context) }
+    val locationManager = remember { context.appGraph.locationChannelManager }
     val permissionState by locationManager.permissionState.collectAsStateWithLifecycle()
     val locationServicesEnabled by locationManager.effectiveLocationEnabled.collectAsStateWithLifecycle(false)
 

@@ -1,29 +1,25 @@
 package com.bitchat.android.onboarding
 
-import android.content.Context
-import com.app.data.appSettings
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import com.russhwolf.settings.ObservableSettings
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 
 /**
- * Preference manager for battery optimization skip choice
+ * Graph-owned preference for the battery-optimization skip choice
+ * (formerly an `object` calling the global appSettings()).
  */
-object BatteryOptimizationPreferenceManager {
-    private const val KEY_BATTERY_SKIP = "battery_optimization_skipped"
+@SingleIn(AppScope::class)
+@Inject
+class BatteryOptimizationPreferenceManager(private val settings: ObservableSettings) {
 
-    private val _skipFlow = MutableStateFlow(false)
-    val skipFlow: StateFlow<Boolean> = _skipFlow
-
-    fun init(context: Context) {
-        _skipFlow.value = isSkipped(context)
+    private companion object {
+        const val KEY_BATTERY_SKIP = "battery_optimization_skipped"
     }
 
-    fun setSkipped(context: Context, skipped: Boolean) {
-        appSettings(context).putBoolean(KEY_BATTERY_SKIP, skipped)
-        _skipFlow.value = skipped
+    fun setSkipped(skipped: Boolean) {
+        settings.putBoolean(KEY_BATTERY_SKIP, skipped)
     }
 
-    fun isSkipped(context: Context): Boolean {
-        return appSettings(context).getBoolean(KEY_BATTERY_SKIP, false)
-    }
+    fun isSkipped(): Boolean = settings.getBoolean(KEY_BATTERY_SKIP, false)
 }
