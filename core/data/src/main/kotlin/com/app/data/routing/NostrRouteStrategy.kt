@@ -1,6 +1,5 @@
 package com.app.data.routing
 
-import com.app.data.favorites.FavoritesPersistenceService
 import com.app.data.nostr.NostrTransport
 import com.app.transport.model.ReadReceipt
 import com.app.transport.nostr.GeohashAliasRegistry
@@ -25,17 +24,17 @@ import dev.zacsweers.metro.Inject
 @Inject
 internal class NostrRouteStrategy(
     private val nostr: NostrTransport,
-    private val favoritesService: FavoritesPersistenceService,
     private val geohashAliasRegistry: GeohashAliasRegistry,
     private val geohashConversationRegistry: GeohashConversationRegistry,
     private val nostrIdentityProvider: NostrIdentityProvider,
+    private val peerAddressResolver: PeerAddressResolver,
 ) : RouteStrategy {
 
     override val priority = 50
 
     override fun reachability(peerID: String): Reachability {
         if (geohashAliasRegistry.contains(peerID)) return Reachability.ViaRelay
-        return if (canSendViaNostr(peerID)) Reachability.ViaRelay else Reachability.Unreachable
+        return if (peerAddressResolver.canSendViaNostr(peerID)) Reachability.ViaRelay else Reachability.Unreachable
     }
 
     override suspend fun send(envelope: OutgoingEnvelope): SendOutcome {
@@ -83,25 +82,4 @@ internal class NostrRouteStrategy(
         }
     }
 
-    /** Same mutual-favorite + npub-mapping reachability rule the legacy MessageRouter used. */
-    private fun canSendViaNostr(peerID: String): Boolean = try {
-        val hexRegex = Regex("^[0-9a-fA-F]+$")
-        when (peerID.length) {
-            64 if peerID.matches(hexRegex) -> {
-                val noiseKey = hexToBytes(peerID)
-                val fav = favoritesService.getFavoriteStatus(noiseKey)
-                fav?.isMutual == true && fav.peerNostrPublicKey != null
-            }
-            16 if peerID.matches(hexRegex) -> {
-                val fav = favoritesService.getFavoriteStatus(peerID)
-                fav?.isMutual == true && fav.peerNostrPublicKey != null
-            }
-            else -> false
-        }
-    } catch (_: Exception) { false }
-
-    private fun hexToBytes(hex: String): ByteArray {
-        val clean = if (hex.length % 2 == 0) hex else "0$hex"
-        return clean.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-    }
 }
