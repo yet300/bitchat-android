@@ -18,7 +18,8 @@ import kotlin.time.Instant
 class GeohashRepository(
     private val application: Application,
     private val state: ChatState,
-    private val dataManager: com.bitchat.android.ui.DataManager
+    private val dataManager: com.bitchat.android.ui.DataManager,
+    private val nostrIdentityBridge: NostrIdentityBridge,
 ) {
     companion object { private const val TAG = "GeohashRepository" }
 
@@ -146,7 +147,7 @@ class GeohashRepository(
             .map { (pubkeyHex, lastSeen) ->
             // Use our actual nickname for self; otherwise use cached nickname or anon
             val base = try {
-                val myHex = currentGeohash?.let { NostrIdentityBridge.deriveIdentity(it, application).publicKeyHex }
+                val myHex = currentGeohash?.let { nostrIdentityBridge.deriveIdentity(it).publicKeyHex }
                 if (myHex != null && myHex.equals(pubkeyHex, true)) {
                     state.getNicknameValue() ?: "anon"
                 } else {
@@ -188,7 +189,7 @@ class GeohashRepository(
         val current = currentGeohash
         if (current != null) {
             try {
-                val my = NostrIdentityBridge.deriveIdentity(current, application)
+                val my = nostrIdentityBridge.deriveIdentity(current)
                 if (my.publicKeyHex.equals(lower, true)) {
                     return "${state.getNicknameValue()}#$suffix"
                 }
@@ -204,7 +205,7 @@ class GeohashRepository(
         val current = currentGeohash
         val base: String = try {
             if (current != null) {
-                val my = NostrIdentityBridge.deriveIdentity(current, application)
+                val my = nostrIdentityBridge.deriveIdentity(current)
                 if (my.publicKeyHex.equals(lower, true)) {
                     state.getNicknameValue() ?: "anon"
                 } else geoNicknames[lower] ?: "anon"

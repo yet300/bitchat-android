@@ -60,7 +60,9 @@ class GeohashViewModel(
         (application as BitchatApplication).appGraph.nostrRelayManager
     private val nostrTransport =
         (application as BitchatApplication).appGraph.nostrTransport
-    private val repo = GeohashRepository(application, state, dataManager)
+    private val nostrIdentityBridge =
+        (application as BitchatApplication).appGraph.nostrIdentityBridge
+    private val repo = GeohashRepository(application, state, dataManager, nostrIdentityBridge)
     private val subscriptionManager = NostrSubscriptionManager(viewModelScope, relayDirectory, nostrRelayManager)
     private val geohashMessageHandler = GeohashMessageHandler(
         application = application,
@@ -70,7 +72,8 @@ class GeohashViewModel(
         scope = viewModelScope,
         dataManager = dataManager,
         geohashAliasRegistry = geohashAliasRegistry,
-        powPreferenceManager = powPreferenceManager
+        powPreferenceManager = powPreferenceManager,
+        nostrIdentityBridge = nostrIdentityBridge,
     )
     private val dmHandler = NostrDirectMessageHandler(
         application = application,
@@ -103,7 +106,7 @@ class GeohashViewModel(
         kotlin.runCatching {
             ProcessLifecycleOwner.get().lifecycle.addObserver(this)
         }
-        val identity = NostrIdentityBridge.getCurrentNostrIdentity(getApplication())
+        val identity = nostrIdentityBridge.getCurrentNostrIdentity()
         if (identity != null) {
             // Use global chat-messages only for full account DMs (mesh context). For geohash DMs, subscribe per-geohash below.
             subscriptionManager.subscribeGiftWraps(
@@ -191,13 +194,13 @@ class GeohashViewModel(
         geoTimer = null
         globalPresenceJob?.cancel()
         globalPresenceJob = null
-        try { NostrIdentityBridge.clearAllAssociations(getApplication()) } catch (_: Exception) {}
+        try { nostrIdentityBridge.clearAllAssociations() } catch (_: Exception) {}
         initialize()
     }
 
     private suspend fun broadcastPresence(geohash: String) {
         try {
-            val identity = NostrIdentityBridge.deriveIdentity(geohash, getApplication())
+            val identity = nostrIdentityBridge.deriveIdentity(geohash)
             val event = NostrProtocol.createGeohashPresenceEvent(geohash, identity)
             val relayManager = nostrRelayManager
             // Presence is lightweight, send to geohash relays
@@ -229,7 +232,7 @@ class GeohashViewModel(
                     PoWMiningTracker.startMiningMessage(tempId)
                 }
                 try {
-                    val identity = NostrIdentityBridge.deriveIdentity(forGeohash = channel.geohash, context = getApplication())
+                    val identity = nostrIdentityBridge.deriveIdentity(channel.geohash)
                     val teleported = state.isTeleported.value
                     val event = NostrProtocol.createEphemeralGeohashEvent(content, channel.geohash, identity, powPreferenceManager, nickname, teleported)
                     val relayManager = nostrRelayManager
@@ -383,7 +386,7 @@ class GeohashViewModel(
                 try { messageManager.clearChannelUnreadCount("geo:${channel.channel.geohash}") } catch (_: Exception) { }
 
                 try {
-                    val identity = NostrIdentityBridge.deriveIdentity(channel.channel.geohash, getApplication())
+                    val identity = nostrIdentityBridge.deriveIdentity(channel.channel.geohash)
                     // We don't update participant here anymore; presence loop handles it via Kind 20001
                     val teleported = state.isTeleported.value
                     if (teleported) repo.markTeleported(identity.publicKeyHex)
@@ -401,7 +404,7 @@ class GeohashViewModel(
                         id = subId,
                         handler = { event -> geohashMessageHandler.onEvent(event, geohash) }
                     )
-                    val dmIdentity = NostrIdentityBridge.deriveIdentity(geohash, getApplication())
+                    val dmIdentity = nostrIdentityBridge.deriveIdentity(geohash)
                     val dmSubId = "geo-dm-$geohash"; currentDmSubId = dmSubId
                     subscriptionManager.subscribeGiftWraps(
                         pubkey = dmIdentity.publicKeyHex,

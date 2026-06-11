@@ -13,6 +13,7 @@ import com.app.transport.model.ReadReceipt
 import com.app.transport.notification.ServiceNotifier
 import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.nostr.NostrIdentityBridge
+import com.app.transport.routing.MeshPeerIdSource
 import com.app.transport.routing.NostrIdentityProvider
 import com.bitchat.android.ui.DataManager
 import com.bitchat.android.ui.NotificationManager
@@ -84,14 +85,22 @@ object AndroidAppBindings {
      * NostrIdentityBridge so :core:data stays Context-free.
      */
     @Provides
-    fun provideNostrIdentityProvider(context: Context): NostrIdentityProvider =
+    fun provideNostrIdentityProvider(bridge: NostrIdentityBridge): NostrIdentityProvider =
         NostrIdentityProvider {
             try {
-                NostrIdentityBridge.getCurrentNostrIdentity(context)
+                bridge.getCurrentNostrIdentity()
             } catch (_: Exception) {
                 null
             }
         }
+
+    /**
+     * Our own mesh peer id, read live from the Noise identity fingerprint — the same
+     * derivation BMS uses, so it stays correct across panic resets with no re-wiring.
+     */
+    @Provides
+    fun provideMeshPeerIdSource(encryptionService: com.app.crypto.EncryptionService): MeshPeerIdSource =
+        MeshPeerIdSource { encryptionService.getIdentityFingerprint().take(16) }
 
     /**
      * Routes read receipts over the relay when the recipient is a geohash alias.

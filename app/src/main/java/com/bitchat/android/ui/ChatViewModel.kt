@@ -16,7 +16,6 @@ import com.app.transport.model.BitchatMessage
 import com.app.data.nostr.CurrentGeohashSource
 import com.app.transport.mesh.BluetoothMeshDelegate
 import com.app.transport.mesh.BluetoothMeshService
-import com.app.transport.nostr.NostrIdentityBridge
 import com.bitchat.android.BitchatApplication
 import com.app.transport.VerificationService
 import com.bitchat.android.geohash.ChannelID
@@ -60,8 +59,8 @@ class ChatViewModel(
 
     fun getCurrentNpub(): String? {
         return try {
-            NostrIdentityBridge
-                .getCurrentNostrIdentity(getApplication())
+            (getApplication<Application>() as BitchatApplication)
+                .appGraph.nostrIdentityBridge.getCurrentNostrIdentity()
                 ?.npub
         } catch (_: Exception) {
             null
@@ -319,7 +318,6 @@ class ChatViewModel(
 
         // Ensure NostrTransport knows our mesh peer ID for embedded packets
         try {
-            nostrTransport.senderPeerID = meshService.myPeerID
             nostrTransport.currentGeohashSource = CurrentGeohashSource {
                 (getApplication<Application>().appGraph.locationChannelManager.selectedChannel.value
                         as? ChannelID.Location)?.channel?.geohash
@@ -358,7 +356,7 @@ class ChatViewModel(
                 val subMgrField = GeohashViewModel::class.java.getDeclaredField("subscriptionManager")
                 subMgrField.isAccessible = true
                 val subMgr = subMgrField.get(geohashViewModel) as com.app.transport.nostr.NostrSubscriptionManager
-                val identity = com.app.transport.nostr.NostrIdentityBridge.deriveIdentity(gh, getApplication())
+                val identity = (getApplication<Application>() as BitchatApplication).appGraph.nostrIdentityBridge.deriveIdentity(gh)
                 val subId = "geo-dm-$gh"
                 val currentDmSubField = GeohashViewModel::class.java.getDeclaredField("currentDmSubId")
                 currentDmSubField.isAccessible = true
@@ -636,7 +634,7 @@ class ChatViewModel(
 
                 // Send favorite notification via mesh or Nostr with our npub if available
                 try {
-                    val myNostr = com.app.transport.nostr.NostrIdentityBridge.getCurrentNostrIdentity(getApplication())
+                    val myNostr = (getApplication<Application>() as BitchatApplication).appGraph.nostrIdentityBridge.getCurrentNostrIdentity()
                     val announcementContent = if (isNowFavorite) "[FAVORITED]:${myNostr?.npub ?: ""}" else "[UNFAVORITED]:${myNostr?.npub ?: ""}"
                     // Prefer mesh if session established, else try Nostr
                     if (meshService.hasEstablishedSession(peerID)) {
@@ -648,8 +646,7 @@ class ChatViewModel(
                             java.util.UUID.randomUUID().toString()
                         )
                     } else {
-                        nostrTransport.senderPeerID = meshService.myPeerID
-                        nostrTransport.sendFavoriteNotification(peerID, isNowFavorite)
+                                    nostrTransport.sendFavoriteNotification(peerID, isNowFavorite)
                     }
                 } catch (_: Exception) { }
             }
