@@ -1,4 +1,4 @@
-    package com.app.data.routing
+package com.app.data.routing
 
 import com.app.data.favorites.FavoritesChangeListener
 import com.app.data.favorites.FavoritesPersistenceService

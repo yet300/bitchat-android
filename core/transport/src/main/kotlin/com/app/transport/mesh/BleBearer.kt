@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 /**
  * BLE (Bluetooth Low Energy) implementation of [MeshBearer].
@@ -97,13 +98,14 @@ class BleBearer(
     override fun bindPeer(peerID: String, linkAddress: String) {
         connectionManager.addressPeerMap[linkAddress] = peerID
         val isInbound = connectionManager.isClientConnection(linkAddress) == false
-        _neighbors.value = _neighbors.value
-            .filterNot { it.deviceAddress == linkAddress }
-            .toSet() + PeerLink(peerID, linkAddress, isInbound = isInbound)
+        _neighbors.update { links ->
+            links.filterNot { it.deviceAddress == linkAddress }.toSet() +
+                PeerLink(peerID, linkAddress, isInbound = isInbound)
+        }
     }
 
     private fun notifyPeerDisconnected(deviceAddress: String) {
-        _neighbors.value = _neighbors.value.filterNot { it.deviceAddress == deviceAddress }.toSet()
+        _neighbors.update { links -> links.filterNot { it.deviceAddress == deviceAddress }.toSet() }
     }
 
     init {
@@ -111,7 +113,10 @@ class BleBearer(
     }
 
     private fun wireConnectionManager() {
-        connectionManager.delegate = object : BluetoothConnectionManagerDelegate {
+        // Capture THIS generation's manager: BLE callbacks are asynchronous and may fire
+        // after reset() swapped the field — they must never touch the new stack's state.
+        val cm = connectionManager
+        cm.delegate = object : BluetoothConnectionManagerDelegate {
             override fun onPacketReceived(
                 packet: BitchatPacket,
                 peerID: String,
@@ -134,9 +139,9 @@ class BleBearer(
             override fun onDeviceConnected(device: BluetoothDevice) {
                 try {
                     val addr = device.address
-                    val peer = connectionManager.addressPeerMap[addr]
+                    val peer = cm.addressPeerMap[addr]
                     val nick = peer?.let { nicknameResolver?.invoke(it) } ?: "unknown"
-                    val inbound = connectionManager.isClientConnection(addr) == false
+                    val inbound = cm.isClientConnection(addr) == false
                     debugSettingsManager.logPeerConnection(peer ?: "unknown", nick, addr, inbound)
                 } catch (_: Exception) { }
                 _events.tryEmit(BearerEvent.LinkConnected(device.address))
@@ -144,9 +149,9 @@ class BleBearer(
 
             override fun onDeviceDisconnected(device: BluetoothDevice) {
                 val addr = device.address
-                val peer = connectionManager.addressPeerMap[addr]
+                val peer = cm.addressPeerMap[addr]
                 // ConnectionTracker has already removed the address mapping; be defensive either way
-                connectionManager.addressPeerMap.remove(addr)
+                cm.addressPeerMap.remove(addr)
                 notifyPeerDisconnected(addr)
                 if (peer != null) {
                     try {
@@ -159,10 +164,11 @@ class BleBearer(
 
             override fun onRSSIUpdated(deviceAddress: String, rssi: Int) {
                 // Update RSSI on the matching PeerLink if it exists
-                val updated = _neighbors.value.map { link ->
-                    if (link.deviceAddress == deviceAddress) link.copy(rssi = rssi) else link
-                }.toSet()
-                _neighbors.value = updated
+                _neighbors.update { links ->
+                    links.map { link ->
+                        if (link.deviceAddress == deviceAddress) link.copy(rssi = rssi) else link
+                    }.toSet()
+                }
                 _events.tryEmit(BearerEvent.RssiChanged(deviceAddress, rssi))
             }
         }
@@ -174,7 +180,12 @@ class BleBearer(
      * the multibound Set<MeshBearer>) keeps serving this instance.
      */
     fun reset(myPeerID: String) {
-        try { connectionManager.stopServices() } catch (_: Exception) { }
+        val old = connectionManager
+        try { old.stopServices() } catch (_: Exception) { }
+        // Detach the old stack's delegate: late asynchronous GATT callbacks must neither
+        // emit stale packets into the new generation's flow nor evict fresh address
+        // bindings (audit finding A6).
+        old.delegate = null
         this.myPeerID = myPeerID
         _neighbors.value = emptySet()
         connectionManager = BluetoothConnectionManager(
