@@ -1,7 +1,7 @@
 package com.bitchat.android.ui
 
 
-import android.util.Log
+import com.bitchat.android.di.appGraph
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -346,7 +346,7 @@ private fun MainHeader(
 
     // Bookmarks store for current geohash toggle (iOS parity)
     val context = androidx.compose.ui.platform.LocalContext.current
-    val bookmarksStore = remember { com.bitchat.android.geohash.GeohashBookmarksStore.getInstance(context) }
+    val bookmarksStore = remember { context.appGraph.geohashBookmarksStore }
     val bookmarks by bookmarksStore.bookmarks.collectAsStateWithLifecycle()
 
     Row(

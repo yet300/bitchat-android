@@ -2,12 +2,14 @@ package com.bitchat.android.geohash
 
 import com.app.common.geohash.Geohash
 import android.content.Context
-import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
 import android.util.Log
-import com.app.data.appSettings
 import com.app.common.serialization.JsonConfig
+import com.russhwolf.settings.ObservableSettings
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
@@ -24,19 +26,17 @@ import java.util.Locale
  * - Persistence: SharedPreferences (JSON string array)
  * - Semantics: geohashes are normalized to lowercase base32 and de-duplicated
  */
-class GeohashBookmarksStore private constructor(private val context: Context) {
+@SingleIn(AppScope::class)
+@Inject
+class GeohashBookmarksStore(
+    private val context: Context,
+    private val settings: ObservableSettings,
+) {
 
     companion object {
         private const val TAG = "GeohashBookmarksStore"
         private const val STORE_KEY = "locationChannel.bookmarks"
         private const val NAMES_STORE_KEY = "locationChannel.bookmarkNames"
-
-        @Volatile private var INSTANCE: GeohashBookmarksStore? = null
-        fun getInstance(context: Context): GeohashBookmarksStore {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: GeohashBookmarksStore(context.applicationContext).also { INSTANCE = it }
-            }
-        }
 
         private val allowedChars = "0123456789bcdefghjkmnpqrstuvwxyz".toSet()
         fun normalize(raw: String): String {
@@ -45,8 +45,6 @@ class GeohashBookmarksStore private constructor(private val context: Context) {
                 .filter { allowedChars.contains(it) }
         }
     }
-
-    private val settings = appSettings(context)
 
     private val membership = mutableSetOf<String>()
 

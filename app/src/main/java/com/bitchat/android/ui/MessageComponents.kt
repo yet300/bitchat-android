@@ -2,6 +2,7 @@
 
 package com.bitchat.android.ui
 
+import com.bitchat.android.di.appGraph
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -410,9 +411,7 @@ fun MessageItem(
                         if (geohashAnnotations.isNotEmpty()) {
                             val geohash = geohashAnnotations.first().item
                             try {
-                                val locationManager = com.bitchat.android.geohash.LocationChannelManager.getInstance(
-                                    context
-                                )
+                                val locationManager = context.appGraph.locationChannelManager
                                 val level = when (geohash.length) {
                                     in 0..2 -> com.bitchat.android.geohash.GeohashChannelLevel.REGION
                                     in 3..4 -> com.bitchat.android.geohash.GeohashChannelLevel.PROVINCE

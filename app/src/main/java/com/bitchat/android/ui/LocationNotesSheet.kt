@@ -2,6 +2,7 @@
 
 package com.bitchat.android.ui
 
+import com.bitchat.android.di.appGraph
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -62,7 +63,7 @@ fun LocationNotesSheet(
     
     // Managers
     val notesManager = (LocalContext.current.applicationContext as BitchatApplication).appGraph.locationNotesManager
-    val locationManager = remember { LocationChannelManager.getInstance(context) }
+    val locationManager = remember { context.appGraph.locationChannelManager }
     val relayDirectory = (context.applicationContext as BitchatApplication).appGraph.relayDirectory
     
     // State

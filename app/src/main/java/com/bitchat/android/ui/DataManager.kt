@@ -1,8 +1,6 @@
 package com.bitchat.android.ui
 
-import android.content.Context
 import android.util.Log
-import com.app.data.appSettings
 import com.app.common.serialization.JsonConfig
 import com.russhwolf.settings.Settings
 import kotlinx.serialization.builtins.MapSerializer
@@ -17,13 +15,11 @@ import kotlin.random.Random
  * native set type; the [JsonConfig] codec keeps that encoding consistent with
  * the rest of the app.
  */
-class DataManager(private val context: Context) {
+class DataManager(private val settings: Settings) {
 
     companion object {
         private const val TAG = "DataManager"
     }
-
-    private val settings: Settings = appSettings(context)
 
     // Channel-related maps that need to persist state
     private val _channelCreators = mutableMapOf<String, String>()

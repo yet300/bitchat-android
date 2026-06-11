@@ -1,5 +1,6 @@
 package com.bitchat.android.ui
 
+import com.bitchat.android.di.appGraph
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -30,7 +31,7 @@ fun LocationNotesSheetPresenter(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val locationManager = remember { LocationChannelManager.getInstance(context) }
+    val locationManager = remember { context.appGraph.locationChannelManager }
     val availableChannels by locationManager.availableChannels.collectAsStateWithLifecycle()
     val permissionState by locationManager.permissionState.collectAsStateWithLifecycle()
     val isLoadingLocation by locationManager.isLoadingLocation.collectAsStateWithLifecycle()

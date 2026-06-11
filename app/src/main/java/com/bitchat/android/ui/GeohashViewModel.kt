@@ -2,6 +2,7 @@
 
 package com.bitchat.android.ui
 
+import com.bitchat.android.di.appGraph
 import kotlin.time.Instant
 import android.app.Application
 import android.util.Log
@@ -113,7 +114,7 @@ class GeohashViewModel(
             )
         }
         try {
-            locationChannelManager = com.bitchat.android.geohash.LocationChannelManager.getInstance(getApplication())
+            locationChannelManager = getApplication<Application>().appGraph.locationChannelManager
             viewModelScope.launch {
                 locationChannelManager?.selectedChannel?.collect { channel ->
                     state.setSelectedLocationChannel(channel)

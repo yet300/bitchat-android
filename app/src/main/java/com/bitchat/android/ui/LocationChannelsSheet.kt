@@ -1,5 +1,6 @@
 package com.bitchat.android.ui
 
+import com.bitchat.android.di.appGraph
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -55,8 +56,8 @@ fun LocationChannelsSheet(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val locationManager = LocationChannelManager.getInstance(context)
-    val bookmarksStore = remember { GeohashBookmarksStore.getInstance(context) }
+    val locationManager = context.appGraph.locationChannelManager
+    val bookmarksStore = remember { context.appGraph.geohashBookmarksStore }
 
     // Observe location manager state
     val permissionState by locationManager.permissionState.collectAsStateWithLifecycle()

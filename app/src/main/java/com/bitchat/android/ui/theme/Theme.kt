@@ -14,7 +14,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import com.bitchat.android.di.appGraph
 
 // Colors that match the iOS bitchat theme
 private val DarkColorScheme = darkColorScheme(
@@ -48,8 +50,9 @@ fun BitchatTheme(
     darkTheme: Boolean? = null,
     content: @Composable () -> Unit
 ) {
-    // App-level override from ThemePreferenceManager
-    val themePref by ThemePreferenceManager.themeFlow.collectAsState(initial = ThemePreference.System)
+    // App-level override from the graph-owned ThemePreferenceManager
+    val themeManager = LocalContext.current.appGraph.themePreferenceManager
+    val themePref by themeManager.themeFlow.collectAsState(initial = ThemePreference.System)
     val shouldUseDark = when (darkTheme) {
         true -> true
         false -> false

@@ -13,6 +13,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.bitchat.android.BitchatApplication
+import com.bitchat.android.di.appGraph
 import com.bitchat.android.MainActivity
 import com.bitchat.android.R
 import com.app.transport.mesh.MeshLifecycleController
@@ -40,7 +41,7 @@ class MeshForegroundService : Service() {
 
             // On API >= 26, avoid background-service start restrictions by using startForegroundService
             // only when we can actually post a notification (Android 13+ requires runtime notif permission)
-            val bgEnabled = MeshServicePreferences.isBackgroundEnabled(true)
+            val bgEnabled = context.appGraph.meshServicePreferences.isBackgroundEnabled(true)
             val hasNotifPerm = hasNotificationPermissionStatic(context)
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -70,7 +71,7 @@ class MeshForegroundService : Service() {
         fun onNotificationPermissionGranted(context: Context) {
             // If background is enabled and permission now granted, start/promo service
             val hasNotifPerm = hasNotificationPermissionStatic(context)
-            if (!MeshServicePreferences.isBackgroundEnabled(true) || !hasNotifPerm) return
+            if (!context.appGraph.meshServicePreferences.isBackgroundEnabled(true) || !hasNotifPerm) return
 
             val intent = Intent(context, MeshForegroundService::class.java).apply { action = ACTION_UPDATE_NOTIFICATION }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -87,7 +88,7 @@ class MeshForegroundService : Service() {
         }
 
         private fun shouldStartAsForeground(context: Context): Boolean {
-            return MeshServicePreferences.isBackgroundEnabled(true) &&
+            return context.appGraph.meshServicePreferences.isBackgroundEnabled(true) &&
                     hasBluetoothPermissionsStatic(context) &&
                     hasNotificationPermissionStatic(context)
         }
@@ -170,7 +171,7 @@ class MeshForegroundService : Service() {
             }
             ACTION_UPDATE_NOTIFICATION -> {
                 // If we became eligible and are not in foreground yet, promote once
-                if (MeshServicePreferences.isBackgroundEnabled(true) && hasAllRequiredPermissions() && !isInForeground) {
+                if (appGraph.meshServicePreferences.isBackgroundEnabled(true) && hasAllRequiredPermissions() && !isInForeground) {
                     val n = buildNotification(meshLifecycle.activePeerCount())
                     startForegroundCompat(n)
                     isInForeground = true
@@ -185,7 +186,7 @@ class MeshForegroundService : Service() {
         ensureMeshStarted()
 
         // Promote exactly once when eligible, otherwise stay background (or stop)
-        if (MeshServicePreferences.isBackgroundEnabled(true) && hasAllRequiredPermissions() && !isInForeground) {
+        if (appGraph.meshServicePreferences.isBackgroundEnabled(true) && hasAllRequiredPermissions() && !isInForeground) {
             val notification = buildNotification(meshLifecycle.activePeerCount())
             startForegroundCompat(notification)
             isInForeground = true
@@ -197,7 +198,7 @@ class MeshForegroundService : Service() {
                 while (isActive) {
                     // Retry enabling mesh/foreground once permissions become available
                     ensureMeshStarted()
-                    val eligible = MeshServicePreferences.isBackgroundEnabled(true) && hasAllRequiredPermissions()
+                    val eligible = appGraph.meshServicePreferences.isBackgroundEnabled(true) && hasAllRequiredPermissions()
                     if (eligible) {
                         // Only update the notification; do not re-call startForeground()
                         updateNotification(force = false)
@@ -235,7 +236,7 @@ class MeshForegroundService : Service() {
         }
         val count = meshLifecycle.activePeerCount()
         val notification = buildNotification(count)
-        if (MeshServicePreferences.isBackgroundEnabled(true) && hasAllRequiredPermissions()) {
+        if (appGraph.meshServicePreferences.isBackgroundEnabled(true) && hasAllRequiredPermissions()) {
             notificationManager.notify(NOTIFICATION_ID, notification)
         } else if (force) {
             // If disabled and forced, make sure to remove any prior foreground state

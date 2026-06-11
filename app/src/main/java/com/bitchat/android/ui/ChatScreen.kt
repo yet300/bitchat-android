@@ -4,6 +4,7 @@ package com.bitchat.android.ui
 // [Goose] Installing FileShareDispatcher handler in ChatScreen to forward file sends to ViewModel
 
 
+import com.bitchat.android.di.appGraph
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -422,7 +423,7 @@ private fun ChatFloatingHeader(
     onLocationNotesClick: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val locationManager = remember { com.bitchat.android.geohash.LocationChannelManager.getInstance(context) }
+    val locationManager = remember { context.appGraph.locationChannelManager }
     
     Surface(
         modifier = Modifier

@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
+import com.bitchat.android.di.appGraph
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -38,11 +39,6 @@ fun BatteryOptimizationScreen(
     val context = LocalContext.current
     val colorScheme = MaterialTheme.colorScheme
     
-    // Initialize preference manager
-    LaunchedEffect(Unit) {
-        BatteryOptimizationPreferenceManager.init(context)
-    }
-
     Box(
         modifier = modifier.padding(24.dp),
         contentAlignment = Alignment.Center
@@ -250,7 +246,7 @@ private fun BatteryOptimizationEnabledContent(
                 
                 TextButton(
                     onClick = {
-                        BatteryOptimizationPreferenceManager.setSkipped(context, true)
+                        context.appGraph.batteryOptimizationPreferenceManager.setSkipped(true)
                         onSkip()
                     },
                     modifier = Modifier.weight(1f),
