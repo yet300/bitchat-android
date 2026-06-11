@@ -60,6 +60,7 @@ class BluetoothMeshService(
     private val incomingSink: IncomingMessageSink,
     private val favoriteNostrLink: FavoriteNostrLink,
     private val geohashReadReceiptRouter: GeohashReadReceiptRouter,
+    private val verificationService: VerificationService,
     // Graph-owned engine collaborators: the fragment reassembly state shared with the BLE
     // stack, the BLE bearer (also multibound into Set<MeshBearer>) and the bearer
     // multiplexer that is now the single data path for all mesh traffic.
@@ -112,7 +113,6 @@ class BluetoothMeshService(
 
     init {
         Log.i(TAG, "Initializing BluetoothMeshService for peer=$myPeerID")
-        VerificationService.configure(encryptionService)
         wireComponents()
     }
 
@@ -1045,7 +1045,7 @@ class BluetoothMeshService(
     // MARK: QR Verification over Noise
 
     fun sendVerifyChallenge(peerID: String, noiseKeyHex: String, nonceA: ByteArray) {
-        val tlv = VerificationService.buildVerifyChallenge(noiseKeyHex, nonceA)
+        val tlv = verificationService.buildVerifyChallenge(noiseKeyHex, nonceA)
         val payload = NoisePayload(
             type = NoisePayloadType.VERIFY_CHALLENGE,
             data = tlv
@@ -1054,7 +1054,7 @@ class BluetoothMeshService(
     }
 
     fun sendVerifyResponse(peerID: String, noiseKeyHex: String, nonceA: ByteArray) {
-        val tlv = VerificationService.buildVerifyResponse(noiseKeyHex, nonceA) ?: return
+        val tlv = verificationService.buildVerifyResponse(noiseKeyHex, nonceA) ?: return
         val payload = NoisePayload(
             type = NoisePayloadType.VERIFY_RESPONSE,
             data = tlv

@@ -817,7 +817,7 @@ class MainActivity : OrientationAwareActivity() {
         if (uri.scheme != "bitchat" || uri.host != "verify") return
 
         chatViewModel.showVerificationSheet()
-        val qr = VerificationService.verifyScannedQR(uri.toString())
+        val qr = (application as BitchatApplication).appGraph.verificationService.verifyScannedQR(uri.toString())
         if (qr != null) {
             chatViewModel.beginQRVerification(qr)
         }

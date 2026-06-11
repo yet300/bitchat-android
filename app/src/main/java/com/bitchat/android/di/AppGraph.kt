@@ -15,6 +15,7 @@ import com.app.data.AppStateStore
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.data.routing.MessageRouter
 import com.app.transport.SeenMessageStore
+import com.app.transport.VerificationService
 import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.mesh.MeshLifecycleController
 import com.app.transport.mesh.TransferProgressManager
@@ -89,6 +90,7 @@ interface AppGraph {
     val meshServicePreferences: MeshServicePreferences
     val locationChannelManager: LocationChannelManager
     val geohashBookmarksStore: GeohashBookmarksStore
+    val verificationService: VerificationService
 
     // Graph-owned mesh engine: full surface for the still-living god-classes
     // (MainActivity/ChatViewModel, retires Phase C) and the narrow lifecycle contract

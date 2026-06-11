@@ -5,22 +5,25 @@ import android.util.Base64
 import com.app.crypto.EncryptionService
 import com.app.common.encoding.dataFromHexString
 import com.app.common.encoding.hexEncodedString
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import java.io.ByteArrayOutputStream
 import java.security.SecureRandom
-import java.lang.ref.WeakReference
 
 /**
  * QR verification helpers: schema, signing, and basic challenge/response helpers.
+ * Graph-owned; the EncryptionService is injected (formerly a static configure()
+ * call from BluetoothMeshService with a WeakReference holder).
  */
-object VerificationService {
-    private const val CONTEXT = "bitchat-verify-v1"
-    private const val RESPONSE_CONTEXT = "bitchat-verify-resp-v1"
+@SingleIn(AppScope::class)
+@Inject
+class VerificationService(private val encryptionService: EncryptionService) {
 
-    private const val QR_MAX_AGE_SECONDS = 300L // 5 minutes
-    private var encryptionServiceRef: WeakReference<EncryptionService>? = null
-
-    fun configure(encryptionService: EncryptionService) {
-        this.encryptionServiceRef = WeakReference(encryptionService)
+    private companion object {
+        const val CONTEXT = "bitchat-verify-v1"
+        const val RESPONSE_CONTEXT = "bitchat-verify-resp-v1"
+        const val QR_MAX_AGE_SECONDS = 300L // 5 minutes
     }
 
     data class VerificationQR(
@@ -102,8 +105,8 @@ object VerificationService {
     }
 
     fun buildMyQRString(nickname: String, npub: String?): String? {
-        val service = encryptionServiceRef?.get() ?: return null
-        val cache = Cache.last
+        val service = encryptionService
+        val cache = cachedQR
         if (cache != null && cache.nickname == nickname && cache.npub == npub) {
             if (System.currentTimeMillis() - cache.builtAtMs < 60_000L) {
                 return cache.value
@@ -134,7 +137,7 @@ object VerificationService {
         val signature = service.signData(payload.canonicalBytes()) ?: return null
         val signed = payload.copy(sigHex = signature.hexEncodedString())
         val out = signed.toUrlString()
-        Cache.last = CacheEntry(nickname, npub, System.currentTimeMillis(), out)
+        cachedQR = CacheEntry(nickname, npub, System.currentTimeMillis(), out)
         return out
     }
 
@@ -142,7 +145,7 @@ object VerificationService {
         urlString: String,
         maxAgeSeconds: Long = QR_MAX_AGE_SECONDS
     ): VerificationQR? {
-        val service = encryptionServiceRef?.get() ?: return null
+        val service = encryptionService
         val qr = VerificationQR.fromUrlString(urlString) ?: return null
         val now = System.currentTimeMillis() / 1000L
         if (now - qr.ts > maxAgeSeconds) return null
@@ -166,7 +169,7 @@ object VerificationService {
     }
 
     fun buildVerifyResponse(noiseKeyHex: String, nonceA: ByteArray): ByteArray? {
-        val service = encryptionServiceRef?.get() ?: return null
+        val service = encryptionService
         val noiseData = noiseKeyHex.toByteArray(Charsets.UTF_8)
         val msg = ByteArrayOutputStream()
         msg.write(RESPONSE_CONTEXT.toByteArray(Charsets.UTF_8))
@@ -269,7 +272,7 @@ object VerificationService {
         signature: ByteArray,
         signerPublicKeyHex: String
     ): Boolean {
-        val service = encryptionServiceRef?.get() ?: return false
+        val service = encryptionService
         val noiseData = noiseKeyHex.toByteArray(Charsets.UTF_8)
         val msg = ByteArrayOutputStream()
         msg.write(RESPONSE_CONTEXT.toByteArray(Charsets.UTF_8))
@@ -287,7 +290,5 @@ object VerificationService {
         val value: String
     )
 
-    private object Cache {
-        var last: CacheEntry? = null
-    }
+    private var cachedQR: CacheEntry? = null
 }
