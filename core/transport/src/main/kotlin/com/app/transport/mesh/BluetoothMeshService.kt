@@ -97,7 +97,13 @@ class BluetoothMeshService(
     private var packetProcessor = PacketProcessor(myPeerID, debugSettingsManager)
     private lateinit var gossipSyncManager: GossipSyncManager
 
+    // Single monitor for all lifecycle transitions (start/stop/reset/finishStop): the
+    // delayed teardown runs on IO while callers arrive on main — without one lock the
+    // terminated/isActive/pendingStopJob handoff was only safe by call-site accident.
+    private val lifecycleLock = Any()
+
     // Service state management
+    @Volatile
     private var isActive = false
 
     // Delegate for message callbacks (maintains same interface)
@@ -106,6 +112,7 @@ class BluetoothMeshService(
     // Coroutines
     private var serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     // Tracks whether the current component generation was terminated via stopServices()
+    @Volatile
     private var terminated = false
     // In-flight delayed teardown of stopServices(); completed eagerly by startServices()
     @Volatile
@@ -240,15 +247,17 @@ class BluetoothMeshService(
      * changes, so no consumer is left holding a dead instance.
      */
     fun reset() {
-        Log.w(TAG, "🚨 Resetting mesh service in place — old peerID=$myPeerID")
-        isActive = false
-        stopComponentsNow()
-        serviceScope.cancel() // also kills any pending stop teardown
-        pendingStopJob = null
-        rebuildComponents()
-        startServices()
-        sendBroadcastAnnounce()
-        Log.w(TAG, "✅ Mesh service reset complete — new peerID=$myPeerID")
+        synchronized(lifecycleLock) {
+            Log.w(TAG, "🚨 Resetting mesh service in place — old peerID=$myPeerID")
+            isActive = false
+            stopComponentsNow()
+            serviceScope.cancel() // also kills any pending stop teardown
+            pendingStopJob = null
+            rebuildComponents()
+            startServices()
+            sendBroadcastAnnounce()
+            Log.w(TAG, "✅ Mesh service reset complete — new peerID=$myPeerID")
+        }
     }
     
     /**
@@ -692,7 +701,7 @@ class BluetoothMeshService(
     /**
      * Start the mesh service
      */
-    fun startServices() {
+    fun startServices(): Unit = synchronized(lifecycleLock) {
         // Prevent double starts (defensive programming)
         if (isActive) {
             Log.w(TAG, "Mesh service already active, ignoring duplicate start request")
@@ -703,7 +712,7 @@ class BluetoothMeshService(
         pendingStopJob?.let { job ->
             Log.i(TAG, "Restart requested during stop grace window; completing stop first")
             job.cancel()
-            finishStop()
+            finishStop(serviceScope)
         }
         if (terminated) {
             // The previous generation's scope was cancelled by stopServices(); rebuild the
@@ -713,10 +722,10 @@ class BluetoothMeshService(
         }
 
         Log.i(TAG, "Starting Bluetooth mesh service with peer ID: $myPeerID")
-        
+
         if (meshNetwork.startAll()) {
             isActive = true
-            
+
             // Start periodic announcements for peer discovery and connectivity
             sendPeriodicBroadcastAnnounce()
             Log.d(TAG, "Started periodic broadcast announcements (every 30 seconds)")
@@ -733,7 +742,7 @@ class BluetoothMeshService(
      * announcement gets out; a startServices() call inside that window completes the stop
      * synchronously first (see [finishStop]) instead of racing against it.
      */
-    fun stopServices() {
+    fun stopServices(): Unit = synchronized(lifecycleLock) {
         if (!isActive) {
             Log.w(TAG, "Mesh service not active, ignoring stop request")
             return
@@ -745,26 +754,34 @@ class BluetoothMeshService(
         // Send leave announcement
         sendLeaveAnnouncement()
 
-        pendingStopJob = serviceScope.launch {
+        // Capture the generation this stop belongs to: finishStop must never tear down a
+        // newer generation installed by reset()/revival while the grace delay was pending.
+        val stoppingScope = serviceScope
+        pendingStopJob = stoppingScope.launch {
             delay(200) // Give leave message time to send
-            finishStop()
+            finishStop(stoppingScope)
         }
     }
 
     /**
      * Completes a requested stop: shuts components down, marks the generation terminated
-     * and cancels its scope. Idempotent and synchronized — invoked either by the delayed
-     * teardown coroutine or eagerly by [startServices] when a restart arrives inside the
-     * grace window (previously that restart was killed by the in-flight teardown).
+     * and cancels its scope. Idempotent (terminated flag) and generation-guarded
+     * ([stoppingScope] identity) — invoked either by the delayed teardown coroutine or
+     * eagerly by [startServices] when a restart arrives inside the grace window.
      */
-    @Synchronized
-    private fun finishStop() {
+    private fun finishStop(stoppingScope: CoroutineScope): Unit = synchronized(lifecycleLock) {
         if (terminated) return
+        if (stoppingScope !== serviceScope) {
+            // reset()/rebuild replaced the generation this stop belonged to; the old
+            // components are already down and the new generation must not be touched.
+            Log.d(TAG, "Stale stop teardown skipped (generation replaced)")
+            return
+        }
         Log.d(TAG, "Stopping subcomponents and cancelling scope...")
         stopComponentsNow()
         terminated = true
         pendingStopJob = null
-        serviceScope.cancel()
+        stoppingScope.cancel()
         Log.i(TAG, "BluetoothMeshService terminated and scope cancelled")
     }
 
