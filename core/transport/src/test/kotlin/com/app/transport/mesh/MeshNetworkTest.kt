@@ -28,8 +28,9 @@ class MeshNetworkTest {
         val broadcasts = mutableListOf<RoutedPacket>()
         val unicasts = mutableListOf<Pair<String, RoutedPacket>>()
         var sendToPeerResult = true
+        var startResult = true
 
-        override fun start(): Boolean = true
+        override fun start(): Boolean = startResult
         override fun stop() = Unit
         override fun broadcast(packet: RoutedPacket) {
             broadcasts.add(packet)
@@ -116,6 +117,7 @@ class MeshNetworkTest {
         val wifi = FakeBearer(BearerId.WIFI_AWARE)
         ble.neighbors.value = setOf(PeerLink("peerA", "AA:11", isInbound = false))
         val network = MeshNetwork(setOf(ble, wifi))
+        network.startAll()
 
         val path = network.sendToPeer("peerA", RoutedPacket(packet(1u)))
 
@@ -129,6 +131,7 @@ class MeshNetworkTest {
         val ble = FakeBearer(BearerId.BLE)
         val wifi = FakeBearer(BearerId.WIFI_AWARE)
         val network = MeshNetwork(setOf(ble, wifi))
+        network.startAll()
 
         val path = network.sendToPeer("unknown", RoutedPacket(packet(1u)))
 
@@ -144,6 +147,7 @@ class MeshNetworkTest {
         ble.neighbors.value = setOf(PeerLink("peerA", "AA:11", isInbound = false))
         ble.sendToPeerResult = false
         val network = MeshNetwork(setOf(ble))
+        network.startAll()
 
         val path = network.sendToPeer("peerA", RoutedPacket(packet(1u)))
 
@@ -157,5 +161,26 @@ class MeshNetworkTest {
         val network = MeshNetwork(emptySet())
 
         assertEquals(SendPath.NoRoute, network.sendToPeer("peerA", RoutedPacket(packet(1u))))
+    }
+
+    /** A registered bearer whose start() failed must not fake a Flooded outcome (audit B6). */
+    @Test
+    fun unstartedBearersDoNotCountTowardsFlooded() {
+        val ble = FakeBearer(BearerId.BLE).apply { startResult = false }
+        val wifiStub = FakeBearer(BearerId.WIFI_AWARE).apply { startResult = false }
+        val network = MeshNetwork(setOf(ble, wifiStub))
+        network.startAll()
+
+        val path = network.sendToPeer("peerA", RoutedPacket(packet(1u)))
+
+        assertEquals(SendPath.NoRoute, path)
+        assertTrue(ble.broadcasts.isEmpty() && wifiStub.broadcasts.isEmpty())
+
+        // Once a bearer actually starts, flooding resumes
+        ble.startResult = true
+        network.startAll()
+        assertEquals(SendPath.Flooded, network.sendToPeer("peerA", RoutedPacket(packet(2u))))
+        assertEquals(1, ble.broadcasts.size)
+        assertTrue("stub never started — must not be broadcast to", wifiStub.broadcasts.isEmpty())
     }
 }

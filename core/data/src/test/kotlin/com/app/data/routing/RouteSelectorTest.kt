@@ -128,6 +128,29 @@ class RouteSelectorTest {
         assertTrue("queue must be drained", box.drain(peer).isEmpty())
     }
 
+    /** Audit A8: a fresh send must not overtake envelopes queued earlier for the same peer. */
+    @Test
+    fun newSendDoesNotOvertakeQueuedEnvelopes() = runTest {
+        val mesh = FakeStrategy(priority = 100)
+        val box = outbox()
+        val selector = selector(setOf(mesh), box, scope = this)
+
+        // Two envelopes queue up while the peer is unreachable
+        val first = OutgoingEnvelope.Private(peer, "first", "nick", "msg-1")
+        val second = OutgoingEnvelope.Private(peer, "second", "nick", "msg-2")
+        selector.route(first)
+        selector.route(second)
+        assertTrue(mesh.sent.isEmpty())
+
+        // Session comes up and a NEW message is sent immediately:
+        // FIFO requires [first, second, third], not third overtaking the backlog
+        mesh.reachable = Reachability.Direct
+        val third = OutgoingEnvelope.Private(peer, "third", "nick", "msg-3")
+        selector.route(third)
+
+        assertEquals(listOf<OutgoingEnvelope>(first, second, third), mesh.sent)
+    }
+
     @Test
     fun flushAlsoDrainsEnvelopesQueuedUnderNoiseKeyHex() = runTest {
         val mesh = FakeStrategy(priority = 100)
