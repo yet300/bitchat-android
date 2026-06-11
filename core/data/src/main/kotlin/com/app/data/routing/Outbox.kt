@@ -1,4 +1,4 @@
-package com.app.data.routing
+    package com.app.data.routing
 
 import com.app.data.favorites.FavoritesChangeListener
 import com.app.data.favorites.FavoritesPersistenceService
@@ -6,7 +6,6 @@ import com.app.transport.routing.OutgoingEnvelope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * In-memory outbox for envelopes that could not be routed immediately.
@@ -14,6 +13,10 @@ import java.util.concurrent.ConcurrentHashMap
  * Listens for favorites changes so queued Nostr-bound messages can be flushed
  * as soon as a mutual-favorite mapping becomes available.
  * Injected as a graph singleton; [RouteSelector] wires the flush callback on init.
+ *
+ * enqueue/drain share one lock: a ConcurrentHashMap alone only made the map ops atomic —
+ * an enqueue could add into a list a concurrent drain had already removed from the map,
+ * silently losing the envelope (audit finding A4).
  */
 @SingleIn(AppScope::class)
 @Inject
@@ -21,7 +24,8 @@ internal class Outbox(
     private val favoritesService: FavoritesPersistenceService,
 ) : FavoritesChangeListener {
 
-    private val queued = ConcurrentHashMap<String, MutableList<OutgoingEnvelope>>()
+    private val lock = Any()
+    private val queued = HashMap<String, MutableList<OutgoingEnvelope>>()
 
     /**
      * Called by [RouteSelector] during its own initialisation to hook flush-on-reachable.
@@ -35,12 +39,15 @@ internal class Outbox(
 
     /** Enqueues [envelope] for later delivery. */
     fun enqueue(envelope: OutgoingEnvelope) {
-        queued.getOrPut(envelope.peerID) { mutableListOf() }.add(envelope)
+        synchronized(lock) {
+            queued.getOrPut(envelope.peerID) { mutableListOf() }.add(envelope)
+        }
     }
 
     /** Removes and returns all envelopes queued for [peerID]. */
-    fun drain(peerID: String): List<OutgoingEnvelope> =
+    fun drain(peerID: String): List<OutgoingEnvelope> = synchronized(lock) {
         queued.remove(peerID) ?: emptyList()
+    }
 
     // FavoritesChangeListener -------------------------------------------------
 
