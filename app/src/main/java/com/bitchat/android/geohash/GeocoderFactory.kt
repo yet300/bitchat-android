@@ -2,6 +2,7 @@ package com.bitchat.android.geohash
 
 import android.content.Context
 import android.location.Geocoder
+import com.bitchat.android.di.appGraph
 
 /**
  * Factory to provide the best available geocoder.
@@ -13,7 +14,7 @@ object GeocoderFactory {
         return if (Geocoder.isPresent()) {
             AndroidGeocoderProvider(context)
         } else {
-            OpenStreetMapGeocoderProvider()
+            OpenStreetMapGeocoderProvider(context.appGraph.httpClientProvider)
         }
     }
 }

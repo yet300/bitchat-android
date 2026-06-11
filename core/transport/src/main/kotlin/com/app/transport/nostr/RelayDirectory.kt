@@ -38,6 +38,7 @@ import kotlinx.coroutines.withContext
 @Inject
 class RelayDirectory(
     private val settings: SettingsStore,
+    private val httpClientProvider: com.app.transport.net.HttpClientProvider,
 ) {
 
     private val TAG = "RelayDirectory"
@@ -49,7 +50,7 @@ class RelayDirectory(
 
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val httpClient: HttpClient
-        get() = HttpClientProvider.httpClient()
+        get() = httpClientProvider.httpClient()
 
     data class RelayInfo(
         val url: String,

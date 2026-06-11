@@ -13,7 +13,9 @@ import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class OpenStreetMapGeocoderProvider : GeocoderProvider {
+class OpenStreetMapGeocoderProvider(
+    private val httpClientProvider: com.app.transport.net.HttpClientProvider,
+) : GeocoderProvider {
     private val TAG = "OSMGeocoderProvider"
     private val userAgent = "Bitchat-Android/1.0"
 
@@ -24,7 +26,7 @@ class OpenStreetMapGeocoderProvider : GeocoderProvider {
             val url = "https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$latitude&lon=$longitude&zoom=18&addressdetails=1&accept-language=$lang"
 
             try {
-                val response = HttpClientProvider.httpClient().get(url) {
+                val response = httpClientProvider.httpClient().get(url) {
                     header("User-Agent", userAgent)
                 }
                 if (!response.status.isSuccess()) {
