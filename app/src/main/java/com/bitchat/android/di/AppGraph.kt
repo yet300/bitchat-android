@@ -9,7 +9,6 @@ import com.app.domain.repository.MessageTransport
 import com.app.domain.repository.PeerRepository
 import com.app.domain.repository.SearchRepository
 import com.app.domain.repository.SettingsRepository
-import com.app.crypto.EncryptionService
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.data.AppStateStore
 import com.app.data.favorites.FavoritesPersistenceService
@@ -20,7 +19,6 @@ import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.mesh.MeshLifecycleController
 import com.app.transport.mesh.TransferProgressManager
 import com.app.transport.meshgraph.MeshGraphService
-import com.app.transport.debug.DebugPreferenceManager
 import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.nostr.GeohashConversationRegistry
@@ -62,7 +60,6 @@ interface AppGraph {
     val geohashConversationRegistry: GeohashConversationRegistry
     val geohashAliasRegistry: GeohashAliasRegistry
     val debugSettingsManager: DebugSettingsManager
-    val debugPreferenceManager: DebugPreferenceManager
     val powPreferenceManager: PoWPreferenceManager
     val relayDirectory: RelayDirectory
     val torPreferenceManager: TorPreferenceManager
@@ -77,7 +74,6 @@ interface AppGraph {
     val locationNotesManager: LocationNotesManager
     // temporary Phase-D/DI-core bridge, retires Phase C
     val peerFingerprintManager: PeerFingerprintManager
-    val encryptionService: EncryptionService
     val messageRouter: MessageRouter
     val favoritesPersistenceService: FavoritesPersistenceService
 

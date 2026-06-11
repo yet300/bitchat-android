@@ -47,7 +47,6 @@ class BluetoothMeshService(
     private val debugSettingsManager: MeshTelemetry,
     private val debugPreferenceManager: com.app.transport.debug.DebugPreferenceManager,
     private val seenMessageStore: SeenMessageStore,
-    private val transferProgressManager: TransferProgressManager,
     private val meshGraphService: MeshGraphService,
     private val peerFingerprintManager: PeerFingerprintManager,
     // Graph-provided: the same instance backs IdentityRepositoryImpl, so Noise session
@@ -68,7 +67,6 @@ class BluetoothMeshService(
     val bleBearer: BleBearer,
     private val meshNetwork: MeshNetwork,
 ) : MeshLifecycleController {
-    private val debugManager = debugSettingsManager
 
     companion object {
         private const val TAG = "BluetoothMeshService"
@@ -308,7 +306,7 @@ class BluetoothMeshService(
         try {
             val resolver: (String) -> String? = { pid -> peerManager.getPeerNickname(pid) }
             bleBearer.setNicknameResolver(resolver)
-            debugManager?.setNicknameResolver(resolver)
+            debugSettingsManager.setNicknameResolver(resolver)
         } catch (_: Exception) { }
         // PeerManager delegates to main mesh service delegate
         peerManager.delegate = object : PeerManagerDelegate {
@@ -1344,14 +1342,6 @@ class BluetoothMeshService(
         return encryptionService.hasEstablishedSession(peerID)
     }
     
-    /**
-     * Get all peers with established encrypted sessions
-     */
-    fun getEncryptedPeers(): List<String> {
-        // SIMPLIFIED: Return empty list for now since we don't have direct access to sessionManager
-        // This method is not critical for the session retention fix
-        return emptyList()
-    }
     
     /**
      * Get device address for a specific peer ID

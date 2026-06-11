@@ -210,65 +210,6 @@ class BluetoothPacketBroadcaster(
         return true
     }
 
-    /**
-     * Send a packet to a specific peer only, without broadcasting.
-     * Returns true if a direct path was found and used.
-     */
-    fun sendPacketToPeer(
-        routed: RoutedPacket,
-        targetPeerID: String,
-        gattServer: BluetoothGattServer?,
-        characteristic: BluetoothGattCharacteristic?
-    ): Boolean {
-        val packet = routed.packet
-        val data = packet.toBinaryData() ?: return false
-        val isFile = packet.type == MessageType.FILE_TRANSFER.value
-        if (isFile) {
-            Log.d(TAG, "📤 Broadcasting FILE_TRANSFER: ${packet.payload.size} bytes")
-        }
-        // Prefer caller-provided transferId (e.g., for encrypted media), else derive for FILE_TRANSFER
-        val transferId = routed.transferId ?: (if (isFile) sha256Hex(packet.payload) else null)
-        if (transferId != null) {
-            transferProgressManager.start(transferId, 1)
-        }
-        val typeName = MessageType.fromValue(packet.type)?.name ?: packet.type.toString()
-        val senderPeerID = routed.peerID ?: packet.senderID.toHexString()
-        val incomingAddr = routed.relayAddress
-        val incomingPeer = incomingAddr?.let { connectionTracker.addressPeerMap[it] }
-        val senderNick = senderPeerID.let { pid -> nicknameResolver?.invoke(pid) }
-        val route = packet.route
-        val routeInfo = if (!route.isNullOrEmpty()) "routed: ${route.size} hops" else null
-
-        // Prefer server-side subscriptions
-        val serverTarget = connectionTracker.getSubscribedDevices()
-            .firstOrNull { connectionTracker.addressPeerMap[it.address] == targetPeerID }
-        if (serverTarget != null) {
-            if (notifyDevice(serverTarget, data, gattServer, characteristic)) {
-                logPacketRelay(typeName, senderPeerID, senderNick, incomingPeer, incomingAddr, targetPeerID, serverTarget.address, packet.ttl, packet.version, routeInfo)
-                if (transferId != null) {
-                    transferProgressManager.progress(transferId, 1, 1)
-                    transferProgressManager.complete(transferId, 1)
-                }
-                return true
-            }
-        }
-
-        // Then client connections
-        val clientTarget = connectionTracker.getConnectedDevices().values
-            .firstOrNull { connectionTracker.addressPeerMap[it.device.address] == targetPeerID }
-        if (clientTarget != null) {
-            if (writeToDeviceConn(clientTarget, data)) {
-                logPacketRelay(typeName, senderPeerID, senderNick, incomingPeer, incomingAddr, targetPeerID, clientTarget.device.address, packet.ttl, packet.version, routeInfo)
-                if (transferId != null) {
-                    transferProgressManager.progress(transferId, 1, 1)
-                    transferProgressManager.complete(transferId, 1)
-                }
-                return true
-            }
-        }
-
-        return false
-    }
 
     private fun sha256Hex(bytes: ByteArray): String = try {
         val md = java.security.MessageDigest.getInstance("SHA-256")

@@ -305,18 +305,6 @@ class BluetoothConnectionManager(
         return packetBroadcaster.cancelTransfer(transferId)
     }
 
-    /**
-     * Send a packet directly to a specific peer, without broadcasting to others.
-     */
-    fun sendPacketToPeer(peerID: String, packet: BitchatPacket): Boolean {
-        if (!isActive) return false
-        return packetBroadcaster.sendPacketToPeer(
-            RoutedPacket(packet),
-            peerID,
-            serverManager.getGattServer(),
-            serverManager.getCharacteristic()
-        )
-    }
     
 
     // Expose role controls for debug UI

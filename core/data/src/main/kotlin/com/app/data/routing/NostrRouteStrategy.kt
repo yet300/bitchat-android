@@ -83,7 +83,7 @@ internal class NostrRouteStrategy(
         }
     }
 
-    /** Mirrors [com.app.data.routing.MessageRouter.canSendViaNostr] exactly. */
+    /** Same mutual-favorite + npub-mapping reachability rule the legacy MessageRouter used. */
     private fun canSendViaNostr(peerID: String): Boolean = try {
         val hexRegex = Regex("^[0-9a-fA-F]+$")
         when (peerID.length) {
