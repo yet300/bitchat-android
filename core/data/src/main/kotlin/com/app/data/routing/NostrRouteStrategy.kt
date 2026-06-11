@@ -1,6 +1,6 @@
 package com.app.data.routing
 
-import com.app.data.nostr.NostrTransport
+import com.app.data.nostr.NostrMessageSender
 import com.app.transport.model.ReadReceipt
 import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.nostr.GeohashConversationRegistry
@@ -23,7 +23,7 @@ import dev.zacsweers.metro.Inject
  */
 @Inject
 internal class NostrRouteStrategy(
-    private val nostr: NostrTransport,
+    private val nostr: NostrMessageSender,
     private val geohashAliasRegistry: GeohashAliasRegistry,
     private val geohashConversationRegistry: GeohashConversationRegistry,
     private val nostrIdentityProvider: NostrIdentityProvider,
@@ -52,7 +52,7 @@ internal class NostrRouteStrategy(
                         envelope.content, envelope.peerID, envelope.recipientNickname, envelope.messageId,
                     )
                 }
-                // NostrTransport schedules the send internally — fire-and-forget
+                // NostrMessageSender schedules the send internally — fire-and-forget
                 SendOutcome.Accepted
             }
             is OutgoingEnvelope.Receipt -> {

@@ -1,7 +1,7 @@
 package com.bitchat.android.nostr
 
 import com.app.transport.nostr.*
-import com.app.data.nostr.NostrTransport
+import com.app.data.nostr.NostrMessageSender
 import android.app.Application
 import android.util.Log
 import com.app.transport.features.file.FileUtils
@@ -38,7 +38,7 @@ class NostrDirectMessageHandler(
     private val geohashConversationRegistry: GeohashConversationRegistry,
     private val geohashAliasRegistry: GeohashAliasRegistry,
     private val seenMessageStore: SeenMessageStore,
-    private val nostrTransport: NostrTransport,
+    private val nostrMessageSender: NostrMessageSender,
 ) {
     companion object { private const val TAG = "NostrDirectMessageHandler" }
 
@@ -153,12 +153,12 @@ class NostrDirectMessageHandler(
                 }
 
                 if (!seenStore.hasDelivered(pm.messageID)) {
-                    nostrTransport.sendDeliveryAckGeohash(pm.messageID, senderPubkey, recipientIdentity)
+                    nostrMessageSender.sendDeliveryAckGeohash(pm.messageID, senderPubkey, recipientIdentity)
                     seenStore.markDelivered(pm.messageID)
                 }
 
                 if (isViewing && !suppressUnread) {
-                    nostrTransport.sendReadReceiptGeohash(pm.messageID, senderPubkey, recipientIdentity)
+                    nostrMessageSender.sendReadReceiptGeohash(pm.messageID, senderPubkey, recipientIdentity)
                     seenStore.markRead(pm.messageID)
                 }
             }

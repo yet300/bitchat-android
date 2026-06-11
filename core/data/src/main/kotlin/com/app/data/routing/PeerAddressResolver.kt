@@ -1,5 +1,6 @@
 package com.app.data.routing
 
+import com.app.common.encoding.dataFromHexString
 import com.app.common.encoding.hexEncodedString
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.domain.model.PeerId
@@ -60,7 +61,8 @@ class PeerAddressResolver(
     fun canSendViaNostr(peerID: String): Boolean = try {
         when (PeerId(peerID).kind) {
             PeerId.Kind.NOISE_STABLE -> {
-                val fav = favorites.getFavoriteStatus(peerID.hexToBytes())
+                val noiseKey = peerID.dataFromHexString() ?: return false
+                val fav = favorites.getFavoriteStatus(noiseKey)
                 fav?.isMutual == true && fav.peerNostrPublicKey != null
             }
             PeerId.Kind.MESH_EPHEMERAL -> {
@@ -85,11 +87,11 @@ class PeerAddressResolver(
             when (PeerId(selectedPeerID).kind) {
                 PeerId.Kind.NOSTR_ALIAS -> {
                     val noiseHex = noiseKeyHexForNostrAlias(selectedPeerID) ?: return selectedPeerID
-                    val noiseKey = noiseHex.hexToBytes()
+                    val noiseKey = noiseHex.dataFromHexString() ?: return noiseHex
                     return connectedMeshPeerFor(noiseKey, connectedPeers) ?: noiseHex
                 }
                 PeerId.Kind.NOISE_STABLE -> {
-                    val noiseKey = selectedPeerID.hexToBytes()
+                    val noiseKey = selectedPeerID.dataFromHexString() ?: return selectedPeerID
                     return connectedMeshPeerFor(noiseKey, connectedPeers) ?: selectedPeerID
                 }
                 else -> return selectedPeerID
@@ -103,7 +105,4 @@ class PeerAddressResolver(
         connectedPeers.firstOrNull { pid ->
             mesh.getPeerInfo(pid)?.noisePublicKey?.contentEquals(noiseKey) == true
         }
-
-    private fun String.hexToBytes(): ByteArray =
-        chunked(2).map { it.toInt(16).toByte() }.toByteArray()
 }

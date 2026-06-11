@@ -3,6 +3,7 @@ package com.bitchat.android.ui
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.data.routing.MessageRouter
 import com.app.data.routing.PeerAddressResolver
+import com.app.common.encoding.hexEncodedString
 import com.app.transport.notification.NotificationTextUtils
 import com.app.transport.model.BitchatMessage
 import com.app.transport.model.DeliveryStatus
@@ -143,7 +144,7 @@ class MeshDelegateHandler(
                     } catch (_: Exception) { null }
 
                     if (favoriteRel?.isMutual == true) {
-                        val noiseHex = favoriteRel.peerNoisePublicKey.joinToString("") { b -> "%02x".format(b) }
+                        val noiseHex = favoriteRel.peerNoisePublicKey.hexEncodedString()
                         if (noiseHex != currentPeer) {
                             com.bitchat.android.services.ConversationAliasResolver.unifyChatsIntoPeer(
                                 state = state,
@@ -164,14 +165,14 @@ class MeshDelegateHandler(
                 try {
                     val info = getPeerInfo(pid)
                     val noiseKey = info?.noisePublicKey ?: return@forEach
-                    val noiseHex = noiseKey.joinToString("") { b -> "%02x".format(b) }
+                    val noiseHex = noiseKey.hexEncodedString()
 
                     // Derive temp nostr key from favorites npub
                     val npub = favoritesService.findNostrPubkey(noiseKey)
                     val tempNostrKey: String? = try {
                         if (npub != null) {
                             val (hrp, data) = Bech32.decode(npub)
-                            if (hrp == "npub") "nostr_${data.joinToString("") { b -> "%02x".format(b) }.take(16)}" else null
+                            if (hrp == "npub") "nostr_${data.hexEncodedString().take(16)}" else null
                         } else null
                     } catch (_: Exception) { null }
 

@@ -2,6 +2,8 @@
 
 package com.app.data.repository
 
+import com.app.common.encoding.dataFromHexString
+import com.app.common.encoding.hexEncodedString
 import com.app.common.serialization.JsonConfig
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.data.favorites.FavoritesPersistenceService
@@ -63,7 +65,7 @@ internal class ContactRepositoryImpl(
     }
 
     override suspend fun contact(identity: PeerIdentity): Contact? {
-        val noiseKey = runCatching { identity.noiseKeyHex.hexToBytes() }.getOrNull() ?: return null
+        val noiseKey = identity.noiseKeyHex.dataFromHexString() ?: return null
         val rel = favorites.getFavoriteStatus(noiseKey) ?: return null
         return Contact(
             identity = PeerIdentity(identity.noiseKeyHex, rel.peerNostrPublicKey),
@@ -92,8 +94,9 @@ internal class ContactRepositoryImpl(
     private fun fingerprintFor(peer: PeerId): String? {
         fingerprints.getFingerprintForPeer(peer.raw)?.let { return it }
         if (peer.kind == PeerId.Kind.NOISE_STABLE) {
+            val noiseKey = peer.raw.dataFromHexString() ?: return null
             return runCatching {
-                MessageDigest.getInstance("SHA-256").digest(peer.raw.hexToBytes()).toHex()
+                MessageDigest.getInstance("SHA-256").digest(noiseKey).hexEncodedString()
             }.getOrNull()
         }
         return null
@@ -109,10 +112,6 @@ internal class ContactRepositoryImpl(
         if (json == null) return emptySet()
         return runCatching { JsonConfig.json.decodeFromString(SET_SERIALIZER, json) }.getOrDefault(emptySet())
     }
-
-    private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
-
-    private fun String.hexToBytes(): ByteArray = chunked(2).map { it.toInt(16).toByte() }.toByteArray()
 
     private companion object {
         const val KEY_FAVORITES = "favorites"

@@ -11,7 +11,7 @@ import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.MessageType
 import com.app.common.encoding.toHexString
 import com.app.transport.MeshConstants
-import com.app.transport.MeshTelemetry
+import com.app.transport.MeshTrafficLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -46,7 +46,7 @@ internal class BluetoothPacketBroadcaster(
     private val connectionTracker: BluetoothConnectionTracker,
     private val fragmentManager: FragmentManager?,
     private val myPeerID: String,
-    private val debugSettingsManager: MeshTelemetry,
+    private val debugSettingsManager: MeshTrafficLog,
     private val transferProgressManager: TransferProgressManager,
 ) {
     

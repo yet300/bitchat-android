@@ -6,17 +6,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Telemetry port for the production mesh classes (BMS, bearers, PacketProcessor, GATT
- * managers): debug logging plus the debug toggles they honor. The debug-screen state
- * machinery ([com.app.transport.debug.DebugSettingsManager]) implements it; tests use
- * [NoOpMeshTelemetry]. Mesh constructors depend on this interface, not the manager (DIP).
+ * Debug toggles and connection limits the mesh stack honors (read-only flows).
+ * Split from [MeshTrafficLog] per ISP: PacketRelayManager and the GATT server only
+ * need this half.
  */
-interface MeshTelemetry {
-
-    // ------------------------------------------------------------------
-    // Toggle reads honored by the mesh stack
-    // ------------------------------------------------------------------
-
+interface MeshDebugToggles {
     val gattServerEnabled: StateFlow<Boolean>
     val gattClientEnabled: StateFlow<Boolean>
     val packetRelayEnabled: StateFlow<Boolean>
@@ -24,13 +18,16 @@ interface MeshTelemetry {
     val maxConnectionsOverall: StateFlow<Int>
     val maxServerConnections: StateFlow<Int>
     val maxClientConnections: StateFlow<Int>
+}
+
+/**
+ * Traffic/event logging sink for the mesh stack. BleBearer, the packet broadcaster and
+ * PacketProcessor only need this half.
+ */
+interface MeshTrafficLog {
 
     /** Injects a nickname resolver so logs show human names. */
     fun setNicknameResolver(resolver: (String) -> String?)
-
-    // ------------------------------------------------------------------
-    // Event logging
-    // ------------------------------------------------------------------
 
     fun logIncoming(
         packet: BitchatPacket,
@@ -79,6 +76,14 @@ interface MeshTelemetry {
 
     fun addScanResult(scanResult: DebugScanResult)
 }
+
+/**
+ * Full telemetry port: toggles + traffic log. The debug-screen state machinery
+ * ([com.app.transport.debug.DebugSettingsManager]) implements it; tests use
+ * [NoOpMeshTelemetry]. Mesh constructors depend on the narrowest interface they
+ * actually use (DIP + ISP).
+ */
+interface MeshTelemetry : MeshDebugToggles, MeshTrafficLog
 
 /** Silent implementation for unit tests: toggles default to enabled, logging is dropped. */
 object NoOpMeshTelemetry : MeshTelemetry {

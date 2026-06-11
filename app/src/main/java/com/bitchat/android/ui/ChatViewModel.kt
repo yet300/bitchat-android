@@ -93,8 +93,8 @@ class ChatViewModel(
         (application as BitchatApplication).appGraph.seenMessageStore
     private val transferProgressManager =
         (application as BitchatApplication).appGraph.transferProgressManager
-    private val nostrTransport =
-        (application as BitchatApplication).appGraph.nostrTransport
+    private val nostrMessageSender =
+        (application as BitchatApplication).appGraph.nostrMessageSender
     private val peerFingerprintManager =
         (application as BitchatApplication).appGraph.peerFingerprintManager
     private val messageRouter =
@@ -316,9 +316,9 @@ class ChatViewModel(
         verificationHandler.loadVerifiedFingerprints()
 
 
-        // Ensure NostrTransport knows our mesh peer ID for embedded packets
+        // Ensure NostrMessageSender knows our mesh peer ID for embedded packets
         try {
-            nostrTransport.currentGeohashSource = CurrentGeohashSource {
+            nostrMessageSender.currentGeohashSource = CurrentGeohashSource {
                 (getApplication<Application>().appGraph.locationChannelManager.selectedChannel.value
                         as? ChannelID.Location)?.channel?.geohash
             }
@@ -646,7 +646,7 @@ class ChatViewModel(
                             java.util.UUID.randomUUID().toString()
                         )
                     } else {
-                                    nostrTransport.sendFavoriteNotification(peerID, isNowFavorite)
+                                    nostrMessageSender.sendFavoriteNotification(peerID, isNowFavorite)
                     }
                 } catch (_: Exception) { }
             }

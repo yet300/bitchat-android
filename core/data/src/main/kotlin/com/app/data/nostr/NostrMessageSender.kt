@@ -18,11 +18,12 @@ import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
  * Minimal Nostr transport for offline sending
- * Direct port from iOS NostrTransport for 100% compatibility
+ * Direct port from iOS NostrTransport (renamed here: it lives in :core:data,
+ * not :core:transport) for 100% compatibility
  */
 @SingleIn(AppScope::class)
 @Inject
-class NostrTransport(
+class NostrMessageSender(
     private val context: Context,
     private val relayManager: NostrRelayManager,
     private val favoritesService: FavoritesPersistenceService,
@@ -33,7 +34,7 @@ class NostrTransport(
     val senderPeerID: String get() = peerIdSource.current()
 
     companion object {
-        private const val TAG = "NostrTransport"
+        private const val TAG = "NostrMessageSender"
         private const val READ_ACK_INTERVAL = NostrConstants.READ_ACK_INTERVAL_MS // ~3 per second (0.35s interval like iOS)
     }
     
@@ -80,18 +81,18 @@ class NostrTransport(
                     return@launch
                 }
                 
-                Log.d(TAG, "NostrTransport: preparing PM to ${recipientNostrPubkey.take(16)}... for peerID ${to.take(8)}... id=${messageID.take(8)}...")
+                Log.d(TAG, "NostrMessageSender: preparing PM to ${recipientNostrPubkey.take(16)}... for peerID ${to.take(8)}... id=${messageID.take(8)}...")
                 
                 // Convert recipient npub -> hex (x-only)
                 val recipientHex = try {
                     val (hrp, data) = Bech32.decode(recipientNostrPubkey)
                     if (hrp != "npub") {
-                        Log.e(TAG, "NostrTransport: recipient key not npub (hrp=$hrp)")
+                        Log.e(TAG, "NostrMessageSender: recipient key not npub (hrp=$hrp)")
                         return@launch
                     }
                     data.joinToString("") { "%02x".format(it) }
                 } catch (e: Exception) {
-                    Log.e(TAG, "NostrTransport: failed to decode npub -> hex: $e")
+                    Log.e(TAG, "NostrMessageSender: failed to decode npub -> hex: $e")
                     return@launch
                 }
                 
@@ -101,7 +102,7 @@ class NostrTransport(
                         .findPeerIDForNostrPubkey(recipientNostrPubkey)
                 } catch (_: Exception) { null }
                 if (recipientPeerIDForEmbed.isNullOrBlank()) {
-                    Log.e(TAG, "NostrTransport: no peerID stored for recipient npub; cannot embed PM. npub=${recipientNostrPubkey.take(16)}...")
+                    Log.e(TAG, "NostrMessageSender: no peerID stored for recipient npub; cannot embed PM. npub=${recipientNostrPubkey.take(16)}...")
                     return@launch
                 }
                 val embedded = NostrEmbeddedBitChat.encodePMForNostr(
@@ -113,7 +114,7 @@ class NostrTransport(
                 
                 
                 if (embedded == null) {
-                    Log.e(TAG, "NostrTransport: failed to embed PM packet")
+                    Log.e(TAG, "NostrMessageSender: failed to embed PM packet")
                     return@launch
                 }
                 
@@ -124,7 +125,7 @@ class NostrTransport(
                 )
                 
                 giftWraps.forEach { event ->
-                    Log.d(TAG, "NostrTransport: sending PM giftWrap id=${event.id.take(16)}...")
+                    Log.d(TAG, "NostrMessageSender: sending PM giftWrap id=${event.id.take(16)}...")
                     relayManager.sendEvent(event)
                 }
                 
@@ -175,7 +176,7 @@ class NostrTransport(
                     return@launch
                 }
                 
-                Log.d(TAG, "NostrTransport: preparing READ ack for id=${item.receipt.originalMessageID.take(8)}... to ${recipientNostrPubkey.take(16)}...")
+                Log.d(TAG, "NostrMessageSender: preparing READ ack for id=${item.receipt.originalMessageID.take(8)}... to ${recipientNostrPubkey.take(16)}...")
                 
                 // Convert recipient npub -> hex
                 val recipientHex = try {
@@ -198,7 +199,7 @@ class NostrTransport(
                 )
                 
                 if (ack == null) {
-                    Log.e(TAG, "NostrTransport: failed to embed READ ack")
+                    Log.e(TAG, "NostrMessageSender: failed to embed READ ack")
                     scheduleNextReadAck()
                     return@launch
                 }
@@ -210,7 +211,7 @@ class NostrTransport(
                 )
                 
                 giftWraps.forEach { event ->
-                    Log.d(TAG, "NostrTransport: sending READ ack giftWrap id=${event.id.take(16)}...")
+                    Log.d(TAG, "NostrMessageSender: sending READ ack giftWrap id=${event.id.take(16)}...")
                     relayManager.sendEvent(event)
                 }
                 
@@ -252,7 +253,7 @@ class NostrTransport(
                 
                 val content = if (isFavorite) "[FAVORITED]:${senderIdentity.npub}" else "[UNFAVORITED]:${senderIdentity.npub}"
                 
-                Log.d(TAG, "NostrTransport: preparing FAVORITE($isFavorite) to ${recipientNostrPubkey.take(16)}...")
+                Log.d(TAG, "NostrMessageSender: preparing FAVORITE($isFavorite) to ${recipientNostrPubkey.take(16)}...")
                 
                 // Convert recipient npub -> hex
                 val recipientHex = try {
@@ -271,7 +272,7 @@ class NostrTransport(
                 )
                 
                 if (embedded == null) {
-                    Log.e(TAG, "NostrTransport: failed to embed favorite notification")
+                    Log.e(TAG, "NostrMessageSender: failed to embed favorite notification")
                     return@launch
                 }
                 
@@ -282,7 +283,7 @@ class NostrTransport(
                 )
                 
                 giftWraps.forEach { event ->
-                    Log.d(TAG, "NostrTransport: sending favorite giftWrap id=${event.id.take(16)}...")
+                    Log.d(TAG, "NostrMessageSender: sending favorite giftWrap id=${event.id.take(16)}...")
                     relayManager.sendEvent(event)
                 }
                 
@@ -311,7 +312,7 @@ class NostrTransport(
                     return@launch
                 }
                 
-                Log.d(TAG, "NostrTransport: preparing DELIVERED ack for id=${messageID.take(8)}... to ${recipientNostrPubkey.take(16)}...")
+                Log.d(TAG, "NostrMessageSender: preparing DELIVERED ack for id=${messageID.take(8)}... to ${recipientNostrPubkey.take(16)}...")
                 
                 val recipientHex = try {
                     val (hrp, data) = Bech32.decode(recipientNostrPubkey)
@@ -329,7 +330,7 @@ class NostrTransport(
                 )
                 
                 if (ack == null) {
-                    Log.e(TAG, "NostrTransport: failed to embed DELIVERED ack")
+                    Log.e(TAG, "NostrMessageSender: failed to embed DELIVERED ack")
                     return@launch
                 }
                 
@@ -340,7 +341,7 @@ class NostrTransport(
                 )
                 
                 giftWraps.forEach { event ->
-                    Log.d(TAG, "NostrTransport: sending DELIVERED ack giftWrap id=${event.id.take(16)}...")
+                    Log.d(TAG, "NostrMessageSender: sending DELIVERED ack giftWrap id=${event.id.take(16)}...")
                     relayManager.sendEvent(event)
                 }
                 
@@ -434,7 +435,7 @@ class NostrTransport(
         val geohash = sourceGeohash ?: run {
             val gh = try { currentGeohashSource?.currentGeohash() } catch (_: Exception) { null }
             if (gh == null) {
-                Log.w(TAG, "NostrTransport: cannot send geohash PM - not in a location channel and no geohash provided")
+                Log.w(TAG, "NostrMessageSender: cannot send geohash PM - not in a location channel and no geohash provided")
                 return
             }
             gh
@@ -443,7 +444,7 @@ class NostrTransport(
         val fromIdentity = try {
             nostrIdentityBridge.deriveIdentity(geohash)
         } catch (e: Exception) {
-            Log.e(TAG, "NostrTransport: cannot derive geohash identity for $geohash: ${e.message}")
+            Log.e(TAG, "NostrMessageSender: cannot derive geohash identity for $geohash: ${e.message}")
             return
         }
         
@@ -462,7 +463,7 @@ class NostrTransport(
                     messageID = messageID,
                     senderPeerID = senderPeerID
                 ) ?: run {
-                    Log.e(TAG, "NostrTransport: failed to embed geohash PM packet")
+                    Log.e(TAG, "NostrMessageSender: failed to embed geohash PM packet")
                     return@launch
                 }
 
@@ -473,7 +474,7 @@ class NostrTransport(
                 )
 
                 giftWraps.forEach { event ->
-                    Log.d(TAG, "NostrTransport: sending geohash PM giftWrap id=${event.id.take(16)}...")
+                    Log.d(TAG, "NostrMessageSender: sending geohash PM giftWrap id=${event.id.take(16)}...")
                     NostrRelayManager.registerPendingGiftWrap(event.id)
                     relayManager.sendEvent(event)
                 }

@@ -4,7 +4,7 @@ import android.util.Log
 import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
 import com.app.common.encoding.toHexString
-import com.app.transport.MeshTelemetry
+import com.app.transport.MeshDebugToggles
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,7 +20,7 @@ import kotlin.random.Random
  */
 internal class PacketRelayManager(
     private val myPeerID: String,
-    private val debugSettingsManager: MeshTelemetry,
+    private val debugSettingsManager: MeshDebugToggles,
 ) {
     companion object {
         private const val TAG = "PacketRelayManager"
