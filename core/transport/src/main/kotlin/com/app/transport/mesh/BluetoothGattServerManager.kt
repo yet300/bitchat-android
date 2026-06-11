@@ -8,7 +8,7 @@ import android.bluetooth.le.BluetoothLeAdvertiser
 import android.content.Context
 import android.os.ParcelUuid
 import android.util.Log
-import com.app.transport.MeshTelemetry
+import com.app.transport.MeshDebugToggles
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.MeshConstants
 import kotlinx.coroutines.CoroutineScope
@@ -26,7 +26,7 @@ internal class BluetoothGattServerManager(
     private val powerManager: PowerManager,
     private val delegate: BluetoothConnectionManagerDelegate?,
     private val myPeerID: String,
-    private val debugSettingsManager: MeshTelemetry,
+    private val debugSettingsManager: MeshDebugToggles,
 ) {
     
     companion object {

@@ -31,7 +31,7 @@ import com.app.transport.nostr.NostrIdentityBridge
 import com.app.transport.nostr.NostrRelayManager
 import com.app.transport.nostr.PoWPreferenceManager
 import com.app.transport.nostr.RelayDirectory
-import com.app.data.nostr.NostrTransport
+import com.app.data.nostr.NostrMessageSender
 import com.bitchat.android.geohash.GeohashBookmarksStore
 import com.bitchat.android.geohash.LocationChannelManager
 import com.bitchat.android.onboarding.BackgroundLocationPreferenceManager
@@ -73,7 +73,7 @@ interface AppGraph {
     val meshGraphService: MeshGraphService
     val nostrRelayManager: NostrRelayManager
     val nostrIdentityBridge: NostrIdentityBridge
-    val nostrTransport: NostrTransport
+    val nostrMessageSender: NostrMessageSender
     val artiTorManager: ArtiTorManager
     val httpClientProvider: HttpClientProvider
     val locationNotesManager: LocationNotesManager

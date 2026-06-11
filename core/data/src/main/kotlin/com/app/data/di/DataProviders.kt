@@ -8,6 +8,7 @@ import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
+import com.app.common.encoding.hexEncodedString
 import com.app.transport.routing.PeerKeyResolver
 import com.app.transport.routing.SessionInitiator
 import kotlinx.coroutines.CoroutineScope
@@ -46,7 +47,7 @@ object DataProviders {
     fun providePeerKeyResolver(mesh: BluetoothMeshService): PeerKeyResolver =
         PeerKeyResolver { peerID ->
             try {
-                mesh.getPeerInfo(peerID)?.noisePublicKey?.joinToString("") { b -> "%02x".format(b) }
+                mesh.getPeerInfo(peerID)?.noisePublicKey?.hexEncodedString()
             } catch (_: Exception) {
                 null
             }
