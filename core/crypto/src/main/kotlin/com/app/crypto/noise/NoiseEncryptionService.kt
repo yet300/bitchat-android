@@ -18,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap
  * - Channel encryption using password-derived keys
  * - Peer fingerprint mapping and identity persistence
  */
-class NoiseEncryptionService(
+internal class NoiseEncryptionService(
     private val context: Context,
     private val fingerprintManager: PeerFingerprintManager,
 ) {
@@ -494,7 +494,7 @@ class NoiseEncryptionService(
 /**
  * Noise-specific errors
  */
-sealed class NoiseEncryptionError(message: String) : Exception(message) {
+internal sealed class NoiseEncryptionError(message: String) : Exception(message) {
     object HandshakeRequired : NoiseEncryptionError("Handshake required before encryption")
     object SessionNotEstablished : NoiseEncryptionError("No established Noise session")
     object InvalidMessage : NoiseEncryptionError("Invalid message format")

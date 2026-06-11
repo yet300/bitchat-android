@@ -9,7 +9,7 @@ import java.security.MessageDigest
  * [type | senderID | timestamp | payload] to generate a stable ID.
  * Returns a 16-byte (128-bit) truncated hash for compactness.
  */
-object PacketIdUtil {
+internal object PacketIdUtil {
     fun computeIdBytes(packet: BitchatPacket): ByteArray {
         val md = MessageDigest.getInstance("SHA-256")
         md.update(packet.type.toByte())

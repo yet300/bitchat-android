@@ -15,7 +15,7 @@ package com.app.transport.model
  * 
  * Total header size: 13 bytes
  */
-data class FragmentPayload(
+internal data class FragmentPayload(
     val fragmentID: ByteArray,      // 8 bytes - random fragment identifier
     val index: Int,                 // Fragment index (0-based)
     val total: Int,                 // Total number of fragments

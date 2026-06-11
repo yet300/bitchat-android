@@ -14,7 +14,7 @@ package com.app.crypto.noise.southernstorm.crypto
  * method for generating the public "a" value for anonymity networks
  * like Tor.
  */
-open class NewHopeTor : NewHope() {
+internal open class NewHopeTor : NewHope() {
 
     override fun uniform(coeffs: CharArray, seed: ByteArray) {
         val state = LongArray(25)

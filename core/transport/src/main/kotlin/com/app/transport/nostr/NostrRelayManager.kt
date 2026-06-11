@@ -29,7 +29,7 @@ import kotlin.math.pow
  */
 @SingleIn(AppScope::class)
 @Inject
-class NostrRelayManager(private val eventDeduplicator: NostrEventDeduplicator) {
+class NostrRelayManager internal constructor(private val eventDeduplicator: NostrEventDeduplicator) {
 
     companion object {
         private const val TAG = "NostrRelayManager"
@@ -495,7 +495,7 @@ class NostrRelayManager(private val eventDeduplicator: NostrEventDeduplicator) {
     /**
      * Get event deduplication statistics
      */
-    fun getDeduplicationStats(): DeduplicationStats {
+    internal fun getDeduplicationStats(): DeduplicationStats {
         return eventDeduplicator.getStats()
     }
     

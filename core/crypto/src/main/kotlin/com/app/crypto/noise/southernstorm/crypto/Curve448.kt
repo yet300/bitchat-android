@@ -59,7 +59,7 @@ package com.app.crypto.noise.southernstorm.crypto
  * 
  * Reference: RFC 7748
  */
-class Curve448 private constructor() {
+internal class Curve448 private constructor() {
     // Numbers modulo 2^448 - 2^224 - 1 are broken up into sixteen 28-bit words.
     private val x_1 = IntArray(16)
     private val x_2 = IntArray(16)

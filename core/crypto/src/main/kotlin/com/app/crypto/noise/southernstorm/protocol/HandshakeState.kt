@@ -34,7 +34,7 @@ import javax.crypto.ShortBufferException
 /**
  * Interface to a Noise handshake.
  */
-class HandshakeState(protocolName: String, role: Int) : Destroyable {
+internal class HandshakeState(protocolName: String, role: Int) : Destroyable {
     private var symmetric: SymmetricState?
     private var isInitiator: Boolean
 

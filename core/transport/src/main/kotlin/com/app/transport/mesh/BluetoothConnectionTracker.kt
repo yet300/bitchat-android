@@ -14,7 +14,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 /**
  * Tracks all Bluetooth connections and handles cleanup
  */
-class BluetoothConnectionTracker(
+internal class BluetoothConnectionTracker(
     private val connectionScope: CoroutineScope,
     private val powerManager: PowerManager
 ) {

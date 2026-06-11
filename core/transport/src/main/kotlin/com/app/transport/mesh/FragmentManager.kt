@@ -39,7 +39,7 @@ class FragmentManager {
     private var globalBufferedBytes: Long = 0L
 
     // Delegate for callbacks
-    var delegate: FragmentManagerDelegate? = null
+    internal var delegate: FragmentManagerDelegate? = null
     
     // Coroutines
     private val managerScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -394,6 +394,6 @@ class FragmentManager {
 /**
  * Delegate interface for fragment manager callbacks
  */
-interface FragmentManagerDelegate {
+internal interface FragmentManagerDelegate {
     fun onPacketReassembled(packet: BitchatPacket)
 }

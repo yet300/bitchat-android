@@ -1,6 +1,5 @@
-package com.bitchat.android.mesh
+package com.app.transport.mesh
 
-import com.app.transport.mesh.FragmentManager
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
 import com.app.transport.model.FragmentPayload

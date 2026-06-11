@@ -6,7 +6,7 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * SIMPLIFIED Noise session manager - focuses on core functionality only
  */
-class NoiseSessionManager(
+internal class NoiseSessionManager(
     private val localStaticPrivateKey: ByteArray,
     private val localStaticPublicKey: ByteArray
 ) {
@@ -217,7 +217,7 @@ class NoiseSessionManager(
 /**
  * Session-related errors
  */
-sealed class NoiseSessionError(message: String, cause: Throwable? = null) : Exception(message, cause) {
+internal sealed class NoiseSessionError(message: String, cause: Throwable? = null) : Exception(message, cause) {
     object SessionNotFound : NoiseSessionError("Session not found")
     object SessionNotEstablished : NoiseSessionError("Session not established")
     object InvalidState : NoiseSessionError("Session in invalid state")

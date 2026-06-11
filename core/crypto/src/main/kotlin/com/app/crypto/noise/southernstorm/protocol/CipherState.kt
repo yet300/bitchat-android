@@ -32,7 +32,7 @@ import javax.crypto.ShortBufferException
  * will create two CipherState objects for encrypting packets sent to
  * the other party, and decrypting packets received from the other party.
  */
-interface CipherState : Destroyable {
+internal interface CipherState : Destroyable {
     /**
      * Gets the Noise protocol name for this cipher.
      *

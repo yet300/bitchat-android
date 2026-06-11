@@ -18,7 +18,7 @@ import kotlin.random.Random
  * This class handles all relay decisions and logic for bitchat packets.
  * All packets that aren't specifically addressed to us get processed here.
  */
-class PacketRelayManager(
+internal class PacketRelayManager(
     private val myPeerID: String,
     private val debugSettingsManager: MeshTelemetry,
 ) {
@@ -199,7 +199,7 @@ class PacketRelayManager(
 /**
  * Delegate interface for packet relay manager callbacks
  */
-interface PacketRelayManagerDelegate {
+internal interface PacketRelayManagerDelegate {
     // Network information
     fun getNetworkSize(): Int
     fun getBroadcastRecipient(): ByteArray

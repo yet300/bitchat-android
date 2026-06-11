@@ -6,7 +6,7 @@ import android.util.Log
  * Gossip TLV helpers for embedding direct neighbor peer IDs in ANNOUNCE payloads.
  * Uses compact TLV: [type=0x04][len=1 byte][value=N*8 bytes of peerIDs]
  */
-object GossipTLV {
+internal object GossipTLV {
     // TLV type for a compact list of direct neighbor peerIDs (each 8 bytes)
     const val DIRECT_NEIGHBORS_TYPE: UByte = 0x04u
 

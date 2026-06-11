@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
  * All routing logic has moved to [RouteSelector] + [MeshRouteStrategy]/[NostrRouteStrategy].
  * The former if/else branching (duplicated 4×) is gone — the Shotgun Surgery smell is fixed.
  */
-class MessageRouter(
+class MessageRouter internal constructor(
     private val routingCore: RoutingCore,
     private val scope: CoroutineScope,
 ) {

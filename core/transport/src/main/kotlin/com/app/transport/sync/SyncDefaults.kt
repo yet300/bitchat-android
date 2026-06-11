@@ -1,6 +1,6 @@
 package com.app.transport.sync
 
-object SyncDefaults {
+internal object SyncDefaults {
     // Default values used when debug prefs are unavailable
     const val DEFAULT_FILTER_BYTES: Int = 256
     const val DEFAULT_FPR_PERCENT: Double = 1.0

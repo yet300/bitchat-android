@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 @SingleIn(AppScope::class)
 @Inject
-class NostrClient(
+internal class NostrClient(
     private val context: Context,
     private val powPreferenceManager: PoWPreferenceManager,
     private val relayManager: NostrRelayManager,

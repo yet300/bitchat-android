@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
  * Compatible with iOS AnnouncementPacket TLV format
  */
 @Serializable
-data class IdentityAnnouncement(
+internal data class IdentityAnnouncement(
     val nickname: String,
     val noisePublicKey: ByteArray,    // Noise static public key (Curve25519.KeyAgreement)
     val signingPublicKey: ByteArray   // Ed25519 public key for signing

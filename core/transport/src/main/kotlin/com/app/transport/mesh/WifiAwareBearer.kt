@@ -27,7 +27,7 @@ import kotlinx.coroutines.flow.emptyFlow
  */
 @ContributesIntoSet(AppScope::class)
 @Inject
-class WifiAwareBearer(
+internal class WifiAwareBearer(
     @Suppress("UNUSED_PARAMETER") context: Context,
 ) : MeshBearer {
 

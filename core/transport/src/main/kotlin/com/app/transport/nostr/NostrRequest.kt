@@ -25,7 +25,7 @@ import kotlinx.serialization.json.jsonPrimitive
  * Supports EVENT, REQ, and CLOSE message types
  */
 @Serializable(with = NostrRequestSerializer::class)
-sealed class NostrRequest {
+internal sealed class NostrRequest {
 
     /**
      * EVENT message - publish an event
@@ -61,7 +61,7 @@ sealed class NostrRequest {
  * `["CLOSE", subId]`.
  */
 @OptIn(InternalSerializationApi::class)
-object NostrRequestSerializer : KSerializer<NostrRequest> {
+internal object NostrRequestSerializer : KSerializer<NostrRequest> {
     override val descriptor: SerialDescriptor =
         buildSerialDescriptor("NostrRequest", StructureKind.LIST)
 

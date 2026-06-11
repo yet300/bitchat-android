@@ -32,7 +32,7 @@ import kotlin.time.Instant
  * Handles processing of different message types
  * Extracted from BluetoothMeshService for better separation of concerns
  */
-class MessageHandler(
+internal class MessageHandler(
     private val myPeerID: String,
     private val appContext: Context,
     private val meshGraphService: MeshGraphService,
@@ -611,7 +611,7 @@ class MessageHandler(
 /**
  * Delegate interface for message handler callbacks
  */
-interface MessageHandlerDelegate {
+internal interface MessageHandlerDelegate {
     // Peer management
     fun addOrUpdatePeer(peerID: String, nickname: String): Boolean
     fun removePeer(peerID: String)

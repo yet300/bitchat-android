@@ -31,7 +31,7 @@ import java.security.MessageDigest
  * Note: This implementation is limited to a maximum 2^56 - 1 bytes of input.
  * That is, we don't bother trying to implement 128-bit length values.
  */
-class SHA512MessageDigest : MessageDigest("SHA-512"), Destroyable {
+internal class SHA512MessageDigest : MessageDigest("SHA-512"), Destroyable {
     private val h = LongArray(8)
     private val block = ByteArray(128)
     private val w = LongArray(80)

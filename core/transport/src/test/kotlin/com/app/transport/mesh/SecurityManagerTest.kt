@@ -1,11 +1,8 @@
-package com.bitchat.android.mesh
+package com.app.transport.mesh
 
 import android.os.Build
 import com.app.crypto.EncryptionService
 import com.app.crypto.identity.PeerFingerprintManager
-import com.app.transport.mesh.PeerInfo
-import com.app.transport.mesh.SecurityManager
-import com.app.transport.mesh.SecurityManagerDelegate
 import com.app.transport.model.IdentityAnnouncement
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType

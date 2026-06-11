@@ -9,7 +9,7 @@ package com.app.crypto.secure
  * Tink (see [TinkSecureKeyValueStore]); the interface itself carries no Android
  * types so it can move to `commonMain` unchanged when the project goes KMP.
  */
-interface SecureKeyValueStore {
+internal interface SecureKeyValueStore {
 
     fun getString(key: String): String?
 

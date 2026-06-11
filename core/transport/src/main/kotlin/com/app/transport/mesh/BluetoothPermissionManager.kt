@@ -8,7 +8,7 @@ import androidx.core.app.ActivityCompat
 /**
  * Handles all Bluetooth permission checking logic
  */
-class BluetoothPermissionManager(private val context: Context) {
+internal class BluetoothPermissionManager(private val context: Context) {
     
     /**
      * Check if all required Bluetooth permissions are granted

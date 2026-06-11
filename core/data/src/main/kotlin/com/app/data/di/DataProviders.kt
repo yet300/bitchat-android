@@ -16,7 +16,8 @@ import kotlinx.coroutines.CoroutineScope
  * Platform-agnostic @Provides bindings for the routing layer.
  *
  * Separated from [DataBindings] (abstract class, @Binds only) because @Provides requires
- * a concrete object. Placed in :core:data so it can reference internal types
+ * a concrete object. Must stay public: an internal @ContributesTo container is invisible
+ * to the :app graph aggregation (verified — Metro/MissingBinding for MessageRouter). Placed in :core:data so it can reference internal types
  * (RouteSelector, MeshRouteStrategy, NostrRouteStrategy) that must not leak to :app.
  */
 @ContributesTo(AppScope::class)
@@ -31,7 +32,7 @@ object DataProviders {
      */
     @Provides
     @SingleIn(AppScope::class)
-    fun provideMessageRouter(
+    internal fun provideMessageRouter(
         routingCore: RoutingCore,
         scope: CoroutineScope,
     ): MessageRouter = MessageRouter(routingCore, scope)

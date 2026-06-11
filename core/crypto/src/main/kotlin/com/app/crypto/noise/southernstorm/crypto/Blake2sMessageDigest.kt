@@ -32,7 +32,7 @@ import java.security.MessageDigest
  * length of 32 bytes.  Keyed hashing and variable-length digests are
  * not supported.
  */
-class Blake2sMessageDigest : MessageDigest("BLAKE2S-256"), Destroyable {
+internal class Blake2sMessageDigest : MessageDigest("BLAKE2S-256"), Destroyable {
     private val h = IntArray(8)
     private val block = ByteArray(64)
     private val m = IntArray(16)

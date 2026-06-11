@@ -4,7 +4,7 @@ package com.app.transport.protocol
  * Privacy-preserving padding utilities - exact same as iOS version
  * Provides traffic analysis resistance by normalizing message sizes
  */
-object MessagePadding {
+internal object MessagePadding {
     // Standard block sizes for padding - exact same as iOS
     private val blockSizes = listOf(256, 512, 1024, 2048)
     
