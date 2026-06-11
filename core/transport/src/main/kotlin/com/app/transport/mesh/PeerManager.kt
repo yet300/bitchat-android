@@ -65,7 +65,7 @@ data class PeerInfo(
  * Now includes centralized peer fingerprint management via PeerFingerprintManager singleton
  * and support for signed announcement verification
  */
-class PeerManager(
+internal class PeerManager(
     private val fingerprintManager: PeerFingerprintManager,
 ) {
 
@@ -535,7 +535,7 @@ class PeerManager(
 /**
  * Delegate interface for peer manager callbacks
  */
-interface PeerManagerDelegate {
+internal interface PeerManagerDelegate {
     fun onPeerListUpdated(peerIDs: List<String>)
     fun onPeerRemoved(peerID: String)
 }

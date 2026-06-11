@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap
  * Manages store-and-forward messaging for offline peers
  * Extracted from BluetoothMeshService for better separation of concerns
  */
-class StoreForwardManager {
+internal class StoreForwardManager {
     
     companion object {
         private const val TAG = "StoreForwardManager"
@@ -310,7 +310,7 @@ class StoreForwardManager {
 /**
  * Delegate interface for store-forward manager callbacks
  */
-interface StoreForwardManagerDelegate {
+internal interface StoreForwardManagerDelegate {
     fun isFavorite(peerID: String): Boolean
     fun isPeerOnline(peerID: String): Boolean
     fun sendPacket(packet: BitchatPacket)

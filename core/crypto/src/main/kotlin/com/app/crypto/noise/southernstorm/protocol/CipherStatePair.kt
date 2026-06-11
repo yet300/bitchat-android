@@ -29,7 +29,7 @@ package com.app.crypto.noise.southernstorm.protocol
  * @param sender The CipherState to use to send packets to the remote party.
  * @param receiver The CipherState to use to receive packets from the remote party.
  */
-class CipherStatePair(
+internal class CipherStatePair(
     var sender: CipherState?,
     var receiver: CipherState?,
 ) : Destroyable {

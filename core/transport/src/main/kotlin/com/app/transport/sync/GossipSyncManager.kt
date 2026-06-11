@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap
  * Tracks seen public packets (ANNOUNCE, broadcast MESSAGE) and periodically requests sync
  * from neighbors. Responds to REQUEST_SYNC by sending missing packets.
  */
-class GossipSyncManager(
+internal class GossipSyncManager(
     private val myPeerID: String,
     private val scope: CoroutineScope,
     private val configProvider: ConfigProvider

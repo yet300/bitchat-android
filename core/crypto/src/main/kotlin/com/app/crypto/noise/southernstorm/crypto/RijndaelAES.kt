@@ -34,7 +34,7 @@ package com.app.crypto.noise.southernstorm.crypto
 /**
  * Public domain fallback implementation of AES in ECB mode.
  */
-class RijndaelAES {
+internal class RijndaelAES {
     private val rk = IntArray(60)
     private var Nr = 14
 

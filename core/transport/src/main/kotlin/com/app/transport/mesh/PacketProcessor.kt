@@ -16,7 +16,7 @@ import kotlinx.coroutines.channels.actor
  * Prevents race condition where multiple threads process packets
  * from the same peer simultaneously, causing session management conflicts.
  */
-class PacketProcessor(
+internal class PacketProcessor(
     private val myPeerID: String,
     private val debugSettingsManager: MeshTelemetry,
 ) {
@@ -303,7 +303,7 @@ class PacketProcessor(
 /**
  * Delegate interface for packet processor callbacks
  */
-interface PacketProcessorDelegate {
+internal interface PacketProcessorDelegate {
     // Security validation
     fun validatePacketSecurity(packet: BitchatPacket, peerID: String): Boolean
     

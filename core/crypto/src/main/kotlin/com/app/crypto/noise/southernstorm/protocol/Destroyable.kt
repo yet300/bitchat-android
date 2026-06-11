@@ -34,7 +34,7 @@ package com.app.crypto.noise.southernstorm.protocol
  * The Noise.destroy() function can help with destroying byte arrays
  * that hold sensitive values.
  */
-interface Destroyable {
+internal interface Destroyable {
     /**
      * Destroys all sensitive state in the current object.
      */

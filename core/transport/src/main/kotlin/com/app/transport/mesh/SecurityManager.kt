@@ -17,7 +17,7 @@ import kotlin.collections.mutableSetOf
  * replay attack protection, and key exchange handling
  * Extracted from BluetoothMeshService for better separation of concerns
  */
-class SecurityManager(private val encryptionService: EncryptionService, private val myPeerID: String) {
+internal class SecurityManager(private val encryptionService: EncryptionService, private val myPeerID: String) {
     
     companion object {
         private const val TAG = "SecurityManager"
@@ -417,7 +417,7 @@ class SecurityManager(private val encryptionService: EncryptionService, private 
 /**
  * Delegate interface for security manager callbacks
  */
-interface SecurityManagerDelegate {
+internal interface SecurityManagerDelegate {
     fun onKeyExchangeCompleted(peerID: String, peerPublicKeyData: ByteArray)
     fun sendHandshakeResponse(peerID: String, response: ByteArray)
     fun getPeerInfo(peerID: String): PeerInfo? // NEW: For signature verification

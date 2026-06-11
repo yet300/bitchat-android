@@ -21,7 +21,7 @@ import javax.crypto.spec.SecretKeySpec
  * Uses PBKDF2 key derivation with channel name as salt and AES-256-GCM for encryption.
  * This is separate from Noise sessions and used for group channels with shared passwords.
  */
-class NoiseChannelEncryption {
+internal class NoiseChannelEncryption {
     
     companion object {
         private const val TAG = "NoiseChannelEncryption"

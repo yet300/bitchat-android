@@ -9,7 +9,7 @@ import java.util.zip.Inflater
  * Compression utilities - 100% iOS-compatible zlib implementation
  * Uses the same zlib algorithm as iOS CompressionUtil.swift
  */
-object CompressionUtil {
+internal object CompressionUtil {
     private const val COMPRESSION_THRESHOLD = 100  // bytes - same as iOS
     
     /**

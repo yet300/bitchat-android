@@ -33,7 +33,7 @@ import javax.crypto.BadPaddingException
 /**
  * Utility functions for the Noise protocol library.
  */
-object Noise {
+internal object Noise {
     /**
      * Maximum length for Noise packets.
      */

@@ -18,7 +18,7 @@ import java.security.SecureRandom
  * 
  * @see NewHopeTor
  */
-open class NewHope {
+internal open class NewHope {
     // -------------- newhope.c --------------
     private var sk: Poly? = null
 

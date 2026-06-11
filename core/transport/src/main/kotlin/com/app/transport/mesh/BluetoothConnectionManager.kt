@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.combine
  * Integrates with PowerManager for adaptive power consumption
  * Coordinates smaller, focused components for better maintainability
  */
-class BluetoothConnectionManager(
+internal class BluetoothConnectionManager(
     private val context: Context, 
     private val myPeerID: String,
     private val debugSettingsManager: MeshTelemetry,
@@ -427,7 +427,7 @@ class BluetoothConnectionManager(
 /**
  * Delegate interface for Bluetooth connection manager callbacks
  */
-interface BluetoothConnectionManagerDelegate {
+internal interface BluetoothConnectionManagerDelegate {
     fun onPacketReceived(packet: BitchatPacket, peerID: String, device: BluetoothDevice?)
     fun onDeviceConnected(device: BluetoothDevice)
     fun onDeviceDisconnected(device: BluetoothDevice)

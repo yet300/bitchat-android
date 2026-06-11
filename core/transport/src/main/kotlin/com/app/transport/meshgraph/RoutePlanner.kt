@@ -7,7 +7,7 @@ import java.util.PriorityQueue
  * Computes shortest paths on the current mesh graph snapshot using Dijkstra.
  * Assumes unit edge weights.
  */
-object RoutePlanner {
+internal object RoutePlanner {
     private const val TAG = "RoutePlanner"
 
     /**

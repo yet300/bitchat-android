@@ -8,7 +8,7 @@ import com.app.transport.routing.OutgoingEnvelope
  * All operations are suspending: the policy awaits each strategy's send outcome
  * (honest [com.app.transport.routing.SendOutcome] contract).
  */
-interface RoutingCore {
+internal interface RoutingCore {
     /** Dispatches [envelope] via the best available strategy, or queues it. */
     suspend fun route(envelope: OutgoingEnvelope)
 

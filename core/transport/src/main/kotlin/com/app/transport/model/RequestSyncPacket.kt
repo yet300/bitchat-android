@@ -7,7 +7,7 @@ package com.app.transport.model
  *  - 0x02: M (uint32, big-endian) — hash range (N * 2^P)
  *  - 0x03: data (opaque) — GR bitstream bytes
  */
-data class RequestSyncPacket(
+internal data class RequestSyncPacket(
     val p: Int,
     val m: Long,
     val data: ByteArray

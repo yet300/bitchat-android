@@ -24,7 +24,7 @@ import com.app.transport.debug.DebugScanResult
 /**
  * Manages GATT client operations, scanning, and client-side connections
  */
-class BluetoothGattClientManager(
+internal class BluetoothGattClientManager(
     private val context: Context,
     private val connectionScope: CoroutineScope,
     private val connectionTracker: BluetoothConnectionTracker,

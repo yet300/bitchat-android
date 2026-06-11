@@ -20,7 +20,7 @@ import java.math.BigInteger
  * Cryptographic utilities for Nostr protocol
  * Includes secp256k1 operations, ECDH, and NIP-44 encryption
  */
-object NostrCrypto {
+internal object NostrCrypto {
     
     private val secureRandom = SecureRandom()
     // NIP-44 v2 only

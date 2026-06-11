@@ -25,7 +25,7 @@ package com.app.crypto.noise.southernstorm.protocol
  * Additional API for DH objects that need special handling for
  * hybrid operations.
  */
-interface DHStateHybrid : DHState {
+internal interface DHStateHybrid : DHState {
     /**
      * Generates a new random keypair relative to the parameters
      * in another object.

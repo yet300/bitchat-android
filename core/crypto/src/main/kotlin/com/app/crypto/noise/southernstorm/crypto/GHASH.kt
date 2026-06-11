@@ -26,7 +26,7 @@ import com.app.crypto.noise.southernstorm.protocol.Destroyable
 /**
  * Implementation of the GHASH primitive for GCM.
  */
-class GHASH : Destroyable {
+internal class GHASH : Destroyable {
     private val h = LongArray(2)
     private val y = ByteArray(16)
     private var posn: Int = 0

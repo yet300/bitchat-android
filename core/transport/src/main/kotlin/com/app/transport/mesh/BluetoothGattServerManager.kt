@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 /**
  * Manages GATT server operations, advertising, and server-side connections
  */
-class BluetoothGattServerManager(
+internal class BluetoothGattServerManager(
     private val context: Context,
     private val connectionScope: CoroutineScope,
     private val connectionTracker: BluetoothConnectionTracker,

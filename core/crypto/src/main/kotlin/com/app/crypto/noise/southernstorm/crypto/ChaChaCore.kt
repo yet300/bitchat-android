@@ -24,7 +24,7 @@ package com.app.crypto.noise.southernstorm.crypto
 /**
  * Implementation of the ChaCha20 core hash transformation.
  */
-object ChaChaCore {
+internal object ChaChaCore {
     /**
      * Hashes an input block with ChaCha20.
      * 

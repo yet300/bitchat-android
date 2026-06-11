@@ -32,7 +32,7 @@ package com.app.crypto.noise.southernstorm.crypto
  * 
  * References: http://cr.yp.to/ecdh.html, RFC 7748
  */
-class Curve25519 {
+internal class Curve25519 {
     private val x_1 = IntArray(NUM_LIMBS_255BIT)
     private val x_2 = IntArray(NUM_LIMBS_255BIT)
     private val x_3 = IntArray(NUM_LIMBS_255BIT)

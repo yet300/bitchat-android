@@ -41,7 +41,7 @@ import kotlinx.coroutines.channels.actor
  * Hosts a GATT client.
  * Reads/writes to the peripheral’s characteristics.
  */
-class BluetoothPacketBroadcaster(
+internal class BluetoothPacketBroadcaster(
     private val connectionScope: CoroutineScope,
     private val connectionTracker: BluetoothConnectionTracker,
     private val fragmentManager: FragmentManager?,

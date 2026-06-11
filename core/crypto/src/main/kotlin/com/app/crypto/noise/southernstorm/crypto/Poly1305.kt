@@ -27,7 +27,7 @@ import com.app.crypto.noise.southernstorm.protocol.Destroyable
 /**
  * Simple implementation of the Poly1305 message authenticator.
  */
-class Poly1305 : Destroyable {
+internal class Poly1305 : Destroyable {
     // The 130-bit intermediate values are broken up into five 26-bit words.
     private val nonce = ByteArray(16)
     private val block = ByteArray(16)

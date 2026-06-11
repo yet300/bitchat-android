@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentHashMap
  */
 @SingleIn(AppScope::class)
 @Inject
-class NostrEventDeduplicator(
+internal class NostrEventDeduplicator(
     private val maxCapacity: Int = DEFAULT_CAPACITY
 ) {
     companion object {
@@ -238,7 +238,7 @@ class NostrEventDeduplicator(
 /**
  * Statistics about the deduplication system
  */
-data class DeduplicationStats(
+internal data class DeduplicationStats(
     val capacity: Int,
     val currentSize: Int,
     val totalChecks: Long,

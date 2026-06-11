@@ -24,7 +24,7 @@ package com.app.crypto.noise.southernstorm.protocol
 /**
  * Interface to a Diffie-Hellman algorithm for the Noise protocol.
  */
-interface DHState : Destroyable {
+internal interface DHState : Destroyable {
     /** The Noise protocol name for this Diffie-Hellman algorithm. */
     val dhName: String
 

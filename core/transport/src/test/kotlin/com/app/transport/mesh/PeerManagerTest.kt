@@ -1,7 +1,6 @@
-package com.bitchat
+package com.app.transport.mesh
 
 import com.app.crypto.identity.PeerFingerprintManager
-import com.app.transport.mesh.PeerManager
 import junit.framework.TestCase.assertEquals
 import org.junit.Test
 

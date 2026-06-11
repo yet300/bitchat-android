@@ -29,7 +29,7 @@ import java.security.MessageDigest
 /**
  * Fallback implementation of SHA256.
  */
-class SHA256MessageDigest : MessageDigest("SHA-256"), Destroyable {
+internal class SHA256MessageDigest : MessageDigest("SHA-256"), Destroyable {
     private val h = IntArray(8)
     private val block = ByteArray(64)
     private val w = IntArray(64)

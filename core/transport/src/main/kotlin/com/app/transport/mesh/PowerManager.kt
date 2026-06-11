@@ -22,7 +22,7 @@ import kotlin.math.max
  * Power-aware Bluetooth management for bitchat
  * Adjusts scanning, advertising, and connection behavior based on battery state
  */
-class PowerManager(private val context: Context) : LifecycleEventObserver {
+internal class PowerManager(private val context: Context) : LifecycleEventObserver {
     
     companion object {
         private const val TAG = "PowerManager"
@@ -361,7 +361,7 @@ class PowerManager(private val context: Context) : LifecycleEventObserver {
 /**
  * Delegate interface for power management callbacks
  */
-interface PowerManagerDelegate {
+internal interface PowerManagerDelegate {
     fun onPowerModeChanged(newMode: PowerManager.PowerMode)
     fun onScanStateChanged(shouldScan: Boolean)
 }
