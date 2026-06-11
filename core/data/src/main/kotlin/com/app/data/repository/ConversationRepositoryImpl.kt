@@ -84,9 +84,8 @@ internal class ConversationRepositoryImpl(
 
     override suspend fun markRead(id: ConversationId) {
         val key = conversationKey(id) ?: return
-        // Persist read ids first so the counter does not bounce back after restart
-        seenMessageStore.markReadAll(messagesOf(id).map { it.id })
-        appStateStore.markRead(key)
+        // Persist + counter reset run atomically inside the store (audit A9)
+        appStateStore.markRead(key) { ids -> seenMessageStore.markReadAll(ids) }
     }
 
     private fun conversationKey(id: ConversationId): String? = when (id) {
@@ -94,14 +93,6 @@ internal class ConversationRepositoryImpl(
         is ConversationId.Private -> AppStateStore.privateConversationKey(id.peer.raw)
         is ConversationId.Channel -> AppStateStore.channelConversationKey(id.tag)
         is ConversationId.Geohash -> AppStateStore.channelConversationKey(GEO_TAG_PREFIX + id.channel.geohash)
-    }
-
-    private fun messagesOf(id: ConversationId): List<BitchatMessage> = when (id) {
-        is ConversationId.PublicMesh -> appStateStore.publicMessages.value
-        is ConversationId.Private -> appStateStore.privateMessages.value[id.peer.raw].orEmpty()
-        is ConversationId.Channel -> appStateStore.channelMessages.value[id.tag].orEmpty()
-        is ConversationId.Geohash ->
-            appStateStore.channelMessages.value[GEO_TAG_PREFIX + id.channel.geohash].orEmpty()
     }
 
     /** Legacy `geo:<geohash>` channel tags are geo conversations; everything else is a channel. */
