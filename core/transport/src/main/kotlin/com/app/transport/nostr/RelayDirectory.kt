@@ -3,7 +3,7 @@ package com.app.transport.nostr
 import android.app.Application
 import android.util.Log
 import com.app.common.geohash.Geohash
-import com.app.domain.repository.SettingsStore
+import com.app.common.settings.SettingsStore
 import com.app.transport.net.HttpClientProvider
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject

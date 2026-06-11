@@ -2,7 +2,7 @@
 
 package com.app.data.repository
 
-import com.app.domain.repository.SettingsStore
+import com.app.common.settings.SettingsStore
 import com.russhwolf.settings.ExperimentalSettingsApi
 import com.russhwolf.settings.ObservableSettings
 import com.russhwolf.settings.coroutines.getStringFlow

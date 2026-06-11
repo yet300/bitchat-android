@@ -4,7 +4,7 @@ import com.app.common.serialization.JsonConfig
 import com.app.domain.model.Channel
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.JoinResult
-import com.app.domain.repository.SettingsStore
+import com.app.common.settings.SettingsStore
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn

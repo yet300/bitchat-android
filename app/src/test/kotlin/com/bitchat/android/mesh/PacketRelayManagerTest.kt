@@ -1,7 +1,7 @@
 
 package com.bitchat.android.mesh
 
-import com.app.domain.repository.SettingsStore
+import com.app.common.settings.SettingsStore
 import com.app.transport.debug.DebugPreferenceManager
 import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.mesh.PacketRelayManager

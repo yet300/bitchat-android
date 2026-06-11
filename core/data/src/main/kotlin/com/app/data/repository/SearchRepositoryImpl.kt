@@ -10,7 +10,7 @@ import com.app.domain.model.Contact
 import com.app.domain.model.ConversationId
 import com.app.domain.model.PeerId
 import com.app.domain.repository.SearchRepository
-import com.app.domain.repository.SettingsStore
+import com.app.common.settings.SettingsStore
 import com.app.transport.model.BitchatMessage
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject

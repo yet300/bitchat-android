@@ -1,4 +1,4 @@
-package com.app.domain.repository
+package com.app.common.settings
 
 import kotlinx.coroutines.flow.Flow
 
@@ -7,9 +7,6 @@ import kotlinx.coroutines.flow.Flow
  * backend (multiplatform-settings) away from the layers that read/write arbitrary keys, so neither
  * the domain nor the lower modules depend on the settings infrastructure library — only on this
  * interface. The implementation lives in :core:data.
- *
- * High-level, semantic settings (nickname, location-enabled, …) belong on [SettingsRepository];
- * this port is for components that persist their own ad-hoc keys (transport prefs, registries, etc).
  *
  * Secrets at rest go through the crypto layer's secure store, not here.
  */

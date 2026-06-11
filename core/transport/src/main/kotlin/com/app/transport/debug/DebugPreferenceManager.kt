@@ -1,6 +1,6 @@
 package com.app.transport.debug
 
-import com.app.domain.repository.SettingsStore
+import com.app.common.settings.SettingsStore
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
