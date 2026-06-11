@@ -290,5 +290,6 @@ class VerificationService(private val encryptionService: EncryptionService) {
         val value: String
     )
 
+    @Volatile
     private var cachedQR: CacheEntry? = null
 }

@@ -35,6 +35,11 @@ class AppStateStore(
     companion object {
         private const val SEEN_IDS_CAP = 2048
 
+        // Per-conversation timeline bound (drop-oldest). Keeps long foreground sessions
+        // from growing without limit and keeps retained messages roughly within the
+        // seen-id LRU horizon (audit finding A10).
+        private const val TIMELINE_CAP = 500
+
         fun publicConversationKey() = "public"
         fun privateConversationKey(peerID: String) = "private:" + peerID
         fun channelConversationKey(channel: String) = "channel:" + channel
@@ -72,13 +77,28 @@ class AppStateStore(
         }
     }
 
-    /** Reset the unread counter of a conversation (the repository persists read ids). */
-    fun markRead(conversationKey: String) {
+    /**
+     * Reset the unread counter of a conversation. [persistReadIds] (the repository's
+     * SeenMessageStore write) runs under the same monitor the add*Message paths take, so a
+     * message cannot slip between the persist snapshot and the counter reset and end up
+     * neither counted nor persisted as read (audit finding A9).
+     */
+    fun markRead(conversationKey: String, persistReadIds: ((List<String>) -> Unit)? = null) {
         synchronized(this) {
+            persistReadIds?.invoke(messagesForKey(conversationKey).map { it.id })
             if (_unreadCounts.value.containsKey(conversationKey)) {
                 _unreadCounts.value = _unreadCounts.value - conversationKey
             }
         }
+    }
+
+    private fun messagesForKey(conversationKey: String): List<BitchatMessage> = when {
+        conversationKey == publicConversationKey() -> _publicMessages.value
+        conversationKey.startsWith("private:") ->
+            _privateMessages.value[conversationKey.removePrefix("private:")].orEmpty()
+        conversationKey.startsWith("channel:") ->
+            _channelMessages.value[conversationKey.removePrefix("channel:")].orEmpty()
+        else -> emptyList()
     }
     // Connected peer IDs (mesh ephemeral IDs)
     private val _peers = MutableStateFlow<List<String>>(emptyList())
@@ -103,7 +123,7 @@ class AppStateStore(
     override fun addPublicMessage(msg: BitchatMessage) {
         synchronized(this) {
             if (!rememberSeen(msg.id)) return
-            _publicMessages.value = _publicMessages.value + msg
+            _publicMessages.value = (_publicMessages.value + msg).takeLast(TIMELINE_CAP)
             countUnread(publicConversationKey(), msg)
         }
     }
@@ -112,8 +132,7 @@ class AppStateStore(
         synchronized(this) {
             if (!rememberSeen(msg.id)) return
             val map = _privateMessages.value.toMutableMap()
-            val list = (map[peerID] ?: emptyList()) + msg
-            map[peerID] = list
+            map[peerID] = ((map[peerID] ?: emptyList()) + msg).takeLast(TIMELINE_CAP)
             _privateMessages.value = map
             countUnread(privateConversationKey(peerID), msg)
         }
@@ -156,8 +175,7 @@ class AppStateStore(
         synchronized(this) {
             if (!rememberSeen(msg.id)) return
             val map = _channelMessages.value.toMutableMap()
-            val list = (map[channel] ?: emptyList()) + msg
-            map[channel] = list
+            map[channel] = ((map[channel] ?: emptyList()) + msg).takeLast(TIMELINE_CAP)
             _channelMessages.value = map
             countUnread(channelConversationKey(channel), msg)
         }
