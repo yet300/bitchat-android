@@ -69,7 +69,7 @@ class ChatViewModel(
     }
 
     fun buildMyQRString(nickname: String, npub: String?): String {
-        return VerificationService.buildMyQRString(nickname, npub) ?: ""
+        return (getApplication<Application>() as BitchatApplication).appGraph.verificationService.buildMyQRString(nickname, npub) ?: ""
     }
 
     // MARK: - State management
@@ -131,6 +131,7 @@ class ChatViewModel(
         messageManager = messageManager,
         geohashAliasRegistry = geohashAliasRegistry,
         favoritesService = favoritesService,
+        verificationService = (application as BitchatApplication).appGraph.verificationService,
     )
     val verifiedFingerprints = verificationHandler.verifiedFingerprints
 

@@ -58,6 +58,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import com.bitchat.android.di.appGraph
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -120,6 +121,7 @@ fun VerificationSheet(
             verticalArrangement = Arrangement.Top
         ) {
             // Header
+            val verificationService = LocalContext.current.appGraph.verificationService
             VerificationHeader(
                 accent = accent,
                 onClose = onDismiss,
@@ -179,7 +181,7 @@ fun VerificationSheet(
                     1 -> ScanTabContent(
                         accent = accent,
                         onScan = { code ->
-                            val qr = VerificationService.verifyScannedQR(code)
+                            val qr = verificationService.verifyScannedQR(code)
                             if (qr != null && viewModel.beginQRVerification(qr)) {
                                 selectedTab = 0
                             }

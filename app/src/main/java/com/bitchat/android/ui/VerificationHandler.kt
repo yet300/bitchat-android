@@ -36,6 +36,7 @@ class VerificationHandler(
     private val messageManager: MessageManager,
     private val geohashAliasRegistry: GeohashAliasRegistry,
     private val favoritesService: FavoritesPersistenceService,
+    private val verificationService: VerificationService,
 ) {
     // Helper to get current mesh service (may change after panic clear)
     private val meshService: BluetoothMeshService
@@ -108,7 +109,7 @@ class VerificationHandler(
 
     fun didReceiveVerifyChallenge(peerID: String, payload: ByteArray) {
         scope.launch {
-            val parsed = VerificationService.parseVerifyChallenge(payload) ?: return@launch
+            val parsed = verificationService.parseVerifyChallenge(payload) ?: return@launch
             val myNoiseHex = meshService.getStaticNoisePublicKey()?.hexEncodedString()?.lowercase() ?: return@launch
             if (parsed.first.lowercase() != myNoiseHex) return@launch
 
@@ -137,12 +138,12 @@ class VerificationHandler(
 
     fun didReceiveVerifyResponse(peerID: String, payload: ByteArray) {
         scope.launch {
-            val resp = VerificationService.parseVerifyResponse(payload) ?: return@launch
+            val resp = verificationService.parseVerifyResponse(payload) ?: return@launch
             val pending = pendingQRVerifications[peerID] ?: return@launch
             if (!resp.noiseKeyHex.equals(pending.noiseKeyHex, ignoreCase = true)) return@launch
             if (!resp.nonceA.contentEquals(pending.nonceA)) return@launch
 
-            val ok = VerificationService.verifyResponseSignature(
+            val ok = verificationService.verifyResponseSignature(
                 noiseKeyHex = resp.noiseKeyHex,
                 nonceA = resp.nonceA,
                 signature = resp.signature,
