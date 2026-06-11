@@ -29,6 +29,7 @@ internal class IdentityRepositoryImpl(
     private val identityState: SecureIdentityStateManager,
     private val settings: SettingsStore,
     private val context: Context,
+    private val nostrIdentityBridge: NostrIdentityBridge,
 ) : IdentityRepository {
 
     private val verifiedState = MutableStateFlow(loadVerified())
@@ -40,7 +41,7 @@ internal class IdentityRepositoryImpl(
             fingerprint = Fingerprint(fingerprint),
             nickname = settings.getStringOrNull(KEY_NICKNAME).orEmpty(),
             nostrNpub = runCatching {
-                NostrIdentityBridge.getCurrentNostrIdentity(context)?.npub
+                nostrIdentityBridge.getCurrentNostrIdentity()?.npub
             }.getOrNull(),
         )
     }
@@ -60,7 +61,7 @@ internal class IdentityRepositoryImpl(
         // in-memory geohash-identity cache. Mesh recreation / media / bookmarks are app-lifecycle
         // orchestration handled elsewhere; the use-case clears messages/contacts separately.
         identityState.clearIdentityData()
-        runCatching { NostrIdentityBridge.clearAllAssociations(context) }
+        runCatching { nostrIdentityBridge.clearAllAssociations() }
         verifiedState.value = emptySet()
     }
 

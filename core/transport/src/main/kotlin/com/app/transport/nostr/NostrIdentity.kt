@@ -1,10 +1,14 @@
 package com.app.transport.nostr
 
 import android.content.Context
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import android.util.Log
 import com.app.crypto.identity.SecureIdentityStateManager
 import java.security.MessageDigest
 import java.security.SecureRandom
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Manages Nostr identity (secp256k1 keypair) for NIP-17 private messaging
@@ -93,18 +97,24 @@ data class NostrIdentity(
  * Bridge between Noise and Nostr identities
  * Manages persistent storage and per-geohash identity derivation
  */
-object NostrIdentityBridge {
-    private const val TAG = "NostrIdentityBridge"
-    private const val NOSTR_PRIVATE_KEY = "nostr_private_key"
-    private const val DEVICE_SEED_KEY = "nostr_device_seed"
-    
+@SingleIn(AppScope::class)
+@Inject
+class NostrIdentityBridge(private val context: Context) {
+
+    private companion object {
+        const val TAG = "NostrIdentityBridge"
+        const val NOSTR_PRIVATE_KEY = "nostr_private_key"
+        const val DEVICE_SEED_KEY = "nostr_device_seed"
+    }
+
     // Cache for derived geohash identities to avoid repeated crypto operations
-    private val geohashIdentityCache = mutableMapOf<String, NostrIdentity>()
+    // (concurrent: derivation happens from UI, transport and data coroutines)
+    private val geohashIdentityCache = ConcurrentHashMap<String, NostrIdentity>()
     
     /**
      * Get or create the current Nostr identity
      */
-    fun getCurrentNostrIdentity(context: Context): NostrIdentity? {
+    fun getCurrentNostrIdentity(): NostrIdentity? {
         val stateManager = SecureIdentityStateManager(context)
         
         // Try to load existing Nostr private key
@@ -134,7 +144,7 @@ object NostrIdentityBridge {
      * Direct port from iOS implementation for 100% compatibility
      * OPTIMIZED: Cached for UI responsiveness
      */
-    fun deriveIdentity(forGeohash: String, context: Context): NostrIdentity {
+    fun deriveIdentity(forGeohash: String): NostrIdentity {
         // Check cache first for immediate response
         geohashIdentityCache[forGeohash]?.let { cachedIdentity ->
             //Log.v(TAG, "Using cached geohash identity for $forGeohash")
@@ -187,7 +197,7 @@ object NostrIdentityBridge {
     /**
      * Associate a Nostr identity with a Noise public key (for favorites)
      */
-    fun associateNostrIdentity(nostrPubkey: String, noisePublicKey: ByteArray, context: Context) {
+    fun associateNostrIdentity(nostrPubkey: String, noisePublicKey: ByteArray) {
         val stateManager = SecureIdentityStateManager(context)
         
         // We'll use the existing signing key storage mechanism for associations
@@ -200,7 +210,7 @@ object NostrIdentityBridge {
     /**
      * Get Nostr public key associated with a Noise public key
      */
-    fun getNostrPublicKey(noisePublicKey: ByteArray, context: Context): String? {
+    fun getNostrPublicKey(noisePublicKey: ByteArray): String? {
         // This would need proper implementation based on your favorites storage system
         // For now, return null as we don't have the full association system
         return null
@@ -209,7 +219,7 @@ object NostrIdentityBridge {
     /**
      * Clear all Nostr identity data
      */
-    fun clearAllAssociations(context: Context) {
+    fun clearAllAssociations() {
         val stateManager = SecureIdentityStateManager(context)
         
         // Clear cache first

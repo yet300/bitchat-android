@@ -28,7 +28,8 @@ class GeohashMessageHandler(
     private val scope: CoroutineScope,
     private val dataManager: com.bitchat.android.ui.DataManager,
     private val geohashAliasRegistry: com.app.transport.nostr.GeohashAliasRegistry,
-    private val powPreferenceManager: PoWPreferenceManager
+    private val powPreferenceManager: PoWPreferenceManager,
+    private val nostrIdentityBridge: NostrIdentityBridge,
 ) {
     companion object { private const val TAG = "GeohashMessageHandler" }
 
@@ -86,7 +87,7 @@ class GeohashMessageHandler(
                 if (event.kind == NostrKind.GEOHASH_PRESENCE) return@launch
 
                 // Skip our own events for message emission
-                val my = NostrIdentityBridge.deriveIdentity(subscribedGeohash, application)
+                val my = nostrIdentityBridge.deriveIdentity(subscribedGeohash)
                 if (my.publicKeyHex.equals(event.pubkey, true)) return@launch
 
                 val isTeleportPresence = event.tags.any { it.size >= 2 && it[0] == "t" && it[1] == "teleport" } &&

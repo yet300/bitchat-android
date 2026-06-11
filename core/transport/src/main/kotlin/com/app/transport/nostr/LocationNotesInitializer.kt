@@ -17,7 +17,7 @@ object LocationNotesInitializer {
      * @param context Application context
      * @return true if initialization succeeded, false otherwise
      */
-    fun initialize(context: Context, relayDirectory: RelayDirectory, relayManager: NostrRelayManager, locationNotesManager: LocationNotesManager): Boolean {
+    fun initialize(context: Context, relayDirectory: RelayDirectory, relayManager: NostrRelayManager, locationNotesManager: LocationNotesManager, nostrIdentityBridge: NostrIdentityBridge): Boolean {
         return try {
             locationNotesManager.initialize(
                 relayManager = { relayManager },
@@ -51,7 +51,7 @@ object LocationNotesInitializer {
                     }
                 },
                 deriveIdentity = { geohash ->
-                    NostrIdentityBridge.deriveIdentity(geohash, context)
+                    nostrIdentityBridge.deriveIdentity(geohash)
                 }
             )
             Log.d(TAG, "✅ Location Notes Manager initialized")

@@ -22,3 +22,12 @@ fun interface PeerKeyResolver {
 fun interface NostrIdentityProvider {
     fun current(): NostrIdentity?
 }
+
+/**
+ * Live source of our own mesh peer id (first 16 hex of the Noise identity fingerprint).
+ * Backed by EncryptionService, so it survives a panic reset without re-wiring — replaces
+ * the mutable NostrTransport.senderPeerID that the UI had to keep assigning.
+ */
+fun interface MeshPeerIdSource {
+    fun current(): String
+}

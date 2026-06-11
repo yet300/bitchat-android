@@ -1,5 +1,6 @@
 package com.bitchat.android.ui
 
+import com.bitchat.android.di.appGraph
 import android.util.Log
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -98,10 +99,9 @@ fun GeohashPeopleList(
                 when (val channel = selectedLocationChannel) {
                     is com.bitchat.android.geohash.ChannelID.Location -> {
                         try {
-                            val identity = NostrIdentityBridge.deriveIdentity(
-                                forGeohash = channel.channel.geohash,
-                                context = viewModel.getApplication()
-                            )
+                            val identity = viewModel.getApplication<android.app.Application>()
+                                .appGraph.nostrIdentityBridge
+                                .deriveIdentity(channel.channel.geohash)
                             identity.publicKeyHex.lowercase()
                         } catch (e: Exception) {
                             Log.e("GeohashPeopleList", "Failed to derive identity: ${e.message}")

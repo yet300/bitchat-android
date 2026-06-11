@@ -8,6 +8,7 @@ import com.app.data.favorites.FavoritesPersistenceService
 import com.app.transport.NostrConstants
 import com.app.transport.model.ReadReceipt
 import com.app.transport.model.NoisePayloadType
+import com.app.transport.routing.MeshPeerIdSource
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -25,8 +26,11 @@ class NostrTransport(
     private val context: Context,
     private val relayManager: NostrRelayManager,
     private val favoritesService: FavoritesPersistenceService,
+    private val nostrIdentityBridge: NostrIdentityBridge,
+    private val peerIdSource: MeshPeerIdSource,
 ) {
-    var senderPeerID: String = ""
+    // Live read (panic-safe): replaces the mutable var the UI had to assign before sends
+    val senderPeerID: String get() = peerIdSource.current()
 
     companion object {
         private const val TAG = "NostrTransport"
@@ -70,7 +74,7 @@ class NostrTransport(
                     return@launch
                 }
                 
-                val senderIdentity = NostrIdentityBridge.getCurrentNostrIdentity(context)
+                val senderIdentity = nostrIdentityBridge.getCurrentNostrIdentity()
                 if (senderIdentity == null) {
                     Log.e(TAG, "No Nostr identity available")
                     return@launch
@@ -164,7 +168,7 @@ class NostrTransport(
                     return@launch
                 }
                 
-                val senderIdentity = NostrIdentityBridge.getCurrentNostrIdentity(context)
+                val senderIdentity = nostrIdentityBridge.getCurrentNostrIdentity()
                 if (senderIdentity == null) {
                     Log.e(TAG, "No Nostr identity available for read receipt")
                     scheduleNextReadAck()
@@ -240,7 +244,7 @@ class NostrTransport(
                     return@launch
                 }
                 
-                val senderIdentity = NostrIdentityBridge.getCurrentNostrIdentity(context)
+                val senderIdentity = nostrIdentityBridge.getCurrentNostrIdentity()
                 if (senderIdentity == null) {
                     Log.e(TAG, "No Nostr identity available for favorite notification")
                     return@launch
@@ -301,7 +305,7 @@ class NostrTransport(
                     return@launch
                 }
                 
-                val senderIdentity = NostrIdentityBridge.getCurrentNostrIdentity(context)
+                val senderIdentity = nostrIdentityBridge.getCurrentNostrIdentity()
                 if (senderIdentity == null) {
                     Log.e(TAG, "No Nostr identity available for delivery ack")
                     return@launch
@@ -437,7 +441,7 @@ class NostrTransport(
         }
         
         val fromIdentity = try {
-            NostrIdentityBridge.deriveIdentity(geohash, context)
+            nostrIdentityBridge.deriveIdentity(geohash)
         } catch (e: Exception) {
             Log.e(TAG, "NostrTransport: cannot derive geohash identity for $geohash: ${e.message}")
             return
