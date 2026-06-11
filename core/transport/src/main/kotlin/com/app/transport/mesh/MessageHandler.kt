@@ -14,6 +14,7 @@ import com.app.transport.model.PrivateMessagePacket
 import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
+import com.app.transport.sync.PacketIdUtil
 import com.app.common.encoding.toHexString
 import com.app.transport.MeshConstants
 import com.app.transport.FavoriteNostrLink
@@ -422,7 +423,9 @@ internal class MessageHandler(
                 }
                 val savedPath = FileUtils.saveIncomingFile(appContext, file)
                 val message = BitchatMessage(
-                    id = java.util.UUID.randomUUID().toString().uppercase(),
+                    // Stable content-derived id: request-sync replays of the same packet
+                    // must collapse to one message (upstream #707)
+                    id = PacketIdUtil.computeIdHex(packet).uppercase(),
                     sender = delegate?.getPeerNickname(peerID) ?: "unknown",
                     content = savedPath,
                     type = FileUtils.messageTypeForMime(file.mimeType),
@@ -438,6 +441,7 @@ internal class MessageHandler(
 
             // Fallback: plain text
             val message = BitchatMessage(
+                id = PacketIdUtil.computeIdHex(packet).uppercase(),
                 sender = delegate?.getPeerNickname(peerID) ?: "unknown",
                 content = String(packet.payload, Charsets.UTF_8),
                 senderPeerID = peerID,
