@@ -1,7 +1,7 @@
 package com.app.data.repository
 
 import com.app.domain.repository.SettingsRepository
-import com.app.domain.repository.SettingsStore
+import com.app.common.settings.SettingsStore
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn

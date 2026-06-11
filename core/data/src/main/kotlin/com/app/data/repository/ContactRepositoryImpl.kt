@@ -10,7 +10,7 @@ import com.app.domain.model.Fingerprint
 import com.app.domain.model.PeerId
 import com.app.domain.model.PeerIdentity
 import com.app.domain.repository.ContactRepository
-import com.app.domain.repository.SettingsStore
+import com.app.common.settings.SettingsStore
 import com.app.transport.nostr.GeohashAliasRegistry
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject

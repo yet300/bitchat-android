@@ -3,7 +3,7 @@ package com.app.data.repository
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.domain.model.PeerId
-import com.app.domain.repository.SettingsStore
+import com.app.common.settings.SettingsStore
 import com.app.transport.nostr.GeohashAliasRegistry
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals

@@ -7,7 +7,7 @@ import com.app.domain.model.Fingerprint
 import com.app.domain.model.MyIdentity
 import com.app.domain.model.PeerId
 import com.app.domain.repository.IdentityRepository
-import com.app.domain.repository.SettingsStore
+import com.app.common.settings.SettingsStore
 import com.app.transport.nostr.NostrIdentityBridge
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
