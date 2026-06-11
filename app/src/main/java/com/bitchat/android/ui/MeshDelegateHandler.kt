@@ -2,6 +2,7 @@ package com.bitchat.android.ui
 
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.data.routing.MessageRouter
+import com.app.data.routing.PeerAddressResolver
 import com.app.transport.notification.NotificationTextUtils
 import com.app.transport.model.BitchatMessage
 import com.app.transport.model.DeliveryStatus
@@ -31,6 +32,7 @@ class MeshDelegateHandler(
     private val geohashAliasRegistry: GeohashAliasRegistry,
     private val favoritesService: FavoritesPersistenceService,
     private val messageRouter: MessageRouter,
+    private val peerAddressResolver: PeerAddressResolver,
 ) : BluetoothMeshDelegate {
 
     override fun didReceiveMessage(message: BitchatMessage) {
@@ -124,30 +126,7 @@ class MeshDelegateHandler(
                 if (isNostrAlias || isNoiseHex) {
                     // Reverse case: Nostr/offline chat is open, and peer may have come online on mesh.
                     // Resolve canonical target (prefer connected mesh peer if available)
-                    val canonical = com.bitchat.android.services.ConversationAliasResolver.resolveCanonicalPeerID(
-                        selectedPeerID = currentPeer,
-                        connectedPeers = peers,
-                        meshNoiseKeyForPeer = { pid -> getPeerInfo(pid)?.noisePublicKey },
-                        meshHasPeer = { pid -> peers.contains(pid) },
-                        nostrPubHexForAlias = { alias ->
-                            // Use GeohashAliasRegistry for geohash aliases, but for mesh favorites, derive from favorites mapping
-                            if (geohashAliasRegistry.contains(alias)) {
-                                geohashAliasRegistry.get(alias)
-                            } else {
-                                // Best-effort: derive pub hex from favorites mapping for mesh nostr_ aliases
-                                val prefix = alias.removePrefix("nostr_")
-                                val favs = try { favoritesService.getOurFavorites() } catch (_: Exception) { emptyList() }
-                                favs.firstNotNullOfOrNull { rel ->
-                                    rel.peerNostrPublicKey?.let { s ->
-                                        runCatching { Bech32.decode(s) }.getOrNull()?.let { dec ->
-                                            if (dec.first == "npub") dec.second.joinToString("") { b -> "%02x".format(b) } else null
-                                        }
-                                    }
-                                }?.takeIf { it.startsWith(prefix, ignoreCase = true) }
-                            }
-                        },
-                        findNoiseKeyForNostr = { key -> favoritesService.findNoiseKey(key) }
-                    )
+                    val canonical = peerAddressResolver.canonicalPeerID(currentPeer, peers)
                     if (canonical != currentPeer) {
                         // Merge conversations and switch selection to the live mesh peer (or noiseHex)
                         com.bitchat.android.services.ConversationAliasResolver.unifyChatsIntoPeer(state, canonical, listOf(currentPeer))

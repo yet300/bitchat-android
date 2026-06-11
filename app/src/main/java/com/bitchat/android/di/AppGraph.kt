@@ -13,6 +13,7 @@ import com.app.crypto.identity.PeerFingerprintManager
 import com.app.data.AppStateStore
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.data.routing.MessageRouter
+import com.app.data.routing.PeerAddressResolver
 import com.app.transport.SeenMessageStore
 import com.app.transport.VerificationService
 import com.app.transport.mesh.BluetoothMeshService
@@ -75,6 +76,7 @@ interface AppGraph {
     // temporary Phase-D/DI-core bridge, retires Phase C
     val peerFingerprintManager: PeerFingerprintManager
     val messageRouter: MessageRouter
+    val peerAddressResolver: PeerAddressResolver
     val favoritesPersistenceService: FavoritesPersistenceService
 
     // Settings-backed preference managers (formerly `object`s over the global appSettings()).

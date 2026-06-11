@@ -4,7 +4,7 @@ import com.app.crypto.identity.PeerFingerprintManager
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.domain.model.PeerId
 import com.app.common.settings.SettingsStore
-import com.app.transport.nostr.GeohashAliasRegistry
+import com.app.data.routing.PeerAddressResolver
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -23,40 +23,31 @@ class ContactRepositoryAliasTest {
     }
 
     private lateinit var favorites: FavoritesPersistenceService
-    private lateinit var aliasRegistry: GeohashAliasRegistry
+    private lateinit var resolver: PeerAddressResolver
     private lateinit var repository: ContactRepositoryImpl
 
     @Before
     fun setUp() {
         favorites = mock()
-        aliasRegistry = mock()
+        resolver = mock()
         repository = ContactRepositoryImpl(
             settings = mock<SettingsStore>(),
             favorites = favorites,
             fingerprints = PeerFingerprintManager(),
-            geohashAliasRegistry = aliasRegistry,
+            peerAddressResolver = resolver,
         )
     }
 
     @Test
-    fun resolvesAliasThroughRegistryAndFavorites() = runTest {
-        whenever(aliasRegistry.get(ALIAS)).thenReturn(NOSTR_PUBKEY_HEX)
-        whenever(favorites.findNoiseKey(NOSTR_PUBKEY_HEX)).thenReturn(NOISE_KEY)
+    fun delegatesAliasResolutionToPeerAddressResolver() = runTest {
+        whenever(resolver.noiseKeyHexForNostrAlias(ALIAS)).thenReturn(NOISE_KEY_HEX)
 
         assertEquals(NOISE_KEY_HEX, repository.noiseKeyHexForNostrAlias(PeerId(ALIAS)))
     }
 
     @Test
     fun unknownAliasReturnsNull() = runTest {
-        whenever(aliasRegistry.get(ALIAS)).thenReturn(null)
-
-        assertNull(repository.noiseKeyHexForNostrAlias(PeerId(ALIAS)))
-    }
-
-    @Test
-    fun aliasWithoutFavoriteMappingReturnsNull() = runTest {
-        whenever(aliasRegistry.get(ALIAS)).thenReturn(NOSTR_PUBKEY_HEX)
-        whenever(favorites.findNoiseKey(NOSTR_PUBKEY_HEX)).thenReturn(null)
+        whenever(resolver.noiseKeyHexForNostrAlias(ALIAS)).thenReturn(null)
 
         assertNull(repository.noiseKeyHexForNostrAlias(PeerId(ALIAS)))
     }

@@ -11,7 +11,7 @@ import com.app.domain.model.PeerId
 import com.app.domain.model.PeerIdentity
 import com.app.domain.repository.ContactRepository
 import com.app.common.settings.SettingsStore
-import com.app.transport.nostr.GeohashAliasRegistry
+import com.app.data.routing.PeerAddressResolver
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -32,7 +32,7 @@ internal class ContactRepositoryImpl(
     private val settings: SettingsStore,
     private val favorites: FavoritesPersistenceService,
     private val fingerprints: PeerFingerprintManager,
-    private val geohashAliasRegistry: GeohashAliasRegistry,
+    private val peerAddressResolver: PeerAddressResolver,
 ) : ContactRepository {
 
     override fun observeFavorites(): Flow<Set<Fingerprint>> =
@@ -75,14 +75,8 @@ internal class ContactRepositoryImpl(
         )
     }
 
-    override suspend fun noiseKeyHexForNostrAlias(alias: PeerId): String? {
-        // Mirrors ConversationAliasResolver.resolveCanonicalPeerID: the "nostr_" alias maps
-        // to a full Nostr pubkey via the geohash alias registry; favorites then bridge the
-        // pubkey to the peer's stable Noise key.
-        val pubkeyHex = runCatching { geohashAliasRegistry.get(alias.raw) }.getOrNull() ?: return null
-        val noiseKey = runCatching { favorites.findNoiseKey(pubkeyHex) }.getOrNull() ?: return null
-        return noiseKey.toHex()
-    }
+    override suspend fun noiseKeyHexForNostrAlias(alias: PeerId): String? =
+        peerAddressResolver.noiseKeyHexForNostrAlias(alias.raw)
 
     override suspend fun clearAll() {
         settings.remove(KEY_FAVORITES)

@@ -2,44 +2,12 @@ package com.bitchat.android.services
 
 import com.bitchat.android.ui.ChatState
 
+/**
+ * UI-state merge helper for alias conversations. Address RESOLUTION lives in
+ * [com.app.data.routing.PeerAddressResolver]; this object only rewrites ChatState.
+ */
 object ConversationAliasResolver {
 
-    fun resolveCanonicalPeerID(
-        selectedPeerID: String,
-        connectedPeers: List<String>,
-        meshNoiseKeyForPeer: (String) -> ByteArray?,
-        meshHasPeer: (String) -> Boolean,
-        nostrPubHexForAlias: (String) -> String?,
-        findNoiseKeyForNostr: (String) -> ByteArray?
-    ): String {
-        var peer = selectedPeerID
-        try {
-            if (peer.startsWith("nostr_")) {
-                val pubHex = nostrPubHexForAlias(peer)
-                if (pubHex != null) {
-                    val noiseKey = findNoiseKeyForNostr(pubHex)
-                    if (noiseKey != null) {
-                        val noiseHex = noiseKey.joinToString("") { b -> "%02x".format(b) }
-                        // Prefer a connected mesh peer that matches this noise key
-                        val meshPeer = connectedPeers.firstOrNull { pid ->
-                            meshNoiseKeyForPeer(pid)?.contentEquals(noiseKey) == true
-                        }
-                        peer = meshPeer ?: noiseHex
-                    }
-                }
-            } else if (peer.length == 64 && peer.matches(Regex("^[0-9a-fA-F]+$"))) {
-                // Peer is full noise key hex: upgrade to active mesh peer if available
-                val noiseKey = peer.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-                val meshPeer = connectedPeers.firstOrNull { pid ->
-                    meshNoiseKeyForPeer(pid)?.contentEquals(noiseKey) == true
-                }
-                if (meshPeer != null) {
-                    peer = meshPeer
-                }
-            }
-        } catch (_: Exception) { /* no-op */ }
-        return peer
-    }
 
     fun unifyChatsIntoPeer(
         state: ChatState,

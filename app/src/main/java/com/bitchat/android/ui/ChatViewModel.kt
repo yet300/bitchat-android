@@ -100,6 +100,8 @@ class ChatViewModel(
         (application as BitchatApplication).appGraph.peerFingerprintManager
     private val messageRouter =
         (application as BitchatApplication).appGraph.messageRouter
+    private val peerAddressResolver =
+        (application as BitchatApplication).appGraph.peerAddressResolver
     private val favoritesService =
         (application as BitchatApplication).appGraph.favoritesPersistenceService
     private val identityManager by lazy { SecureIdentityStateManager(getApplication()) }
@@ -152,6 +154,7 @@ class ChatViewModel(
         geohashAliasRegistry = geohashAliasRegistry,
         favoritesService = favoritesService,
         messageRouter = messageRouter,
+        peerAddressResolver = peerAddressResolver,
     )
     
     // New Geohash architecture ViewModel (replaces God object service usage in UI path)
@@ -469,15 +472,7 @@ class ChatViewModel(
                 targetKey
             } else {
                 // Resolve to a canonical mesh peer if needed
-                val canonical = com.bitchat.android.services.ConversationAliasResolver.resolveCanonicalPeerID(
-                    selectedPeerID = targetKey,
-                    connectedPeers = state.getConnectedPeersValue(),
-                    meshNoiseKeyForPeer = { pid -> meshService.getPeerInfo(pid)?.noisePublicKey },
-                    meshHasPeer = { pid -> meshService.getPeerInfo(pid)?.isConnected == true },
-                    nostrPubHexForAlias = { alias -> geohashAliasRegistry.get(alias) },
-                    findNoiseKeyForNostr = { key -> favoritesService.findNoiseKey(key) }
-                )
-                canonical ?: targetKey
+                peerAddressResolver.canonicalPeerID(targetKey, state.getConnectedPeersValue())
             }
 
             showPrivateChatSheet(openPeer)
@@ -523,13 +518,9 @@ class ChatViewModel(
         
         if (selectedPeer != null) {
             // If the selected peer is a temporary Nostr alias or a noise-hex identity, resolve to a canonical target
-            selectedPeer = com.bitchat.android.services.ConversationAliasResolver.resolveCanonicalPeerID(
-                selectedPeerID = selectedPeer,
-                connectedPeers = state.getConnectedPeersValue(),
-                meshNoiseKeyForPeer = { pid -> meshService.getPeerInfo(pid)?.noisePublicKey },
-                meshHasPeer = { pid -> meshService.getPeerInfo(pid)?.isConnected == true },
-                nostrPubHexForAlias = { alias -> geohashAliasRegistry.get(alias) },
-                findNoiseKeyForNostr = { key -> favoritesService.findNoiseKey(key) }
+            selectedPeer = peerAddressResolver.canonicalPeerID(
+                selectedPeer,
+                state.getConnectedPeersValue(),
             ).also { canonical ->
                 if (canonical != state.getSelectedPrivateChatPeerValue()) {
                     privateChatManager.startPrivateChat(canonical, meshService)
