@@ -1,7 +1,10 @@
 package com.app.transport.mesh
 
 import android.util.Log
+import com.app.transport.MeshConstants
 import com.app.transport.model.RoutedPacket
+import com.app.transport.protocol.BitchatPacket
+import com.app.transport.protocol.MessageType
 import com.app.transport.sync.PacketIdUtil
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
@@ -74,11 +77,19 @@ class MeshNetwork(
      * Merged stream of packets arriving on ANY registered bearer, with cross-bearer
      * duplicates (same [PacketIdUtil] id) suppressed.
      *
+     * Exception: ANNOUNCE packets at max TTL always pass. The packet id is TTL-blind, so a
+     * relayed announce copy arriving first would otherwise suppress the direct copy — and
+     * SecurityManager deliberately accepts that duplicate because the engine binds the
+     * direct link (bindPeer) off the first max-TTL announce seen on it.
+     *
      * Consumers (e.g. [BluetoothMeshService]'s packet pipeline) should collect
      * this flow for the lifetime of the component.
      */
     val incoming: Flow<RoutedPacket> = bearers.map { it.incoming }.merge()
-        .filter { routed -> firstSeen(PacketIdUtil.computeIdHex(routed.packet)) }
+        .filter { routed -> isDirectAnnounce(routed.packet) || firstSeen(PacketIdUtil.computeIdHex(routed.packet)) }
+
+    private fun isDirectAnnounce(packet: BitchatPacket): Boolean =
+        packet.type == MessageType.ANNOUNCE.value && packet.ttl >= MeshConstants.MESSAGE_TTL_HOPS
 
     /** Merged stream of link-level events from ALL bearers. */
     val events: Flow<BearerEvent> = bearers.map { it.events }.merge()

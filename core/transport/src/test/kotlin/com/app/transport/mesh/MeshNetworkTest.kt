@@ -44,9 +44,9 @@ class MeshNetworkTest {
         override fun bindPeer(peerID: String, linkAddress: String) = Unit
     }
 
-    private fun packet(timestamp: ULong) = BitchatPacket(
-        type = MessageType.MESSAGE.value,
-        ttl = 7u,
+    private fun packet(timestamp: ULong, type: UByte = MessageType.MESSAGE.value, ttl: UByte = 7u) = BitchatPacket(
+        type = type,
+        ttl = ttl,
         senderID = ByteArray(8) { 0x11 },
         payload = "hello".toByteArray(),
         timestamp = timestamp,
@@ -76,6 +76,36 @@ class MeshNetworkTest {
         // Re-sending the first packet is also suppressed (LRU remembers it)
         ble.incomingFlow.emit(RoutedPacket(pkt, "peerA", "AA:11"))
         assertEquals(2, received.size)
+
+        job.cancel()
+    }
+
+    @Test
+    fun directAnnounceBypassesDedupAfterRelayedCopy() = runTest {
+        val ble = FakeBearer(BearerId.BLE)
+        val network = MeshNetwork(setOf(ble))
+
+        val received = mutableListOf<RoutedPacket>()
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
+            network.incoming.collect { received.add(it) }
+        }
+
+        // Relayed announce copy (decremented TTL) wins the race and seeds the LRU…
+        val announce = packet(timestamp = 1000u, type = MessageType.ANNOUNCE.value, ttl = 7u)
+        val relayedCopy = announce.copy(ttl = 6u)
+        ble.incomingFlow.emit(RoutedPacket(relayedCopy, "peerC", "CC:11"))
+        assertEquals(1, received.size)
+
+        // …but the direct copy (max TTL) MUST still reach the engine: SecurityManager
+        // accepts this duplicate on purpose so bindPeer fires for the direct link.
+        ble.incomingFlow.emit(RoutedPacket(announce, "peerA", "AA:11"))
+        assertEquals("direct announce must not be deduplicated", 2, received.size)
+
+        // Non-announce duplicates at max TTL are still suppressed
+        val msg = packet(timestamp = 2000u, ttl = 7u)
+        ble.incomingFlow.emit(RoutedPacket(msg, "peerA", "AA:11"))
+        ble.incomingFlow.emit(RoutedPacket(msg, "peerA", "AA:11"))
+        assertEquals(3, received.size)
 
         job.cancel()
     }
