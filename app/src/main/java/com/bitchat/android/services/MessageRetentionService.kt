@@ -24,7 +24,6 @@
 //        private const val KEY_FAVORITE_CHANNELS = "favorite_channels"
 //
 //        @Volatile
-//        private var INSTANCE: MessageRetentionService? = null
 //
 //        fun getInstance(context: Context): MessageRetentionService {
 //            return INSTANCE ?: synchronized(this) {

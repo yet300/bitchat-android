@@ -33,9 +33,8 @@ object DataProviders {
     @SingleIn(AppScope::class)
     fun provideMessageRouter(
         routingCore: RoutingCore,
-        mesh: BluetoothMeshService,
         scope: CoroutineScope,
-    ): MessageRouter = MessageRouter(routingCore, mesh, scope)
+    ): MessageRouter = MessageRouter(routingCore, scope)
 
     /** Narrow mesh ports (ISP) for the routing policy — implemented over BMS. */
     @Provides

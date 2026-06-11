@@ -1,6 +1,5 @@
 package com.app.data.routing
 
-import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.model.ReadReceipt
 import com.app.transport.routing.OutgoingEnvelope
 import kotlinx.coroutines.CoroutineScope
@@ -18,7 +17,6 @@ import kotlinx.coroutines.launch
  */
 class MessageRouter(
     private val routingCore: RoutingCore,
-    private val mesh: BluetoothMeshService,
     private val scope: CoroutineScope,
 ) {
 
@@ -50,11 +48,6 @@ class MessageRouter(
         scope.launch { routingCore.flushOutboxFor(peerID) }
     }
 
-    fun flushAllOutbox() {
-        // RouteSelector exposes per-peer flush; a global flush iterates all known peers.
-        val peers = try { mesh.getPeerNicknames().keys.toList() } catch (_: Exception) { emptyList() }
-        scope.launch { peers.forEach { routingCore.flushOutboxFor(it) } }
-    }
 
     fun onPeersUpdated(peers: List<String>) {
         scope.launch { routingCore.onPeersUpdated(peers) }
