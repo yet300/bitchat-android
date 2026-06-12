@@ -20,6 +20,7 @@ dependencyResolutionManagement {
 }
 
 include(":app")
+include(":shared")
 
 include(":core")
 include(":core:common")
