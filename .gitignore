@@ -63,3 +63,6 @@ google-services.json
 # Arti build artifacts (cloned repo and Rust build cache)
 tools/arti-build/.arti-source/
 tools/arti-build/target/
+
+# Local agent settings (skill symlinks are committed; local settings are not)
+.claude/settings.local.json
