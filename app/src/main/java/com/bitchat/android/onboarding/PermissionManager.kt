@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.app.transport.mesh.aware.WifiAwareSupport
 import com.bitchat.android.R
 import com.russhwolf.settings.ObservableSettings
 
@@ -68,9 +69,23 @@ class PermissionManager(
             Manifest.permission.ACCESS_FINE_LOCATION
         ))
 
+        // Wi-Fi Aware: Android 13+ requires NEARBY_WIFI_DEVICES runtime permission
+        if (shouldRequireWifiAwarePermission()) {
+            permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
+        }
+
         // Notification permission intentionally excluded to keep it optional
 
         return permissions
+    }
+
+    private fun shouldRequireWifiAwarePermission(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false
+        return try {
+            WifiAwareSupport.isSupported(context)
+        } catch (_: Exception) {
+            false
+        }
     }
 
     /**
@@ -208,6 +223,20 @@ class PermissionManager(
             )
         )
 
+        // Wi-Fi Aware category (Android 13+, Aware-capable devices only)
+        if (shouldRequireWifiAwarePermission()) {
+            val wifiAwarePermissions = listOf(Manifest.permission.NEARBY_WIFI_DEVICES)
+            categories.add(
+                PermissionCategory(
+                    type = PermissionType.WIFI_AWARE,
+                    description = "Enable Wi-Fi Aware to discover and connect to nearby bitchat users over Wi-Fi.",
+                    permissions = wifiAwarePermissions,
+                    isGranted = wifiAwarePermissions.all { isPermissionGranted(it) },
+                    systemDescription = "Allow bitchat to discover nearby Wi-Fi devices"
+                )
+            )
+        }
+
         if (needsBackgroundLocationPermission()) {
             val backgroundPermission = listOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
             categories.add(
@@ -303,6 +332,7 @@ data class PermissionCategory(
 
 enum class PermissionType(val nameValue: String) {
     NEARBY_DEVICES("Nearby Devices"),
+    WIFI_AWARE("Wi-Fi Aware"),
     PRECISE_LOCATION("Precise Location"),
     BACKGROUND_LOCATION("Background Location"),
     MICROPHONE("Microphone"),

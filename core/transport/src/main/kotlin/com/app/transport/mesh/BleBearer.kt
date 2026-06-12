@@ -107,11 +107,11 @@ class BleBearer internal constructor(
      * Engine-driven binding of a BLE device address to a logical peerID (announce
      * received with max TTL ⇒ direct neighbor). The bearer owns the address↔peer map.
      *
-     * Binds unconditionally: BLE packets only arrive over BLE links, so any address the
-     * engine saw on [incoming] belongs to this stack. Once a second link-bearing bearer
-     * exists, an ownership check (e.g. tracker lookup) must be added here.
+     * Ownership check: ignores pseudo-addresses owned by other bearers (e.g. the
+     * `aware:` namespace of [WifiAwareBearer]); everything else is a BLE MAC.
      */
     override fun bindPeer(peerID: String, linkAddress: String) {
+        if (linkAddress.startsWith(WifiAwareBearer.LINK_PREFIX)) return
         connectionManager.addressPeerMap[linkAddress] = peerID
         val isInbound = connectionManager.isClientConnection(linkAddress) == false
         _neighbors.update { links ->
