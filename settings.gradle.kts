@@ -20,6 +20,7 @@ dependencyResolutionManagement {
 }
 
 include(":app")
+include(":shared")
 
 include(":core")
 include(":core:common")
@@ -27,3 +28,12 @@ include(":core:domain")
 include(":core:crypto")
 include(":core:transport")
 include(":core:data")
+
+include(":feature")
+include(":feature:root")
+
+include(":feature:chats")
+include(":feature:chats:main")
+include(":feature:chats:conversations")
+include(":feature:chats:details")
+
