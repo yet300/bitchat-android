@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.bitchat.android.BitchatApplication
 import com.bitchat.android.di.appGraph
 import com.bitchat.android.MainActivity
@@ -324,31 +325,35 @@ class MeshForegroundService : Service() {
     }
 
     private fun hasLocationPermission(): Boolean {
-        val fine = androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        val coarse = androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val fine = ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val coarse = ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
         return fine || coarse
     }
 
+    private fun hasBluetoothConnectPermission(): Boolean {
+        if (Build.VERSION.SDK_INT < 31) return true
+        return ContextCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    }
+
     private fun startForegroundCompat(notification: Notification) {
-        if (Build.VERSION.SDK_INT >= 34) {
-            val type = if (hasLocationPermission()) {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-            } else {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-            }
-            try {
-                startForeground(NOTIFICATION_ID, notification, type)
-            } catch (e: SecurityException) {
-                // Fallback for cases where "While In Use" permission exists but background start is restricted
-                if (type and ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION != 0) {
-                     android.util.Log.w("MeshForegroundService", "Failed to start with LOCATION type, falling back to CONNECTED_DEVICE: ${e.message}")
-                     startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
-                } else {
-                    throw e
-                }
-            }
-        } else {
+        if (Build.VERSION.SDK_INT < 34) {
             startForeground(NOTIFICATION_ID, notification)
+            return
+        }
+        // On API 34+ each FGS type carries its own permission prerequisite:
+        // CONNECTED_DEVICE needs a Bluetooth grant, LOCATION a location grant.
+        // DATA_SYNC (declared in the manifest) is the unconditional floor so the
+        // service can run in Nostr-only mode with zero runtime permissions.
+        var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+        if (hasBluetoothConnectPermission()) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+        if (hasLocationPermission()) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+        try {
+            startForeground(NOTIFICATION_ID, notification, type)
+        } catch (e: SecurityException) {
+            // "While In Use" grants can still be rejected on background starts —
+            // strip the conditional types and keep the service alive on DATA_SYNC.
+            android.util.Log.w("MeshForegroundService", "startForeground(type=$type) rejected, falling back to DATA_SYNC: ${e.message}")
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         }
     }
 
