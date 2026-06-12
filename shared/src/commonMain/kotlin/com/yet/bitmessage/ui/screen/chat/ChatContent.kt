@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -16,7 +15,10 @@ import androidx.compose.ui.Modifier
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.yet.bitmessage.feature.chats.details.ChatComponent
 import com.yet.bitmessage.shared.resources.Res
+import com.yet.bitmessage.shared.resources.chat_back
 import com.yet.bitmessage.shared.resources.chat_timeline_placeholder
+import com.yet.bitmessage.ui.component.button.IconCircleButton
+import com.yet.bitmessage.ui.component.icon.ArrowBack
 import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,10 +32,11 @@ fun ChatContent(component: ChatComponent, modifier: Modifier = Modifier) {
             TopAppBar(
                 title = { Text(text = model.title) },
                 navigationIcon = {
-                    IconButton(onClick = component::onBackClicked) {
-                        // Glyph placeholder until the ic_arrow_back Compose SVG lands
-                        Text(text = "<", style = MaterialTheme.typography.titleMedium)
-                    }
+                    IconCircleButton(
+                        icon = ArrowBack,
+                        contentDescription = stringResource(Res.string.chat_back),
+                        onClick = component::onBackClicked,
+                    )
                 },
             )
         },
