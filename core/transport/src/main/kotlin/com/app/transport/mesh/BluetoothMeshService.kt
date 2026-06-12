@@ -14,6 +14,7 @@ import com.app.transport.protocol.MessageType
 import com.app.transport.protocol.SpecialRecipients
 import com.app.transport.model.RequestSyncPacket
 import com.app.transport.sync.GossipSyncManager
+import com.app.common.AppDispatchers
 import com.app.common.encoding.toHexString
 import com.app.transport.MeshConstants
 import com.app.transport.MeshTelemetry
@@ -66,11 +67,17 @@ class BluetoothMeshService(
     private val fragmentManager: FragmentManager,
     val bleBearer: BleBearer,
     private val meshNetwork: MeshNetwork,
+    private val dispatchers: AppDispatchers = AppDispatchers(),
 ) : MeshLifecycleController {
 
     companion object {
         private const val TAG = "BluetoothMeshService"
         private val MAX_TTL: UByte = MeshConstants.MESSAGE_TTL_HOPS
+
+        // Grace period between stopServices() and the actual teardown, giving the leave
+        // announcement time to leave the radio. Runs on [AppDispatchers.io], so tests drive it
+        // with virtual time instead of waiting in real time.
+        internal const val STOP_GRACE_PERIOD_MS = 200L
     }
 
     // My peer identification - derived from persisted Noise identity fingerprint (first 16
@@ -108,7 +115,7 @@ class BluetoothMeshService(
     var delegate: BluetoothMeshDelegate? = null
 
     // Coroutines
-    private var serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var serviceScope = CoroutineScope(dispatchers.io + SupervisorJob())
     // Tracks whether the current component generation was terminated via stopServices()
     @Volatile
     private var terminated = false
@@ -225,7 +232,7 @@ class BluetoothMeshService(
      * [serviceScope] cancelled.
      */
     private fun rebuildComponents() {
-        serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        serviceScope = CoroutineScope(dispatchers.io + SupervisorJob())
         myPeerID = encryptionService.getIdentityFingerprint().take(16)
         peerManager = PeerManager(peerFingerprintManager)
         fragmentManager.clearAllFragments()
@@ -756,7 +763,7 @@ class BluetoothMeshService(
         // newer generation installed by reset()/revival while the grace delay was pending.
         val stoppingScope = serviceScope
         pendingStopJob = stoppingScope.launch {
-            delay(200) // Give leave message time to send
+            delay(STOP_GRACE_PERIOD_MS) // Give leave message time to send
             finishStop(stoppingScope)
         }
     }
@@ -782,6 +789,14 @@ class BluetoothMeshService(
         stoppingScope.cancel()
         Log.i(TAG, "BluetoothMeshService terminated and scope cancelled")
     }
+
+    // Test seams for the generation guard. The race finishStop's guard protects against —
+    // a delayed teardown thread already resumed from its grace delay and blocked on
+    // [lifecycleLock] while reset() replaces the generation — cannot be reproduced on a
+    // single-threaded virtual-time scheduler, so the lifecycle test captures the old
+    // scope and replays the stale call directly.
+    internal val currentGenerationScope: CoroutineScope get() = serviceScope
+    internal fun simulateStaleTeardown(stoppingScope: CoroutineScope) = finishStop(stoppingScope)
 
     // MARK: - MeshLifecycleController (narrow contract for the foreground service)
 
