@@ -27,13 +27,31 @@ import kotlinx.coroutines.flow.update
  * BLE-specific debug controls for the debug sheet are exposed through the narrow
  * [BleDebugHandle] interface.
  */
-class BleBearer(
+class BleBearer internal constructor(
     private val context: Context,
     myPeerID: String,
     private val debugSettingsManager: MeshTelemetry,
-    private val fragmentManager: FragmentManager? = null,
+    private val fragmentManager: FragmentManager?,
     private val transferProgressManager: TransferProgressManager,
+    // Test seam ([BluetoothConnectionManager] is internal, hence the internal primary
+    // constructor): lifecycle tests substitute a mock BLE stack to prove that late GATT
+    // callbacks on a pre-reset() manager cannot leak into the new generation. Production
+    // (the public constructor below) always uses the real stack.
+    private val connectionManagerFactory: (myPeerID: String) -> BluetoothConnectionManager,
 ) : MeshBearer, BleDebugHandle {
+
+    constructor(
+        context: Context,
+        myPeerID: String,
+        debugSettingsManager: MeshTelemetry,
+        fragmentManager: FragmentManager? = null,
+        transferProgressManager: TransferProgressManager,
+    ) : this(
+        context, myPeerID, debugSettingsManager, fragmentManager, transferProgressManager,
+        { pid ->
+            BluetoothConnectionManager(context, pid, debugSettingsManager, fragmentManager, transferProgressManager)
+        },
+    )
 
     @Volatile
     private var myPeerID: String = myPeerID
@@ -50,9 +68,7 @@ class BleBearer(
      * Replaced in place by [reset]; the BleBearer object itself keeps its graph
      * identity (it lives inside the multibound Set<MeshBearer>).
      */
-    private var connectionManager = BluetoothConnectionManager(
-        context, myPeerID, debugSettingsManager, fragmentManager, transferProgressManager,
-    )
+    private var connectionManager = connectionManagerFactory(myPeerID)
 
     // -----------------------------------------------------------------
     // MeshBearer identity
@@ -188,9 +204,7 @@ class BleBearer(
         old.delegate = null
         this.myPeerID = myPeerID
         _neighbors.value = emptySet()
-        connectionManager = BluetoothConnectionManager(
-            context, myPeerID, debugSettingsManager, fragmentManager, transferProgressManager,
-        )
+        connectionManager = connectionManagerFactory(myPeerID)
         wireConnectionManager()
         nicknameResolver?.let { connectionManager.setNicknameResolver(it) }
     }

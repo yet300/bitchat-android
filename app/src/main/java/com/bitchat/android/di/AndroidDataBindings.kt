@@ -2,6 +2,7 @@ package com.bitchat.android.di
 
 import android.app.Application
 import android.content.Context
+import com.app.common.AppDispatchers
 import com.app.crypto.EncryptionService
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.identity.SecureIdentityStateManager
@@ -98,6 +99,7 @@ object AndroidDataBindings {
     @SingleIn(AppScope::class)
     fun provideBluetoothMeshService(
         context: Context,
+        dispatchers: AppDispatchers,
         debugSettingsManager: DebugSettingsManager,
         debugPreferenceManager: DebugPreferenceManager,
         seenMessageStore: SeenMessageStore,
@@ -130,6 +132,7 @@ object AndroidDataBindings {
         fragmentManager,
         bleBearer,
         meshNetwork,
+        dispatchers = dispatchers,
     )
 
     /** Narrow lifecycle contract for the foreground service (ISP); same underlying BMS. */
