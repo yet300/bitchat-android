@@ -39,6 +39,12 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
         }
         commonMain.dependencies {
+            implementation(projects.core.domain)
+            implementation(projects.feature.root)
+            implementation(projects.feature.chats.main)
+            implementation(projects.feature.chats.conversations)
+            implementation(projects.feature.chats.details)
+
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)
@@ -46,13 +52,21 @@ kotlin {
             implementation(libs.compose.components.resources)
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.lifecycle.runtimeCompose)
+
+            implementation(libs.bundles.decompose)
+            implementation(libs.decompose.compose)
+            implementation(libs.decompose.compose.experimental)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
         }
     }
 }
 
 dependencies {
     androidRuntimeClasspath(libs.compose.uiTooling)
+}
+compose.resources {
+    packageOfResClass = "com.yet.bitmessage.shared.resources"
 }
