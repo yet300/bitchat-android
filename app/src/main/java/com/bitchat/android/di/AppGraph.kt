@@ -39,14 +39,20 @@ import com.bitchat.android.onboarding.BatteryOptimizationPreferenceManager
 import com.bitchat.android.service.MeshServicePreferences
 import com.bitchat.android.ui.theme.ThemePreferenceManager
 import com.russhwolf.settings.ObservableSettings
+import com.yet.bitmessage.di.AppGraph as SharedAppGraph
 
 /**
  * Public API of the application dependency graph: the domain ports the app (and, in Phase C, the
  * Decompose component tree) resolves. The concrete graph is generated per platform
  * ([AndroidAppGraph]). Repository implementations stay internal to :core:data — only these domain
  * interfaces cross the module boundary (DIP).
+ *
+ * Extends the :shared [SharedAppGraph] contract so the Phase C Decompose entry point
+ * ([com.bitchat.android.BitMessageActivity]) resolves `rootFactory` through the same single
+ * graph. When the concrete graph relocates into :shared, this :app interface and its legacy
+ * accessors retire.
  */
-interface AppGraph {
+interface AppGraph : SharedAppGraph {
     val settingsRepository: SettingsRepository
     val contactRepository: ContactRepository
     val channelRepository: ChannelRepository

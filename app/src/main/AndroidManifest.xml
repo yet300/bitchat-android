@@ -109,6 +109,21 @@
             </intent-filter>
         </activity>
 
+        <!-- Phase C preview: new Decompose/CMP UI. Separate launcher entry while the
+             legacy MainActivity remains the default; both share one application graph. -->
+        <activity
+            android:name=".BitMessageActivity"
+            android:exported="true"
+            android:label="bitMessage"
+            android:theme="@style/Theme.BitchatAndroid"
+            android:windowSoftInputMode="adjustResize"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
         <!-- Persistent foreground service to run the mesh in background -->
         <service
             android:name=".service.MeshForegroundService"
