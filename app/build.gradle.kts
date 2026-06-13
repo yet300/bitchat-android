@@ -91,6 +91,15 @@ dependencies {
     implementation(projects.core.transport)
     implementation(projects.core.data)
 
+    // Phase C CMP UI + feature modules (their Metro @ContributesTo bindings aggregate
+    // into AndroidAppGraph so rootFactory resolves; RootComponent type for the activity).
+    implementation(projects.shared)
+    implementation(projects.feature.root)
+    implementation(projects.feature.chats.main)
+    implementation(projects.feature.chats.conversations)
+    implementation(projects.feature.chats.details)
+    implementation(libs.decompose)
+
     implementation(libs.metrox.android)
 
     // Core Android dependencies
