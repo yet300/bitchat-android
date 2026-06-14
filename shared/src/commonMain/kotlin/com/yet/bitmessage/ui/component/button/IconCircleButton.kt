@@ -12,9 +12,11 @@ internal fun IconCircleButton(
     icon: ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
+    enabled: Boolean = true,
 ) {
     IconButton(
         onClick = onClick,
+        enabled = enabled,
         colors = IconButtonDefaults.iconButtonColors(
             containerColor = MaterialTheme.colorScheme.surface,
             contentColor = MaterialTheme.colorScheme.onSurface,

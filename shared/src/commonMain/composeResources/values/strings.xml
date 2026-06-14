@@ -2,5 +2,7 @@
 <resources>
     <string name="conversations_empty">No conversations yet</string>
     <string name="chat_back">Back</string>
-    <string name="chat_timeline_placeholder">Message timeline — next iteration</string>
+    <string name="chat_empty">No messages yet</string>
+    <string name="chat_input_hint">Message</string>
+    <string name="chat_send">Send</string>
 </resources>

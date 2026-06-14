@@ -1,0 +1,183 @@
+@file:OptIn(ExperimentalCoroutinesApi::class, ExperimentalTime::class)
+
+package com.yet.bitmessage.feature.chats.details.store
+
+import com.app.domain.model.Attachment
+import com.app.domain.model.BitMessage
+import com.app.domain.model.Conversation
+import com.app.domain.model.ConversationId
+import com.app.domain.model.DeliveryStatus
+import com.app.domain.model.Fingerprint
+import com.app.domain.model.GeohashChannel
+import com.app.domain.model.MyIdentity
+import com.app.domain.model.PeerId
+import com.app.domain.model.SenderRef
+import com.app.domain.repository.ConversationRepository
+import com.app.domain.repository.IdentityRepository
+import com.app.domain.repository.MessageRepository
+import com.app.domain.repository.MessageTransport
+import com.arkivanov.mvikotlin.main.store.DefaultStoreFactory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+
+class ChatStoreFactoryTest {
+
+    private val testDispatcher = UnconfinedTestDispatcher()
+    private val conversationId = ConversationId.Channel("dev")
+
+    @BeforeTest
+    fun setUp() = Dispatchers.setMain(testDispatcher)
+
+    @AfterTest
+    fun tearDown() = Dispatchers.resetMain()
+
+    private class FakeMessageRepository(
+        val flow: MutableStateFlow<List<BitMessage>> = MutableStateFlow(emptyList()),
+    ) : MessageRepository {
+        val appended = mutableListOf<BitMessage>()
+        override fun observeMessages(id: ConversationId): Flow<List<BitMessage>> = flow
+        override suspend fun snapshot(id: ConversationId): List<BitMessage> = flow.value
+        override suspend fun append(id: ConversationId, message: BitMessage) {
+            appended += message
+            flow.value = flow.value + message
+        }
+        override suspend fun updateDeliveryStatus(messageId: String, status: DeliveryStatus) = Unit
+        override suspend fun remove(messageId: String) = Unit
+        override suspend fun clear(id: ConversationId) = Unit
+        override suspend fun clearAll() = Unit
+    }
+
+    private class RecordingTransport : MessageTransport {
+        val publicSends = mutableListOf<Pair<String, String?>>()
+        override suspend fun sendPublic(content: String, mentions: List<String>, channel: String?) {
+            publicSends += content to channel
+        }
+        override suspend fun sendPrivate(content: String, to: PeerId, recipientNickname: String?, messageId: String) = Unit
+        override suspend fun sendGeohash(content: String, channel: GeohashChannel, nickname: String?) = Unit
+        override suspend fun sendAttachment(attachment: Attachment, target: ConversationId, messageId: String) = Unit
+        override suspend fun cancelTransfer(messageId: String): Boolean = false
+        override suspend fun sendReadReceipt(messageId: String, to: PeerId) = Unit
+        override suspend fun sendFavoriteNotification(to: PeerId, isFavorite: Boolean) = Unit
+        override suspend fun announceSelf() = Unit
+    }
+
+    private class FakeConversationRepository : ConversationRepository {
+        val readIds = mutableListOf<ConversationId>()
+        override fun observeConversations(): Flow<List<Conversation>> = MutableStateFlow(emptyList())
+        override fun observeUnreadCount(): Flow<Int> = MutableStateFlow(0)
+        override suspend fun markRead(id: ConversationId) { readIds += id }
+    }
+
+    private class FakeIdentityRepository : IdentityRepository {
+        override suspend fun myIdentity(): MyIdentity = MyIdentity(
+            peerId = PeerId("abc123"),
+            fingerprint = Fingerprint("ff"),
+            nickname = "me",
+        )
+        override fun observeVerifiedFingerprints(): Flow<Set<Fingerprint>> = MutableStateFlow(emptySet())
+        override suspend fun isVerified(fingerprint: Fingerprint): Boolean = false
+        override suspend fun setVerified(fingerprint: Fingerprint, verified: Boolean) = Unit
+        override suspend fun panicWipe() = Unit
+    }
+
+    private fun message(id: String, content: String, mine: Boolean = false) = BitMessage(
+        id = id,
+        conversationId = conversationId,
+        sender = SenderRef(peerId = if (mine) PeerId("abc123") else PeerId("peer"), displayName = "x"),
+        content = content,
+        timestamp = Instant.fromEpochMilliseconds(0),
+        isMine = mine,
+    )
+
+    private fun factory(
+        messages: FakeMessageRepository = FakeMessageRepository(),
+        transport: RecordingTransport = RecordingTransport(),
+        conversations: FakeConversationRepository = FakeConversationRepository(),
+        identity: FakeIdentityRepository = FakeIdentityRepository(),
+    ) = ChatStoreFactory(
+        storeFactory = DefaultStoreFactory(),
+        conversationId = conversationId,
+        title = "dev",
+        messageRepository = messages,
+        identityRepository = identity,
+        messageTransport = transport,
+        conversationRepository = conversations,
+    )
+
+    @Test
+    fun bootstrap_subscribes_and_clears_loading_with_title() = runTest {
+        val store = factory().create()
+
+        assertFalse(store.state.isLoading)
+        assertEquals("dev", store.state.title)
+        assertEquals(conversationId, store.state.conversationId)
+    }
+
+    @Test
+    fun repository_emissions_populate_the_timeline() = runTest {
+        val messages = FakeMessageRepository()
+        val store = factory(messages = messages).create()
+
+        messages.flow.value = listOf(message("1", "hi"), message("2", "yo"))
+
+        assertEquals(listOf("hi", "yo"), store.state.messages.map { it.content })
+    }
+
+    @Test
+    fun bootstrap_marks_the_conversation_read() = runTest {
+        val conversations = FakeConversationRepository()
+        factory(conversations = conversations).create()
+
+        assertEquals(listOf<ConversationId>(conversationId), conversations.readIds)
+    }
+
+    @Test
+    fun draft_changed_is_reflected_in_state_and_gates_send() = runTest {
+        val store = factory().create()
+
+        assertFalse(store.state.canSend)
+        store.accept(ChatStore.Intent.DraftChanged("  "))
+        assertFalse(store.state.canSend)
+        store.accept(ChatStore.Intent.DraftChanged("hello"))
+        assertTrue(store.state.canSend)
+    }
+
+    @Test
+    fun send_clicked_routes_through_transport_and_clears_draft() = runTest {
+        val transport = RecordingTransport()
+        val messages = FakeMessageRepository()
+        val store = factory(messages = messages, transport = transport).create()
+
+        store.accept(ChatStore.Intent.DraftChanged("hello"))
+        store.accept(ChatStore.Intent.SendClicked)
+
+        assertEquals("", store.state.draft)
+        assertEquals(listOf<Pair<String, String?>>("hello" to "dev"), transport.publicSends)
+        // Local echo appended for the channel timeline.
+        assertEquals(listOf("hello"), messages.appended.map { it.content })
+    }
+
+    @Test
+    fun send_clicked_with_blank_draft_is_ignored() = runTest {
+        val transport = RecordingTransport()
+        val store = factory(transport = transport).create()
+
+        store.accept(ChatStore.Intent.SendClicked)
+
+        assertTrue(transport.publicSends.isEmpty())
+    }
+}
