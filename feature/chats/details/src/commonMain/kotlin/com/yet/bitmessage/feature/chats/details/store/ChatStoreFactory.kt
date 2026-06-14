@@ -21,8 +21,8 @@ internal class ChatStoreFactory(
     private val title: String,
     private val messageRepository: MessageRepository,
     private val identityRepository: IdentityRepository,
+    private val conversationRepository: ConversationRepository,
     messageTransport: MessageTransport,
-    conversationRepository: ConversationRepository,
 ) {
     private val sendMessage = SendMessageUseCase(messageTransport, messageRepository)
     private val markRead =
@@ -43,6 +43,7 @@ internal class ChatStoreFactory(
             when (msg) {
                 is ChatStore.Msg.Loaded -> copy(isLoading = false, messages = msg.messages)
                 is ChatStore.Msg.DraftChanged -> copy(draft = msg.text)
+                is ChatStore.Msg.TitleResolved -> copy(title = msg.title)
             }
     }
 
@@ -55,6 +56,16 @@ internal class ChatStoreFactory(
                     scope.launch {
                         messageRepository.observeMessages(conversationId).collect { messages ->
                             dispatch(ChatStore.Msg.Loaded(messages))
+                        }
+                    }
+                    // Resolve the display title from the chat-list aggregate (nickname / channel
+                    // name), falling back to the initial id-derived label until it appears.
+                    scope.launch {
+                        conversationRepository.observeConversations().collect { conversations ->
+                            conversations.firstOrNull { it.id == conversationId }
+                                ?.title
+                                ?.takeIf { it.isNotBlank() }
+                                ?.let { dispatch(ChatStore.Msg.TitleResolved(it)) }
                         }
                     }
                     // Reset unread count and (private chats) flush read receipts; best-effort.

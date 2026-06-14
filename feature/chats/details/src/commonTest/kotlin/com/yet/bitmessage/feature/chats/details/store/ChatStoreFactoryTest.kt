@@ -75,9 +75,11 @@ class ChatStoreFactoryTest {
         override suspend fun announceSelf() = Unit
     }
 
-    private class FakeConversationRepository : ConversationRepository {
+    private class FakeConversationRepository(
+        val conversations: MutableStateFlow<List<Conversation>> = MutableStateFlow(emptyList()),
+    ) : ConversationRepository {
         val readIds = mutableListOf<ConversationId>()
-        override fun observeConversations(): Flow<List<Conversation>> = MutableStateFlow(emptyList())
+        override fun observeConversations(): Flow<List<Conversation>> = conversations
         override fun observeUnreadCount(): Flow<Int> = MutableStateFlow(0)
         override suspend fun markRead(id: ConversationId) { readIds += id }
     }
@@ -135,6 +137,21 @@ class ChatStoreFactoryTest {
         messages.flow.value = listOf(message("1", "hi"), message("2", "yo"))
 
         assertEquals(listOf("hi", "yo"), store.state.messages.map { it.content })
+    }
+
+    @Test
+    fun title_resolves_from_the_matching_conversation() = runTest {
+        val conversations = FakeConversationRepository()
+        val store = factory(conversations = conversations).create()
+
+        assertEquals("dev", store.state.title)
+
+        conversations.conversations.value = listOf(
+            Conversation(id = ConversationId.Channel("other"), title = "ignored"),
+            Conversation(id = conversationId, title = "#dev channel"),
+        )
+
+        assertEquals("#dev channel", store.state.title)
     }
 
     @Test
