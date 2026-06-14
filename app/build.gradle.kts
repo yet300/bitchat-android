@@ -98,6 +98,7 @@ dependencies {
     implementation(projects.feature.chats.main)
     implementation(projects.feature.chats.conversations)
     implementation(projects.feature.chats.details)
+
     implementation(libs.decompose)
 
     implementation(libs.metrox.android)
@@ -114,7 +115,7 @@ dependencies {
     // Lifecycle
     implementation(libs.bundles.lifecycle)
     implementation(libs.androidx.lifecycle.process)
-    
+
     // Permissions
     implementation(libs.accompanist.permissions)
 
@@ -126,9 +127,6 @@ dependencies {
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.compose)
-    
-    // Cryptography
-    implementation(libs.bundles.cryptography)
 
     implementation(libs.bundles.multiplatform.settings)
 
@@ -138,9 +136,6 @@ dependencies {
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
-    
-    // Bluetooth
-    implementation(libs.nordic.ble)
 
     // Google Play Services Location
     implementation(libs.gms.location)
