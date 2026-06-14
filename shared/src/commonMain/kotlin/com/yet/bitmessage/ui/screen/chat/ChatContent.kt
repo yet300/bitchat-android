@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,6 +16,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -26,9 +28,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.app.domain.model.BitMessage
+import com.app.domain.model.DeliveryStatus
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.yet.bitmessage.feature.chats.details.ChatComponent
 import com.yet.bitmessage.shared.resources.Res
@@ -38,6 +43,9 @@ import com.yet.bitmessage.shared.resources.chat_input_hint
 import com.yet.bitmessage.shared.resources.chat_send
 import com.yet.bitmessage.ui.component.button.IconCircleButton
 import com.yet.bitmessage.ui.component.icon.ArrowBack
+import com.yet.bitmessage.ui.component.icon.Check
+import com.yet.bitmessage.ui.component.icon.Close
+import com.yet.bitmessage.ui.component.icon.DoneAll
 import com.yet.bitmessage.ui.component.icon.Send
 import org.jetbrains.compose.resources.stringResource
 
@@ -129,9 +137,40 @@ private fun MessageBubble(message: BitMessage, modifier: Modifier = Modifier) {
                     )
                 }
                 Text(text = message.content, style = MaterialTheme.typography.bodyMedium)
+                if (message.isMine && message.deliveryStatus != null) {
+                    Row(
+                        modifier = Modifier.align(Alignment.End),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        DeliveryStatusIndicator(message.deliveryStatus!!)
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+private fun DeliveryStatusIndicator(status: DeliveryStatus, modifier: Modifier = Modifier) {
+    val (icon, tint) = status.glyph()
+    Icon(
+        imageVector = icon,
+        contentDescription = null,
+        tint = tint,
+        modifier = modifier.size(14.dp),
+    )
+}
+
+/** Maps a delivery status to a check-mark glyph + tint (mirrors the iOS check-mark ladder). */
+@Composable
+internal fun DeliveryStatus.glyph(): Pair<ImageVector, Color> = when (this) {
+    DeliveryStatus.Sending -> Check to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+    DeliveryStatus.Sent -> Check to MaterialTheme.colorScheme.onSurfaceVariant
+    is DeliveryStatus.Delivered -> DoneAll to MaterialTheme.colorScheme.onSurfaceVariant
+    is DeliveryStatus.PartiallyDelivered -> DoneAll to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+    is DeliveryStatus.Read -> DoneAll to MaterialTheme.colorScheme.primary
+    is DeliveryStatus.Failed -> Close to MaterialTheme.colorScheme.error
 }
 
 @Composable

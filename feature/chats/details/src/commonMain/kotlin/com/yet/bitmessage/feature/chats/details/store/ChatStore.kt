@@ -28,6 +28,7 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
     sealed interface Msg {
         data class Loaded(val messages: List<BitMessage>) : Msg
         data class DraftChanged(val text: String) : Msg
+        data class TitleResolved(val title: String) : Msg
     }
 
     sealed interface Label
