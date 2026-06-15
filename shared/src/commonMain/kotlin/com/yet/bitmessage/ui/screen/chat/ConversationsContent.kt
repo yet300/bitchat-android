@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.yet.bitmessage.ui.screen.chat
 
 import androidx.compose.foundation.background
@@ -39,10 +41,13 @@ import androidx.compose.ui.unit.dp
 import com.app.domain.model.Peer
 import com.app.domain.model.Reachability
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
+import com.yet.bitmessage.feature.chats.conversations.ConversationTimeLabel
 import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
+import com.yet.bitmessage.feature.chats.conversations.conversationTimeLabel
 import com.yet.bitmessage.shared.resources.Res
 import com.yet.bitmessage.shared.resources.connectivity_title
 import com.yet.bitmessage.shared.resources.conversations_empty
+import com.yet.bitmessage.shared.resources.conversations_yesterday
 import com.yet.bitmessage.shared.resources.conversations_nearby
 import com.yet.bitmessage.shared.resources.conversations_search
 import com.yet.bitmessage.shared.resources.conversations_search_close
@@ -53,8 +58,12 @@ import com.yet.bitmessage.ui.component.button.IconCircleButton
 import com.yet.bitmessage.ui.component.icon.Close
 import com.yet.bitmessage.ui.component.icon.MoreVert
 import com.yet.bitmessage.ui.component.icon.Search
+import kotlinx.datetime.TimeZone
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -206,12 +215,19 @@ private fun ConversationList(
                         Text(text = last.content, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 },
-                trailingContent = if (conversation.unreadCount > 0) {
-                    {
-                        Badge { Text(text = conversation.unreadCount.toString()) }
+                trailingContent = {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = conversation.lastActivity.timeLabelText(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (conversation.unreadCount > 0) {
+                            Badge(modifier = Modifier.padding(top = 4.dp)) {
+                                Text(text = conversation.unreadCount.toString())
+                            }
+                        }
                     }
-                } else {
-                    null
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -221,6 +237,20 @@ private fun ConversationList(
         }
     }
 }
+
+/** Relative timestamp for a chat row: HH:mm today, "Yesterday", else a date. */
+@Composable
+private fun Instant?.timeLabelText(): String =
+    when (val label = conversationTimeLabel(this, Clock.System.now(), TimeZone.currentSystemDefault())) {
+        is ConversationTimeLabel.Today -> "${label.hour.pad2()}:${label.minute.pad2()}"
+        ConversationTimeLabel.Yesterday -> stringResource(Res.string.conversations_yesterday)
+        is ConversationTimeLabel.Earlier ->
+            if (label.currentYear) "${label.day.pad2()}.${label.month.pad2()}"
+            else "${label.day.pad2()}.${label.month.pad2()}.${(label.year % 100).pad2()}"
+        ConversationTimeLabel.None -> ""
+    }
+
+private fun Int.pad2(): String = toString().padStart(2, '0')
 
 /**
  * Deterministic colored avatar (hue from the title) with a reachability presence dot:

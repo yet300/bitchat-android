@@ -2,6 +2,7 @@
 <resources>
     <string name="conversations_title">bitchat</string>
     <string name="conversations_nearby">Nearby</string>
+    <string name="conversations_yesterday">Yesterday</string>
     <string name="conversations_empty">No conversations yet</string>
     <string name="conversations_search">Search</string>
     <string name="conversations_search_hint">Search chats</string>

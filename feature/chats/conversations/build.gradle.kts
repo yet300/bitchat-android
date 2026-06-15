@@ -10,6 +10,7 @@ kotlin {
             implementation(projects.core.common)
             implementation(projects.core.domain)
 
+            implementation(libs.kotlinx.datetime)
             implementation(libs.bundles.decompose)
             implementation(libs.bundles.mvi)
         }
