@@ -2,6 +2,7 @@ package com.yet.bitmessage.feature.chats.details
 
 import com.app.domain.model.BitMessage
 import com.app.domain.model.ConversationId
+import com.app.domain.model.Reachability
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.value.Value
 
@@ -28,6 +29,8 @@ interface ChatComponent {
         val messages: List<BitMessage>,
         val draft: String,
         val canSend: Boolean,
+        val reachability: Reachability,
+        val isEncrypted: Boolean,
     )
 
     fun interface Factory {

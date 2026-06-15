@@ -10,12 +10,19 @@ import com.app.domain.model.DeliveryStatus
 import com.app.domain.model.Fingerprint
 import com.app.domain.model.GeohashChannel
 import com.app.domain.model.MyIdentity
+import com.app.domain.model.Peer
 import com.app.domain.model.PeerId
+import com.app.domain.model.PeerIdentity
+import com.app.domain.model.Reachability
 import com.app.domain.model.SenderRef
+import com.app.domain.model.Contact
+import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.MessageTransport
+import com.app.domain.repository.PeerRepository
+import com.app.domain.usecase.ResolveReachabilityUseCase
 import com.arkivanov.mvikotlin.main.store.DefaultStoreFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -96,6 +103,24 @@ class ChatStoreFactoryTest {
         override suspend fun panicWipe() = Unit
     }
 
+    private class FakePeerRepository(private val peers: List<Peer> = emptyList()) : PeerRepository {
+        override fun observePeers(): Flow<List<Peer>> = MutableStateFlow(peers)
+        override fun observeConnectionState(): Flow<Boolean> = MutableStateFlow(peers.any { it.isConnected })
+        override suspend fun snapshot(): List<Peer> = peers
+        override suspend fun peer(id: PeerId): Peer? = peers.firstOrNull { it.id == id }
+    }
+
+    private class FakeContactRepository : ContactRepository {
+        override fun observeFavorites(): Flow<Set<Fingerprint>> = MutableStateFlow(emptySet())
+        override suspend fun toggleFavorite(peer: PeerId) = Unit
+        override suspend fun isFavorite(peer: PeerId): Boolean = false
+        override suspend fun setBlocked(peer: PeerId, blocked: Boolean) = Unit
+        override suspend fun isBlocked(peer: PeerId): Boolean = false
+        override suspend fun contact(identity: PeerIdentity): Contact? = null
+        override suspend fun noiseKeyHexForNostrAlias(alias: PeerId): String? = null
+        override suspend fun clearAll() = Unit
+    }
+
     private fun message(id: String, content: String, mine: Boolean = false) = BitMessage(
         id = id,
         conversationId = conversationId,
@@ -110,14 +135,16 @@ class ChatStoreFactoryTest {
         transport: RecordingTransport = RecordingTransport(),
         conversations: FakeConversationRepository = FakeConversationRepository(),
         identity: FakeIdentityRepository = FakeIdentityRepository(),
+        peers: List<Peer> = emptyList(),
     ) = ChatStoreFactory(
         storeFactory = DefaultStoreFactory(),
         conversationId = conversationId,
         title = "dev",
         messageRepository = messages,
         identityRepository = identity,
-        messageTransport = transport,
         conversationRepository = conversations,
+        resolveReachability = ResolveReachabilityUseCase(FakePeerRepository(peers), FakeContactRepository()),
+        messageTransport = transport,
     )
 
     @Test
@@ -127,6 +154,18 @@ class ChatStoreFactoryTest {
         assertFalse(store.state.isLoading)
         assertEquals("dev", store.state.title)
         assertEquals(conversationId, store.state.conversationId)
+    }
+
+    @Test
+    fun channel_is_not_encrypted_and_reachability_follows_mesh() = runTest {
+        // No connected peers -> OFFLINE; a channel is broadcast, not E2E.
+        val offline = factory().create()
+        assertEquals(Reachability.OFFLINE, offline.state.reachability)
+        assertFalse(offline.state.isEncrypted)
+
+        val peer = Peer(id = PeerId("1111111111111111"), nickname = "n", isConnected = true, isDirect = true)
+        val nearby = factory(peers = listOf(peer)).create()
+        assertEquals(Reachability.NEARBY, nearby.state.reachability)
     }
 
     @Test
