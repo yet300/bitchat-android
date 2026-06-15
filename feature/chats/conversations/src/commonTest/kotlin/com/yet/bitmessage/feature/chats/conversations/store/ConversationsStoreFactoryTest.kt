@@ -72,11 +72,15 @@ class ConversationsStoreFactoryTest {
     private fun storeFactory(
         repository: ConversationRepository,
         peers: List<Peer> = emptyList(),
-    ) = ConversationsStoreFactory(
-        storeFactory = DefaultStoreFactory(),
-        conversationRepository = repository,
-        resolveReachability = ResolveReachabilityUseCase(FakePeerRepository(peers), FakeContactRepository()),
-    )
+    ): ConversationsStoreFactory {
+        val peerRepository = FakePeerRepository(peers)
+        return ConversationsStoreFactory(
+            storeFactory = DefaultStoreFactory(),
+            conversationRepository = repository,
+            peerRepository = peerRepository,
+            resolveReachability = ResolveReachabilityUseCase(peerRepository, FakeContactRepository()),
+        )
+    }
 
     private fun conversation(title: String) = Conversation(
         id = ConversationId.Channel(title),
@@ -115,6 +119,17 @@ class ConversationsStoreFactoryTest {
         repository.conversationsFlow.value = listOf(conversation("alpha"))
 
         assertEquals(Reachability.NEARBY, store.state.reachability[ConversationId.Channel("alpha")])
+    }
+
+    @Test
+    fun nearby_lists_connected_peers_direct_first() = runTest {
+        val repository = FakeConversationRepository()
+        val relayed = Peer(id = PeerId("aaaa"), nickname = "relayed", isConnected = true, isDirect = false)
+        val direct = Peer(id = PeerId("bbbb"), nickname = "direct", isConnected = true, isDirect = true)
+        val offline = Peer(id = PeerId("cccc"), nickname = "offline", isConnected = false, isDirect = false)
+        val store = storeFactory(repository, peers = listOf(relayed, direct, offline)).create()
+
+        assertEquals(listOf("direct", "relayed"), store.state.nearby.map { it.nickname })
     }
 
     @Test

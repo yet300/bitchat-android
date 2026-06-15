@@ -13,6 +13,7 @@ internal val stateToModel: (ConversationsStore.State) -> ConversationsComponent.
         conversations = state.visible.map { conversation ->
             ConversationRow(conversation, state.reachability[conversation.id] ?: Reachability.OFFLINE)
         },
+        nearby = state.nearby,
         query = state.query,
     )
 }

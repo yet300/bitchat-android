@@ -2,6 +2,7 @@ package com.yet.bitmessage.feature.chats.main
 
 import com.app.domain.model.Conversation
 import com.app.domain.model.ConversationId
+import com.app.domain.model.Peer
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.DefaultComponentContext
 import com.arkivanov.decompose.router.panels.ChildPanelsMode
@@ -27,11 +28,13 @@ class DefaultChatsComponentTest {
                 ConversationsComponent.Model(
                     isLoading = false,
                     conversations = emptyList(),
+                    nearby = emptyList(),
                     query = "",
                 ),
             )
 
         override fun onConversationClicked(id: ConversationId) = onConversationSelected(id)
+        override fun onNearbyClicked(peer: Peer) = onConversationSelected(ConversationId.Private(peer.id))
         override fun onQueryChanged(text: String) = Unit
     }
 

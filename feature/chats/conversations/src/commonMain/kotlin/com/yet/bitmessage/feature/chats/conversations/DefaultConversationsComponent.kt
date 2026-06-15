@@ -2,6 +2,7 @@ package com.yet.bitmessage.feature.chats.conversations
 
 import com.app.common.decompose.asValue
 import com.app.domain.model.ConversationId
+import com.app.domain.model.Peer
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.value.Value
 import com.arkivanov.decompose.value.operator.map
@@ -28,6 +29,8 @@ internal class DefaultConversationsComponent(
 
     override fun onConversationClicked(id: ConversationId) = onConversationSelected(id)
 
+    override fun onNearbyClicked(peer: Peer) = onConversationSelected(ConversationId.Private(peer.id))
+
     override fun onQueryChanged(text: String) =
         store.accept(ConversationsStore.Intent.QueryChanged(text))
 }
@@ -47,6 +50,7 @@ internal class DefaultConversationsComponentFactory(
         storeFactory = ConversationsStoreFactory(
             storeFactory = storeFactory,
             conversationRepository = conversationRepository,
+            peerRepository = peerRepository,
             resolveReachability = ResolveReachabilityUseCase(peerRepository, contactRepository),
         ),
         onConversationSelected = onConversationSelected,
