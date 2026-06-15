@@ -15,10 +15,13 @@ import com.app.domain.model.PeerId
 import com.app.domain.model.PeerIdentity
 import com.app.domain.model.Reachability
 import com.app.domain.model.SenderRef
+import com.app.domain.model.Channel
 import com.app.domain.model.Contact
+import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.IdentityRepository
+import com.app.domain.repository.JoinResult
 import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.MessageTransport
 import com.app.domain.repository.PeerRepository
@@ -122,6 +125,15 @@ class ChatStoreFactoryTest {
         override suspend fun clearAll() = Unit
     }
 
+    private class FakeChannelRepository : ChannelRepository {
+        override fun observeJoinedChannels(): Flow<Set<String>> = MutableStateFlow(emptySet())
+        override fun observeChannels(): Flow<List<Channel>> = MutableStateFlow(emptyList())
+        override suspend fun join(tag: String, password: String?): JoinResult = JoinResult.Joined
+        override suspend fun leave(tag: String) = Unit
+        override suspend fun setPassword(tag: String, password: String) = Unit
+        override suspend fun isCreator(tag: String): Boolean = false
+    }
+
     private fun message(id: String, content: String, mine: Boolean = false) = BitMessage(
         id = id,
         conversationId = conversationId,
@@ -145,6 +157,9 @@ class ChatStoreFactoryTest {
         identityRepository = identity,
         conversationRepository = conversations,
         resolveReachability = ResolveReachabilityUseCase(FakePeerRepository(peers), FakeContactRepository()),
+        channelRepository = FakeChannelRepository(),
+        contactRepository = FakeContactRepository(),
+        peerRepository = FakePeerRepository(peers),
         messageTransport = transport,
     )
 

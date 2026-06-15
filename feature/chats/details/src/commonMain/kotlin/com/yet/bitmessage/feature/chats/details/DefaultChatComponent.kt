@@ -1,5 +1,6 @@
 package com.yet.bitmessage.feature.chats.details
 
+import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.IdentityRepository
@@ -52,6 +53,7 @@ internal class DefaultChatComponentFactory(
     private val conversationRepository: ConversationRepository,
     private val peerRepository: PeerRepository,
     private val contactRepository: ContactRepository,
+    private val channelRepository: ChannelRepository,
 ) : ChatComponent.Factory {
     override fun create(
         componentContext: ComponentContext,
@@ -67,6 +69,9 @@ internal class DefaultChatComponentFactory(
             identityRepository = identityRepository,
             conversationRepository = conversationRepository,
             resolveReachability = ResolveReachabilityUseCase(peerRepository, contactRepository),
+            channelRepository = channelRepository,
+            contactRepository = contactRepository,
+            peerRepository = peerRepository,
             messageTransport = messageTransport,
         ),
         onFinished = onFinished,
