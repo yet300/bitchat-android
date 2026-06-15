@@ -3,6 +3,7 @@ package com.yet.bitmessage.feature.chats.conversations.search.store
 import com.app.domain.model.Channel
 import com.app.domain.model.Contact
 import com.app.domain.model.Conversation
+import com.app.domain.model.GeohashChannel
 import com.app.domain.model.Peer
 import com.app.domain.model.SearchResults
 import com.arkivanov.mvikotlin.core.store.Store
@@ -17,6 +18,7 @@ internal interface SearchStore :
         val conversations: List<Conversation> = emptyList(),
         val peers: List<Peer> = emptyList(),
         val results: SearchResults = SearchResults.EMPTY,
+        val parsedGeo: GeohashChannel? = null,
     ) {
         val isActive: Boolean get() = query.isNotBlank()
 
@@ -31,6 +33,12 @@ internal interface SearchStore :
         val contacts: List<Contact> get() = if (!isActive) emptyList() else results.contacts
         val messages get() = if (!isActive) emptyList() else results.messages
         val channels: List<Channel> get() = if (!isActive) emptyList() else results.channels
+
+        /** Geo tab: the geohash channel the query teleports to, if it parses. */
+        val geo: GeohashChannel? get() = if (!isActive) null else parsedGeo
+
+        /** Focused-empty rail: peers currently in range (independent of the query). */
+        val onlinePeers: List<Peer> get() = peers
     }
 
     sealed interface Intent {
@@ -43,7 +51,7 @@ internal interface SearchStore :
     }
 
     sealed interface Msg {
-        data class QueryChanged(val text: String) : Msg
+        data class QueryChanged(val text: String, val geo: GeohashChannel?) : Msg
         data class TabSelected(val tab: SearchTab) : Msg
         data class ConversationsLoaded(val conversations: List<Conversation>) : Msg
         data class PeersLoaded(val peers: List<Peer>) : Msg

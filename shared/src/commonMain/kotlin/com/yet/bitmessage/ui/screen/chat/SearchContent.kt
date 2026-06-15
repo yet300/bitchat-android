@@ -1,14 +1,19 @@
 package com.yet.bitmessage.ui.screen.chat
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -26,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.style.TextOverflow
@@ -38,10 +44,13 @@ import com.yet.bitmessage.feature.chats.conversations.search.SearchTab
 import com.yet.bitmessage.shared.resources.Res
 import com.yet.bitmessage.shared.resources.search_close
 import com.yet.bitmessage.shared.resources.search_empty
+import com.yet.bitmessage.shared.resources.search_geo_action
 import com.yet.bitmessage.shared.resources.search_hint
 import com.yet.bitmessage.shared.resources.search_prompt
+import com.yet.bitmessage.shared.resources.search_recent
 import com.yet.bitmessage.shared.resources.search_tab_channels
 import com.yet.bitmessage.shared.resources.search_tab_chats
+import com.yet.bitmessage.shared.resources.search_tab_geo
 import com.yet.bitmessage.shared.resources.search_tab_messages
 import com.yet.bitmessage.shared.resources.search_tab_people
 import com.yet.bitmessage.ui.component.button.IconCircleButton
@@ -99,7 +108,7 @@ fun SearchContent(component: SearchComponent, modifier: Modifier = Modifier) {
 
             Box(modifier = Modifier.fillMaxSize()) {
                 if (!model.isActive) {
-                    CenteredHint(stringResource(Res.string.search_prompt))
+                    FocusedEmpty(model, component::onResultClicked)
                 } else {
                     SearchResults(model, component::onResultClicked)
                 }
@@ -128,6 +137,7 @@ private fun BoxScope.SearchResults(
         SearchTab.PEOPLE -> model.people.isEmpty()
         SearchTab.MESSAGES -> model.messages.isEmpty()
         SearchTab.CHANNELS -> model.channels.isEmpty()
+        SearchTab.GEO -> model.geo == null
     }
     if (empty) {
         CenteredHint(stringResource(Res.string.search_empty))
@@ -167,8 +177,82 @@ private fun BoxScope.SearchResults(
                     onClick = { onResultClicked(ConversationId.Channel(channel.tag)) },
                 )
             }
+            SearchTab.GEO -> model.geo?.let { geo ->
+                item(key = geo.geohash) {
+                    ResultRow(
+                        title = "#${geo.geohash}",
+                        subtitle = stringResource(Res.string.search_geo_action),
+                        reachability = Reachability.OFFLINE,
+                        onClick = { onResultClicked(ConversationId.Geohash(geo)) },
+                    )
+                }
+            }
         }
     }
+}
+
+/** Focused-empty state: in-range people rail + recent conversations (or a prompt when both empty). */
+@Composable
+private fun BoxScope.FocusedEmpty(
+    model: SearchComponent.Model,
+    onResultClicked: (ConversationId) -> Unit,
+) {
+    if (model.nearby.isEmpty() && model.recent.isEmpty()) {
+        CenteredHint(stringResource(Res.string.search_prompt))
+        return
+    }
+    Column(modifier = Modifier.fillMaxSize()) {
+        if (model.nearby.isNotEmpty()) {
+            SectionLabel(stringResource(Res.string.search_tab_people))
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                items(model.nearby, key = { it.conversationId.toString() }) { person ->
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .width(64.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onResultClicked(person.conversationId) }
+                            .padding(vertical = 4.dp),
+                    ) {
+                        ConversationAvatar(title = person.name, reachability = Reachability.NEARBY)
+                        Text(
+                            text = person.name,
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
+            }
+        }
+        if (model.recent.isNotEmpty()) {
+            SectionLabel(stringResource(Res.string.search_recent))
+            LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                items(model.recent, key = { it.id.toString() }) { conversation ->
+                    ResultRow(
+                        title = conversation.title,
+                        subtitle = conversation.lastMessage?.content,
+                        reachability = Reachability.OFFLINE,
+                        onClick = { onResultClicked(conversation.id) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 16.dp, top = 8.dp),
+    )
 }
 
 @Composable
@@ -193,4 +277,5 @@ private fun SearchTab.label(): StringResource = when (this) {
     SearchTab.PEOPLE -> Res.string.search_tab_people
     SearchTab.MESSAGES -> Res.string.search_tab_messages
     SearchTab.CHANNELS -> Res.string.search_tab_channels
+    SearchTab.GEO -> Res.string.search_tab_geo
 }

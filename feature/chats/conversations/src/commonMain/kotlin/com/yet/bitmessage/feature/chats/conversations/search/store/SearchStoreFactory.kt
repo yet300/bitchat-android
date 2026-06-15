@@ -3,6 +3,7 @@ package com.yet.bitmessage.feature.chats.conversations.search.store
 import com.app.domain.model.SearchResults
 import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.PeerRepository
+import com.app.domain.usecase.ParseGeohashUseCase
 import com.app.domain.usecase.SearchUseCase
 import com.arkivanov.mvikotlin.core.store.Reducer
 import com.arkivanov.mvikotlin.core.store.SimpleBootstrapper
@@ -21,6 +22,7 @@ internal class SearchStoreFactory(
     private val conversationRepository: ConversationRepository,
     private val peerRepository: PeerRepository,
     private val searchUseCase: SearchUseCase,
+    private val parseGeohash: ParseGeohashUseCase,
 ) {
     fun create(): SearchStore =
         object : SearchStore,
@@ -35,7 +37,7 @@ internal class SearchStoreFactory(
     private object ReducerImpl : Reducer<SearchStore.State, SearchStore.Msg> {
         override fun SearchStore.State.reduce(msg: SearchStore.Msg): SearchStore.State =
             when (msg) {
-                is SearchStore.Msg.QueryChanged -> copy(query = msg.text)
+                is SearchStore.Msg.QueryChanged -> copy(query = msg.text, parsedGeo = msg.geo)
                 is SearchStore.Msg.TabSelected -> copy(tab = msg.tab)
                 is SearchStore.Msg.ConversationsLoaded -> copy(conversations = msg.conversations)
                 is SearchStore.Msg.PeersLoaded -> copy(peers = msg.peers)
@@ -79,7 +81,7 @@ internal class SearchStoreFactory(
         override fun executeIntent(intent: SearchStore.Intent) {
             when (intent) {
                 is SearchStore.Intent.QueryChanged -> {
-                    dispatch(SearchStore.Msg.QueryChanged(intent.text))
+                    dispatch(SearchStore.Msg.QueryChanged(intent.text, parseGeohash(intent.text)))
                     queryFlow.value = intent.text
                 }
                 is SearchStore.Intent.TabSelected -> dispatch(SearchStore.Msg.TabSelected(intent.tab))

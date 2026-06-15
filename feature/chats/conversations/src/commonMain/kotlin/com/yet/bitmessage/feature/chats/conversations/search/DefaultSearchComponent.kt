@@ -5,6 +5,7 @@ import com.app.domain.model.ConversationId
 import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.PeerRepository
 import com.app.domain.repository.SearchRepository
+import com.app.domain.usecase.ParseGeohashUseCase
 import com.app.domain.usecase.SearchUseCase
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.value.Value
@@ -53,6 +54,7 @@ internal class DefaultSearchComponentFactory(
             conversationRepository = conversationRepository,
             peerRepository = peerRepository,
             searchUseCase = SearchUseCase(searchRepository),
+            parseGeohash = ParseGeohashUseCase(),
         ),
         onResultSelected = onResultSelected,
         onClose = onClose,
