@@ -21,7 +21,10 @@ import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.mesh.MeshBearer
 import com.app.transport.mesh.MeshLifecycleController
 import com.app.transport.mesh.MeshNetwork
+import com.app.transport.net.TorPreferenceManager
 import com.app.transport.notification.ServiceNotifier
+import com.app.domain.repository.ConnectivityRepository
+import com.bitchat.android.connectivity.AndroidConnectivityRepository
 import com.russhwolf.settings.ObservableSettings
 import com.russhwolf.settings.SharedPreferencesSettings
 import dev.zacsweers.metro.AppScope
@@ -138,4 +141,12 @@ object AndroidDataBindings {
     /** Narrow lifecycle contract for the foreground service (ISP); same underlying BMS. */
     @Provides
     fun provideMeshLifecycleController(mesh: BluetoothMeshService): MeshLifecycleController = mesh
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideConnectivityRepository(
+        context: Context,
+        torPreferenceManager: TorPreferenceManager,
+    ): ConnectivityRepository =
+        AndroidConnectivityRepository(context.applicationContext, torPreferenceManager)
 }

@@ -7,6 +7,17 @@
     <string name="conversations_search_hint">Search chats</string>
     <string name="conversations_search_close">Close search</string>
     <string name="conversations_search_empty">Nothing found</string>
+    <string name="connectivity_title">Connectivity</string>
+    <string name="connectivity_bluetooth">Bluetooth</string>
+    <string name="connectivity_wifi_aware">Wi-Fi Aware</string>
+    <string name="connectivity_internet">Internet</string>
+    <string name="connectivity_tor">Tor</string>
+    <string name="connectivity_state_on">On</string>
+    <string name="connectivity_state_off">Off</string>
+    <string name="connectivity_state_unavailable">Unavailable</string>
+    <string name="connectivity_state_permission">Permission needed</string>
+    <string name="connectivity_action_enable">Enable</string>
+    <string name="connectivity_action_grant">Grant</string>
     <string name="chat_back">Back</string>
     <string name="chat_empty">No messages yet</string>
     <string name="chat_input_hint">Message</string>

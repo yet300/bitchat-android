@@ -1,6 +1,5 @@
 package com.yet.bitmessage.feature.chats.main
 
-import com.app.domain.model.Conversation
 import com.app.domain.model.ConversationId
 import com.app.domain.model.Peer
 import com.arkivanov.decompose.ComponentContext
@@ -9,9 +8,10 @@ import com.arkivanov.decompose.router.panels.ChildPanelsMode
 import com.arkivanov.decompose.value.MutableValue
 import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
+import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
+import com.yet.bitmessage.feature.chats.conversations.connectivity.ConnectivityComponent
 import com.yet.bitmessage.feature.chats.details.ChatComponent
 import com.yet.bitmessage.feature.chats.details.ChatConfig
-import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -22,6 +22,7 @@ class DefaultChatsComponentTest {
 
     private class FakeConversationsComponent(
         val onConversationSelected: (ConversationId) -> Unit,
+        val onConnectivityRequested: () -> Unit,
     ) : ConversationsComponent {
         override val model: Value<ConversationsComponent.Model> =
             MutableValue(
@@ -35,7 +36,15 @@ class DefaultChatsComponentTest {
 
         override fun onConversationClicked(id: ConversationId) = onConversationSelected(id)
         override fun onNearbyClicked(peer: Peer) = onConversationSelected(ConversationId.Private(peer.id))
+        override fun onConnectivityClicked() = onConnectivityRequested()
         override fun onQueryChanged(text: String) = Unit
+    }
+
+    private class FakeConnectivityComponent : ConnectivityComponent {
+        override val model: Value<ConnectivityComponent.Model> =
+            MutableValue(ConnectivityComponent.Model(statuses = emptyList()))
+
+        override fun onEnableClicked(kind: com.app.domain.model.TransportKind) = Unit
     }
 
     private class FakeChatComponent(
@@ -63,12 +72,13 @@ class DefaultChatsComponentTest {
         val lifecycle = LifecycleRegistry()
         return DefaultChatsComponent(
             componentContext = DefaultComponentContext(lifecycle),
-            conversationsFactory = { ctx: ComponentContext, onSelected: (ConversationId) -> Unit ->
-                FakeConversationsComponent(onSelected)
+            conversationsFactory = { ctx, onSelected, onConnectivity ->
+                FakeConversationsComponent(onSelected, onConnectivity)
             },
             chatFactory = { _: ComponentContext, config: ChatConfig, onFinished: () -> Unit ->
                 FakeChatComponent(config, onFinished)
             },
+            connectivityFactory = { _: ComponentContext -> FakeConnectivityComponent() },
         )
     }
 
@@ -121,5 +131,22 @@ class DefaultChatsComponentTest {
         val component = build()
         component.setMode(ChildPanelsMode.DUAL)
         assertEquals(ChildPanelsMode.DUAL, component.panels.value.mode)
+    }
+
+    @Test
+    fun sheet_slot_is_closed_initially() {
+        val component = build()
+        assertNull(component.sheetSlot.value.child)
+    }
+
+    @Test
+    fun requesting_connectivity_opens_the_sheet_and_dismiss_closes_it() {
+        val component = build()
+
+        component.mainConversations.onConnectivityClicked()
+        assertIs<ChatsComponent.SheetChild.Connectivity>(component.sheetSlot.value.child?.instance)
+
+        component.onDismissSheet()
+        assertNull(component.sheetSlot.value.child)
     }
 }

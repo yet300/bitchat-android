@@ -18,6 +18,9 @@ interface ConversationsComponent {
     /** Open (or start) a DM with an in-range peer from the nearby rail. */
     fun onNearbyClicked(peer: Peer)
 
+    /** Request the connectivity panel (hosted as a ChildSlot by the parent). */
+    fun onConnectivityClicked()
+
     fun onQueryChanged(text: String)
 
     data class Model(
@@ -31,6 +34,7 @@ interface ConversationsComponent {
         fun create(
             componentContext: ComponentContext,
             onConversationSelected: (ConversationId) -> Unit,
+            onConnectivityRequested: () -> Unit,
         ): ConversationsComponent
     }
 }
