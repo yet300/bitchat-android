@@ -26,7 +26,7 @@ class DefaultChatsComponentTest {
             MutableValue(
                 ConversationsComponent.Model(
                     isLoading = false,
-                    conversations = emptyList<Conversation>(),
+                    conversations = emptyList(),
                     query = "",
                 ),
             )

@@ -1,6 +1,5 @@
 package com.yet.bitmessage.feature.chats.conversations
 
-import com.app.domain.model.Conversation
 import com.app.domain.model.ConversationId
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.value.Value
@@ -19,7 +18,7 @@ interface ConversationsComponent {
 
     data class Model(
         val isLoading: Boolean,
-        val conversations: List<Conversation>,
+        val conversations: List<ConversationRow>,
         val query: String,
     )
 

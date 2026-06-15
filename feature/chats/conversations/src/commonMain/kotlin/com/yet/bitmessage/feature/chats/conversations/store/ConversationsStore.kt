@@ -1,6 +1,8 @@
 package com.yet.bitmessage.feature.chats.conversations.store
 
 import com.app.domain.model.Conversation
+import com.app.domain.model.ConversationId
+import com.app.domain.model.Reachability
 import com.arkivanov.mvikotlin.core.store.Store
 
 internal interface ConversationsStore :
@@ -9,6 +11,7 @@ internal interface ConversationsStore :
     data class State(
         val isLoading: Boolean = true,
         val conversations: List<Conversation> = emptyList(),
+        val reachability: Map<ConversationId, Reachability> = emptyMap(),
         val query: String = "",
     ) {
         /** Client-side chat-list filter on title + last-message text. */
@@ -34,6 +37,7 @@ internal interface ConversationsStore :
 
     sealed interface Msg {
         data class Loaded(val conversations: List<Conversation>) : Msg
+        data class ReachabilityLoaded(val reachability: Map<ConversationId, Reachability>) : Msg
         data class QueryChanged(val text: String) : Msg
     }
 
