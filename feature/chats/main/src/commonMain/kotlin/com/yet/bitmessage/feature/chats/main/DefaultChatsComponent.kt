@@ -19,6 +19,7 @@ import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
 import com.yet.bitmessage.feature.chats.conversations.connectivity.ConnectivityComponent
 import com.yet.bitmessage.feature.chats.conversations.contacts.ContactsComponent
 import com.yet.bitmessage.feature.chats.conversations.search.SearchComponent
+import com.yet.bitmessage.feature.chats.conversations.settings.SettingsComponent
 import com.yet.bitmessage.feature.chats.details.ChatComponent
 import com.yet.bitmessage.feature.chats.details.ChatConfig
 import dev.zacsweers.metro.Inject
@@ -32,6 +33,7 @@ internal class DefaultChatsComponent(
     private val connectivityFactory: ConnectivityComponent.Factory,
     private val searchFactory: SearchComponent.Factory,
     private val contactsFactory: ContactsComponent.Factory,
+    private val settingsFactory: SettingsComponent.Factory,
 ) : ChatsComponent, ComponentContext by componentContext {
 
     private val navigation = PanelsNavigation<Unit, ChatConfig, Nothing>()
@@ -53,6 +55,7 @@ internal class DefaultChatsComponent(
                         onConnectivityRequested = { sheetNavigation.activate(SheetConfig.Connectivity) },
                         onSearchRequested = { sheetNavigation.activate(SheetConfig.Search) },
                         onContactsRequested = { sheetNavigation.activate(SheetConfig.Contacts) },
+                        onSettingsRequested = { sheetNavigation.activate(SheetConfig.Settings) },
                     ),
                 )
             },
@@ -98,6 +101,13 @@ internal class DefaultChatsComponent(
                                 onClose = { sheetNavigation.dismiss() },
                             ),
                         )
+                    SheetConfig.Settings ->
+                        ChatsComponent.SheetChild.Settings(
+                            settingsFactory.create(
+                                componentContext = ctx,
+                                onClose = { sheetNavigation.dismiss() },
+                            ),
+                        )
                 }
             },
         )
@@ -118,6 +128,9 @@ internal class DefaultChatsComponent(
 
         @Serializable
         data object Contacts : SheetConfig
+
+        @Serializable
+        data object Settings : SheetConfig
     }
 }
 
@@ -128,6 +141,7 @@ internal class DefaultChatsComponentFactory(
     private val connectivityFactory: ConnectivityComponent.Factory,
     private val searchFactory: SearchComponent.Factory,
     private val contactsFactory: ContactsComponent.Factory,
+    private val settingsFactory: SettingsComponent.Factory,
 ) : ChatsComponent.Factory {
     override fun create(componentContext: ComponentContext): ChatsComponent =
         DefaultChatsComponent(
@@ -137,5 +151,6 @@ internal class DefaultChatsComponentFactory(
             connectivityFactory = connectivityFactory,
             searchFactory = searchFactory,
             contactsFactory = contactsFactory,
+            settingsFactory = settingsFactory,
         )
 }

@@ -14,6 +14,7 @@ import com.yet.bitmessage.feature.chats.conversations.connectivity.ConnectivityC
 import com.yet.bitmessage.feature.chats.conversations.contacts.ContactsComponent
 import com.yet.bitmessage.feature.chats.conversations.search.SearchComponent
 import com.yet.bitmessage.feature.chats.conversations.search.SearchTab
+import com.yet.bitmessage.feature.chats.conversations.settings.SettingsComponent
 import com.yet.bitmessage.feature.chats.details.ChatComponent
 import com.yet.bitmessage.feature.chats.details.ChatConfig
 import kotlin.test.Test
@@ -29,6 +30,7 @@ class DefaultChatsComponentTest {
         val onConnectivityRequested: () -> Unit,
         val onSearchRequested: () -> Unit,
         val onContactsRequested: () -> Unit,
+        val onSettingsRequested: () -> Unit,
     ) : ConversationsComponent {
         override val model: Value<ConversationsComponent.Model> =
             MutableValue(
@@ -44,6 +46,7 @@ class DefaultChatsComponentTest {
         override fun onConnectivityClicked() = onConnectivityRequested()
         override fun onSearchClicked() = onSearchRequested()
         override fun onContactsClicked() = onContactsRequested()
+        override fun onSettingsClicked() = onSettingsRequested()
         override fun onTogglePin(id: ConversationId) = Unit
         override fun onToggleMute(id: ConversationId) = Unit
         override fun onDismissBanner() = Unit
@@ -95,6 +98,15 @@ class DefaultChatsComponentTest {
         override fun onCloseClicked() = onClose()
     }
 
+    private class FakeSettingsComponent(val onClose: () -> Unit) : SettingsComponent {
+        override val model: Value<SettingsComponent.Model> =
+            MutableValue(SettingsComponent.Model(nickname = "", npub = null, fingerprint = "", isWiping = false))
+
+        override fun onNicknameChanged(text: String) = Unit
+        override fun onPanicWipe() = Unit
+        override fun onCloseClicked() = onClose()
+    }
+
     private class FakeChatComponent(
         config: ChatConfig,
         val onFinished: () -> Unit,
@@ -122,8 +134,8 @@ class DefaultChatsComponentTest {
         val lifecycle = LifecycleRegistry()
         return DefaultChatsComponent(
             componentContext = DefaultComponentContext(lifecycle),
-            conversationsFactory = { _, onSelected, onConnectivity, onSearch, onContacts ->
-                FakeConversationsComponent(onSelected, onConnectivity, onSearch, onContacts)
+            conversationsFactory = { _, onSelected, onConnectivity, onSearch, onContacts, onSettings ->
+                FakeConversationsComponent(onSelected, onConnectivity, onSearch, onContacts, onSettings)
             },
             chatFactory = { _: ComponentContext, config: ChatConfig, onFinished: () -> Unit ->
                 FakeChatComponent(config, onFinished)
@@ -135,6 +147,7 @@ class DefaultChatsComponentTest {
             contactsFactory = { _, onContactSelected, onClose ->
                 FakeContactsComponent(onContactSelected, onClose)
             },
+            settingsFactory = { _, onClose -> FakeSettingsComponent(onClose) },
         )
     }
 
@@ -225,6 +238,13 @@ class DefaultChatsComponentTest {
 
         assertNull(component.sheetSlot.value.child)
         assertIs<ChatsComponent.Details.Chat>(component.panels.value.details?.instance)
+    }
+
+    @Test
+    fun requesting_settings_opens_the_overlay() {
+        val component = build()
+        component.mainConversations.onSettingsClicked()
+        assertIs<ChatsComponent.SheetChild.Settings>(component.sheetSlot.value.child?.instance)
     }
 
     @Test

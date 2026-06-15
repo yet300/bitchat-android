@@ -8,6 +8,8 @@ import com.yet.bitmessage.feature.chats.conversations.contacts.ContactsComponent
 import com.yet.bitmessage.feature.chats.conversations.contacts.DefaultContactsComponentFactory
 import com.yet.bitmessage.feature.chats.conversations.search.DefaultSearchComponentFactory
 import com.yet.bitmessage.feature.chats.conversations.search.SearchComponent
+import com.yet.bitmessage.feature.chats.conversations.settings.DefaultSettingsComponentFactory
+import com.yet.bitmessage.feature.chats.conversations.settings.SettingsComponent
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Binds
 import dev.zacsweers.metro.BindingContainer
@@ -27,4 +29,7 @@ abstract class ConversationsBindings {
 
     @Binds
     internal abstract val DefaultContactsComponentFactory.bindContactsComponentFactory: ContactsComponent.Factory
+
+    @Binds
+    internal abstract val DefaultSettingsComponentFactory.bindSettingsComponentFactory: SettingsComponent.Factory
 }

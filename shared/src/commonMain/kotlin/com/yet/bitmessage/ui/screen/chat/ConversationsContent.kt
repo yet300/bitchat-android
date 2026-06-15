@@ -70,6 +70,7 @@ import com.yet.bitmessage.shared.resources.conversations_nearby
 import com.yet.bitmessage.shared.resources.conversations_pin
 import com.yet.bitmessage.shared.resources.conversations_search
 import com.yet.bitmessage.shared.resources.conversations_title
+import com.yet.bitmessage.shared.resources.settings_title
 import com.yet.bitmessage.shared.resources.conversations_unmute
 import com.yet.bitmessage.shared.resources.conversations_unpin
 import com.yet.bitmessage.ui.component.button.IconCircleButton
@@ -104,6 +105,7 @@ fun ConversationsContent(component: ConversationsComponent, modifier: Modifier =
                     OverflowMenu(
                         onConnectivity = component::onConnectivityClicked,
                         onContacts = component::onContactsClicked,
+                        onSettings = component::onSettingsClicked,
                     )
                 },
             )
@@ -144,7 +146,7 @@ fun ConversationsContent(component: ConversationsComponent, modifier: Modifier =
 
 /** Top-bar overflow: connectivity sheet + contacts screen (no dedicated icons needed). */
 @Composable
-private fun OverflowMenu(onConnectivity: () -> Unit, onContacts: () -> Unit) {
+private fun OverflowMenu(onConnectivity: () -> Unit, onContacts: () -> Unit, onSettings: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconCircleButton(
@@ -160,6 +162,10 @@ private fun OverflowMenu(onConnectivity: () -> Unit, onContacts: () -> Unit) {
             DropdownMenuItem(
                 text = { Text(stringResource(Res.string.connectivity_title)) },
                 onClick = { open = false; onConnectivity() },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(Res.string.settings_title)) },
+                onClick = { open = false; onSettings() },
             )
         }
     }
