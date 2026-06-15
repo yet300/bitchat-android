@@ -25,6 +25,9 @@ interface ConversationsComponent {
     /** Open the unified full-screen search (hosted as a slot by the parent). */
     fun onSearchClicked()
 
+    /** Open the contacts screen (hosted as a slot by the parent). */
+    fun onContactsClicked()
+
     fun onTogglePin(id: ConversationId)
 
     fun onToggleMute(id: ConversationId)
@@ -48,6 +51,7 @@ interface ConversationsComponent {
             onConversationSelected: (ConversationId) -> Unit,
             onConnectivityRequested: () -> Unit,
             onSearchRequested: () -> Unit,
+            onContactsRequested: () -> Unit,
         ): ConversationsComponent
     }
 }

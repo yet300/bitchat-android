@@ -8,6 +8,7 @@ import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.backhandler.BackHandlerOwner
 import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
 import com.yet.bitmessage.feature.chats.conversations.connectivity.ConnectivityComponent
+import com.yet.bitmessage.feature.chats.conversations.contacts.ContactsComponent
 import com.yet.bitmessage.feature.chats.conversations.search.SearchComponent
 import com.yet.bitmessage.feature.chats.details.ChatComponent
 
@@ -38,10 +39,11 @@ interface ChatsComponent : BackHandlerOwner {
         class Chat(val component: ChatComponent) : Details
     }
 
-    /** Overlay children — modal sheets and the full-screen search. */
+    /** Overlay children — modal sheets and the full-screen search / contacts. */
     sealed interface SheetChild {
         class Connectivity(val component: ConnectivityComponent) : SheetChild
         class Search(val component: SearchComponent) : SheetChild
+        class Contacts(val component: ContactsComponent) : SheetChild
     }
 
     fun interface Factory {

@@ -67,6 +67,8 @@ fun ChatsContent(component: ChatsComponent, modifier: Modifier = Modifier) {
             ConnectivitySheet(child.component, onDismiss = component::onDismissSheet)
         is ChatsComponent.SheetChild.Search ->
             SearchContent(child.component)
+        is ChatsComponent.SheetChild.Contacts ->
+            ContactsContent(child.component)
         null -> Unit
     }
 }

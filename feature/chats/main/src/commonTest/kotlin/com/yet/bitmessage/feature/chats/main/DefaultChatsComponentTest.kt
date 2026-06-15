@@ -11,6 +11,7 @@ import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
 import com.yet.bitmessage.feature.chats.conversations.connectivity.ConnectivityComponent
+import com.yet.bitmessage.feature.chats.conversations.contacts.ContactsComponent
 import com.yet.bitmessage.feature.chats.conversations.search.SearchComponent
 import com.yet.bitmessage.feature.chats.conversations.search.SearchTab
 import com.yet.bitmessage.feature.chats.details.ChatComponent
@@ -27,6 +28,7 @@ class DefaultChatsComponentTest {
         val onConversationSelected: (ConversationId) -> Unit,
         val onConnectivityRequested: () -> Unit,
         val onSearchRequested: () -> Unit,
+        val onContactsRequested: () -> Unit,
     ) : ConversationsComponent {
         override val model: Value<ConversationsComponent.Model> =
             MutableValue(
@@ -41,6 +43,7 @@ class DefaultChatsComponentTest {
         override fun onNearbyClicked(peer: Peer) = onConversationSelected(ConversationId.Private(peer.id))
         override fun onConnectivityClicked() = onConnectivityRequested()
         override fun onSearchClicked() = onSearchRequested()
+        override fun onContactsClicked() = onContactsRequested()
         override fun onTogglePin(id: ConversationId) = Unit
         override fun onToggleMute(id: ConversationId) = Unit
         override fun onDismissBanner() = Unit
@@ -79,6 +82,19 @@ class DefaultChatsComponentTest {
         override fun onCloseClicked() = onClose()
     }
 
+    private class FakeContactsComponent(
+        val onContactSelected: (ConversationId) -> Unit,
+        val onClose: () -> Unit,
+    ) : ContactsComponent {
+        override val model: Value<ContactsComponent.Model> =
+            MutableValue(ContactsComponent.Model(isLoading = false, favorites = emptyList(), blocked = emptyList()))
+
+        override fun onContactClicked(noiseKeyHex: String) =
+            onContactSelected(ConversationId.Private(com.app.domain.model.PeerId(noiseKeyHex)))
+        override fun onToggleBlock(noiseKeyHex: String, blocked: Boolean) = Unit
+        override fun onCloseClicked() = onClose()
+    }
+
     private class FakeChatComponent(
         config: ChatConfig,
         val onFinished: () -> Unit,
@@ -106,8 +122,8 @@ class DefaultChatsComponentTest {
         val lifecycle = LifecycleRegistry()
         return DefaultChatsComponent(
             componentContext = DefaultComponentContext(lifecycle),
-            conversationsFactory = { _, onSelected, onConnectivity, onSearch ->
-                FakeConversationsComponent(onSelected, onConnectivity, onSearch)
+            conversationsFactory = { _, onSelected, onConnectivity, onSearch, onContacts ->
+                FakeConversationsComponent(onSelected, onConnectivity, onSearch, onContacts)
             },
             chatFactory = { _: ComponentContext, config: ChatConfig, onFinished: () -> Unit ->
                 FakeChatComponent(config, onFinished)
@@ -115,6 +131,9 @@ class DefaultChatsComponentTest {
             connectivityFactory = { _: ComponentContext -> FakeConnectivityComponent() },
             searchFactory = { _, onResultSelected, onClose ->
                 FakeSearchComponent(onResultSelected, onClose)
+            },
+            contactsFactory = { _, onContactSelected, onClose ->
+                FakeContactsComponent(onContactSelected, onClose)
             },
         )
     }
@@ -194,6 +213,18 @@ class DefaultChatsComponentTest {
         component.mainConversations.onSearchClicked()
 
         assertIs<ChatsComponent.SheetChild.Search>(component.sheetSlot.value.child?.instance)
+    }
+
+    @Test
+    fun requesting_contacts_opens_the_overlay_and_dm_navigates_and_closes() {
+        val component = build()
+        component.mainConversations.onContactsClicked()
+        val contacts = assertIs<ChatsComponent.SheetChild.Contacts>(component.sheetSlot.value.child?.instance)
+
+        contacts.component.onContactClicked("a".repeat(64))
+
+        assertNull(component.sheetSlot.value.child)
+        assertIs<ChatsComponent.Details.Chat>(component.panels.value.details?.instance)
     }
 
     @Test

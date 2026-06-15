@@ -9,6 +9,16 @@
     <string name="conversations_unmute">Unmute</string>
     <string name="conversations_empty">No conversations yet</string>
     <string name="conversations_search">Search</string>
+    <string name="conversations_more">More</string>
+    <string name="conversations_contacts">Contacts</string>
+    <string name="contacts_title">Contacts</string>
+    <string name="contacts_close">Close</string>
+    <string name="contacts_section_favorites">Favorites</string>
+    <string name="contacts_section_blocked">Blocked</string>
+    <string name="contacts_empty">No contacts yet</string>
+    <string name="contacts_mutual">Mutual</string>
+    <string name="contacts_block">Block</string>
+    <string name="contacts_unblock">Unblock</string>
     <string name="search_hint">Search</string>
     <string name="search_close">Close</string>
     <string name="search_tab_chats">Chats</string>
