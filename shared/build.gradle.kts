@@ -45,6 +45,7 @@ kotlin {
             implementation(projects.feature.chats.conversations)
             implementation(projects.feature.chats.details)
 
+            implementation(libs.kotlinx.datetime)
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)
