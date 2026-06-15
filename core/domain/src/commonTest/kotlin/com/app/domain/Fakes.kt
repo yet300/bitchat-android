@@ -108,10 +108,11 @@ class FakePeerRepository(private val peers: List<Peer> = emptyList()) : PeerRepo
     override suspend fun peer(id: PeerId): Peer? = peers.firstOrNull { it.id == id }
 }
 
-/** In-memory favorites/blocked + alias->noiseHex map. */
+/** In-memory favorites/blocked + alias->noiseHex map + contacts by noise-key hex. */
 class FakeContactRepository(
     private val aliasToNoiseHex: Map<String, String> = emptyMap(),
     initialFavorites: Set<PeerId> = emptySet(),
+    private val contactsByNoiseHex: Map<String, Contact> = emptyMap(),
 ) : ContactRepository {
     val favorites = initialFavorites.toMutableSet()
     val blocked = mutableSetOf<PeerId>()
@@ -124,7 +125,8 @@ class FakeContactRepository(
         if (blocked) this.blocked.add(peer) else this.blocked.remove(peer)
     }
     override suspend fun isBlocked(peer: PeerId): Boolean = peer in blocked
-    override suspend fun contact(identity: PeerIdentity): Contact? = null
+    override suspend fun contact(identity: PeerIdentity): Contact? =
+        contactsByNoiseHex[identity.noiseKeyHex]
     override suspend fun noiseKeyHexForNostrAlias(alias: PeerId): String? = aliasToNoiseHex[alias.raw]
     override suspend fun clearAll() { favorites.clear(); blocked.clear(); clearedAll = true }
 }
