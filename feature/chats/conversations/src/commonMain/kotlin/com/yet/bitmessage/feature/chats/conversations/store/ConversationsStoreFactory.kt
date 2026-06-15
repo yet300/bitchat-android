@@ -1,6 +1,8 @@
 package com.yet.bitmessage.feature.chats.conversations.store
 
+import com.app.domain.model.Peer
 import com.app.domain.repository.ConversationRepository
+import com.app.domain.repository.PeerRepository
 import com.app.domain.usecase.ResolveReachabilityUseCase
 import com.arkivanov.mvikotlin.core.store.Reducer
 import com.arkivanov.mvikotlin.core.store.Store
@@ -17,6 +19,7 @@ import kotlinx.coroutines.launch
 internal class ConversationsStoreFactory(
     private val storeFactory: StoreFactory,
     private val conversationRepository: ConversationRepository,
+    private val peerRepository: PeerRepository,
     private val resolveReachability: ResolveReachabilityUseCase,
 ) {
     fun create(): ConversationsStore =
@@ -34,6 +37,7 @@ internal class ConversationsStoreFactory(
             when (msg) {
                 is ConversationsStore.Msg.Loaded -> copy(isLoading = false, conversations = msg.conversations)
                 is ConversationsStore.Msg.ReachabilityLoaded -> copy(reachability = msg.reachability)
+                is ConversationsStore.Msg.NearbyLoaded -> copy(nearby = msg.nearby)
                 is ConversationsStore.Msg.QueryChanged -> copy(query = msg.text)
             }
     }
@@ -67,6 +71,13 @@ internal class ConversationsStoreFactory(
                             }
                             .collect { dispatch(ConversationsStore.Msg.ReachabilityLoaded(it)) }
                     }
+                    // Nearby rail: peers currently reachable over the mesh (direct first,
+                    // strongest signal first), for proximity discovery.
+                    scope.launch {
+                        peerRepository.observePeers().collect { peers ->
+                            dispatch(ConversationsStore.Msg.NearbyLoaded(peers.filter { it.isConnected }.sortedByNearby()))
+                        }
+                    }
                 }
             }
         }
@@ -79,3 +90,11 @@ internal class ConversationsStoreFactory(
         }
     }
 }
+
+/** Direct peers first, then strongest signal, then nickname — for a stable nearby rail. */
+private fun List<Peer>.sortedByNearby(): List<Peer> =
+    sortedWith(
+        compareByDescending<Peer> { it.isDirect }
+            .thenByDescending { it.rssi ?: Int.MIN_VALUE }
+            .thenBy { it.nickname },
+    )

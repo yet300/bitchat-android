@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="conversations_title">bitchat</string>
+    <string name="conversations_nearby">Nearby</string>
     <string name="conversations_empty">No conversations yet</string>
     <string name="conversations_search">Search</string>
     <string name="conversations_search_hint">Search chats</string>
