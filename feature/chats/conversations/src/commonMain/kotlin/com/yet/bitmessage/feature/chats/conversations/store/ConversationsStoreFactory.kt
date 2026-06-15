@@ -26,6 +26,7 @@ internal class ConversationsStoreFactory(
         override fun ConversationsStore.State.reduce(msg: ConversationsStore.Msg): ConversationsStore.State =
             when (msg) {
                 is ConversationsStore.Msg.Loaded -> copy(isLoading = false, conversations = msg.conversations)
+                is ConversationsStore.Msg.QueryChanged -> copy(query = msg.text)
             }
     }
 
@@ -39,6 +40,13 @@ internal class ConversationsStoreFactory(
                         dispatch(ConversationsStore.Msg.Loaded(conversations))
                     }
                 }
+            }
+        }
+
+        override fun executeIntent(intent: ConversationsStore.Intent) {
+            when (intent) {
+                is ConversationsStore.Intent.QueryChanged ->
+                    dispatch(ConversationsStore.Msg.QueryChanged(intent.text))
             }
         }
     }

@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="conversations_title">bitchat</string>
     <string name="conversations_empty">No conversations yet</string>
+    <string name="conversations_search">Search</string>
+    <string name="conversations_search_hint">Search chats</string>
+    <string name="conversations_search_close">Close search</string>
+    <string name="conversations_search_empty">Nothing found</string>
     <string name="chat_back">Back</string>
     <string name="chat_empty">No messages yet</string>
     <string name="chat_input_hint">Message</string>

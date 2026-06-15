@@ -9,6 +9,7 @@ import com.arkivanov.mvikotlin.core.instancekeeper.getStore
 import com.arkivanov.mvikotlin.core.store.StoreFactory
 import com.app.domain.repository.ConversationRepository
 import com.yet.bitmessage.feature.chats.conversations.integration.stateToModel
+import com.yet.bitmessage.feature.chats.conversations.store.ConversationsStore
 import com.yet.bitmessage.feature.chats.conversations.store.ConversationsStoreFactory
 import dev.zacsweers.metro.Inject
 
@@ -23,6 +24,9 @@ internal class DefaultConversationsComponent(
     override val model: Value<ConversationsComponent.Model> = store.asValue().map(stateToModel)
 
     override fun onConversationClicked(id: ConversationId) = onConversationSelected(id)
+
+    override fun onQueryChanged(text: String) =
+        store.accept(ConversationsStore.Intent.QueryChanged(text))
 }
 
 @Inject

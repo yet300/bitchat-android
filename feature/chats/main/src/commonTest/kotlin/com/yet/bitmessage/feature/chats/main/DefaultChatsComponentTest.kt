@@ -23,9 +23,16 @@ class DefaultChatsComponentTest {
         val onConversationSelected: (ConversationId) -> Unit,
     ) : ConversationsComponent {
         override val model: Value<ConversationsComponent.Model> =
-            MutableValue(ConversationsComponent.Model(isLoading = false, conversations = emptyList<Conversation>()))
+            MutableValue(
+                ConversationsComponent.Model(
+                    isLoading = false,
+                    conversations = emptyList<Conversation>(),
+                    query = "",
+                ),
+            )
 
         override fun onConversationClicked(id: ConversationId) = onConversationSelected(id)
+        override fun onQueryChanged(text: String) = Unit
     }
 
     private class FakeChatComponent(
@@ -33,8 +40,19 @@ class DefaultChatsComponentTest {
         val onFinished: () -> Unit,
     ) : ChatComponent {
         override val model: Value<ChatComponent.Model> =
-            MutableValue(ChatComponent.Model(conversationId = config.toConversationId(), title = "test"))
+            MutableValue(
+                ChatComponent.Model(
+                    conversationId = config.toConversationId(),
+                    title = "test",
+                    isLoading = false,
+                    messages = emptyList(),
+                    draft = "",
+                    canSend = false,
+                ),
+            )
 
+        override fun onDraftChanged(text: String) = Unit
+        override fun onSendClicked() = Unit
         override fun onBackClicked() = onFinished()
     }
 
