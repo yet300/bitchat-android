@@ -10,6 +10,7 @@ import com.app.data.repository.PeerRepositoryImpl
 import com.app.data.repository.SearchRepositoryImpl
 import com.app.data.repository.SettingsRepositoryImpl
 import com.app.data.repository.SettingsStoreImpl
+import com.app.data.repository.ThemeRepositoryImpl
 import com.app.data.routing.MeshRouteStrategy
 import com.app.data.routing.NostrRouteStrategy
 import com.app.data.routing.RoutingCore
@@ -26,6 +27,7 @@ import com.app.domain.repository.MessageTransport
 import com.app.domain.repository.PeerRepository
 import com.app.domain.repository.SearchRepository
 import com.app.domain.repository.SettingsRepository
+import com.app.domain.repository.ThemeRepository
 import com.app.common.settings.SettingsStore
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Binds
@@ -46,6 +48,9 @@ abstract class DataBindings {
 
     @Binds
     internal abstract val SettingsRepositoryImpl.bindSettings: SettingsRepository
+
+    @Binds
+    internal abstract val ThemeRepositoryImpl.bindTheme: ThemeRepository
 
     @Binds
     internal abstract val ContactRepositoryImpl.bindContact: ContactRepository
