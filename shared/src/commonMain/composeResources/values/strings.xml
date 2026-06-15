@@ -23,6 +23,9 @@
     <string name="connectivity_state_permission">Permission needed</string>
     <string name="connectivity_action_enable">Enable</string>
     <string name="connectivity_action_grant">Grant</string>
+    <string name="connectivity_banner_title">Some transports need permission</string>
+    <string name="connectivity_banner_action">Review</string>
+    <string name="connectivity_banner_dismiss">Dismiss</string>
     <string name="chat_back">Back</string>
     <string name="chat_empty">No messages yet</string>
     <string name="chat_encrypted">Encrypted</string>

@@ -4,6 +4,9 @@ import com.app.domain.model.Conversation
 import com.app.domain.model.ConversationId
 import com.app.domain.model.Peer
 import com.app.domain.model.Reachability
+import com.app.domain.model.TransportKind
+import com.app.domain.model.TransportState
+import com.app.domain.model.TransportStatus
 import com.arkivanov.mvikotlin.core.store.Store
 
 internal interface ConversationsStore :
@@ -17,6 +20,8 @@ internal interface ConversationsStore :
         val pinned: Set<ConversationId> = emptySet(),
         val muted: Set<ConversationId> = emptySet(),
         val query: String = "",
+        val transports: List<TransportStatus> = emptyList(),
+        val bannerDismissed: Boolean = false,
     ) {
         /** Client-side chat-list filter on title + last-message text. */
         val visible: List<Conversation>
@@ -28,6 +33,13 @@ internal interface ConversationsStore :
                         conversation.lastMessage?.content?.contains(query, ignoreCase = true) == true
                 }
             }
+
+        /**
+         * Transports a denied-earlier user can re-enable in one tap. Only PERMISSION_REQUIRED
+         * surfaces here — an OFF radio / Tor is a deliberate user choice, never a nag.
+         */
+        val transportsNeedingAttention: List<TransportKind>
+            get() = transports.filter { it.state == TransportState.PERMISSION_REQUIRED }.map { it.kind }
     }
 
     /** Selection is navigation, owned by the component. */
@@ -35,6 +47,7 @@ internal interface ConversationsStore :
         data class QueryChanged(val text: String) : Intent
         data class TogglePin(val id: ConversationId) : Intent
         data class ToggleMute(val id: ConversationId) : Intent
+        data object DismissBanner : Intent
     }
 
     sealed interface Action {
@@ -48,6 +61,8 @@ internal interface ConversationsStore :
         data class PinnedLoaded(val pinned: Set<ConversationId>) : Msg
         data class MutedLoaded(val muted: Set<ConversationId>) : Msg
         data class QueryChanged(val text: String) : Msg
+        data class TransportsLoaded(val transports: List<TransportStatus>) : Msg
+        data object BannerDismissed : Msg
     }
 
     sealed interface Label

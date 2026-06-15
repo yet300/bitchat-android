@@ -32,6 +32,7 @@ import com.app.transport.nostr.NostrRelayManager
 import com.app.transport.nostr.PoWPreferenceManager
 import com.app.transport.nostr.RelayDirectory
 import com.app.data.nostr.NostrMessageSender
+import com.bitchat.android.connectivity.RuntimePermissionRequester
 import com.bitchat.android.geohash.GeohashBookmarksStore
 import com.bitchat.android.geohash.LocationChannelManager
 import com.bitchat.android.onboarding.BackgroundLocationPreferenceManager
@@ -105,4 +106,7 @@ interface AppGraph : SharedAppGraph {
     // for the foreground service (invariant: the service owns the mesh lifecycle).
     val bluetoothMeshService: BluetoothMeshService
     val meshLifecycleController: MeshLifecycleController
+
+    /** Bridge the Phase C Activity attaches its runtime-permission launcher into. */
+    val runtimePermissionRequester: RuntimePermissionRequester
 }

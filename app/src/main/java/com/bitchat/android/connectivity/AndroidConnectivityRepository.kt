@@ -33,6 +33,7 @@ import kotlinx.coroutines.delay
 class AndroidConnectivityRepository(
     private val context: Context,
     private val torPreferenceManager: TorPreferenceManager,
+    private val permissionRequester: RuntimePermissionRequester,
 ) : ConnectivityRepository {
 
     override fun observe(): Flow<List<TransportStatus>> = flow {
@@ -87,12 +88,12 @@ class AndroidConnectivityRepository(
     override suspend fun enable(kind: TransportKind) {
         when (kind) {
             TransportKind.BLUETOOTH ->
-                if (!hasBluetoothRuntimePermission()) openAppSettings()
+                if (!hasBluetoothRuntimePermission()) requestOrSettings(bluetoothPermissions())
                 else startSystemIntent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
 
             TransportKind.WIFI_AWARE ->
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNearbyWifiPermission()) {
-                    openAppSettings()
+                    requestOrSettings(listOf(Manifest.permission.NEARBY_WIFI_DEVICES))
                 } else {
                     startSystemIntent(Settings.ACTION_WIFI_SETTINGS)
                 }
@@ -105,6 +106,26 @@ class AndroidConnectivityRepository(
             }
         }
     }
+
+    /**
+     * Ask for the missing runtime [permissions] via the in-app system dialog; only fall back to the
+     * app-settings deep link when the dialog can't help (permanently denied, or no Activity attached).
+     * On grant the next [observe] poll reflects the new state — the radio itself (if off) is then a
+     * separate one-tap "Enable" step.
+     */
+    private suspend fun requestOrSettings(permissions: List<String>) {
+        when (permissionRequester.request(permissions)) {
+            PermissionOutcome.GRANTED, PermissionOutcome.DENIED -> Unit
+            PermissionOutcome.PERMANENTLY_DENIED, PermissionOutcome.NO_HOST -> openAppSettings()
+        }
+    }
+
+    private fun bluetoothPermissions(): List<String> =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            listOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
+        } else {
+            emptyList()
+        }
 
     private fun bluetoothAdapter(): BluetoothAdapter? =
         (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter

@@ -1,6 +1,7 @@
 package com.yet.bitmessage.feature.chats.conversations.store
 
 import com.app.domain.model.Peer
+import com.app.domain.repository.ConnectivityRepository
 import com.app.domain.repository.ConversationPrefsRepository
 import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.PeerRepository
@@ -22,6 +23,7 @@ internal class ConversationsStoreFactory(
     private val conversationRepository: ConversationRepository,
     private val peerRepository: PeerRepository,
     private val conversationPrefsRepository: ConversationPrefsRepository,
+    private val connectivityRepository: ConnectivityRepository,
     private val resolveReachability: ResolveReachabilityUseCase,
 ) {
     fun create(): ConversationsStore =
@@ -43,6 +45,12 @@ internal class ConversationsStoreFactory(
                 is ConversationsStore.Msg.PinnedLoaded -> copy(pinned = msg.pinned)
                 is ConversationsStore.Msg.MutedLoaded -> copy(muted = msg.muted)
                 is ConversationsStore.Msg.QueryChanged -> copy(query = msg.text)
+                is ConversationsStore.Msg.TransportsLoaded -> {
+                    val next = copy(transports = msg.transports)
+                    // Once everything is resolved, arm the banner again for any future issue.
+                    if (next.transportsNeedingAttention.isEmpty()) next.copy(bannerDismissed = false) else next
+                }
+                ConversationsStore.Msg.BannerDismissed -> copy(bannerDismissed = true)
             }
     }
 
@@ -92,6 +100,11 @@ internal class ConversationsStoreFactory(
                             dispatch(ConversationsStore.Msg.MutedLoaded(it))
                         }
                     }
+                    scope.launch {
+                        connectivityRepository.observe().collect {
+                            dispatch(ConversationsStore.Msg.TransportsLoaded(it))
+                        }
+                    }
                 }
             }
         }
@@ -106,6 +119,9 @@ internal class ConversationsStoreFactory(
 
                 is ConversationsStore.Intent.ToggleMute ->
                     scope.launch { conversationPrefsRepository.setMuted(intent.id, intent.id !in state().muted) }
+
+                is ConversationsStore.Intent.DismissBanner ->
+                    dispatch(ConversationsStore.Msg.BannerDismissed)
             }
         }
     }

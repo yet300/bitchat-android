@@ -22,5 +22,8 @@ internal val stateToModel: (ConversationsStore.State) -> ConversationsComponent.
             },
         nearby = state.nearby,
         query = state.query,
+        connectivityBanner = state.transportsNeedingAttention
+            .takeIf { it.isNotEmpty() && !state.bannerDismissed }
+            ?.let { ConversationsComponent.ConnectivityBanner(it) },
     )
 }

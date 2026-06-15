@@ -8,6 +8,7 @@ import com.arkivanov.decompose.value.Value
 import com.arkivanov.decompose.value.operator.map
 import com.arkivanov.mvikotlin.core.instancekeeper.getStore
 import com.arkivanov.mvikotlin.core.store.StoreFactory
+import com.app.domain.repository.ConnectivityRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationPrefsRepository
 import com.app.domain.repository.ConversationRepository
@@ -41,6 +42,8 @@ internal class DefaultConversationsComponent(
 
     override fun onQueryChanged(text: String) =
         store.accept(ConversationsStore.Intent.QueryChanged(text))
+
+    override fun onDismissBanner() = store.accept(ConversationsStore.Intent.DismissBanner)
 }
 
 @Inject
@@ -50,6 +53,7 @@ internal class DefaultConversationsComponentFactory(
     private val peerRepository: PeerRepository,
     private val contactRepository: ContactRepository,
     private val conversationPrefsRepository: ConversationPrefsRepository,
+    private val connectivityRepository: ConnectivityRepository,
 ) : ConversationsComponent.Factory {
     override fun create(
         componentContext: ComponentContext,
@@ -62,6 +66,7 @@ internal class DefaultConversationsComponentFactory(
             conversationRepository = conversationRepository,
             peerRepository = peerRepository,
             conversationPrefsRepository = conversationPrefsRepository,
+            connectivityRepository = connectivityRepository,
             resolveReachability = ResolveReachabilityUseCase(peerRepository, contactRepository),
         ),
         onConversationSelected = onConversationSelected,
