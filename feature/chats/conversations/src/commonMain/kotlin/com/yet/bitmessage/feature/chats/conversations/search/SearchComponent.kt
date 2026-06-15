@@ -4,6 +4,7 @@ import com.app.domain.model.BitMessage
 import com.app.domain.model.Channel
 import com.app.domain.model.Conversation
 import com.app.domain.model.ConversationId
+import com.app.domain.model.GeohashChannel
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.value.Value
 
@@ -32,6 +33,10 @@ interface SearchComponent {
         val people: List<PersonResult>,
         val messages: List<BitMessage>,
         val channels: List<Channel>,
+        val geo: GeohashChannel?,
+        // Focused-empty state (no query yet): nearby people + recent conversations.
+        val nearby: List<PersonResult>,
+        val recent: List<Conversation>,
     )
 
     /** A person hit (in-range peer or saved contact) flattened to what the row needs. */

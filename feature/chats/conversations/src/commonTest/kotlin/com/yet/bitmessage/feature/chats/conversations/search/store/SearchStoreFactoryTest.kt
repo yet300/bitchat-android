@@ -13,7 +13,9 @@ import com.app.domain.model.PeerIdentity
 import com.app.domain.model.SenderRef
 import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.PeerRepository
+import com.app.domain.model.GeohashLevel
 import com.app.domain.repository.SearchRepository
+import com.app.domain.usecase.ParseGeohashUseCase
 import com.app.domain.usecase.SearchUseCase
 import com.yet.bitmessage.feature.chats.conversations.search.SearchTab
 import com.yet.bitmessage.feature.chats.conversations.search.searchStateToModel
@@ -80,6 +82,7 @@ class SearchStoreFactoryTest {
         conversationRepository = conversations,
         peerRepository = FakePeerRepository(peers),
         searchUseCase = SearchUseCase(search),
+        parseGeohash = ParseGeohashUseCase(),
     )
 
     private fun conversation(title: String) =
@@ -144,6 +147,29 @@ class SearchStoreFactoryTest {
         val model = searchStateToModel(store.state)
         assertEquals(listOf("1"), model.messages.map { it.id })
         assertEquals(listOf("#kotlin"), model.channels.map { it.tag })
+    }
+
+    @Test
+    fun geo_tab_parses_a_geohash_query_into_a_teleport_channel() = runTest {
+        val store = factory().create()
+
+        store.accept(SearchStore.Intent.QueryChanged("u4pruyd"))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val geo = searchStateToModel(store.state).geo
+        assertEquals("u4pruyd", geo?.geohash)
+        assertEquals(GeohashLevel.BLOCK, geo?.level)
+    }
+
+    @Test
+    fun focused_empty_state_exposes_nearby_and_recent() = runTest {
+        val peer = Peer(id = PeerId("1111111111111111"), nickname = "neo", isConnected = true, isDirect = true)
+        val convo = FakeConversationRepository(MutableStateFlow(listOf(conversation("alpha"))))
+        val store = factory(conversations = convo, peers = listOf(peer)).create()
+
+        val model = searchStateToModel(store.state)
+        assertEquals(listOf("neo"), model.nearby.map { it.name })
+        assertEquals(listOf("alpha"), model.recent.map { it.title })
     }
 
     @Test

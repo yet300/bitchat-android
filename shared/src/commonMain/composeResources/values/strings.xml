@@ -15,8 +15,11 @@
     <string name="search_tab_people">People</string>
     <string name="search_tab_messages">Messages</string>
     <string name="search_tab_channels">Channels</string>
+    <string name="search_tab_geo">Geo</string>
     <string name="search_prompt">Search chats, people, messages and channels</string>
     <string name="search_empty">Nothing found</string>
+    <string name="search_recent">Recent</string>
+    <string name="search_geo_action">Teleport here</string>
     <string name="connectivity_title">Connectivity</string>
     <string name="connectivity_bluetooth">Bluetooth</string>
     <string name="connectivity_wifi_aware">Wi-Fi Aware</string>

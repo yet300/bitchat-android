@@ -67,6 +67,9 @@ class DefaultChatsComponentTest {
                     people = emptyList(),
                     messages = emptyList(),
                     channels = emptyList(),
+                    geo = null,
+                    nearby = emptyList(),
+                    recent = emptyList(),
                 ),
             )
 
