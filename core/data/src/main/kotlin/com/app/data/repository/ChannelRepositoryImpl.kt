@@ -9,6 +9,7 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.builtins.SetSerializer
 import kotlinx.serialization.builtins.serializer
@@ -27,6 +28,16 @@ internal class ChannelRepositoryImpl(
 
     override fun observeJoinedChannels(): Flow<Set<String>> =
         settings.getStringOrNullFlow(KEY_JOINED).map(::decodeSet)
+
+    override fun observeChannels(): Flow<List<Channel>> =
+        combine(
+            settings.getStringOrNullFlow(KEY_JOINED).map(::decodeSet),
+            settings.getStringOrNullFlow(KEY_PROTECTED).map(::decodeSet),
+        ) { joined, protected ->
+            joined.sorted().map { tag ->
+                Channel(tag = tag, isJoined = true, isPasswordProtected = tag in protected)
+            }
+        }
 
     override suspend fun join(tag: String, password: String?): JoinResult {
         val channel = Channel.tag(tag)

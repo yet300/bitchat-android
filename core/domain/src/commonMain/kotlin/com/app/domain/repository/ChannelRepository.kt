@@ -1,5 +1,6 @@
 package com.app.domain.repository
 
+import com.app.domain.model.Channel
 import kotlinx.coroutines.flow.Flow
 
 /** Result of an attempt to join a channel. */
@@ -15,6 +16,12 @@ sealed interface JoinResult {
 interface ChannelRepository {
 
     fun observeJoinedChannels(): Flow<Set<String>>
+
+    /**
+     * Stream of the joined channels as [Channel] metadata (password-protected flag annotated) —
+     * the data source for the channel-management screen.
+     */
+    fun observeChannels(): Flow<List<Channel>>
 
     suspend fun join(tag: String, password: String?): JoinResult
 
