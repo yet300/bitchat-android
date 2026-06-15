@@ -11,5 +11,7 @@ internal val stateToModel: (ChatStore.State) -> ChatComponent.Model = { state ->
         messages = state.messages,
         draft = state.draft,
         canSend = state.canSend,
+        reachability = state.reachability,
+        isEncrypted = state.isEncrypted,
     )
 }

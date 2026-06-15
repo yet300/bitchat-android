@@ -7,6 +7,7 @@ import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.MessageTransport
 import com.app.domain.usecase.MarkConversationReadUseCase
+import com.app.domain.usecase.ResolveReachabilityUseCase
 import com.app.domain.usecase.SendMessageUseCase
 import com.arkivanov.mvikotlin.core.store.Reducer
 import com.arkivanov.mvikotlin.core.store.SimpleBootstrapper
@@ -22,6 +23,7 @@ internal class ChatStoreFactory(
     private val messageRepository: MessageRepository,
     private val identityRepository: IdentityRepository,
     private val conversationRepository: ConversationRepository,
+    private val resolveReachability: ResolveReachabilityUseCase,
     messageTransport: MessageTransport,
 ) {
     private val sendMessage = SendMessageUseCase(messageTransport, messageRepository)
@@ -44,6 +46,7 @@ internal class ChatStoreFactory(
                 is ChatStore.Msg.Loaded -> copy(isLoading = false, messages = msg.messages)
                 is ChatStore.Msg.DraftChanged -> copy(draft = msg.text)
                 is ChatStore.Msg.TitleResolved -> copy(title = msg.title)
+                is ChatStore.Msg.ReachabilityChanged -> copy(reachability = msg.reachability)
             }
     }
 
@@ -66,6 +69,12 @@ internal class ChatStoreFactory(
                                 ?.title
                                 ?.takeIf { it.isNotBlank() }
                                 ?.let { dispatch(ChatStore.Msg.TitleResolved(it)) }
+                        }
+                    }
+                    // Live reachability for the header (Nearby / via Nostr / Offline).
+                    scope.launch {
+                        resolveReachability.observe(conversationId).collect {
+                            dispatch(ChatStore.Msg.ReachabilityChanged(it))
                         }
                     }
                     // Reset unread count and (private chats) flush read receipts; best-effort.

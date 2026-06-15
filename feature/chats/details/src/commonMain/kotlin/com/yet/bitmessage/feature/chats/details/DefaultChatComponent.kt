@@ -1,9 +1,12 @@
 package com.yet.bitmessage.feature.chats.details
 
+import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.MessageTransport
+import com.app.domain.repository.PeerRepository
+import com.app.domain.usecase.ResolveReachabilityUseCase
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.value.Value
 import com.arkivanov.decompose.value.operator.map
@@ -47,6 +50,8 @@ internal class DefaultChatComponentFactory(
     private val identityRepository: IdentityRepository,
     private val messageTransport: MessageTransport,
     private val conversationRepository: ConversationRepository,
+    private val peerRepository: PeerRepository,
+    private val contactRepository: ContactRepository,
 ) : ChatComponent.Factory {
     override fun create(
         componentContext: ComponentContext,
@@ -60,8 +65,9 @@ internal class DefaultChatComponentFactory(
             title = config.titleFallback(),
             messageRepository = messageRepository,
             identityRepository = identityRepository,
-            messageTransport = messageTransport,
             conversationRepository = conversationRepository,
+            resolveReachability = ResolveReachabilityUseCase(peerRepository, contactRepository),
+            messageTransport = messageTransport,
         ),
         onFinished = onFinished,
     )

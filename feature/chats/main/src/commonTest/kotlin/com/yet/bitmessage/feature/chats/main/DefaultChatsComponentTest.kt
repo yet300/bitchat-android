@@ -2,6 +2,7 @@ package com.yet.bitmessage.feature.chats.main
 
 import com.app.domain.model.ConversationId
 import com.app.domain.model.Peer
+import com.app.domain.model.Reachability
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.DefaultComponentContext
 import com.arkivanov.decompose.router.panels.ChildPanelsMode
@@ -60,6 +61,8 @@ class DefaultChatsComponentTest {
                     messages = emptyList(),
                     draft = "",
                     canSend = false,
+                    reachability = Reachability.OFFLINE,
+                    isEncrypted = false,
                 ),
             )
 

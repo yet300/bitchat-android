@@ -34,18 +34,24 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.app.domain.model.BitMessage
 import com.app.domain.model.DeliveryStatus
+import com.app.domain.model.Reachability
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.yet.bitmessage.feature.chats.details.ChatComponent
 import com.yet.bitmessage.shared.resources.Res
 import com.yet.bitmessage.shared.resources.chat_back
 import com.yet.bitmessage.shared.resources.chat_empty
+import com.yet.bitmessage.shared.resources.chat_encrypted
 import com.yet.bitmessage.shared.resources.chat_input_hint
+import com.yet.bitmessage.shared.resources.chat_reach_internet
+import com.yet.bitmessage.shared.resources.chat_reach_nearby
+import com.yet.bitmessage.shared.resources.chat_reach_offline
 import com.yet.bitmessage.shared.resources.chat_send
 import com.yet.bitmessage.ui.component.button.IconCircleButton
 import com.yet.bitmessage.ui.component.icon.ArrowBack
 import com.yet.bitmessage.ui.component.icon.Check
 import com.yet.bitmessage.ui.component.icon.Close
 import com.yet.bitmessage.ui.component.icon.DoneAll
+import com.yet.bitmessage.ui.component.icon.Lock
 import com.yet.bitmessage.ui.component.icon.Send
 import org.jetbrains.compose.resources.stringResource
 
@@ -58,7 +64,7 @@ fun ChatContent(component: ChatComponent, modifier: Modifier = Modifier) {
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text(text = model.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                title = { ChatTitle(model) },
                 navigationIcon = {
                     IconCircleButton(
                         icon = ArrowBack,
@@ -92,6 +98,34 @@ fun ChatContent(component: ChatComponent, modifier: Modifier = Modifier) {
             }
         }
     }
+}
+
+@Composable
+private fun ChatTitle(model: ChatComponent.Model) {
+    Column {
+        Text(text = model.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (model.isEncrypted) {
+                Icon(
+                    imageVector = Lock,
+                    contentDescription = stringResource(Res.string.chat_encrypted),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(12.dp),
+                )
+            }
+            Text(
+                text = stringResource(model.reachability.label()),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+private fun Reachability.label() = when (this) {
+    Reachability.NEARBY -> Res.string.chat_reach_nearby
+    Reachability.INTERNET -> Res.string.chat_reach_internet
+    Reachability.OFFLINE -> Res.string.chat_reach_offline
 }
 
 @Composable
