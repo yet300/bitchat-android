@@ -1,5 +1,6 @@
 package com.yet.bitmessage.feature.root
 
+import com.app.domain.model.ConversationId
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.router.stack.ChildStack
 import com.arkivanov.decompose.value.Value
@@ -14,6 +15,9 @@ import com.yet.bitmessage.feature.chats.main.ChatsComponent
 interface RootComponent : BackHandlerOwner {
 
     val stack: Value<ChildStack<*, Child>>
+
+    /** Deep-link entry point (notification tap): open a conversation in the chats flow. */
+    fun openConversation(id: ConversationId)
 
     fun onBackClicked()
 

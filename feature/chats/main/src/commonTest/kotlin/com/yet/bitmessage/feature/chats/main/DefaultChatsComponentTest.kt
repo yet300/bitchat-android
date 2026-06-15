@@ -270,6 +270,17 @@ class DefaultChatsComponentTest {
     }
 
     @Test
+    fun open_conversation_deep_link_shows_chat_details() {
+        val component = build()
+        val id = ConversationId.Private(com.app.domain.model.PeerId("a".repeat(64)))
+
+        component.openConversation(id)
+
+        val chat = assertIs<ChatsComponent.Details.Chat>(component.panels.value.details?.instance)
+        assertEquals(id, chat.component.model.value.conversationId)
+    }
+
+    @Test
     fun requesting_settings_opens_the_overlay() {
         val component = build()
         component.mainConversations.onSettingsClicked()

@@ -1,14 +1,20 @@
 package com.bitchat.android
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import com.app.domain.model.ConversationId
+import com.app.domain.model.PeerId
+import com.app.domain.usecase.ParseGeohashUseCase
 import com.arkivanov.decompose.defaultComponentContext
 import com.bitchat.android.connectivity.PermissionOutcome
 import com.bitchat.android.connectivity.RuntimePermissionRequester
 import com.bitchat.android.di.appGraph
+import com.bitchat.android.ui.NotificationManager
+import com.yet.bitmessage.feature.root.RootComponent
 import com.yet.bitmessage.ui.App
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +36,7 @@ import kotlinx.coroutines.withContext
  */
 class BitMessageActivity : ComponentActivity() {
 
+    private lateinit var rootComponent: RootComponent
     private var pendingPermission: CompletableDeferred<Map<String, Boolean>>? = null
 
     // Must be registered before the Activity is STARTED, hence a field initializer.
@@ -64,15 +71,41 @@ class BitMessageActivity : ComponentActivity() {
 
         // defaultComponentContext() must be obtained before setContent so Decompose binds to the
         // activity lifecycle / saved-state registry (config-change + process-death survival).
-        val rootComponent = appGraph.rootFactory.create(defaultComponentContext())
+        rootComponent = appGraph.rootFactory.create(defaultComponentContext())
+
+        // Cold-start deep link from a notification tap (warm taps arrive via onNewIntent).
+        intent?.let(::handleDeepLink)
 
         setContent {
             App(rootComponent = rootComponent)
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleDeepLink(intent)
+    }
+
     override fun onDestroy() {
         appGraph.runtimePermissionRequester.detach(permissionHost)
         super.onDestroy()
+    }
+
+    /** Map a notification intent (shared [NotificationManager] extras) to a conversation and open it. */
+    private fun handleDeepLink(intent: Intent) {
+        intent.toConversationId()?.let { rootComponent.openConversation(it) }
+    }
+
+    private fun Intent.toConversationId(): ConversationId? = when {
+        getBooleanExtra(NotificationManager.EXTRA_OPEN_PRIVATE_CHAT, false) ->
+            getStringExtra(NotificationManager.EXTRA_PEER_ID)?.let { ConversationId.Private(PeerId(it)) }
+
+        getBooleanExtra(NotificationManager.EXTRA_OPEN_GEOHASH_CHAT, false) ->
+            getStringExtra(NotificationManager.EXTRA_GEOHASH)
+                ?.let { ParseGeohashUseCase().invoke(it) }
+                ?.let { ConversationId.Geohash(it) }
+
+        else -> null
     }
 }

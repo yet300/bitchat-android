@@ -131,6 +131,11 @@ internal class DefaultChatsComponent(
 
     override fun setMode(mode: ChildPanelsMode) = navigation.setMode(mode)
 
+    override fun openConversation(id: ConversationId) {
+        sheetNavigation.dismiss()
+        navigation.navigate { it.copy(details = ChatConfig.from(id)) }
+    }
+
     override fun onBackClicked() = navigation.pop()
 
     override fun onDismissSheet() = sheetNavigation.dismiss()

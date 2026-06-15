@@ -1,5 +1,6 @@
 package com.yet.bitmessage.feature.chats.main
 
+import com.app.domain.model.ConversationId
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.router.panels.ChildPanels
 import com.arkivanov.decompose.router.panels.ChildPanelsMode
@@ -27,6 +28,9 @@ interface ChatsComponent : BackHandlerOwner {
     val sheetSlot: Value<ChildSlot<*, SheetChild>>
 
     fun setMode(mode: ChildPanelsMode)
+
+    /** Open (or switch to) a conversation in the details panel — used by notification deep-links. */
+    fun openConversation(id: ConversationId)
 
     fun onBackClicked()
 

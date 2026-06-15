@@ -1,5 +1,6 @@
 package com.yet.bitmessage.feature.root
 
+import com.app.domain.model.ConversationId
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.router.stack.ChildStack
 import com.arkivanov.decompose.router.stack.StackNavigation
@@ -29,6 +30,11 @@ internal class DefaultRootComponent(
         when (config) {
             is Config.Chats -> RootComponent.Child.Chats(chatsFactory.create(componentContext))
         }
+
+    override fun openConversation(id: ConversationId) {
+        // Only the Chats flow exists today; forward the deep-link to its component.
+        (stack.value.active.instance as? RootComponent.Child.Chats)?.component?.openConversation(id)
+    }
 
     override fun onBackClicked() = navigation.pop()
 
