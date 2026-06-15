@@ -7,7 +7,10 @@ import com.arkivanov.decompose.value.Value
 import com.arkivanov.decompose.value.operator.map
 import com.arkivanov.mvikotlin.core.instancekeeper.getStore
 import com.arkivanov.mvikotlin.core.store.StoreFactory
+import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationRepository
+import com.app.domain.repository.PeerRepository
+import com.app.domain.usecase.ResolveReachabilityUseCase
 import com.yet.bitmessage.feature.chats.conversations.integration.stateToModel
 import com.yet.bitmessage.feature.chats.conversations.store.ConversationsStore
 import com.yet.bitmessage.feature.chats.conversations.store.ConversationsStoreFactory
@@ -33,13 +36,19 @@ internal class DefaultConversationsComponent(
 internal class DefaultConversationsComponentFactory(
     private val storeFactory: StoreFactory,
     private val conversationRepository: ConversationRepository,
+    private val peerRepository: PeerRepository,
+    private val contactRepository: ContactRepository,
 ) : ConversationsComponent.Factory {
     override fun create(
         componentContext: ComponentContext,
         onConversationSelected: (ConversationId) -> Unit,
     ): ConversationsComponent = DefaultConversationsComponent(
         componentContext = componentContext,
-        storeFactory = ConversationsStoreFactory(storeFactory, conversationRepository),
+        storeFactory = ConversationsStoreFactory(
+            storeFactory = storeFactory,
+            conversationRepository = conversationRepository,
+            resolveReachability = ResolveReachabilityUseCase(peerRepository, contactRepository),
+        ),
         onConversationSelected = onConversationSelected,
     )
 }

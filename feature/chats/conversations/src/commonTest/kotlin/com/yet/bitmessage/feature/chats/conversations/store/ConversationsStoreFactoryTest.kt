@@ -1,8 +1,16 @@
 package com.yet.bitmessage.feature.chats.conversations.store
 
+import com.app.domain.model.Contact
 import com.app.domain.model.Conversation
 import com.app.domain.model.ConversationId
+import com.app.domain.model.Peer
+import com.app.domain.model.PeerId
+import com.app.domain.model.PeerIdentity
+import com.app.domain.model.Reachability
+import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationRepository
+import com.app.domain.repository.PeerRepository
+import com.app.domain.usecase.ResolveReachabilityUseCase
 import com.arkivanov.mvikotlin.main.store.DefaultStoreFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -43,6 +51,33 @@ class ConversationsStoreFactoryTest {
         override suspend fun markRead(id: ConversationId) = Unit
     }
 
+    private class FakePeerRepository(private val peers: List<Peer> = emptyList()) : PeerRepository {
+        override fun observePeers(): Flow<List<Peer>> = flowOf(peers)
+        override fun observeConnectionState(): Flow<Boolean> = flowOf(peers.any { it.isConnected })
+        override suspend fun snapshot(): List<Peer> = peers
+        override suspend fun peer(id: PeerId): Peer? = peers.firstOrNull { it.id == id }
+    }
+
+    private class FakeContactRepository : ContactRepository {
+        override fun observeFavorites(): Flow<Set<com.app.domain.model.Fingerprint>> = flowOf(emptySet())
+        override suspend fun toggleFavorite(peer: PeerId) = Unit
+        override suspend fun isFavorite(peer: PeerId): Boolean = false
+        override suspend fun setBlocked(peer: PeerId, blocked: Boolean) = Unit
+        override suspend fun isBlocked(peer: PeerId): Boolean = false
+        override suspend fun contact(identity: PeerIdentity): Contact? = null
+        override suspend fun noiseKeyHexForNostrAlias(alias: PeerId): String? = null
+        override suspend fun clearAll() = Unit
+    }
+
+    private fun storeFactory(
+        repository: ConversationRepository,
+        peers: List<Peer> = emptyList(),
+    ) = ConversationsStoreFactory(
+        storeFactory = DefaultStoreFactory(),
+        conversationRepository = repository,
+        resolveReachability = ResolveReachabilityUseCase(FakePeerRepository(peers), FakeContactRepository()),
+    )
+
     private fun conversation(title: String) = Conversation(
         id = ConversationId.Channel(title),
         title = title,
@@ -51,7 +86,7 @@ class ConversationsStoreFactoryTest {
     @Test
     fun bootstrap_subscribes_and_clears_loading_on_first_emission() = runTest {
         val repository = FakeConversationRepository()
-        val store = ConversationsStoreFactory(DefaultStoreFactory(), repository).create()
+        val store = storeFactory(repository).create()
 
         assertFalse(store.state.isLoading)
         assertEquals(emptyList(), store.state.conversations)
@@ -60,7 +95,7 @@ class ConversationsStoreFactoryTest {
     @Test
     fun repository_updates_propagate_to_state() = runTest {
         val repository = FakeConversationRepository()
-        val store = ConversationsStoreFactory(DefaultStoreFactory(), repository).create()
+        val store = storeFactory(repository).create()
 
         repository.conversationsFlow.value = listOf(conversation("alpha"), conversation("beta"))
 
@@ -71,9 +106,21 @@ class ConversationsStoreFactoryTest {
     }
 
     @Test
+    fun reachability_is_resolved_per_conversation() = runTest {
+        val repository = FakeConversationRepository()
+        // A connected peer makes channels/public mesh NEARBY.
+        val peer = Peer(id = PeerId("1111111111111111"), nickname = "n", isConnected = true, isDirect = true)
+        val store = storeFactory(repository, peers = listOf(peer)).create()
+
+        repository.conversationsFlow.value = listOf(conversation("alpha"))
+
+        assertEquals(Reachability.NEARBY, store.state.reachability[ConversationId.Channel("alpha")])
+    }
+
+    @Test
     fun query_filters_visible_by_title_and_last_message() = runTest {
         val repository = FakeConversationRepository()
-        val store = ConversationsStoreFactory(DefaultStoreFactory(), repository).create()
+        val store = storeFactory(repository).create()
 
         repository.conversationsFlow.value = listOf(conversation("alpha"), conversation("beta"))
 
