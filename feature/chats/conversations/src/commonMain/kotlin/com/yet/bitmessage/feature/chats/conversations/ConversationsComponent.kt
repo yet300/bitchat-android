@@ -22,11 +22,12 @@ interface ConversationsComponent {
     /** Request the connectivity panel (hosted as a ChildSlot by the parent). */
     fun onConnectivityClicked()
 
+    /** Open the unified full-screen search (hosted as a slot by the parent). */
+    fun onSearchClicked()
+
     fun onTogglePin(id: ConversationId)
 
     fun onToggleMute(id: ConversationId)
-
-    fun onQueryChanged(text: String)
 
     /** Dismiss the connectivity attention banner for this session. */
     fun onDismissBanner()
@@ -35,7 +36,6 @@ interface ConversationsComponent {
         val isLoading: Boolean,
         val conversations: List<ConversationRow>,
         val nearby: List<Peer>,
-        val query: String,
         val connectivityBanner: ConnectivityBanner? = null,
     )
 
@@ -47,6 +47,7 @@ interface ConversationsComponent {
             componentContext: ComponentContext,
             onConversationSelected: (ConversationId) -> Unit,
             onConnectivityRequested: () -> Unit,
+            onSearchRequested: () -> Unit,
         ): ConversationsComponent
     }
 }

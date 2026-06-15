@@ -10,7 +10,7 @@ internal val stateToModel: (ConversationsStore.State) -> ConversationsComponent.
         isLoading = state.isLoading,
         // Pinned first (stable sort preserves the repository's last-activity order within groups);
         // each row carries its live reachability + pin/mute flags.
-        conversations = state.visible
+        conversations = state.conversations
             .sortedByDescending { it.id in state.pinned }
             .map { conversation ->
                 ConversationRow(
@@ -21,7 +21,6 @@ internal val stateToModel: (ConversationsStore.State) -> ConversationsComponent.
                 )
             },
         nearby = state.nearby,
-        query = state.query,
         connectivityBanner = state.transportsNeedingAttention
             .takeIf { it.isNotEmpty() && !state.bannerDismissed }
             ?.let { ConversationsComponent.ConnectivityBanner(it) },

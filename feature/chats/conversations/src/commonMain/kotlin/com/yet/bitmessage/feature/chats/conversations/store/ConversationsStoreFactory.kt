@@ -44,7 +44,6 @@ internal class ConversationsStoreFactory(
                 is ConversationsStore.Msg.NearbyLoaded -> copy(nearby = msg.nearby)
                 is ConversationsStore.Msg.PinnedLoaded -> copy(pinned = msg.pinned)
                 is ConversationsStore.Msg.MutedLoaded -> copy(muted = msg.muted)
-                is ConversationsStore.Msg.QueryChanged -> copy(query = msg.text)
                 is ConversationsStore.Msg.TransportsLoaded -> {
                     val next = copy(transports = msg.transports)
                     // Once everything is resolved, arm the banner again for any future issue.
@@ -111,9 +110,6 @@ internal class ConversationsStoreFactory(
 
         override fun executeIntent(intent: ConversationsStore.Intent) {
             when (intent) {
-                is ConversationsStore.Intent.QueryChanged ->
-                    dispatch(ConversationsStore.Msg.QueryChanged(intent.text))
-
                 is ConversationsStore.Intent.TogglePin ->
                     scope.launch { conversationPrefsRepository.setPinned(intent.id, intent.id !in state().pinned) }
 

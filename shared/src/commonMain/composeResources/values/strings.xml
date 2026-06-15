@@ -9,9 +9,14 @@
     <string name="conversations_unmute">Unmute</string>
     <string name="conversations_empty">No conversations yet</string>
     <string name="conversations_search">Search</string>
-    <string name="conversations_search_hint">Search chats</string>
-    <string name="conversations_search_close">Close search</string>
-    <string name="conversations_search_empty">Nothing found</string>
+    <string name="search_hint">Search</string>
+    <string name="search_close">Close</string>
+    <string name="search_tab_chats">Chats</string>
+    <string name="search_tab_people">People</string>
+    <string name="search_tab_messages">Messages</string>
+    <string name="search_tab_channels">Channels</string>
+    <string name="search_prompt">Search chats, people, messages and channels</string>
+    <string name="search_empty">Nothing found</string>
     <string name="connectivity_title">Connectivity</string>
     <string name="connectivity_bluetooth">Bluetooth</string>
     <string name="connectivity_wifi_aware">Wi-Fi Aware</string>

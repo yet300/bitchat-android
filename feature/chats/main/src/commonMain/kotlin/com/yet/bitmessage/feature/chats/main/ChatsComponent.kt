@@ -8,6 +8,7 @@ import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.backhandler.BackHandlerOwner
 import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
 import com.yet.bitmessage.feature.chats.conversations.connectivity.ConnectivityComponent
+import com.yet.bitmessage.feature.chats.conversations.search.SearchComponent
 import com.yet.bitmessage.feature.chats.details.ChatComponent
 
 /**
@@ -37,9 +38,10 @@ interface ChatsComponent : BackHandlerOwner {
         class Chat(val component: ChatComponent) : Details
     }
 
-    /** Bottom-sheet children — add new sheet kinds here as the app grows. */
+    /** Overlay children — modal sheets and the full-screen search. */
     sealed interface SheetChild {
         class Connectivity(val component: ConnectivityComponent) : SheetChild
+        class Search(val component: SearchComponent) : SheetChild
     }
 
     fun interface Factory {
