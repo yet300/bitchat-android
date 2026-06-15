@@ -8,9 +8,11 @@ import com.app.domain.model.PeerId
 import com.app.domain.model.PeerIdentity
 import com.app.domain.model.Reachability
 import com.app.domain.repository.ContactRepository
+import com.app.domain.repository.ConversationPrefsRepository
 import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.PeerRepository
 import com.app.domain.usecase.ResolveReachabilityUseCase
+import com.yet.bitmessage.feature.chats.conversations.integration.stateToModel
 import com.arkivanov.mvikotlin.main.store.DefaultStoreFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -69,15 +71,30 @@ class ConversationsStoreFactoryTest {
         override suspend fun clearAll() = Unit
     }
 
+    private class FakeConversationPrefsRepository : ConversationPrefsRepository {
+        val pinned = MutableStateFlow<Set<ConversationId>>(emptySet())
+        val muted = MutableStateFlow<Set<ConversationId>>(emptySet())
+        override fun observePinned(): Flow<Set<ConversationId>> = pinned
+        override fun observeMuted(): Flow<Set<ConversationId>> = muted
+        override suspend fun setPinned(id: ConversationId, pinned: Boolean) {
+            this.pinned.value = if (pinned) this.pinned.value + id else this.pinned.value - id
+        }
+        override suspend fun setMuted(id: ConversationId, muted: Boolean) {
+            this.muted.value = if (muted) this.muted.value + id else this.muted.value - id
+        }
+    }
+
     private fun storeFactory(
         repository: ConversationRepository,
         peers: List<Peer> = emptyList(),
+        prefs: ConversationPrefsRepository = FakeConversationPrefsRepository(),
     ): ConversationsStoreFactory {
         val peerRepository = FakePeerRepository(peers)
         return ConversationsStoreFactory(
             storeFactory = DefaultStoreFactory(),
             conversationRepository = repository,
             peerRepository = peerRepository,
+            conversationPrefsRepository = prefs,
             resolveReachability = ResolveReachabilityUseCase(peerRepository, FakeContactRepository()),
         )
     }
@@ -146,6 +163,35 @@ class ConversationsStoreFactoryTest {
 
         store.accept(ConversationsStore.Intent.QueryChanged(""))
         assertEquals(listOf("alpha", "beta"), store.state.visible.map { it.title })
+    }
+
+    @Test
+    fun toggle_pin_persists_and_reflects_in_state() = runTest {
+        val repository = FakeConversationRepository()
+        val store = storeFactory(repository).create()
+        val id = ConversationId.Channel("alpha")
+
+        store.accept(ConversationsStore.Intent.TogglePin(id))
+        assertEquals(setOf(id), store.state.pinned)
+
+        store.accept(ConversationsStore.Intent.TogglePin(id))
+        assertEquals(emptySet(), store.state.pinned)
+    }
+
+    @Test
+    fun mapper_sorts_pinned_first_and_flags_rows() {
+        val gamma = conversation("gamma")
+        val state = ConversationsStore.State(
+            isLoading = false,
+            conversations = listOf(conversation("alpha"), conversation("beta"), gamma),
+            pinned = setOf(gamma.id),
+            muted = setOf(gamma.id),
+        )
+
+        val rows = stateToModel(state).conversations
+        assertEquals(listOf("gamma", "alpha", "beta"), rows.map { it.conversation.title })
+        assertTrue(rows.first().isPinned)
+        assertTrue(rows.first().isMuted)
     }
 
     @Test

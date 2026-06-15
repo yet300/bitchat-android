@@ -38,6 +38,8 @@ class DefaultChatsComponentTest {
         override fun onConversationClicked(id: ConversationId) = onConversationSelected(id)
         override fun onNearbyClicked(peer: Peer) = onConversationSelected(ConversationId.Private(peer.id))
         override fun onConnectivityClicked() = onConnectivityRequested()
+        override fun onTogglePin(id: ConversationId) = Unit
+        override fun onToggleMute(id: ConversationId) = Unit
         override fun onQueryChanged(text: String) = Unit
     }
 

@@ -8,11 +8,18 @@ import com.yet.bitmessage.feature.chats.conversations.store.ConversationsStore
 internal val stateToModel: (ConversationsStore.State) -> ConversationsComponent.Model = { state ->
     ConversationsComponent.Model(
         isLoading = state.isLoading,
-        // Order comes from the repository (sorted by last activity); pair each with its
-        // live reachability, defaulting to OFFLINE until the first reachability emission.
-        conversations = state.visible.map { conversation ->
-            ConversationRow(conversation, state.reachability[conversation.id] ?: Reachability.OFFLINE)
-        },
+        // Pinned first (stable sort preserves the repository's last-activity order within groups);
+        // each row carries its live reachability + pin/mute flags.
+        conversations = state.visible
+            .sortedByDescending { it.id in state.pinned }
+            .map { conversation ->
+                ConversationRow(
+                    conversation = conversation,
+                    reachability = state.reachability[conversation.id] ?: Reachability.OFFLINE,
+                    isPinned = conversation.id in state.pinned,
+                    isMuted = conversation.id in state.muted,
+                )
+            },
         nearby = state.nearby,
         query = state.query,
     )
