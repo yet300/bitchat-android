@@ -41,6 +41,7 @@ class DefaultChatsComponentTest {
         override fun onTogglePin(id: ConversationId) = Unit
         override fun onToggleMute(id: ConversationId) = Unit
         override fun onQueryChanged(text: String) = Unit
+        override fun onDismissBanner() = Unit
     }
 
     private class FakeConnectivityComponent : ConnectivityComponent {

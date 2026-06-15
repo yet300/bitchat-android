@@ -23,6 +23,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Badge
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -46,12 +48,20 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.app.domain.model.Peer
 import com.app.domain.model.Reachability
+import com.app.domain.model.TransportKind
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.yet.bitmessage.feature.chats.conversations.ConversationTimeLabel
 import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
 import com.yet.bitmessage.feature.chats.conversations.conversationTimeLabel
 import com.yet.bitmessage.shared.resources.Res
+import com.yet.bitmessage.shared.resources.connectivity_banner_action
+import com.yet.bitmessage.shared.resources.connectivity_banner_dismiss
+import com.yet.bitmessage.shared.resources.connectivity_banner_title
+import com.yet.bitmessage.shared.resources.connectivity_bluetooth
+import com.yet.bitmessage.shared.resources.connectivity_internet
 import com.yet.bitmessage.shared.resources.connectivity_title
+import com.yet.bitmessage.shared.resources.connectivity_tor
+import com.yet.bitmessage.shared.resources.connectivity_wifi_aware
 import com.yet.bitmessage.shared.resources.conversations_empty
 import com.yet.bitmessage.shared.resources.conversations_yesterday
 import com.yet.bitmessage.shared.resources.conversations_mute
@@ -121,6 +131,14 @@ fun ConversationsContent(component: ConversationsComponent, modifier: Modifier =
             return@Scaffold
         }
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            val banner = model.connectivityBanner
+            if (!searching && banner != null) {
+                ConnectivityBanner(
+                    banner = banner,
+                    onReview = component::onConnectivityClicked,
+                    onDismiss = component::onDismissBanner,
+                )
+            }
             if (!searching && model.nearby.isNotEmpty()) {
                 NearbyRail(peers = model.nearby, onClick = component::onNearbyClicked)
             }
@@ -139,6 +157,60 @@ fun ConversationsContent(component: ConversationsComponent, modifier: Modifier =
                     ConversationList(component, model)
                 }
             }
+        }
+    }
+}
+
+/**
+ * Dismissible prompt shown atop the list when one or more transports need a runtime permission.
+ * Tapping the body or "Review" opens the connectivity sheet (the actual re-enable flow lives there);
+ * the close button hides it for the session.
+ */
+@Composable
+private fun ConnectivityBanner(
+    banner: ConversationsComponent.ConnectivityBanner,
+    onReview: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    // stringResource cannot run inside a lambda, so resolve every kind's label up front, then join.
+    val labels = mapOf(
+        TransportKind.BLUETOOTH to stringResource(Res.string.connectivity_bluetooth),
+        TransportKind.WIFI_AWARE to stringResource(Res.string.connectivity_wifi_aware),
+        TransportKind.INTERNET to stringResource(Res.string.connectivity_internet),
+        TransportKind.TOR to stringResource(Res.string.connectivity_tor),
+    )
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onReview),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 4.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(Res.string.connectivity_banner_title),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+                Text(
+                    text = banner.transports.mapNotNull { labels[it] }.joinToString(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            }
+            TextButton(onClick = onReview) {
+                Text(text = stringResource(Res.string.connectivity_banner_action))
+            }
+            IconCircleButton(
+                icon = Close,
+                contentDescription = stringResource(Res.string.connectivity_banner_dismiss),
+                onClick = onDismiss,
+            )
         }
     }
 }

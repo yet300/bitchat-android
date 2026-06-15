@@ -25,6 +25,7 @@ import com.app.transport.net.TorPreferenceManager
 import com.app.transport.notification.ServiceNotifier
 import com.app.domain.repository.ConnectivityRepository
 import com.bitchat.android.connectivity.AndroidConnectivityRepository
+import com.bitchat.android.connectivity.RuntimePermissionRequester
 import com.russhwolf.settings.ObservableSettings
 import com.russhwolf.settings.SharedPreferencesSettings
 import dev.zacsweers.metro.AppScope
@@ -142,11 +143,17 @@ object AndroidDataBindings {
     @Provides
     fun provideMeshLifecycleController(mesh: BluetoothMeshService): MeshLifecycleController = mesh
 
+    /** Graph-owned holder the Activity attaches its ActivityResult permission launcher into. */
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideRuntimePermissionRequester(): RuntimePermissionRequester = RuntimePermissionRequester()
+
     @Provides
     @SingleIn(AppScope::class)
     fun provideConnectivityRepository(
         context: Context,
         torPreferenceManager: TorPreferenceManager,
+        permissionRequester: RuntimePermissionRequester,
     ): ConnectivityRepository =
-        AndroidConnectivityRepository(context.applicationContext, torPreferenceManager)
+        AndroidConnectivityRepository(context.applicationContext, torPreferenceManager, permissionRequester)
 }

@@ -7,6 +7,10 @@ import com.app.domain.model.Peer
 import com.app.domain.model.PeerId
 import com.app.domain.model.PeerIdentity
 import com.app.domain.model.Reachability
+import com.app.domain.model.TransportKind
+import com.app.domain.model.TransportState
+import com.app.domain.model.TransportStatus
+import com.app.domain.repository.ConnectivityRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationPrefsRepository
 import com.app.domain.repository.ConversationRepository
@@ -28,6 +32,8 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -84,10 +90,18 @@ class ConversationsStoreFactoryTest {
         }
     }
 
+    private class FakeConnectivityRepository(
+        val statuses: MutableStateFlow<List<TransportStatus>> = MutableStateFlow(emptyList()),
+    ) : ConnectivityRepository {
+        override fun observe(): Flow<List<TransportStatus>> = statuses
+        override suspend fun enable(kind: TransportKind) = Unit
+    }
+
     private fun storeFactory(
         repository: ConversationRepository,
         peers: List<Peer> = emptyList(),
         prefs: ConversationPrefsRepository = FakeConversationPrefsRepository(),
+        connectivity: ConnectivityRepository = FakeConnectivityRepository(),
     ): ConversationsStoreFactory {
         val peerRepository = FakePeerRepository(peers)
         return ConversationsStoreFactory(
@@ -95,6 +109,7 @@ class ConversationsStoreFactoryTest {
             conversationRepository = repository,
             peerRepository = peerRepository,
             conversationPrefsRepository = prefs,
+            connectivityRepository = connectivity,
             resolveReachability = ResolveReachabilityUseCase(peerRepository, FakeContactRepository()),
         )
     }
@@ -192,6 +207,37 @@ class ConversationsStoreFactoryTest {
         assertEquals(listOf("gamma", "alpha", "beta"), rows.map { it.conversation.title })
         assertTrue(rows.first().isPinned)
         assertTrue(rows.first().isMuted)
+    }
+
+    @Test
+    fun permission_required_transport_raises_a_banner_until_dismissed() = runTest {
+        val connectivity = FakeConnectivityRepository(
+            MutableStateFlow(listOf(TransportStatus(TransportKind.BLUETOOTH, TransportState.PERMISSION_REQUIRED))),
+        )
+        val store = storeFactory(FakeConversationRepository(), connectivity = connectivity).create()
+
+        assertEquals(listOf(TransportKind.BLUETOOTH), store.state.transportsNeedingAttention)
+        assertNotNull(stateToModel(store.state).connectivityBanner)
+
+        store.accept(ConversationsStore.Intent.DismissBanner)
+        assertNull(stateToModel(store.state).connectivityBanner)
+    }
+
+    @Test
+    fun banner_rearms_after_the_issue_is_resolved() = runTest {
+        val connectivity = FakeConnectivityRepository(
+            MutableStateFlow(listOf(TransportStatus(TransportKind.BLUETOOTH, TransportState.PERMISSION_REQUIRED))),
+        )
+        val store = storeFactory(FakeConversationRepository(), connectivity = connectivity).create()
+        store.accept(ConversationsStore.Intent.DismissBanner)
+
+        // Permission granted elsewhere → no attention → dismissal resets.
+        connectivity.statuses.value = listOf(TransportStatus(TransportKind.BLUETOOTH, TransportState.ON))
+        assertNull(stateToModel(store.state).connectivityBanner)
+
+        // A fresh problem surfaces the banner again.
+        connectivity.statuses.value = listOf(TransportStatus(TransportKind.BLUETOOTH, TransportState.PERMISSION_REQUIRED))
+        assertNotNull(stateToModel(store.state).connectivityBanner)
     }
 
     @Test
