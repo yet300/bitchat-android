@@ -1,22 +1,31 @@
 package com.yet.bitmessage.feature.root
 
+import com.app.common.decompose.coroutineScope
 import com.app.domain.model.ConversationId
+import com.app.domain.model.ThemeMode
+import com.app.domain.repository.ThemeRepository
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.router.stack.ChildStack
 import com.arkivanov.decompose.router.stack.StackNavigation
 import com.arkivanov.decompose.router.stack.childStack
 import com.arkivanov.decompose.router.stack.pop
+import com.arkivanov.decompose.value.MutableValue
 import com.arkivanov.decompose.value.Value
 import com.yet.bitmessage.feature.chats.main.ChatsComponent
 import dev.zacsweers.metro.Inject
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
 internal class DefaultRootComponent(
     componentContext: ComponentContext,
     private val chatsFactory: ChatsComponent.Factory,
+    themeRepository: ThemeRepository,
 ) : RootComponent, ComponentContext by componentContext {
 
     private val navigation = StackNavigation<Config>()
+
+    private val _themeMode = MutableValue(ThemeMode.SYSTEM)
+    override val themeMode: Value<ThemeMode> = _themeMode
 
     override val stack: Value<ChildStack<*, RootComponent.Child>> = childStack(
         source = navigation,
@@ -25,6 +34,12 @@ internal class DefaultRootComponent(
         handleBackButton = true,
         childFactory = ::createChild,
     )
+
+    init {
+        coroutineScope().launch {
+            themeRepository.observeTheme().collect { _themeMode.value = it }
+        }
+    }
 
     private fun createChild(config: Config, componentContext: ComponentContext): RootComponent.Child =
         when (config) {
@@ -48,10 +63,12 @@ internal class DefaultRootComponent(
 @Inject
 internal class DefaultRootComponentFactory(
     private val chatsFactory: ChatsComponent.Factory,
+    private val themeRepository: ThemeRepository,
 ) : RootComponent.Factory {
     override fun create(componentContext: ComponentContext): RootComponent =
         DefaultRootComponent(
             componentContext = componentContext,
             chatsFactory = chatsFactory,
+            themeRepository = themeRepository,
         )
 }

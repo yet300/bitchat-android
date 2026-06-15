@@ -103,9 +103,25 @@ class DefaultChatsComponentTest {
 
     private class FakeSettingsComponent(val onClose: () -> Unit) : SettingsComponent {
         override val model: Value<SettingsComponent.Model> =
-            MutableValue(SettingsComponent.Model(nickname = "", npub = null, fingerprint = "", isWiping = false))
+            MutableValue(
+                SettingsComponent.Model(
+                    nickname = "",
+                    npub = null,
+                    fingerprint = "",
+                    isWiping = false,
+                    theme = com.app.domain.model.ThemeMode.SYSTEM,
+                    torEnabled = false,
+                    powEnabled = false,
+                    powDifficulty = 0,
+                    powLevels = emptyList(),
+                ),
+            )
 
         override fun onNicknameChanged(text: String) = Unit
+        override fun onThemeSelected(mode: com.app.domain.model.ThemeMode) = Unit
+        override fun onTorToggled(enabled: Boolean) = Unit
+        override fun onPowToggled(enabled: Boolean) = Unit
+        override fun onPowDifficultySelected(difficulty: Int) = Unit
         override fun onPanicWipe() = Unit
         override fun onCloseClicked() = onClose()
     }

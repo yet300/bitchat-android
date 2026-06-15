@@ -10,10 +10,15 @@ import com.app.domain.model.Fingerprint
 import com.app.domain.model.MyIdentity
 import com.app.domain.model.PeerId
 import com.app.domain.model.PeerIdentity
+import com.app.domain.model.ThemeMode
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.MessageRepository
+import com.app.domain.repository.PowDifficultyLevel
+import com.app.domain.repository.PowRepository
 import com.app.domain.repository.SettingsRepository
+import com.app.domain.repository.ThemeRepository
+import com.app.domain.repository.TorRepository
 import com.app.domain.usecase.PanicWipeUseCase
 import com.arkivanov.mvikotlin.main.store.DefaultStoreFactory
 import kotlinx.coroutines.Dispatchers
@@ -85,15 +90,44 @@ class SettingsStoreFactoryTest {
         override suspend fun clearAll() { cleared = true }
     }
 
+    private class FakeThemeRepository : ThemeRepository {
+        val mode = MutableStateFlow(ThemeMode.SYSTEM)
+        override fun observeTheme(): Flow<ThemeMode> = mode
+        override suspend fun setTheme(mode: ThemeMode) { this.mode.value = mode }
+    }
+
+    private class FakeTorRepository : TorRepository {
+        val enabled = MutableStateFlow(false)
+        override fun observeTorEnabled(): Flow<Boolean> = enabled
+        override suspend fun setTorEnabled(enabled: Boolean) { this.enabled.value = enabled }
+    }
+
+    private class FakePowRepository : PowRepository {
+        val enabled = MutableStateFlow(false)
+        val difficulty = MutableStateFlow(8)
+        override fun observePowEnabled(): Flow<Boolean> = enabled
+        override fun observePowDifficulty(): Flow<Int> = difficulty
+        override suspend fun setPowEnabled(enabled: Boolean) { this.enabled.value = enabled }
+        override suspend fun setPowDifficulty(difficulty: Int) { this.difficulty.value = difficulty }
+        override fun difficultyLevels(): List<PowDifficultyLevel> =
+            listOf(PowDifficultyLevel(8, "Low"), PowDifficultyLevel(16, "High"))
+    }
+
     private fun factory(
         settings: FakeSettingsRepository = FakeSettingsRepository(),
         identity: FakeIdentityRepository = FakeIdentityRepository(),
         messages: FakeMessageRepository = FakeMessageRepository(),
         contacts: FakeContactRepository = FakeContactRepository(),
+        theme: FakeThemeRepository = FakeThemeRepository(),
+        tor: FakeTorRepository = FakeTorRepository(),
+        pow: FakePowRepository = FakePowRepository(),
     ) = SettingsStoreFactory(
         storeFactory = DefaultStoreFactory(),
         settingsRepository = settings,
         identityRepository = identity,
+        themeRepository = theme,
+        torRepository = tor,
+        powRepository = pow,
         panicWipe = PanicWipeUseCase(messages, contacts, identity),
     )
 
@@ -129,5 +163,38 @@ class SettingsStoreFactoryTest {
         assertTrue(contacts.cleared)
         assertTrue(identity.wiped)
         assertEquals(false, store.state.isWiping)
+    }
+
+    @Test
+    fun loads_theme_tor_and_pow_and_difficulty_levels() = runTest {
+        val theme = FakeThemeRepository().apply { mode.value = ThemeMode.DARK }
+        val tor = FakeTorRepository().apply { enabled.value = true }
+        val pow = FakePowRepository().apply { enabled.value = true; difficulty.value = 16 }
+        val store = factory(theme = theme, tor = tor, pow = pow).create()
+
+        assertEquals(ThemeMode.DARK, store.state.theme)
+        assertTrue(store.state.torEnabled)
+        assertTrue(store.state.powEnabled)
+        assertEquals(16, store.state.powDifficulty)
+        assertEquals(listOf(8, 16), store.state.powLevels.map { it.difficulty })
+    }
+
+    @Test
+    fun setters_route_to_their_repositories() = runTest {
+        val theme = FakeThemeRepository()
+        val tor = FakeTorRepository()
+        val pow = FakePowRepository()
+        val store = factory(theme = theme, tor = tor, pow = pow).create()
+
+        store.accept(SettingsStore.Intent.ThemeSelected(ThemeMode.LIGHT))
+        store.accept(SettingsStore.Intent.TorToggled(true))
+        store.accept(SettingsStore.Intent.PowToggled(true))
+        store.accept(SettingsStore.Intent.PowDifficultySelected(16))
+
+        assertEquals(ThemeMode.LIGHT, theme.mode.value)
+        assertTrue(tor.enabled.value)
+        assertTrue(pow.enabled.value)
+        assertEquals(16, pow.difficulty.value)
+        assertEquals(ThemeMode.LIGHT, store.state.theme)
     }
 }

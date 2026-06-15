@@ -22,10 +22,15 @@ import com.app.transport.mesh.MeshBearer
 import com.app.transport.mesh.MeshLifecycleController
 import com.app.transport.mesh.MeshNetwork
 import com.app.transport.net.TorPreferenceManager
+import com.app.transport.nostr.PoWPreferenceManager
 import com.app.transport.notification.ServiceNotifier
 import com.app.domain.repository.ConnectivityRepository
+import com.app.domain.repository.PowRepository
+import com.app.domain.repository.TorRepository
 import com.bitchat.android.connectivity.AndroidConnectivityRepository
 import com.bitchat.android.connectivity.RuntimePermissionRequester
+import com.bitchat.android.settings.PowRepositoryImpl
+import com.bitchat.android.settings.TorRepositoryImpl
 import com.russhwolf.settings.ObservableSettings
 import com.russhwolf.settings.SharedPreferencesSettings
 import dev.zacsweers.metro.AppScope
@@ -147,6 +152,13 @@ object AndroidDataBindings {
     @Provides
     @SingleIn(AppScope::class)
     fun provideRuntimePermissionRequester(): RuntimePermissionRequester = RuntimePermissionRequester()
+
+    /** Transport-backed settings ports (Tor, PoW) over the existing managers (DIP for the feature). */
+    @Provides
+    fun provideTorRepository(manager: TorPreferenceManager): TorRepository = TorRepositoryImpl(manager)
+
+    @Provides
+    fun providePowRepository(manager: PoWPreferenceManager): PowRepository = PowRepositoryImpl(manager)
 
     @Provides
     @SingleIn(AppScope::class)
