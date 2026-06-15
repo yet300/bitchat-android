@@ -1,12 +1,20 @@
 package com.yet.bitmessage.feature.chats.details.store
 
+import com.app.domain.model.BitMessage
 import com.app.domain.model.ConversationId
 import com.app.domain.model.SenderRef
+import com.app.domain.repository.ChannelRepository
+import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.MessageTransport
+import com.app.domain.repository.PeerRepository
+import com.app.domain.usecase.ChatCommand
+import com.app.domain.usecase.CommandResult
 import com.app.domain.usecase.MarkConversationReadUseCase
+import com.app.domain.usecase.ParseCommandUseCase
+import com.app.domain.usecase.ProcessCommandUseCase
 import com.app.domain.usecase.ResolveReachabilityUseCase
 import com.app.domain.usecase.SendMessageUseCase
 import com.arkivanov.mvikotlin.core.store.Reducer
@@ -15,6 +23,10 @@ import com.arkivanov.mvikotlin.core.store.Store
 import com.arkivanov.mvikotlin.core.store.StoreFactory
 import com.arkivanov.mvikotlin.extensions.coroutines.CoroutineExecutor
 import kotlinx.coroutines.launch
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 internal class ChatStoreFactory(
     private val storeFactory: StoreFactory,
@@ -24,11 +36,17 @@ internal class ChatStoreFactory(
     private val identityRepository: IdentityRepository,
     private val conversationRepository: ConversationRepository,
     private val resolveReachability: ResolveReachabilityUseCase,
+    channelRepository: ChannelRepository,
+    contactRepository: ContactRepository,
+    peerRepository: PeerRepository,
     messageTransport: MessageTransport,
 ) {
     private val sendMessage = SendMessageUseCase(messageTransport, messageRepository)
     private val markRead =
         MarkConversationReadUseCase(conversationRepository, messageRepository, messageTransport)
+    private val parseCommand = ParseCommandUseCase()
+    private val processCommand =
+        ProcessCommandUseCase(messageRepository, channelRepository, contactRepository, peerRepository)
 
     fun create(): ChatStore =
         object : ChatStore,
@@ -91,13 +109,35 @@ internal class ChatStoreFactory(
                     val text = state().draft
                     if (text.isBlank()) return
                     dispatch(ChatStore.Msg.DraftChanged(""))
-                    scope.launch {
-                        val me = identityRepository.myIdentity()
-                        val sender = SenderRef(peerId = me.peerId, displayName = me.nickname)
-                        sendMessage(target = conversationId, content = text, sender = sender)
-                    }
+                    val command = parseCommand(text)
+                    if (command != null) scope.launch { runCommand(command) }
+                    else scope.launch { send(text) }
                 }
             }
         }
+
+        private suspend fun send(text: String) {
+            val me = identityRepository.myIdentity()
+            val sender = SenderRef(peerId = me.peerId, displayName = me.nickname)
+            sendMessage(target = conversationId, content = text, sender = sender)
+        }
+
+        private suspend fun runCommand(command: ChatCommand) {
+            when (val result = processCommand(conversationId, command)) {
+                is CommandResult.Feedback -> messageRepository.append(conversationId, systemMessage(result.text))
+                is CommandResult.SendAsMessage -> send(result.text)
+                CommandResult.Handled -> Unit
+            }
+        }
+
+        /** Local-only system line in the timeline (not sent over any transport). */
+        @OptIn(ExperimentalTime::class, ExperimentalUuidApi::class)
+        private fun systemMessage(text: String): BitMessage = BitMessage(
+            id = Uuid.random().toString().uppercase(),
+            conversationId = conversationId,
+            sender = SenderRef.SYSTEM,
+            content = text,
+            timestamp = Clock.System.now(),
+        )
     }
 }
