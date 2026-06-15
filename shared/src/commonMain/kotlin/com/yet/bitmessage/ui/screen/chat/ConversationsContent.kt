@@ -33,7 +33,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -68,9 +67,6 @@ import com.yet.bitmessage.shared.resources.conversations_mute
 import com.yet.bitmessage.shared.resources.conversations_nearby
 import com.yet.bitmessage.shared.resources.conversations_pin
 import com.yet.bitmessage.shared.resources.conversations_search
-import com.yet.bitmessage.shared.resources.conversations_search_close
-import com.yet.bitmessage.shared.resources.conversations_search_empty
-import com.yet.bitmessage.shared.resources.conversations_search_hint
 import com.yet.bitmessage.shared.resources.conversations_title
 import com.yet.bitmessage.shared.resources.conversations_unmute
 import com.yet.bitmessage.shared.resources.conversations_unpin
@@ -91,37 +87,25 @@ import kotlin.time.Instant
 @Composable
 fun ConversationsContent(component: ConversationsComponent, modifier: Modifier = Modifier) {
     val model by component.model.subscribeAsState()
-    var searching by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier,
         topBar = {
-            if (searching) {
-                SearchBar(
-                    query = model.query,
-                    onQueryChanged = component::onQueryChanged,
-                    onClose = {
-                        component.onQueryChanged("")
-                        searching = false
-                    },
-                )
-            } else {
-                TopAppBar(
-                    title = { Text(text = stringResource(Res.string.conversations_title)) },
-                    actions = {
-                        IconCircleButton(
-                            icon = Search,
-                            contentDescription = stringResource(Res.string.conversations_search),
-                            onClick = { searching = true },
-                        )
-                        IconCircleButton(
-                            icon = MoreVert,
-                            contentDescription = stringResource(Res.string.connectivity_title),
-                            onClick = component::onConnectivityClicked,
-                        )
-                    },
-                )
-            }
+            TopAppBar(
+                title = { Text(text = stringResource(Res.string.conversations_title)) },
+                actions = {
+                    IconCircleButton(
+                        icon = Search,
+                        contentDescription = stringResource(Res.string.conversations_search),
+                        onClick = component::onSearchClicked,
+                    )
+                    IconCircleButton(
+                        icon = MoreVert,
+                        contentDescription = stringResource(Res.string.connectivity_title),
+                        onClick = component::onConnectivityClicked,
+                    )
+                },
+            )
         },
     ) { padding ->
         if (model.isLoading) {
@@ -131,24 +115,20 @@ fun ConversationsContent(component: ConversationsComponent, modifier: Modifier =
             return@Scaffold
         }
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            val banner = model.connectivityBanner
-            if (!searching && banner != null) {
+            model.connectivityBanner?.let { banner ->
                 ConnectivityBanner(
                     banner = banner,
                     onReview = component::onConnectivityClicked,
                     onDismiss = component::onDismissBanner,
                 )
             }
-            if (!searching && model.nearby.isNotEmpty()) {
+            if (model.nearby.isNotEmpty()) {
                 NearbyRail(peers = model.nearby, onClick = component::onNearbyClicked)
             }
             Box(modifier = Modifier.fillMaxSize()) {
                 if (model.conversations.isEmpty()) {
                     Text(
-                        text = stringResource(
-                            if (model.query.isBlank()) Res.string.conversations_empty
-                            else Res.string.conversations_search_empty,
-                        ),
+                        text = stringResource(Res.string.conversations_empty),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.align(Alignment.Center),
@@ -250,33 +230,6 @@ private fun NearbyRail(peers: List<Peer>, onClick: (Peer) -> Unit) {
             }
         }
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SearchBar(
-    query: String,
-    onQueryChanged: (String) -> Unit,
-    onClose: () -> Unit,
-) {
-    TopAppBar(
-        title = {
-            TextField(
-                value = query,
-                onValueChange = onQueryChanged,
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                placeholder = { Text(text = stringResource(Res.string.conversations_search_hint)) },
-            )
-        },
-        navigationIcon = {
-            IconCircleButton(
-                icon = Close,
-                contentDescription = stringResource(Res.string.conversations_search_close),
-                onClick = onClose,
-            )
-        },
-    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)

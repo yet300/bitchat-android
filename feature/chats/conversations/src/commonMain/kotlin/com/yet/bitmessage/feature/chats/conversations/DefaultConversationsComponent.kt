@@ -24,6 +24,7 @@ internal class DefaultConversationsComponent(
     storeFactory: ConversationsStoreFactory,
     private val onConversationSelected: (ConversationId) -> Unit,
     private val onConnectivityRequested: () -> Unit,
+    private val onSearchRequested: () -> Unit,
 ) : ConversationsComponent, ComponentContext by componentContext {
 
     private val store = instanceKeeper.getStore { storeFactory.create() }
@@ -36,12 +37,11 @@ internal class DefaultConversationsComponent(
 
     override fun onConnectivityClicked() = onConnectivityRequested()
 
+    override fun onSearchClicked() = onSearchRequested()
+
     override fun onTogglePin(id: ConversationId) = store.accept(ConversationsStore.Intent.TogglePin(id))
 
     override fun onToggleMute(id: ConversationId) = store.accept(ConversationsStore.Intent.ToggleMute(id))
-
-    override fun onQueryChanged(text: String) =
-        store.accept(ConversationsStore.Intent.QueryChanged(text))
 
     override fun onDismissBanner() = store.accept(ConversationsStore.Intent.DismissBanner)
 }
@@ -59,6 +59,7 @@ internal class DefaultConversationsComponentFactory(
         componentContext: ComponentContext,
         onConversationSelected: (ConversationId) -> Unit,
         onConnectivityRequested: () -> Unit,
+        onSearchRequested: () -> Unit,
     ): ConversationsComponent = DefaultConversationsComponent(
         componentContext = componentContext,
         storeFactory = ConversationsStoreFactory(
@@ -71,5 +72,6 @@ internal class DefaultConversationsComponentFactory(
         ),
         onConversationSelected = onConversationSelected,
         onConnectivityRequested = onConnectivityRequested,
+        onSearchRequested = onSearchRequested,
     )
 }

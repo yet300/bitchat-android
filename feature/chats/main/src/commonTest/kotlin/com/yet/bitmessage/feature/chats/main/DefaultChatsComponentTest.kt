@@ -11,6 +11,8 @@ import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
 import com.yet.bitmessage.feature.chats.conversations.connectivity.ConnectivityComponent
+import com.yet.bitmessage.feature.chats.conversations.search.SearchComponent
+import com.yet.bitmessage.feature.chats.conversations.search.SearchTab
 import com.yet.bitmessage.feature.chats.details.ChatComponent
 import com.yet.bitmessage.feature.chats.details.ChatConfig
 import kotlin.test.Test
@@ -24,6 +26,7 @@ class DefaultChatsComponentTest {
     private class FakeConversationsComponent(
         val onConversationSelected: (ConversationId) -> Unit,
         val onConnectivityRequested: () -> Unit,
+        val onSearchRequested: () -> Unit,
     ) : ConversationsComponent {
         override val model: Value<ConversationsComponent.Model> =
             MutableValue(
@@ -31,16 +34,15 @@ class DefaultChatsComponentTest {
                     isLoading = false,
                     conversations = emptyList(),
                     nearby = emptyList(),
-                    query = "",
                 ),
             )
 
         override fun onConversationClicked(id: ConversationId) = onConversationSelected(id)
         override fun onNearbyClicked(peer: Peer) = onConversationSelected(ConversationId.Private(peer.id))
         override fun onConnectivityClicked() = onConnectivityRequested()
+        override fun onSearchClicked() = onSearchRequested()
         override fun onTogglePin(id: ConversationId) = Unit
         override fun onToggleMute(id: ConversationId) = Unit
-        override fun onQueryChanged(text: String) = Unit
         override fun onDismissBanner() = Unit
     }
 
@@ -49,6 +51,29 @@ class DefaultChatsComponentTest {
             MutableValue(ConnectivityComponent.Model(statuses = emptyList()))
 
         override fun onEnableClicked(kind: com.app.domain.model.TransportKind) = Unit
+    }
+
+    private class FakeSearchComponent(
+        val onResultSelected: (ConversationId) -> Unit,
+        val onClose: () -> Unit,
+    ) : SearchComponent {
+        override val model: Value<SearchComponent.Model> =
+            MutableValue(
+                SearchComponent.Model(
+                    query = "",
+                    tab = SearchTab.CHATS,
+                    isActive = false,
+                    chats = emptyList(),
+                    people = emptyList(),
+                    messages = emptyList(),
+                    channels = emptyList(),
+                ),
+            )
+
+        override fun onQueryChanged(text: String) = Unit
+        override fun onTabSelected(tab: SearchTab) = Unit
+        override fun onResultClicked(id: ConversationId) = onResultSelected(id)
+        override fun onCloseClicked() = onClose()
     }
 
     private class FakeChatComponent(
@@ -78,13 +103,16 @@ class DefaultChatsComponentTest {
         val lifecycle = LifecycleRegistry()
         return DefaultChatsComponent(
             componentContext = DefaultComponentContext(lifecycle),
-            conversationsFactory = { ctx, onSelected, onConnectivity ->
-                FakeConversationsComponent(onSelected, onConnectivity)
+            conversationsFactory = { _, onSelected, onConnectivity, onSearch ->
+                FakeConversationsComponent(onSelected, onConnectivity, onSearch)
             },
             chatFactory = { _: ComponentContext, config: ChatConfig, onFinished: () -> Unit ->
                 FakeChatComponent(config, onFinished)
             },
             connectivityFactory = { _: ComponentContext -> FakeConnectivityComponent() },
+            searchFactory = { _, onResultSelected, onClose ->
+                FakeSearchComponent(onResultSelected, onClose)
+            },
         )
     }
 
@@ -154,5 +182,28 @@ class DefaultChatsComponentTest {
 
         component.onDismissSheet()
         assertNull(component.sheetSlot.value.child)
+    }
+
+    @Test
+    fun requesting_search_opens_the_overlay() {
+        val component = build()
+
+        component.mainConversations.onSearchClicked()
+
+        assertIs<ChatsComponent.SheetChild.Search>(component.sheetSlot.value.child?.instance)
+    }
+
+    @Test
+    fun selecting_a_search_result_opens_chat_details_and_closes_search() {
+        val component = build()
+        component.mainConversations.onSearchClicked()
+        val search = assertIs<ChatsComponent.SheetChild.Search>(component.sheetSlot.value.child?.instance)
+        val id = ConversationId.Channel("kotlin")
+
+        search.component.onResultClicked(id)
+
+        assertNull(component.sheetSlot.value.child)
+        val chat = assertIs<ChatsComponent.Details.Chat>(component.panels.value.details?.instance)
+        assertEquals(id, chat.component.model.value.conversationId)
     }
 }

@@ -65,6 +65,8 @@ fun ChatsContent(component: ChatsComponent, modifier: Modifier = Modifier) {
     when (val child = sheet.child?.instance) {
         is ChatsComponent.SheetChild.Connectivity ->
             ConnectivitySheet(child.component, onDismiss = component::onDismissSheet)
+        is ChatsComponent.SheetChild.Search ->
+            SearchContent(child.component)
         null -> Unit
     }
 }

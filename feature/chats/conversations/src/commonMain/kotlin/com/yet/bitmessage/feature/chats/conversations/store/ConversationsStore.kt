@@ -19,21 +19,9 @@ internal interface ConversationsStore :
         val nearby: List<Peer> = emptyList(),
         val pinned: Set<ConversationId> = emptySet(),
         val muted: Set<ConversationId> = emptySet(),
-        val query: String = "",
         val transports: List<TransportStatus> = emptyList(),
         val bannerDismissed: Boolean = false,
     ) {
-        /** Client-side chat-list filter on title + last-message text. */
-        val visible: List<Conversation>
-            get() = if (query.isBlank()) {
-                conversations
-            } else {
-                conversations.filter { conversation ->
-                    conversation.title.contains(query, ignoreCase = true) ||
-                        conversation.lastMessage?.content?.contains(query, ignoreCase = true) == true
-                }
-            }
-
         /**
          * Transports a denied-earlier user can re-enable in one tap. Only PERMISSION_REQUIRED
          * surfaces here — an OFF radio / Tor is a deliberate user choice, never a nag.
@@ -44,7 +32,6 @@ internal interface ConversationsStore :
 
     /** Selection is navigation, owned by the component. */
     sealed interface Intent {
-        data class QueryChanged(val text: String) : Intent
         data class TogglePin(val id: ConversationId) : Intent
         data class ToggleMute(val id: ConversationId) : Intent
         data object DismissBanner : Intent
@@ -60,7 +47,6 @@ internal interface ConversationsStore :
         data class NearbyLoaded(val nearby: List<Peer>) : Msg
         data class PinnedLoaded(val pinned: Set<ConversationId>) : Msg
         data class MutedLoaded(val muted: Set<ConversationId>) : Msg
-        data class QueryChanged(val text: String) : Msg
         data class TransportsLoaded(val transports: List<TransportStatus>) : Msg
         data object BannerDismissed : Msg
     }
