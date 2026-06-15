@@ -28,6 +28,9 @@ interface ConversationsComponent {
     /** Open the contacts screen (hosted as a slot by the parent). */
     fun onContactsClicked()
 
+    /** Open the settings screen (hosted as a slot by the parent). */
+    fun onSettingsClicked()
+
     fun onTogglePin(id: ConversationId)
 
     fun onToggleMute(id: ConversationId)
@@ -52,6 +55,7 @@ interface ConversationsComponent {
             onConnectivityRequested: () -> Unit,
             onSearchRequested: () -> Unit,
             onContactsRequested: () -> Unit,
+            onSettingsRequested: () -> Unit,
         ): ConversationsComponent
     }
 }

@@ -69,6 +69,8 @@ fun ChatsContent(component: ChatsComponent, modifier: Modifier = Modifier) {
             SearchContent(child.component)
         is ChatsComponent.SheetChild.Contacts ->
             ContactsContent(child.component)
+        is ChatsComponent.SheetChild.Settings ->
+            SettingsContent(child.component)
         null -> Unit
     }
 }

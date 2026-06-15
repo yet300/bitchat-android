@@ -10,6 +10,7 @@ import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
 import com.yet.bitmessage.feature.chats.conversations.connectivity.ConnectivityComponent
 import com.yet.bitmessage.feature.chats.conversations.contacts.ContactsComponent
 import com.yet.bitmessage.feature.chats.conversations.search.SearchComponent
+import com.yet.bitmessage.feature.chats.conversations.settings.SettingsComponent
 import com.yet.bitmessage.feature.chats.details.ChatComponent
 
 /**
@@ -44,6 +45,7 @@ interface ChatsComponent : BackHandlerOwner {
         class Connectivity(val component: ConnectivityComponent) : SheetChild
         class Search(val component: SearchComponent) : SheetChild
         class Contacts(val component: ContactsComponent) : SheetChild
+        class Settings(val component: SettingsComponent) : SheetChild
     }
 
     fun interface Factory {
