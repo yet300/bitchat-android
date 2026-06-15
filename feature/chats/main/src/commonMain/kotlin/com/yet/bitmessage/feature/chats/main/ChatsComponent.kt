@@ -7,6 +7,7 @@ import com.arkivanov.decompose.router.slot.ChildSlot
 import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.backhandler.BackHandlerOwner
 import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
+import com.yet.bitmessage.feature.chats.conversations.channels.ChannelsComponent
 import com.yet.bitmessage.feature.chats.conversations.connectivity.ConnectivityComponent
 import com.yet.bitmessage.feature.chats.conversations.contacts.ContactsComponent
 import com.yet.bitmessage.feature.chats.conversations.search.SearchComponent
@@ -46,6 +47,7 @@ interface ChatsComponent : BackHandlerOwner {
         class Search(val component: SearchComponent) : SheetChild
         class Contacts(val component: ContactsComponent) : SheetChild
         class Settings(val component: SettingsComponent) : SheetChild
+        class Channels(val component: ChannelsComponent) : SheetChild
     }
 
     fun interface Factory {
