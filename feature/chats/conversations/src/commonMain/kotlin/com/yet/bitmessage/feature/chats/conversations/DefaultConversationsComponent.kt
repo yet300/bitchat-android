@@ -9,6 +9,7 @@ import com.arkivanov.decompose.value.operator.map
 import com.arkivanov.mvikotlin.core.instancekeeper.getStore
 import com.arkivanov.mvikotlin.core.store.StoreFactory
 import com.app.domain.repository.ContactRepository
+import com.app.domain.repository.ConversationPrefsRepository
 import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.PeerRepository
 import com.app.domain.usecase.ResolveReachabilityUseCase
@@ -34,6 +35,10 @@ internal class DefaultConversationsComponent(
 
     override fun onConnectivityClicked() = onConnectivityRequested()
 
+    override fun onTogglePin(id: ConversationId) = store.accept(ConversationsStore.Intent.TogglePin(id))
+
+    override fun onToggleMute(id: ConversationId) = store.accept(ConversationsStore.Intent.ToggleMute(id))
+
     override fun onQueryChanged(text: String) =
         store.accept(ConversationsStore.Intent.QueryChanged(text))
 }
@@ -44,6 +49,7 @@ internal class DefaultConversationsComponentFactory(
     private val conversationRepository: ConversationRepository,
     private val peerRepository: PeerRepository,
     private val contactRepository: ContactRepository,
+    private val conversationPrefsRepository: ConversationPrefsRepository,
 ) : ConversationsComponent.Factory {
     override fun create(
         componentContext: ComponentContext,
@@ -55,6 +61,7 @@ internal class DefaultConversationsComponentFactory(
             storeFactory = storeFactory,
             conversationRepository = conversationRepository,
             peerRepository = peerRepository,
+            conversationPrefsRepository = conversationPrefsRepository,
             resolveReachability = ResolveReachabilityUseCase(peerRepository, contactRepository),
         ),
         onConversationSelected = onConversationSelected,

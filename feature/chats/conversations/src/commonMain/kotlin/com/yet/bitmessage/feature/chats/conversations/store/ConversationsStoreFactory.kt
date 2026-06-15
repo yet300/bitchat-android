@@ -1,6 +1,7 @@
 package com.yet.bitmessage.feature.chats.conversations.store
 
 import com.app.domain.model.Peer
+import com.app.domain.repository.ConversationPrefsRepository
 import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.PeerRepository
 import com.app.domain.usecase.ResolveReachabilityUseCase
@@ -20,6 +21,7 @@ internal class ConversationsStoreFactory(
     private val storeFactory: StoreFactory,
     private val conversationRepository: ConversationRepository,
     private val peerRepository: PeerRepository,
+    private val conversationPrefsRepository: ConversationPrefsRepository,
     private val resolveReachability: ResolveReachabilityUseCase,
 ) {
     fun create(): ConversationsStore =
@@ -38,6 +40,8 @@ internal class ConversationsStoreFactory(
                 is ConversationsStore.Msg.Loaded -> copy(isLoading = false, conversations = msg.conversations)
                 is ConversationsStore.Msg.ReachabilityLoaded -> copy(reachability = msg.reachability)
                 is ConversationsStore.Msg.NearbyLoaded -> copy(nearby = msg.nearby)
+                is ConversationsStore.Msg.PinnedLoaded -> copy(pinned = msg.pinned)
+                is ConversationsStore.Msg.MutedLoaded -> copy(muted = msg.muted)
                 is ConversationsStore.Msg.QueryChanged -> copy(query = msg.text)
             }
     }
@@ -78,6 +82,16 @@ internal class ConversationsStoreFactory(
                             dispatch(ConversationsStore.Msg.NearbyLoaded(peers.filter { it.isConnected }.sortedByNearby()))
                         }
                     }
+                    scope.launch {
+                        conversationPrefsRepository.observePinned().collect {
+                            dispatch(ConversationsStore.Msg.PinnedLoaded(it))
+                        }
+                    }
+                    scope.launch {
+                        conversationPrefsRepository.observeMuted().collect {
+                            dispatch(ConversationsStore.Msg.MutedLoaded(it))
+                        }
+                    }
                 }
             }
         }
@@ -86,6 +100,12 @@ internal class ConversationsStoreFactory(
             when (intent) {
                 is ConversationsStore.Intent.QueryChanged ->
                     dispatch(ConversationsStore.Msg.QueryChanged(intent.text))
+
+                is ConversationsStore.Intent.TogglePin ->
+                    scope.launch { conversationPrefsRepository.setPinned(intent.id, intent.id !in state().pinned) }
+
+                is ConversationsStore.Intent.ToggleMute ->
+                    scope.launch { conversationPrefsRepository.setMuted(intent.id, intent.id !in state().muted) }
             }
         }
     }

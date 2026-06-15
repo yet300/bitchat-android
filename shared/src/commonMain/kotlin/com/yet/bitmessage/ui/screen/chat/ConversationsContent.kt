@@ -2,12 +2,15 @@
 
 package com.yet.bitmessage.ui.screen.chat
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -20,7 +23,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Badge
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -48,15 +54,21 @@ import com.yet.bitmessage.shared.resources.Res
 import com.yet.bitmessage.shared.resources.connectivity_title
 import com.yet.bitmessage.shared.resources.conversations_empty
 import com.yet.bitmessage.shared.resources.conversations_yesterday
+import com.yet.bitmessage.shared.resources.conversations_mute
 import com.yet.bitmessage.shared.resources.conversations_nearby
+import com.yet.bitmessage.shared.resources.conversations_pin
 import com.yet.bitmessage.shared.resources.conversations_search
 import com.yet.bitmessage.shared.resources.conversations_search_close
 import com.yet.bitmessage.shared.resources.conversations_search_empty
 import com.yet.bitmessage.shared.resources.conversations_search_hint
 import com.yet.bitmessage.shared.resources.conversations_title
+import com.yet.bitmessage.shared.resources.conversations_unmute
+import com.yet.bitmessage.shared.resources.conversations_unpin
 import com.yet.bitmessage.ui.component.button.IconCircleButton
+import com.yet.bitmessage.ui.component.icon.BellOffRegular
 import com.yet.bitmessage.ui.component.icon.Close
 import com.yet.bitmessage.ui.component.icon.MoreVert
+import com.yet.bitmessage.ui.component.icon.PushPin
 import com.yet.bitmessage.ui.component.icon.Search
 import kotlinx.datetime.TimeZone
 import org.jetbrains.compose.resources.stringResource
@@ -195,6 +207,7 @@ private fun SearchBar(
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ConversationList(
     component: ConversationsComponent,
@@ -203,37 +216,88 @@ private fun ConversationList(
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         items(model.conversations, key = { it.conversation.id.toString() }) { row ->
             val conversation = row.conversation
-            ListItem(
-                leadingContent = {
-                    ConversationAvatar(title = conversation.title, reachability = row.reachability)
-                },
-                headlineContent = {
-                    Text(text = conversation.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                },
-                supportingContent = conversation.lastMessage?.let { last ->
-                    {
-                        Text(text = last.content, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                },
-                trailingContent = {
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = conversation.lastActivity.timeLabelText(),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        if (conversation.unreadCount > 0) {
-                            Badge(modifier = Modifier.padding(top = 4.dp)) {
-                                Text(text = conversation.unreadCount.toString())
+            var menuOpen by remember { mutableStateOf(false) }
+            Box {
+                ListItem(
+                    leadingContent = {
+                        ConversationAvatar(title = conversation.title, reachability = row.reachability)
+                    },
+                    headlineContent = {
+                        Text(text = conversation.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    },
+                    supportingContent = conversation.lastMessage?.let { last ->
+                        {
+                            Text(text = last.content, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    },
+                    trailingContent = {
+                        Column(horizontalAlignment = Alignment.End) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            ) {
+                                if (row.isMuted) {
+                                    Icon(
+                                        imageVector = BellOffRegular,
+                                        contentDescription = stringResource(Res.string.conversations_unmute),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                }
+                                if (row.isPinned) {
+                                    Icon(
+                                        imageVector = PushPin,
+                                        contentDescription = stringResource(Res.string.conversations_unpin),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                }
+                                Text(
+                                    text = conversation.lastActivity.timeLabelText(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            if (conversation.unreadCount > 0 && !row.isMuted) {
+                                Badge(modifier = Modifier.padding(top = 4.dp)) {
+                                    Text(text = conversation.unreadCount.toString())
+                                }
                             }
                         }
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { component.onConversationClicked(conversation.id) }
-                    .padding(horizontal = 4.dp),
-            )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .combinedClickable(
+                            onClick = { component.onConversationClicked(conversation.id) },
+                            onLongClick = { menuOpen = true },
+                        )
+                        .padding(horizontal = 4.dp),
+                )
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                stringResource(
+                                    if (row.isPinned) Res.string.conversations_unpin else Res.string.conversations_pin,
+                                ),
+                            )
+                        },
+                        leadingIcon = { Icon(imageVector = PushPin, contentDescription = null) },
+                        onClick = { menuOpen = false; component.onTogglePin(conversation.id) },
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                stringResource(
+                                    if (row.isMuted) Res.string.conversations_unmute else Res.string.conversations_mute,
+                                ),
+                            )
+                        },
+                        leadingIcon = { Icon(imageVector = BellOffRegular, contentDescription = null) },
+                        onClick = { menuOpen = false; component.onToggleMute(conversation.id) },
+                    )
+                }
+            }
         }
     }
 }

@@ -14,6 +14,8 @@ internal interface ConversationsStore :
         val conversations: List<Conversation> = emptyList(),
         val reachability: Map<ConversationId, Reachability> = emptyMap(),
         val nearby: List<Peer> = emptyList(),
+        val pinned: Set<ConversationId> = emptySet(),
+        val muted: Set<ConversationId> = emptySet(),
         val query: String = "",
     ) {
         /** Client-side chat-list filter on title + last-message text. */
@@ -31,6 +33,8 @@ internal interface ConversationsStore :
     /** Selection is navigation, owned by the component. */
     sealed interface Intent {
         data class QueryChanged(val text: String) : Intent
+        data class TogglePin(val id: ConversationId) : Intent
+        data class ToggleMute(val id: ConversationId) : Intent
     }
 
     sealed interface Action {
@@ -41,6 +45,8 @@ internal interface ConversationsStore :
         data class Loaded(val conversations: List<Conversation>) : Msg
         data class ReachabilityLoaded(val reachability: Map<ConversationId, Reachability>) : Msg
         data class NearbyLoaded(val nearby: List<Peer>) : Msg
+        data class PinnedLoaded(val pinned: Set<ConversationId>) : Msg
+        data class MutedLoaded(val muted: Set<ConversationId>) : Msg
         data class QueryChanged(val text: String) : Msg
     }
 

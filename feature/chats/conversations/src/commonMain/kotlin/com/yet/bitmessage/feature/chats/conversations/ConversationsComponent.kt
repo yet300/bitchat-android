@@ -21,6 +21,10 @@ interface ConversationsComponent {
     /** Request the connectivity panel (hosted as a ChildSlot by the parent). */
     fun onConnectivityClicked()
 
+    fun onTogglePin(id: ConversationId)
+
+    fun onToggleMute(id: ConversationId)
+
     fun onQueryChanged(text: String)
 
     data class Model(
