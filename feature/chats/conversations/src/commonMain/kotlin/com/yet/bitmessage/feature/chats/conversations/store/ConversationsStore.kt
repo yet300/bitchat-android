@@ -9,10 +9,24 @@ internal interface ConversationsStore :
     data class State(
         val isLoading: Boolean = true,
         val conversations: List<Conversation> = emptyList(),
-    )
+        val query: String = "",
+    ) {
+        /** Client-side chat-list filter on title + last-message text. */
+        val visible: List<Conversation>
+            get() = if (query.isBlank()) {
+                conversations
+            } else {
+                conversations.filter { conversation ->
+                    conversation.title.contains(query, ignoreCase = true) ||
+                        conversation.lastMessage?.content?.contains(query, ignoreCase = true) == true
+                }
+            }
+    }
 
-    /** Selection is navigation, owned by the component — no intents yet. */
-    sealed interface Intent
+    /** Selection is navigation, owned by the component. */
+    sealed interface Intent {
+        data class QueryChanged(val text: String) : Intent
+    }
 
     sealed interface Action {
         data object Subscribe : Action
@@ -20,6 +34,7 @@ internal interface ConversationsStore :
 
     sealed interface Msg {
         data class Loaded(val conversations: List<Conversation>) : Msg
+        data class QueryChanged(val text: String) : Msg
     }
 
     sealed interface Label

@@ -71,6 +71,22 @@ class ConversationsStoreFactoryTest {
     }
 
     @Test
+    fun query_filters_visible_by_title_and_last_message() = runTest {
+        val repository = FakeConversationRepository()
+        val store = ConversationsStoreFactory(DefaultStoreFactory(), repository).create()
+
+        repository.conversationsFlow.value = listOf(conversation("alpha"), conversation("beta"))
+
+        store.accept(ConversationsStore.Intent.QueryChanged("alp"))
+        assertEquals(listOf("alpha"), store.state.visible.map { it.title })
+        // Raw list is preserved, only the derived view is filtered.
+        assertEquals(listOf("alpha", "beta"), store.state.conversations.map { it.title })
+
+        store.accept(ConversationsStore.Intent.QueryChanged(""))
+        assertEquals(listOf("alpha", "beta"), store.state.visible.map { it.title })
+    }
+
+    @Test
     fun initial_state_is_loading_before_bootstrap_runs() {
         // Constructed directly (no auto-init path executed yet on this thread): the
         // declared initial state must mark loading so the UI shows a spinner first.

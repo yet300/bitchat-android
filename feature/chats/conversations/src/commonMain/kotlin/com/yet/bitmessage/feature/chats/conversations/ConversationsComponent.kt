@@ -15,9 +15,12 @@ interface ConversationsComponent {
 
     fun onConversationClicked(id: ConversationId)
 
+    fun onQueryChanged(text: String)
+
     data class Model(
         val isLoading: Boolean,
         val conversations: List<Conversation>,
+        val query: String,
     )
 
     fun interface Factory {
