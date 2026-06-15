@@ -21,6 +21,7 @@ internal class DefaultConversationsComponent(
     componentContext: ComponentContext,
     storeFactory: ConversationsStoreFactory,
     private val onConversationSelected: (ConversationId) -> Unit,
+    private val onConnectivityRequested: () -> Unit,
 ) : ConversationsComponent, ComponentContext by componentContext {
 
     private val store = instanceKeeper.getStore { storeFactory.create() }
@@ -30,6 +31,8 @@ internal class DefaultConversationsComponent(
     override fun onConversationClicked(id: ConversationId) = onConversationSelected(id)
 
     override fun onNearbyClicked(peer: Peer) = onConversationSelected(ConversationId.Private(peer.id))
+
+    override fun onConnectivityClicked() = onConnectivityRequested()
 
     override fun onQueryChanged(text: String) =
         store.accept(ConversationsStore.Intent.QueryChanged(text))
@@ -45,6 +48,7 @@ internal class DefaultConversationsComponentFactory(
     override fun create(
         componentContext: ComponentContext,
         onConversationSelected: (ConversationId) -> Unit,
+        onConnectivityRequested: () -> Unit,
     ): ConversationsComponent = DefaultConversationsComponent(
         componentContext = componentContext,
         storeFactory = ConversationsStoreFactory(
@@ -54,5 +58,6 @@ internal class DefaultConversationsComponentFactory(
             resolveReachability = ResolveReachabilityUseCase(peerRepository, contactRepository),
         ),
         onConversationSelected = onConversationSelected,
+        onConnectivityRequested = onConnectivityRequested,
     )
 }

@@ -41,6 +41,7 @@ import com.app.domain.model.Reachability
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
 import com.yet.bitmessage.shared.resources.Res
+import com.yet.bitmessage.shared.resources.connectivity_title
 import com.yet.bitmessage.shared.resources.conversations_empty
 import com.yet.bitmessage.shared.resources.conversations_nearby
 import com.yet.bitmessage.shared.resources.conversations_search
@@ -50,6 +51,7 @@ import com.yet.bitmessage.shared.resources.conversations_search_hint
 import com.yet.bitmessage.shared.resources.conversations_title
 import com.yet.bitmessage.ui.component.button.IconCircleButton
 import com.yet.bitmessage.ui.component.icon.Close
+import com.yet.bitmessage.ui.component.icon.MoreVert
 import com.yet.bitmessage.ui.component.icon.Search
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
@@ -80,6 +82,11 @@ fun ConversationsContent(component: ConversationsComponent, modifier: Modifier =
                             icon = Search,
                             contentDescription = stringResource(Res.string.conversations_search),
                             onClick = { searching = true },
+                        )
+                        IconCircleButton(
+                            icon = MoreVert,
+                            contentDescription = stringResource(Res.string.connectivity_title),
+                            onClick = component::onConnectivityClicked,
                         )
                     },
                 )
@@ -220,7 +227,7 @@ private fun ConversationList(
  * green = nearby (mesh), cyan = via Nostr, grey = offline.
  */
 @Composable
-private fun ConversationAvatar(title: String, reachability: Reachability) {
+internal fun ConversationAvatar(title: String, reachability: Reachability) {
     val hue = (abs(title.hashCode()) % 360).toFloat()
     val avatarColor = Color.hsv(hue, saturation = 0.45f, value = 0.55f)
     val initial = title.trimStart('#', '@', ' ').firstOrNull()?.uppercase() ?: "?"
