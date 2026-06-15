@@ -13,6 +13,7 @@ import com.app.domain.model.PeerIdentity
 import com.app.domain.model.ThemeMode
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.IdentityRepository
+import com.app.domain.repository.MeshSettingsRepository
 import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.PowDifficultyLevel
 import com.app.domain.repository.PowRepository
@@ -113,6 +114,15 @@ class SettingsStoreFactoryTest {
             listOf(PowDifficultyLevel(8, "Low"), PowDifficultyLevel(16, "High"))
     }
 
+    private class FakeMeshSettingsRepository : MeshSettingsRepository {
+        val autoStart = MutableStateFlow(true)
+        val background = MutableStateFlow(true)
+        override fun observeAutoStart(): Flow<Boolean> = autoStart
+        override fun observeBackgroundEnabled(): Flow<Boolean> = background
+        override suspend fun setAutoStart(enabled: Boolean) { autoStart.value = enabled }
+        override suspend fun setBackgroundEnabled(enabled: Boolean) { background.value = enabled }
+    }
+
     private fun factory(
         settings: FakeSettingsRepository = FakeSettingsRepository(),
         identity: FakeIdentityRepository = FakeIdentityRepository(),
@@ -121,6 +131,7 @@ class SettingsStoreFactoryTest {
         theme: FakeThemeRepository = FakeThemeRepository(),
         tor: FakeTorRepository = FakeTorRepository(),
         pow: FakePowRepository = FakePowRepository(),
+        mesh: FakeMeshSettingsRepository = FakeMeshSettingsRepository(),
     ) = SettingsStoreFactory(
         storeFactory = DefaultStoreFactory(),
         settingsRepository = settings,
@@ -128,6 +139,7 @@ class SettingsStoreFactoryTest {
         themeRepository = theme,
         torRepository = tor,
         powRepository = pow,
+        meshSettingsRepository = mesh,
         panicWipe = PanicWipeUseCase(messages, contacts, identity),
     )
 
@@ -196,5 +208,21 @@ class SettingsStoreFactoryTest {
         assertTrue(pow.enabled.value)
         assertEquals(16, pow.difficulty.value)
         assertEquals(ThemeMode.LIGHT, store.state.theme)
+    }
+
+    @Test
+    fun mesh_background_loads_and_toggles() = runTest {
+        val mesh = FakeMeshSettingsRepository().apply { autoStart.value = false; background.value = true }
+        val store = factory(mesh = mesh).create()
+
+        assertEquals(false, store.state.autoStartEnabled)
+        assertEquals(true, store.state.backgroundEnabled)
+
+        store.accept(SettingsStore.Intent.AutoStartToggled(true))
+        store.accept(SettingsStore.Intent.BackgroundToggled(false))
+
+        assertTrue(mesh.autoStart.value)
+        assertEquals(false, mesh.background.value)
+        assertEquals(false, store.state.backgroundEnabled)
     }
 }

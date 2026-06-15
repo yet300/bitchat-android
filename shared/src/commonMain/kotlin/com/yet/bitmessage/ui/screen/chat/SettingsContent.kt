@@ -43,9 +43,12 @@ import com.yet.bitmessage.shared.resources.settings_panic_confirm
 import com.yet.bitmessage.shared.resources.settings_panic_confirm_body
 import com.yet.bitmessage.shared.resources.settings_panic_confirm_title
 import com.yet.bitmessage.shared.resources.settings_panic_desc
+import com.yet.bitmessage.shared.resources.settings_auto_start
 import com.yet.bitmessage.shared.resources.settings_pow
 import com.yet.bitmessage.shared.resources.settings_pow_difficulty
+import com.yet.bitmessage.shared.resources.settings_run_background
 import com.yet.bitmessage.shared.resources.settings_section_appearance
+import com.yet.bitmessage.shared.resources.settings_section_background
 import com.yet.bitmessage.shared.resources.settings_section_danger
 import com.yet.bitmessage.shared.resources.settings_section_identity
 import com.yet.bitmessage.shared.resources.settings_section_network
@@ -129,6 +132,10 @@ fun SettingsContent(component: SettingsComponent, modifier: Modifier = Modifier)
                         }
                     }
                 }
+
+                SectionHeader(stringResource(Res.string.settings_section_background))
+                ToggleRow(stringResource(Res.string.settings_auto_start), model.autoStartEnabled, component::onAutoStartToggled)
+                ToggleRow(stringResource(Res.string.settings_run_background), model.backgroundEnabled, component::onBackgroundToggled)
 
                 SectionHeader(stringResource(Res.string.settings_section_danger))
                 Text(

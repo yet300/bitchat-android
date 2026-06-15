@@ -8,6 +8,7 @@ import com.app.domain.model.PeerId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -25,6 +26,7 @@ class ConversationPrefsRepositoryImplTest {
         override fun getStringFlow(key: String, defaultValue: String): Flow<String> =
             data.map { it[key] ?: defaultValue }
         override fun getStringOrNullFlow(key: String): Flow<String?> = data.map { it[key] }
+        override fun getBooleanFlow(key: String, defaultValue: Boolean): Flow<Boolean> = flowOf(defaultValue)
         override fun getBoolean(key: String, defaultValue: Boolean) = defaultValue
         override fun putBoolean(key: String, value: Boolean) = Unit
         override fun getInt(key: String, defaultValue: Int) = defaultValue

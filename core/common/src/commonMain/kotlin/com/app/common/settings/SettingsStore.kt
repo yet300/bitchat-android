@@ -43,4 +43,7 @@ interface SettingsStore {
 
     /** Emits the current value (or null when absent) for [key] and re-emits on every change. */
     fun getStringOrNullFlow(key: String): Flow<String?>
+
+    /** Emits the current boolean value for [key] and re-emits on every change. */
+    fun getBooleanFlow(key: String, defaultValue: Boolean): Flow<Boolean>
 }

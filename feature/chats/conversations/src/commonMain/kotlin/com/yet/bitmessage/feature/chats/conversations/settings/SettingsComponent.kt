@@ -6,8 +6,9 @@ import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.value.Value
 
 /**
- * Settings tree (D5): identity (nickname + npub), appearance (theme), network (Tor, PoW) and the
- * destructive panic wipe. Mesh-background and notifications sections are a follow-up slice.
+ * Settings tree (D5): identity (nickname + npub), appearance (theme), network (Tor, PoW),
+ * background (auto-start / run-in-background) and the destructive panic wipe. The notifications
+ * section is a follow-up slice.
  */
 interface SettingsComponent {
 
@@ -22,6 +23,10 @@ interface SettingsComponent {
     fun onPowToggled(enabled: Boolean)
 
     fun onPowDifficultySelected(difficulty: Int)
+
+    fun onAutoStartToggled(enabled: Boolean)
+
+    fun onBackgroundToggled(enabled: Boolean)
 
     /** Wipe all data and the cryptographic identity (irreversible; the UI confirms first). */
     fun onPanicWipe()
@@ -38,6 +43,8 @@ interface SettingsComponent {
         val powEnabled: Boolean,
         val powDifficulty: Int,
         val powLevels: List<PowDifficultyLevel>,
+        val autoStartEnabled: Boolean,
+        val backgroundEnabled: Boolean,
     )
 
     fun interface Factory {

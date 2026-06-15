@@ -114,6 +114,8 @@ class DefaultChatsComponentTest {
                     powEnabled = false,
                     powDifficulty = 0,
                     powLevels = emptyList(),
+                    autoStartEnabled = true,
+                    backgroundEnabled = true,
                 ),
             )
 
@@ -122,6 +124,8 @@ class DefaultChatsComponentTest {
         override fun onTorToggled(enabled: Boolean) = Unit
         override fun onPowToggled(enabled: Boolean) = Unit
         override fun onPowDifficultySelected(difficulty: Int) = Unit
+        override fun onAutoStartToggled(enabled: Boolean) = Unit
+        override fun onBackgroundToggled(enabled: Boolean) = Unit
         override fun onPanicWipe() = Unit
         override fun onCloseClicked() = onClose()
     }
