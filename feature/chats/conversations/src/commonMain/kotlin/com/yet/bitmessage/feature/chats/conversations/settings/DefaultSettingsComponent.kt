@@ -4,6 +4,7 @@ import com.app.common.decompose.asValue
 import com.app.domain.model.ThemeMode
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.IdentityRepository
+import com.app.domain.repository.MeshSettingsRepository
 import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.PowRepository
 import com.app.domain.repository.SettingsRepository
@@ -38,6 +39,8 @@ internal class DefaultSettingsComponent(
             powEnabled = state.powEnabled,
             powDifficulty = state.powDifficulty,
             powLevels = state.powLevels,
+            autoStartEnabled = state.autoStartEnabled,
+            backgroundEnabled = state.backgroundEnabled,
         )
     }
 
@@ -51,6 +54,10 @@ internal class DefaultSettingsComponent(
 
     override fun onPowDifficultySelected(difficulty: Int) =
         store.accept(SettingsStore.Intent.PowDifficultySelected(difficulty))
+
+    override fun onAutoStartToggled(enabled: Boolean) = store.accept(SettingsStore.Intent.AutoStartToggled(enabled))
+
+    override fun onBackgroundToggled(enabled: Boolean) = store.accept(SettingsStore.Intent.BackgroundToggled(enabled))
 
     override fun onPanicWipe() = store.accept(SettingsStore.Intent.PanicWipe)
 
@@ -67,6 +74,7 @@ internal class DefaultSettingsComponentFactory(
     private val themeRepository: ThemeRepository,
     private val torRepository: TorRepository,
     private val powRepository: PowRepository,
+    private val meshSettingsRepository: MeshSettingsRepository,
 ) : SettingsComponent.Factory {
     override fun create(componentContext: ComponentContext, onClose: () -> Unit): SettingsComponent =
         DefaultSettingsComponent(
@@ -78,6 +86,7 @@ internal class DefaultSettingsComponentFactory(
                 themeRepository = themeRepository,
                 torRepository = torRepository,
                 powRepository = powRepository,
+                meshSettingsRepository = meshSettingsRepository,
                 panicWipe = PanicWipeUseCase(messageRepository, contactRepository, identityRepository),
             ),
             onClose = onClose,

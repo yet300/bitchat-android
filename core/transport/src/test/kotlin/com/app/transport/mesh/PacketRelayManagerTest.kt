@@ -124,6 +124,7 @@ class PacketRelayManagerTest {
         override fun remove(key: String) {}
         override fun getStringFlow(key: String, defaultValue: String): Flow<String> = flowOf(defaultValue)
         override fun getStringOrNullFlow(key: String): Flow<String?> = flowOf(null)
+        override fun getBooleanFlow(key: String, defaultValue: Boolean): Flow<Boolean> = flowOf(defaultValue)
     }
 
     private fun hexStringToPeerBytes(hex: String): ByteArray {

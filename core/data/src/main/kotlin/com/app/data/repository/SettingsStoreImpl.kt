@@ -5,6 +5,7 @@ package com.app.data.repository
 import com.app.common.settings.SettingsStore
 import com.russhwolf.settings.ExperimentalSettingsApi
 import com.russhwolf.settings.ObservableSettings
+import com.russhwolf.settings.coroutines.getBooleanFlow
 import com.russhwolf.settings.coroutines.getStringFlow
 import com.russhwolf.settings.coroutines.getStringOrNullFlow
 import dev.zacsweers.metro.AppScope
@@ -53,4 +54,7 @@ internal class SettingsStoreImpl(
 
     override fun getStringOrNullFlow(key: String): Flow<String?> =
         settings.getStringOrNullFlow(key)
+
+    override fun getBooleanFlow(key: String, defaultValue: Boolean): Flow<Boolean> =
+        settings.getBooleanFlow(key, defaultValue)
 }

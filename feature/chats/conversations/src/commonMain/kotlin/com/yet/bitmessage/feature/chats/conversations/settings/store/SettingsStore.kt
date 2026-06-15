@@ -17,6 +17,8 @@ internal interface SettingsStore :
         val powEnabled: Boolean = false,
         val powDifficulty: Int = 0,
         val powLevels: List<PowDifficultyLevel> = emptyList(),
+        val autoStartEnabled: Boolean = true,
+        val backgroundEnabled: Boolean = true,
     )
 
     sealed interface Intent {
@@ -26,6 +28,8 @@ internal interface SettingsStore :
         data class TorToggled(val enabled: Boolean) : Intent
         data class PowToggled(val enabled: Boolean) : Intent
         data class PowDifficultySelected(val difficulty: Int) : Intent
+        data class AutoStartToggled(val enabled: Boolean) : Intent
+        data class BackgroundToggled(val enabled: Boolean) : Intent
     }
 
     sealed interface Action {
@@ -40,6 +44,8 @@ internal interface SettingsStore :
         data class TorLoaded(val enabled: Boolean) : Msg
         data class PowEnabledLoaded(val enabled: Boolean) : Msg
         data class PowDifficultyLoaded(val difficulty: Int) : Msg
+        data class AutoStartLoaded(val enabled: Boolean) : Msg
+        data class BackgroundLoaded(val enabled: Boolean) : Msg
     }
 
     sealed interface Label

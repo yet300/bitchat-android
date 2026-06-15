@@ -1,6 +1,7 @@
 package com.yet.bitmessage.feature.chats.conversations.settings.store
 
 import com.app.domain.repository.IdentityRepository
+import com.app.domain.repository.MeshSettingsRepository
 import com.app.domain.repository.PowRepository
 import com.app.domain.repository.SettingsRepository
 import com.app.domain.repository.ThemeRepository
@@ -20,6 +21,7 @@ internal class SettingsStoreFactory(
     private val themeRepository: ThemeRepository,
     private val torRepository: TorRepository,
     private val powRepository: PowRepository,
+    private val meshSettingsRepository: MeshSettingsRepository,
     private val panicWipe: PanicWipeUseCase,
 ) {
     fun create(): SettingsStore =
@@ -42,6 +44,8 @@ internal class SettingsStoreFactory(
                 is SettingsStore.Msg.TorLoaded -> copy(torEnabled = msg.enabled)
                 is SettingsStore.Msg.PowEnabledLoaded -> copy(powEnabled = msg.enabled)
                 is SettingsStore.Msg.PowDifficultyLoaded -> copy(powDifficulty = msg.difficulty)
+                is SettingsStore.Msg.AutoStartLoaded -> copy(autoStartEnabled = msg.enabled)
+                is SettingsStore.Msg.BackgroundLoaded -> copy(backgroundEnabled = msg.enabled)
             }
     }
 
@@ -67,6 +71,12 @@ internal class SettingsStoreFactory(
                     scope.launch {
                         powRepository.observePowDifficulty().collect { dispatch(SettingsStore.Msg.PowDifficultyLoaded(it)) }
                     }
+                    scope.launch {
+                        meshSettingsRepository.observeAutoStart().collect { dispatch(SettingsStore.Msg.AutoStartLoaded(it)) }
+                    }
+                    scope.launch {
+                        meshSettingsRepository.observeBackgroundEnabled().collect { dispatch(SettingsStore.Msg.BackgroundLoaded(it)) }
+                    }
                 }
             }
         }
@@ -88,6 +98,12 @@ internal class SettingsStoreFactory(
                 is SettingsStore.Intent.PowToggled -> scope.launch { powRepository.setPowEnabled(intent.enabled) }
                 is SettingsStore.Intent.PowDifficultySelected -> scope.launch {
                     powRepository.setPowDifficulty(intent.difficulty)
+                }
+                is SettingsStore.Intent.AutoStartToggled -> scope.launch {
+                    meshSettingsRepository.setAutoStart(intent.enabled)
+                }
+                is SettingsStore.Intent.BackgroundToggled -> scope.launch {
+                    meshSettingsRepository.setBackgroundEnabled(intent.enabled)
                 }
             }
         }
