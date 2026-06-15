@@ -14,6 +14,12 @@ interface ContactRepository {
     /** Stream of the favorite-fingerprints set (for reactive UI). */
     fun observeFavorites(): Flow<Set<Fingerprint>>
 
+    /**
+     * Stream of our contacts (people we favorited), each annotated with its current
+     * [blocked][Contact.isBlocked] state — the data source for the contacts screen.
+     */
+    fun observeContacts(): Flow<List<Contact>>
+
     /** Toggle favorite for a peer. */
     suspend fun toggleFavorite(peer: PeerId)
 

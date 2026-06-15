@@ -61,7 +61,9 @@ import com.yet.bitmessage.shared.resources.connectivity_internet
 import com.yet.bitmessage.shared.resources.connectivity_title
 import com.yet.bitmessage.shared.resources.connectivity_tor
 import com.yet.bitmessage.shared.resources.connectivity_wifi_aware
+import com.yet.bitmessage.shared.resources.conversations_contacts
 import com.yet.bitmessage.shared.resources.conversations_empty
+import com.yet.bitmessage.shared.resources.conversations_more
 import com.yet.bitmessage.shared.resources.conversations_yesterday
 import com.yet.bitmessage.shared.resources.conversations_mute
 import com.yet.bitmessage.shared.resources.conversations_nearby
@@ -99,10 +101,9 @@ fun ConversationsContent(component: ConversationsComponent, modifier: Modifier =
                         contentDescription = stringResource(Res.string.conversations_search),
                         onClick = component::onSearchClicked,
                     )
-                    IconCircleButton(
-                        icon = MoreVert,
-                        contentDescription = stringResource(Res.string.connectivity_title),
-                        onClick = component::onConnectivityClicked,
+                    OverflowMenu(
+                        onConnectivity = component::onConnectivityClicked,
+                        onContacts = component::onContactsClicked,
                     )
                 },
             )
@@ -137,6 +138,29 @@ fun ConversationsContent(component: ConversationsComponent, modifier: Modifier =
                     ConversationList(component, model)
                 }
             }
+        }
+    }
+}
+
+/** Top-bar overflow: connectivity sheet + contacts screen (no dedicated icons needed). */
+@Composable
+private fun OverflowMenu(onConnectivity: () -> Unit, onContacts: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconCircleButton(
+            icon = MoreVert,
+            contentDescription = stringResource(Res.string.conversations_more),
+            onClick = { open = true },
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(Res.string.conversations_contacts)) },
+                onClick = { open = false; onContacts() },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(Res.string.connectivity_title)) },
+                onClick = { open = false; onConnectivity() },
+            )
         }
     }
 }

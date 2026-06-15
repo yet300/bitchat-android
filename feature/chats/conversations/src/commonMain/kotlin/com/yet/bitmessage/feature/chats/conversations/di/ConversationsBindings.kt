@@ -4,6 +4,8 @@ import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
 import com.yet.bitmessage.feature.chats.conversations.DefaultConversationsComponentFactory
 import com.yet.bitmessage.feature.chats.conversations.connectivity.ConnectivityComponent
 import com.yet.bitmessage.feature.chats.conversations.connectivity.DefaultConnectivityComponentFactory
+import com.yet.bitmessage.feature.chats.conversations.contacts.ContactsComponent
+import com.yet.bitmessage.feature.chats.conversations.contacts.DefaultContactsComponentFactory
 import com.yet.bitmessage.feature.chats.conversations.search.DefaultSearchComponentFactory
 import com.yet.bitmessage.feature.chats.conversations.search.SearchComponent
 import dev.zacsweers.metro.AppScope
@@ -22,4 +24,7 @@ abstract class ConversationsBindings {
 
     @Binds
     internal abstract val DefaultSearchComponentFactory.bindSearchComponentFactory: SearchComponent.Factory
+
+    @Binds
+    internal abstract val DefaultContactsComponentFactory.bindContactsComponentFactory: ContactsComponent.Factory
 }

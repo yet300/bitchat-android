@@ -18,6 +18,7 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.builtins.SetSerializer
 import kotlinx.serialization.builtins.serializer
@@ -40,6 +41,27 @@ internal class ContactRepositoryImpl(
     override fun observeFavorites(): Flow<Set<Fingerprint>> =
         settings.getStringOrNullFlow(KEY_FAVORITES).map { json ->
             decodeSet(json).mapTo(mutableSetOf(), ::Fingerprint)
+        }
+
+    override fun observeContacts(): Flow<List<Contact>> =
+        // Re-emit when either set changes; the relationship details (nickname, Nostr key, mutuality)
+        // come from the favorites store, annotated here with the current blocked state.
+        combine(
+            settings.getStringOrNullFlow(KEY_FAVORITES),
+            settings.getStringOrNullFlow(KEY_BLOCKED),
+        ) { _, blockedJson ->
+            val blocked = decodeSet(blockedJson)
+            favorites.getOurFavorites().map { rel ->
+                Contact(
+                    identity = PeerIdentity(rel.peerNoisePublicKey.hexEncodedString(), rel.peerNostrPublicKey),
+                    nickname = rel.peerNickname,
+                    isFavorite = rel.isFavorite,
+                    theyFavoritedUs = rel.theyFavoritedUs,
+                    favoritedAt = rel.favoritedAt,
+                    lastUpdated = rel.lastUpdated,
+                    isBlocked = fingerprintOf(rel.peerNoisePublicKey) in blocked,
+                )
+            }
         }
 
     override suspend fun toggleFavorite(peer: PeerId) {
@@ -101,6 +123,10 @@ internal class ContactRepositoryImpl(
         }
         return null
     }
+
+    /** SHA-256 hex fingerprint of a raw Noise static public key (same scheme as [fingerprintFor]). */
+    private fun fingerprintOf(noiseKey: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(noiseKey).hexEncodedString()
 
     private fun loadSet(key: String): Set<String> = decodeSet(settings.getStringOrNull(key))
 
