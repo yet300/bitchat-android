@@ -1,18 +1,25 @@
 package com.yet.bitmessage.feature.chats.conversations.channels.store
 
+import com.app.domain.model.ConversationId
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.JoinResult
+import com.app.domain.repository.MessageRepository
+import com.app.domain.usecase.ApplyRetentionUseCase
 import com.arkivanov.mvikotlin.core.store.Reducer
 import com.arkivanov.mvikotlin.core.store.SimpleBootstrapper
 import com.arkivanov.mvikotlin.core.store.Store
 import com.arkivanov.mvikotlin.core.store.StoreFactory
 import com.arkivanov.mvikotlin.extensions.coroutines.CoroutineExecutor
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 internal class ChannelsStoreFactory(
     private val storeFactory: StoreFactory,
     private val channelRepository: ChannelRepository,
+    messageRepository: MessageRepository,
 ) {
+    private val applyRetention = ApplyRetentionUseCase(messageRepository)
+
     fun create(): ChannelsStore =
         object : ChannelsStore,
             Store<ChannelsStore.Intent, ChannelsStore.State, ChannelsStore.Label> by storeFactory.create(
@@ -27,9 +34,7 @@ internal class ChannelsStoreFactory(
         override fun ChannelsStore.State.reduce(msg: ChannelsStore.Msg): ChannelsStore.State =
             when (msg) {
                 is ChannelsStore.Msg.Loaded -> copy(isLoading = false, channels = msg.channels)
-                is ChannelsStore.Msg.PasswordPrompt -> copy(passwordPromptFor = msg.tag, error = null)
-                ChannelsStore.Msg.PromptCleared -> copy(passwordPromptFor = null, error = null)
-                is ChannelsStore.Msg.Error -> copy(error = msg.message, passwordPromptFor = null)
+                is ChannelsStore.Msg.Error -> copy(error = msg.message)
             }
     }
 
@@ -48,8 +53,8 @@ internal class ChannelsStoreFactory(
             when (intent) {
                 is ChannelsStore.Intent.Join -> scope.launch {
                     when (val result = channelRepository.join(intent.tag, intent.password)) {
-                        JoinResult.Joined -> dispatch(ChannelsStore.Msg.PromptCleared)
-                        JoinResult.NeedsPassword -> dispatch(ChannelsStore.Msg.PasswordPrompt(intent.tag))
+                        JoinResult.Joined -> Unit
+                        JoinResult.NeedsPassword -> publish(ChannelsStore.Label.NeedsPassword(intent.tag))
                         is JoinResult.Failed -> dispatch(ChannelsStore.Msg.Error(result.reason))
                     }
                 }
@@ -57,7 +62,14 @@ internal class ChannelsStoreFactory(
                 is ChannelsStore.Intent.SetPassword -> scope.launch {
                     channelRepository.setPassword(intent.tag, intent.password)
                 }
-                ChannelsStore.Intent.DismissPasswordPrompt -> dispatch(ChannelsStore.Msg.PromptCleared)
+                is ChannelsStore.Intent.OpenRetention -> scope.launch {
+                    val current = channelRepository.observeRetention(intent.tag).first()
+                    publish(ChannelsStore.Label.ShowRetention(intent.tag, current))
+                }
+                is ChannelsStore.Intent.SetRetention -> scope.launch {
+                    channelRepository.setRetention(intent.tag, intent.policy)
+                    applyRetention(ConversationId.Channel(intent.tag), intent.policy)
+                }
             }
         }
     }

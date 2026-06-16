@@ -17,6 +17,7 @@ import com.app.domain.model.Reachability
 import com.app.domain.model.SenderRef
 import com.app.domain.model.Channel
 import com.app.domain.model.Contact
+import com.app.domain.model.RetentionPolicy
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationRepository
@@ -133,6 +134,9 @@ class ChatStoreFactoryTest {
         override suspend fun leave(tag: String) = Unit
         override suspend fun setPassword(tag: String, password: String) = Unit
         override suspend fun isCreator(tag: String): Boolean = false
+        override fun observeRetention(tag: String): Flow<RetentionPolicy> =
+            MutableStateFlow(RetentionPolicy.KEEP_ALL)
+        override suspend fun setRetention(tag: String, policy: RetentionPolicy) = Unit
     }
 
     private fun message(id: String, content: String, mine: Boolean = false) = BitMessage(

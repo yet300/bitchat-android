@@ -2,7 +2,9 @@ package com.yet.bitmessage.feature.chats.main
 
 import com.app.domain.model.ConversationId
 import com.app.domain.model.Peer
+import com.app.domain.model.PeerId
 import com.app.domain.model.Reachability
+import com.app.domain.model.RetentionPolicy
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.DefaultComponentContext
 import com.arkivanov.decompose.router.panels.ChildPanelsMode
@@ -10,6 +12,8 @@ import com.arkivanov.decompose.value.MutableValue
 import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
+import com.arkivanov.decompose.router.slot.ChildSlot
+import com.yet.bitmessage.feature.chats.conversations.channels.ChannelDialog
 import com.yet.bitmessage.feature.chats.conversations.channels.ChannelsComponent
 import com.yet.bitmessage.feature.chats.conversations.connectivity.ConnectivityComponent
 import com.yet.bitmessage.feature.chats.conversations.contacts.ContactsComponent
@@ -135,21 +139,17 @@ class DefaultChatsComponentTest {
         val onClose: () -> Unit,
     ) : ChannelsComponent {
         override val model: Value<ChannelsComponent.Model> =
-            MutableValue(
-                ChannelsComponent.Model(
-                    isLoading = false,
-                    channels = emptyList(),
-                    passwordPromptFor = null,
-                    error = null,
-                ),
-            )
+            MutableValue(ChannelsComponent.Model(isLoading = false, channels = emptyList(), error = null))
+        override val dialog: Value<ChildSlot<*, ChannelDialog>> = MutableValue(ChildSlot<Any, ChannelDialog>())
 
         override fun onChannelClicked(tag: String) = onChannelSelected(tag)
         override fun onJoin(tag: String) = Unit
-        override fun onSubmitPassword(tag: String, password: String) = Unit
-        override fun onDismissPasswordPrompt() = Unit
+        override fun onSetPasswordClicked(tag: String) = Unit
+        override fun onRetentionClicked(tag: String) = Unit
         override fun onLeave(tag: String) = Unit
-        override fun onSetPassword(tag: String, password: String) = Unit
+        override fun onSubmitPassword(tag: String, mode: ChannelDialog.Password.Mode, password: String) = Unit
+        override fun onRetentionSelected(tag: String, policy: RetentionPolicy) = Unit
+        override fun onDismissDialog() = Unit
         override fun onCloseClicked() = onClose()
     }
 
@@ -293,7 +293,7 @@ class DefaultChatsComponentTest {
     @Test
     fun open_conversation_deep_link_shows_chat_details() {
         val component = build()
-        val id = ConversationId.Private(com.app.domain.model.PeerId("a".repeat(64)))
+        val id = ConversationId.Private(PeerId("a".repeat(64)))
 
         component.openConversation(id)
 

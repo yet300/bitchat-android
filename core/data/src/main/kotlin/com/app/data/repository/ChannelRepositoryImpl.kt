@@ -2,6 +2,7 @@ package com.app.data.repository
 
 import com.app.common.serialization.JsonConfig
 import com.app.domain.model.Channel
+import com.app.domain.model.RetentionPolicy
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.JoinResult
 import com.app.common.settings.SettingsStore
@@ -68,6 +69,17 @@ internal class ChannelRepositoryImpl(
         return false
     }
 
+    override fun observeRetention(tag: String): Flow<RetentionPolicy> =
+        settings.getStringFlow(retentionKey(tag), RetentionPolicy.KEEP_ALL.name).map { stored ->
+            runCatching { RetentionPolicy.valueOf(stored) }.getOrDefault(RetentionPolicy.KEEP_ALL)
+        }
+
+    override suspend fun setRetention(tag: String, policy: RetentionPolicy) {
+        settings.putString(retentionKey(tag), policy.name)
+    }
+
+    private fun retentionKey(tag: String): String = "$KEY_RETENTION_PREFIX${Channel.tag(tag)}"
+
     private fun loadSet(key: String): Set<String> = decodeSet(settings.getStringOrNull(key))
 
     private fun saveSet(key: String, values: Set<String>) {
@@ -82,6 +94,7 @@ internal class ChannelRepositoryImpl(
     private companion object {
         const val KEY_JOINED = "joined_channels"
         const val KEY_PROTECTED = "password_protected_channels"
+        const val KEY_RETENTION_PREFIX = "channel_retention_"
         val SET_SERIALIZER = SetSerializer(String.serializer())
     }
 }
