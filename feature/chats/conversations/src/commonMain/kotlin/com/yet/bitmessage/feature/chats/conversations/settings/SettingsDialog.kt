@@ -7,4 +7,7 @@ package com.yet.bitmessage.feature.chats.conversations.settings
 sealed interface SettingsDialog {
     /** Confirm the irreversible panic wipe. */
     data object PanicConfirm : SettingsDialog
+
+    /** Show this device's verification QR (rendered from the store's loaded matrix). */
+    data object MyQr : SettingsDialog
 }

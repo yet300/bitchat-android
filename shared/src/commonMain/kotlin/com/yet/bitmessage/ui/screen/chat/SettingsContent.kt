@@ -39,6 +39,11 @@ import com.yet.bitmessage.shared.resources.settings_close
 import com.yet.bitmessage.shared.resources.settings_fingerprint
 import com.yet.bitmessage.shared.resources.settings_nickname
 import com.yet.bitmessage.shared.resources.settings_npub
+import com.yet.bitmessage.shared.resources.settings_my_qr_close
+import com.yet.bitmessage.shared.resources.settings_my_qr_desc
+import com.yet.bitmessage.shared.resources.settings_my_qr_title
+import com.yet.bitmessage.shared.resources.settings_my_qr_unavailable
+import com.yet.bitmessage.shared.resources.settings_show_my_qr
 import com.yet.bitmessage.shared.resources.settings_panic
 import com.yet.bitmessage.shared.resources.settings_panic_confirm
 import com.yet.bitmessage.shared.resources.settings_panic_confirm_body
@@ -48,7 +53,6 @@ import com.yet.bitmessage.shared.resources.settings_auto_start
 import com.yet.bitmessage.shared.resources.settings_notif_enable
 import com.yet.bitmessage.shared.resources.settings_notif_mute_all
 import com.yet.bitmessage.shared.resources.settings_notif_permission_label
-import com.yet.bitmessage.shared.resources.settings_notif_permission_off
 import com.yet.bitmessage.shared.resources.settings_notif_permission_on
 import com.yet.bitmessage.shared.resources.settings_pow
 import com.yet.bitmessage.shared.resources.settings_pow_difficulty
@@ -65,6 +69,7 @@ import com.yet.bitmessage.shared.resources.settings_theme_light
 import com.yet.bitmessage.shared.resources.settings_theme_system
 import com.yet.bitmessage.shared.resources.settings_title
 import com.yet.bitmessage.shared.resources.settings_tor
+import com.yet.bitmessage.ui.component.QrCodeImage
 import com.yet.bitmessage.ui.component.button.IconCircleButton
 import com.yet.bitmessage.ui.component.icon.Close
 import com.yet.bitmessage.feature.chats.conversations.settings.NotifPermissionStatus
@@ -116,6 +121,12 @@ fun SettingsContent(component: SettingsComponent, modifier: Modifier = Modifier)
                 )
                 model.npub?.let { ReadOnlyField(stringResource(Res.string.settings_npub), it) }
                 ReadOnlyField(stringResource(Res.string.settings_fingerprint), model.fingerprint)
+                TextButton(
+                    onClick = component::onShowMyQrClicked,
+                    modifier = Modifier.padding(top = 4.dp),
+                ) {
+                    Text(stringResource(Res.string.settings_show_my_qr))
+                }
 
                 SectionHeader(stringResource(Res.string.settings_section_appearance))
                 ThemeSelector(model.theme, component::onThemeSelected)
@@ -184,6 +195,31 @@ fun SettingsContent(component: SettingsComponent, modifier: Modifier = Modifier)
             dismissButton = {
                 TextButton(onClick = component::onDismissDialog) {
                     Text(stringResource(Res.string.settings_cancel))
+                }
+            },
+        )
+        is SettingsDialog.MyQr -> AlertDialog(
+            onDismissRequest = component::onDismissDialog,
+            title = { Text(stringResource(Res.string.settings_my_qr_title)) },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    val qr = model.myQr
+                    if (qr != null) {
+                        QrCodeImage(payload = qr)
+                    } else {
+                        Text(stringResource(Res.string.settings_my_qr_unavailable))
+                    }
+                    Text(
+                        text = stringResource(Res.string.settings_my_qr_desc),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 16.dp),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = component::onDismissDialog) {
+                    Text(stringResource(Res.string.settings_my_qr_close))
                 }
             },
         )

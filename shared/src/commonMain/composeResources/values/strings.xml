@@ -45,6 +45,11 @@
     <string name="settings_section_background">Background</string>
     <string name="settings_auto_start">Start on boot</string>
     <string name="settings_run_background">Run in background</string>
+    <string name="settings_show_my_qr">Show my verification QR</string>
+    <string name="settings_my_qr_title">My verification QR</string>
+    <string name="settings_my_qr_desc">Have a contact scan this to verify your identity.</string>
+    <string name="settings_my_qr_unavailable">QR code unavailable</string>
+    <string name="settings_my_qr_close">Done</string>
     <string name="settings_section_notifications">Notifications</string>
     <string name="settings_notif_permission_label">Notification permission</string>
     <string name="settings_notif_permission_on">On</string>
