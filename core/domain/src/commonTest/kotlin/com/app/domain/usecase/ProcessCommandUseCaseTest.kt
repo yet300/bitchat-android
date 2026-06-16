@@ -7,6 +7,7 @@ import com.app.domain.model.Channel
 import com.app.domain.model.ConversationId
 import com.app.domain.model.Peer
 import com.app.domain.model.PeerId
+import com.app.domain.model.RetentionPolicy
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.JoinResult
 import kotlinx.coroutines.flow.Flow
@@ -32,6 +33,9 @@ class ProcessCommandUseCaseTest {
         override suspend fun leave(tag: String) = Unit
         override suspend fun setPassword(tag: String, password: String) { passwordsSet += tag to password }
         override suspend fun isCreator(tag: String): Boolean = false
+        override fun observeRetention(tag: String): Flow<RetentionPolicy> =
+            MutableStateFlow(RetentionPolicy.KEEP_ALL)
+        override suspend fun setRetention(tag: String, policy: RetentionPolicy) = Unit
     }
 
     private fun useCase(

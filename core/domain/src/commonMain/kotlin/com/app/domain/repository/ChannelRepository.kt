@@ -1,6 +1,7 @@
 package com.app.domain.repository
 
 import com.app.domain.model.Channel
+import com.app.domain.model.RetentionPolicy
 import kotlinx.coroutines.flow.Flow
 
 /** Result of an attempt to join a channel. */
@@ -30,4 +31,9 @@ interface ChannelRepository {
     suspend fun setPassword(tag: String, password: String)
 
     suspend fun isCreator(tag: String): Boolean
+
+    /** Per-channel message-retention policy. */
+    fun observeRetention(tag: String): Flow<RetentionPolicy>
+
+    suspend fun setRetention(tag: String, policy: RetentionPolicy)
 }

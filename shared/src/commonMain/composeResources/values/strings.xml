@@ -58,6 +58,11 @@
     <string name="channels_password_title">Channel password</string>
     <string name="channels_ok">OK</string>
     <string name="channels_cancel">Cancel</string>
+    <string name="channels_retention">Message retention</string>
+    <string name="retention_keep_all">Keep all</string>
+    <string name="retention_day">1 day</string>
+    <string name="retention_week">1 week</string>
+    <string name="retention_month">1 month</string>
     <string name="search_hint">Search</string>
     <string name="search_close">Close</string>
     <string name="search_tab_chats">Chats</string>
