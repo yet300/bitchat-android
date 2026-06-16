@@ -45,6 +45,12 @@
     <string name="settings_section_background">Background</string>
     <string name="settings_auto_start">Start on boot</string>
     <string name="settings_run_background">Run in background</string>
+    <string name="settings_section_notifications">Notifications</string>
+    <string name="settings_notif_permission_label">Notification permission</string>
+    <string name="settings_notif_permission_on">On</string>
+    <string name="settings_notif_permission_off">Off</string>
+    <string name="settings_notif_enable">Enable</string>
+    <string name="settings_notif_mute_all">Mute all notifications</string>
     <string name="channels_title">Channels</string>
     <string name="channels_close">Close</string>
     <string name="channels_join_hint">Join a channel (#name)</string>

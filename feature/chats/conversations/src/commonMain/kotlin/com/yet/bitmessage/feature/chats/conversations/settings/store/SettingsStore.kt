@@ -3,6 +3,7 @@ package com.yet.bitmessage.feature.chats.conversations.settings.store
 import com.app.domain.model.ThemeMode
 import com.app.domain.repository.PowDifficultyLevel
 import com.arkivanov.mvikotlin.core.store.Store
+import com.yet.bitmessage.feature.chats.conversations.settings.NotifPermissionStatus
 
 internal interface SettingsStore :
     Store<SettingsStore.Intent, SettingsStore.State, SettingsStore.Label> {
@@ -19,6 +20,8 @@ internal interface SettingsStore :
         val powLevels: List<PowDifficultyLevel> = emptyList(),
         val autoStartEnabled: Boolean = true,
         val backgroundEnabled: Boolean = true,
+        val notifPermission: NotifPermissionStatus = NotifPermissionStatus.LOADING,
+        val globalMuteEnabled: Boolean = false,
     )
 
     sealed interface Intent {
@@ -30,6 +33,8 @@ internal interface SettingsStore :
         data class PowDifficultySelected(val difficulty: Int) : Intent
         data class AutoStartToggled(val enabled: Boolean) : Intent
         data class BackgroundToggled(val enabled: Boolean) : Intent
+        data class GlobalMuteToggled(val enabled: Boolean) : Intent
+        data object EnableNotificationsClicked : Intent
     }
 
     sealed interface Action {
@@ -46,6 +51,8 @@ internal interface SettingsStore :
         data class PowDifficultyLoaded(val difficulty: Int) : Msg
         data class AutoStartLoaded(val enabled: Boolean) : Msg
         data class BackgroundLoaded(val enabled: Boolean) : Msg
+        data class NotifPermissionLoaded(val status: NotifPermissionStatus) : Msg
+        data class GlobalMuteLoaded(val enabled: Boolean) : Msg
     }
 
     sealed interface Label

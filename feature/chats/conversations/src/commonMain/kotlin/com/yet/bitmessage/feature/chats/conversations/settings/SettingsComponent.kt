@@ -7,9 +7,9 @@ import com.arkivanov.decompose.router.slot.ChildSlot
 import com.arkivanov.decompose.value.Value
 
 /**
- * Settings tree (D5): identity (nickname + npub), appearance (theme), network (Tor, PoW),
- * background (auto-start / run-in-background) and the destructive panic wipe. The notifications
- * section is a follow-up slice.
+ * Settings tree (D5): identity (editable nickname + read-only npub / fingerprint), appearance
+ * (theme), network (Tor, PoW), background (auto-start / run-in-background), notifications
+ * (permission status + global mute) and the destructive panic wipe.
  */
 interface SettingsComponent {
 
@@ -31,6 +31,11 @@ interface SettingsComponent {
     fun onAutoStartToggled(enabled: Boolean)
 
     fun onBackgroundToggled(enabled: Boolean)
+
+    fun onGlobalMuteToggled(enabled: Boolean)
+
+    /** Triggers the system POST_NOTIFICATIONS dialog (or app-settings on permanent denial). */
+    fun onEnableNotificationsClicked()
 
     /** Open the panic-wipe confirmation dialog. */
     fun onPanicWipeClicked()
@@ -54,6 +59,8 @@ interface SettingsComponent {
         val powLevels: List<PowDifficultyLevel>,
         val autoStartEnabled: Boolean,
         val backgroundEnabled: Boolean,
+        val notifPermission: NotifPermissionStatus,
+        val globalMuteEnabled: Boolean,
     )
 
     fun interface Factory {

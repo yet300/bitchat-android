@@ -25,12 +25,14 @@ import com.app.transport.net.TorPreferenceManager
 import com.app.transport.nostr.PoWPreferenceManager
 import com.app.transport.notification.ServiceNotifier
 import com.app.domain.repository.ConnectivityRepository
+import com.app.domain.repository.NotificationPermissionRepository
 import com.app.domain.repository.PlaceGeocoder
 import com.app.domain.repository.PowRepository
 import com.app.domain.repository.TorRepository
 import com.bitchat.android.geohash.AndroidPlaceGeocoder
 import com.bitchat.android.connectivity.AndroidConnectivityRepository
 import com.bitchat.android.connectivity.RuntimePermissionRequester
+import com.bitchat.android.notification.AndroidNotificationPermissionRepository
 import com.bitchat.android.settings.PowRepositoryImpl
 import com.bitchat.android.settings.TorRepositoryImpl
 import com.russhwolf.settings.ObservableSettings
@@ -174,4 +176,12 @@ object AndroidDataBindings {
         permissionRequester: RuntimePermissionRequester,
     ): ConnectivityRepository =
         AndroidConnectivityRepository(context.applicationContext, torPreferenceManager, permissionRequester)
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideNotificationPermissionRepository(
+        context: Context,
+        permissionRequester: RuntimePermissionRequester,
+    ): NotificationPermissionRepository =
+        AndroidNotificationPermissionRepository(context.applicationContext, permissionRequester)
 }

@@ -6,6 +6,8 @@ import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.MeshSettingsRepository
 import com.app.domain.repository.MessageRepository
+import com.app.domain.repository.NotificationPermissionRepository
+import com.app.domain.repository.NotificationSettingsRepository
 import com.app.domain.repository.PowRepository
 import com.app.domain.repository.SettingsRepository
 import com.app.domain.repository.ThemeRepository
@@ -55,6 +57,8 @@ internal class DefaultSettingsComponent(
             powLevels = state.powLevels,
             autoStartEnabled = state.autoStartEnabled,
             backgroundEnabled = state.backgroundEnabled,
+            notifPermission = state.notifPermission,
+            globalMuteEnabled = state.globalMuteEnabled,
         )
     }
 
@@ -72,6 +76,10 @@ internal class DefaultSettingsComponent(
     override fun onAutoStartToggled(enabled: Boolean) = store.accept(SettingsStore.Intent.AutoStartToggled(enabled))
 
     override fun onBackgroundToggled(enabled: Boolean) = store.accept(SettingsStore.Intent.BackgroundToggled(enabled))
+
+    override fun onGlobalMuteToggled(enabled: Boolean) = store.accept(SettingsStore.Intent.GlobalMuteToggled(enabled))
+
+    override fun onEnableNotificationsClicked() = store.accept(SettingsStore.Intent.EnableNotificationsClicked)
 
     override fun onPanicWipeClicked() = dialogNav.activate(SettingsDialog.PanicConfirm)
 
@@ -96,6 +104,8 @@ internal class DefaultSettingsComponentFactory(
     private val torRepository: TorRepository,
     private val powRepository: PowRepository,
     private val meshSettingsRepository: MeshSettingsRepository,
+    private val notificationSettingsRepository: NotificationSettingsRepository,
+    private val notificationPermissionRepository: NotificationPermissionRepository,
 ) : SettingsComponent.Factory {
     override fun create(componentContext: ComponentContext, onClose: () -> Unit): SettingsComponent =
         DefaultSettingsComponent(
@@ -108,6 +118,8 @@ internal class DefaultSettingsComponentFactory(
                 torRepository = torRepository,
                 powRepository = powRepository,
                 meshSettingsRepository = meshSettingsRepository,
+                notificationSettingsRepository = notificationSettingsRepository,
+                notificationPermissionRepository = notificationPermissionRepository,
                 panicWipe = PanicWipeUseCase(messageRepository, contactRepository, identityRepository),
             ),
             onClose = onClose,
