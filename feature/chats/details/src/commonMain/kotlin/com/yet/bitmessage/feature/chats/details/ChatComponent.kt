@@ -31,6 +31,7 @@ interface ChatComponent {
         val canSend: Boolean,
         val reachability: Reachability,
         val isEncrypted: Boolean,
+        val isVerified: Boolean,
     )
 
     fun interface Factory {

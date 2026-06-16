@@ -38,6 +38,7 @@ class ContactsStoreFactoryTest {
         val blockCalls = mutableListOf<Pair<String, Boolean>>()
         override fun observeFavorites(): Flow<Set<Fingerprint>> = MutableStateFlow(emptySet())
         override fun observeContacts(): Flow<List<Contact>> = contacts
+        override fun observeVerified(noiseKeyHex: String): Flow<Boolean> = MutableStateFlow(false)
         override suspend fun toggleFavorite(peer: PeerId) = Unit
         override suspend fun isFavorite(peer: PeerId): Boolean = false
         override suspend fun setBlocked(peer: PeerId, blocked: Boolean) {

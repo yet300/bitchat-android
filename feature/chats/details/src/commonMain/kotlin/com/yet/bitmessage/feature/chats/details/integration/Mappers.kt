@@ -13,5 +13,6 @@ internal val stateToModel: (ChatStore.State) -> ChatComponent.Model = { state ->
         canSend = state.canSend,
         reachability = state.reachability,
         isEncrypted = state.isEncrypted,
+        isVerified = state.isVerified,
     )
 }

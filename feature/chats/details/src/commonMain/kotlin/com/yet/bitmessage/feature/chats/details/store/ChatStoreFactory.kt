@@ -2,6 +2,7 @@ package com.yet.bitmessage.feature.chats.details.store
 
 import com.app.domain.model.BitMessage
 import com.app.domain.model.ConversationId
+import com.app.domain.model.PeerId
 import com.app.domain.model.SenderRef
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
@@ -36,8 +37,8 @@ internal class ChatStoreFactory(
     private val identityRepository: IdentityRepository,
     private val conversationRepository: ConversationRepository,
     private val resolveReachability: ResolveReachabilityUseCase,
+    private val contactRepository: ContactRepository,
     channelRepository: ChannelRepository,
-    contactRepository: ContactRepository,
     peerRepository: PeerRepository,
     messageTransport: MessageTransport,
 ) {
@@ -65,6 +66,7 @@ internal class ChatStoreFactory(
                 is ChatStore.Msg.DraftChanged -> copy(draft = msg.text)
                 is ChatStore.Msg.TitleResolved -> copy(title = msg.title)
                 is ChatStore.Msg.ReachabilityChanged -> copy(reachability = msg.reachability)
+                is ChatStore.Msg.VerifiedChanged -> copy(isVerified = msg.verified)
             }
     }
 
@@ -93,6 +95,15 @@ internal class ChatStoreFactory(
                     scope.launch {
                         resolveReachability.observe(conversationId).collect {
                             dispatch(ChatStore.Msg.ReachabilityChanged(it))
+                        }
+                    }
+                    // Verified-trust indicator for a DM keyed by a stable Noise key.
+                    val privateId = conversationId as? ConversationId.Private
+                    if (privateId != null && privateId.peer.kind == PeerId.Kind.NOISE_STABLE) {
+                        scope.launch {
+                            contactRepository.observeVerified(privateId.peer.raw).collect {
+                                dispatch(ChatStore.Msg.VerifiedChanged(it))
+                            }
                         }
                     }
                     // Reset unread count and (private chats) flush read receipts; best-effort.

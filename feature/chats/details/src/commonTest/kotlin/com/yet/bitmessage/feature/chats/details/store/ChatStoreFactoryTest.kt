@@ -113,9 +113,10 @@ class ChatStoreFactoryTest {
         override suspend fun peer(id: PeerId): Peer? = peers.firstOrNull { it.id == id }
     }
 
-    private class FakeContactRepository : ContactRepository {
+    private class FakeContactRepository(private val verified: Boolean = false) : ContactRepository {
         override fun observeFavorites(): Flow<Set<Fingerprint>> = MutableStateFlow(emptySet())
         override fun observeContacts(): Flow<List<Contact>> = MutableStateFlow(emptyList())
+        override fun observeVerified(noiseKeyHex: String): Flow<Boolean> = MutableStateFlow(verified)
         override suspend fun toggleFavorite(peer: PeerId) = Unit
         override suspend fun isFavorite(peer: PeerId): Boolean = false
         override suspend fun setBlocked(peer: PeerId, blocked: Boolean) = Unit
@@ -149,16 +150,18 @@ class ChatStoreFactoryTest {
         conversations: FakeConversationRepository = FakeConversationRepository(),
         identity: FakeIdentityRepository = FakeIdentityRepository(),
         peers: List<Peer> = emptyList(),
+        id: ConversationId = conversationId,
+        contacts: FakeContactRepository = FakeContactRepository(),
     ) = ChatStoreFactory(
         storeFactory = DefaultStoreFactory(),
-        conversationId = conversationId,
+        conversationId = id,
         title = "dev",
         messageRepository = messages,
         identityRepository = identity,
         conversationRepository = conversations,
         resolveReachability = ResolveReachabilityUseCase(FakePeerRepository(peers), FakeContactRepository()),
         channelRepository = FakeChannelRepository(),
-        contactRepository = FakeContactRepository(),
+        contactRepository = contacts,
         peerRepository = FakePeerRepository(peers),
         messageTransport = transport,
     )
@@ -251,5 +254,21 @@ class ChatStoreFactoryTest {
         store.accept(ChatStore.Intent.SendClicked)
 
         assertTrue(transport.publicSends.isEmpty())
+    }
+
+    @Test
+    fun private_chat_with_a_verified_peer_reflects_verified() = runTest {
+        val store = factory(
+            id = ConversationId.Private(PeerId("a".repeat(64))),
+            contacts = FakeContactRepository(verified = true),
+        ).create()
+
+        assertTrue(store.state.isVerified)
+    }
+
+    @Test
+    fun channel_chat_is_never_verified() = runTest {
+        val store = factory(contacts = FakeContactRepository(verified = true)).create()
+        assertFalse(store.state.isVerified)
     }
 }

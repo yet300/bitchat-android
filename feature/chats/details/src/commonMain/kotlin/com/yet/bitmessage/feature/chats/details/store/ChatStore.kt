@@ -14,6 +14,7 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
         val messages: List<BitMessage> = emptyList(),
         val draft: String = "",
         val reachability: Reachability = Reachability.OFFLINE,
+        val isVerified: Boolean = false,
     ) {
         val canSend: Boolean get() = draft.isNotBlank()
 
@@ -35,6 +36,7 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
         data class DraftChanged(val text: String) : Msg
         data class TitleResolved(val title: String) : Msg
         data class ReachabilityChanged(val reachability: Reachability) : Msg
+        data class VerifiedChanged(val verified: Boolean) : Msg
     }
 
     sealed interface Label

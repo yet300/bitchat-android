@@ -168,6 +168,7 @@ class DefaultChatsComponentTest {
                     canSend = false,
                     reachability = Reachability.OFFLINE,
                     isEncrypted = false,
+                    isVerified = false,
                 ),
             )
 
