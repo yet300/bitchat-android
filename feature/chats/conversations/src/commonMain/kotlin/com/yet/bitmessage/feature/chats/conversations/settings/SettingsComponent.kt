@@ -3,6 +3,7 @@ package com.yet.bitmessage.feature.chats.conversations.settings
 import com.app.domain.model.ThemeMode
 import com.app.domain.repository.PowDifficultyLevel
 import com.arkivanov.decompose.ComponentContext
+import com.arkivanov.decompose.router.slot.ChildSlot
 import com.arkivanov.decompose.value.Value
 
 /**
@@ -13,6 +14,9 @@ import com.arkivanov.decompose.value.Value
 interface SettingsComponent {
 
     val model: Value<Model>
+
+    /** The active dialog (panic confirm), or none. */
+    val dialog: Value<ChildSlot<*, SettingsDialog>>
 
     fun onNicknameChanged(text: String)
 
@@ -28,8 +32,13 @@ interface SettingsComponent {
 
     fun onBackgroundToggled(enabled: Boolean)
 
-    /** Wipe all data and the cryptographic identity (irreversible; the UI confirms first). */
-    fun onPanicWipe()
+    /** Open the panic-wipe confirmation dialog. */
+    fun onPanicWipeClicked()
+
+    /** Confirm the irreversible wipe (all data + cryptographic identity). */
+    fun onConfirmPanicWipe()
+
+    fun onDismissDialog()
 
     fun onCloseClicked()
 
