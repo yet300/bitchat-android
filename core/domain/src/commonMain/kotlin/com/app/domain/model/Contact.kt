@@ -22,6 +22,7 @@ data class Contact(
     val favoritedAt: Instant,
     val lastUpdated: Instant,
     val isBlocked: Boolean = false,
+    val isVerified: Boolean = false,
 ) {
     /** Mutual favorite — the condition for routing over Nostr when mesh is offline. */
     val isMutual: Boolean get() = isFavorite && theyFavoritedUs

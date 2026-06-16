@@ -17,6 +17,7 @@
     <string name="contacts_section_blocked">Blocked</string>
     <string name="contacts_empty">No contacts yet</string>
     <string name="contacts_mutual">Mutual</string>
+    <string name="contacts_verified">Verified</string>
     <string name="contacts_block">Block</string>
     <string name="contacts_unblock">Unblock</string>
     <string name="settings_title">Settings</string>

@@ -49,7 +49,7 @@ class ContactsStoreFactoryTest {
         override suspend fun clearAll() = Unit
     }
 
-    private fun contact(name: String, blocked: Boolean = false) = Contact(
+    private fun contact(name: String, blocked: Boolean = false, verified: Boolean = false) = Contact(
         identity = PeerIdentity(noiseKeyHex = name.repeat(64).take(64)),
         nickname = name,
         isFavorite = true,
@@ -57,6 +57,7 @@ class ContactsStoreFactoryTest {
         favoritedAt = Instant.fromEpochMilliseconds(0),
         lastUpdated = Instant.fromEpochMilliseconds(0),
         isBlocked = blocked,
+        isVerified = verified,
     )
 
     @Test
@@ -67,6 +68,14 @@ class ContactsStoreFactoryTest {
         val model = contactsStateToModel(store.state)
         assertEquals(listOf("a"), model.favorites.map { it.name })
         assertEquals(listOf("b"), model.blocked.map { it.name })
+    }
+
+    @Test
+    fun verified_flag_propagates_to_the_row() = runTest {
+        val repo = FakeContactRepository(listOf(contact("a", verified = true)))
+        val store = ContactsStoreFactory(DefaultStoreFactory(), repo).create()
+
+        assertTrue(contactsStateToModel(store.state).favorites.single().isVerified)
     }
 
     @Test

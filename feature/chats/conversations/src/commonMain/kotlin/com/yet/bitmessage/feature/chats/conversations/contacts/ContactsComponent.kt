@@ -31,6 +31,7 @@ interface ContactsComponent {
         val noiseKeyHex: String,
         val isMutual: Boolean,
         val isBlocked: Boolean,
+        val isVerified: Boolean,
     )
 
     fun interface Factory {

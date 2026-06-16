@@ -1,7 +1,9 @@
 package com.yet.bitmessage.ui.screen.chat
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -10,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,8 +37,10 @@ import com.yet.bitmessage.shared.resources.contacts_section_blocked
 import com.yet.bitmessage.shared.resources.contacts_section_favorites
 import com.yet.bitmessage.shared.resources.contacts_title
 import com.yet.bitmessage.shared.resources.contacts_unblock
+import com.yet.bitmessage.shared.resources.contacts_verified
 import com.yet.bitmessage.ui.component.button.IconCircleButton
 import com.yet.bitmessage.ui.component.icon.Close
+import com.yet.bitmessage.ui.component.icon.Done
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -72,6 +77,7 @@ fun ContactsContent(component: ContactsComponent, modifier: Modifier = Modifier)
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.align(Alignment.Center),
                 )
+
                 else -> LazyColumn(modifier = Modifier.fillMaxSize().padding(top = 64.dp)) {
                     section(favoritesTitle, model.favorites, component)
                     section(blockedTitle, model.blocked, component)
@@ -109,7 +115,21 @@ private fun ContactRow(row: ContactsComponent.ContactRow, component: ContactsCom
                 reachability = if (row.isMutual) Reachability.INTERNET else Reachability.OFFLINE,
             )
         },
-        headlineContent = { Text(text = row.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        headlineContent = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(text = row.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (row.isVerified) {
+                    Icon(
+                        imageVector = Done,
+                        contentDescription = stringResource(Res.string.contacts_verified),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+        },
         supportingContent = if (row.isMutual) {
             { Text(text = stringResource(Res.string.contacts_mutual)) }
         } else {

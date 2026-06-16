@@ -12,6 +12,7 @@ import com.app.domain.model.Fingerprint
 import com.app.domain.model.PeerId
 import com.app.domain.model.PeerIdentity
 import com.app.domain.repository.ContactRepository
+import com.app.domain.repository.IdentityRepository
 import com.app.common.settings.SettingsStore
 import com.app.data.routing.PeerAddressResolver
 import dev.zacsweers.metro.AppScope
@@ -36,6 +37,7 @@ internal class ContactRepositoryImpl(
     private val favorites: FavoritesPersistenceService,
     private val fingerprints: PeerFingerprintManager,
     private val peerAddressResolver: PeerAddressResolver,
+    private val identityRepository: IdentityRepository,
 ) : ContactRepository {
 
     override fun observeFavorites(): Flow<Set<Fingerprint>> =
@@ -44,14 +46,16 @@ internal class ContactRepositoryImpl(
         }
 
     override fun observeContacts(): Flow<List<Contact>> =
-        // Re-emit when either set changes; the relationship details (nickname, Nostr key, mutuality)
-        // come from the favorites store, annotated here with the current blocked state.
+        // Re-emit when any set changes; the relationship details (nickname, Nostr key, mutuality)
+        // come from the favorites store, annotated here with blocked + verified state.
         combine(
             settings.getStringOrNullFlow(KEY_FAVORITES),
             settings.getStringOrNullFlow(KEY_BLOCKED),
-        ) { _, blockedJson ->
+            identityRepository.observeVerifiedFingerprints(),
+        ) { _, blockedJson, verified ->
             val blocked = decodeSet(blockedJson)
             favorites.getOurFavorites().map { rel ->
+                val fingerprint = fingerprintOf(rel.peerNoisePublicKey)
                 Contact(
                     identity = PeerIdentity(rel.peerNoisePublicKey.hexEncodedString(), rel.peerNostrPublicKey),
                     nickname = rel.peerNickname,
@@ -59,7 +63,8 @@ internal class ContactRepositoryImpl(
                     theyFavoritedUs = rel.theyFavoritedUs,
                     favoritedAt = rel.favoritedAt,
                     lastUpdated = rel.lastUpdated,
-                    isBlocked = fingerprintOf(rel.peerNoisePublicKey) in blocked,
+                    isBlocked = fingerprint in blocked,
+                    isVerified = Fingerprint(fingerprint) in verified,
                 )
             }
         }
