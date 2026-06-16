@@ -87,9 +87,9 @@ internal class DefaultChatsComponent(
                         ChatsComponent.SheetChild.Search(
                             searchFactory.create(
                                 componentContext = ctx,
-                                onResultSelected = { id ->
+                                onResultSelected = { id, targetMessageId ->
                                     sheetNavigation.dismiss()
-                                    navigation.navigate { it.copy(details = ChatConfig.from(id)) }
+                                    navigation.navigate { it.copy(details = ChatConfig.from(id, targetMessageId)) }
                                 },
                                 onClose = { sheetNavigation.dismiss() },
                             ),

@@ -32,6 +32,7 @@ interface ChatComponent {
         val reachability: Reachability,
         val isEncrypted: Boolean,
         val isVerified: Boolean,
+        val targetMessageId: String?,
     )
 
     fun interface Factory {

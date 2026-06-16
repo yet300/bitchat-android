@@ -33,6 +33,7 @@ internal class ChatStoreFactory(
     private val storeFactory: StoreFactory,
     private val conversationId: ConversationId,
     private val title: String,
+    private val targetMessageId: String? = null,
     private val messageRepository: MessageRepository,
     private val identityRepository: IdentityRepository,
     private val conversationRepository: ConversationRepository,
@@ -53,7 +54,11 @@ internal class ChatStoreFactory(
         object : ChatStore,
             Store<ChatStore.Intent, ChatStore.State, ChatStore.Label> by storeFactory.create(
                 name = "ChatStore",
-                initialState = ChatStore.State(conversationId = conversationId, title = title),
+                initialState = ChatStore.State(
+                    conversationId = conversationId,
+                    title = title,
+                    targetMessageId = targetMessageId,
+                ),
                 bootstrapper = SimpleBootstrapper(ChatStore.Action.Subscribe),
                 executorFactory = ::ExecutorImpl,
                 reducer = ReducerImpl,

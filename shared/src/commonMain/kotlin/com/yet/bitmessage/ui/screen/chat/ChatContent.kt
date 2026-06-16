@@ -1,5 +1,6 @@
 package com.yet.bitmessage.ui.screen.chat
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -96,7 +100,7 @@ fun ChatContent(component: ChatComponent, modifier: Modifier = Modifier) {
                     modifier = Modifier.align(Alignment.Center),
                 )
 
-                else -> MessageTimeline(messages = model.messages)
+                else -> MessageTimeline(messages = model.messages, targetMessageId = model.targetMessageId)
             }
         }
     }
@@ -139,12 +143,27 @@ private fun Reachability.label() = when (this) {
 }
 
 @Composable
-private fun MessageTimeline(messages: List<BitMessage>, modifier: Modifier = Modifier) {
+private fun MessageTimeline(
+    messages: List<BitMessage>,
+    targetMessageId: String?,
+    modifier: Modifier = Modifier,
+) {
     val listState = rememberLazyListState()
 
-    // Keep the newest message in view as the timeline grows.
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
+    // A search jump scrolls to the matched message once; otherwise keep the newest in view.
+    var jumped by remember(targetMessageId) { mutableStateOf(false) }
+    LaunchedEffect(messages.size, targetMessageId) {
+        if (messages.isEmpty()) return@LaunchedEffect
+        val targetIndex = targetMessageId
+            ?.takeUnless { jumped }
+            ?.let { id -> messages.indexOfFirst { it.id == id }.takeIf { it >= 0 } }
+        when {
+            targetIndex != null -> {
+                listState.animateScrollToItem(targetIndex)
+                jumped = true
+            }
+            targetMessageId == null -> listState.animateScrollToItem(messages.lastIndex)
+        }
     }
 
     LazyColumn(
@@ -154,23 +173,27 @@ private fun MessageTimeline(messages: List<BitMessage>, modifier: Modifier = Mod
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         items(messages, key = { it.id }) { message ->
-            MessageBubble(message)
+            MessageBubble(message, highlighted = message.id == targetMessageId)
         }
     }
 }
 
 @Composable
-private fun MessageBubble(message: BitMessage, modifier: Modifier = Modifier) {
+private fun MessageBubble(message: BitMessage, highlighted: Boolean = false, modifier: Modifier = Modifier) {
     val alignment = if (message.isMine) Alignment.CenterEnd else Alignment.CenterStart
     val bubbleColor =
         if (message.isMine) MaterialTheme.colorScheme.primaryContainer
         else MaterialTheme.colorScheme.surfaceVariant
+    val shape = RoundedCornerShape(12.dp)
+    // A search-jump target gets a primary outline so the user spots it after the scroll.
+    val highlight =
+        if (highlighted) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape) else Modifier
 
     Box(modifier = modifier.fillMaxWidth(), contentAlignment = alignment) {
         Surface(
             color = bubbleColor,
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.widthIn(max = 320.dp),
+            shape = shape,
+            modifier = Modifier.widthIn(max = 320.dp).then(highlight),
         ) {
             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                 if (!message.isMine && !message.isSystem) {

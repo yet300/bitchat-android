@@ -110,7 +110,7 @@ fun SearchContent(component: SearchComponent, modifier: Modifier = Modifier) {
                 if (!model.isActive) {
                     FocusedEmpty(model, component::onResultClicked)
                 } else {
-                    SearchResults(model, component::onResultClicked)
+                    SearchResults(model, component::onResultClicked, component::onMessageClicked)
                 }
             }
         }
@@ -131,6 +131,7 @@ private fun BoxScope.CenteredHint(text: String) {
 private fun BoxScope.SearchResults(
     model: SearchComponent.Model,
     onResultClicked: (ConversationId) -> Unit,
+    onMessageClicked: (ConversationId, String) -> Unit,
 ) {
     val empty = when (model.tab) {
         SearchTab.CHATS -> model.chats.isEmpty()
@@ -166,7 +167,7 @@ private fun BoxScope.SearchResults(
                     title = message.sender.displayName,
                     subtitle = message.content,
                     reachability = Reachability.OFFLINE,
-                    onClick = { onResultClicked(message.conversationId) },
+                    onClick = { onMessageClicked(message.conversationId, message.id) },
                 )
             }
             SearchTab.CHANNELS -> items(model.channels, key = { it.tag }) { channel ->

@@ -15,6 +15,8 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
         val draft: String = "",
         val reachability: Reachability = Reachability.OFFLINE,
         val isVerified: Boolean = false,
+        /** Message to scroll to / highlight on open (from a Messages search result); static. */
+        val targetMessageId: String? = null,
     ) {
         val canSend: Boolean get() = draft.isNotBlank()
 

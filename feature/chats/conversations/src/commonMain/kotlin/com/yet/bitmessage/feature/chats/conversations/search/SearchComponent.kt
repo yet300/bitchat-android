@@ -20,8 +20,11 @@ interface SearchComponent {
 
     fun onTabSelected(tab: SearchTab)
 
-    /** A result was tapped — open (or jump to) its conversation. */
+    /** A result was tapped — open its conversation. */
     fun onResultClicked(id: ConversationId)
+
+    /** A message hit was tapped — open its conversation and scroll to that message. */
+    fun onMessageClicked(id: ConversationId, messageId: String)
 
     fun onCloseClicked()
 
@@ -49,7 +52,7 @@ interface SearchComponent {
     fun interface Factory {
         fun create(
             componentContext: ComponentContext,
-            onResultSelected: (ConversationId) -> Unit,
+            onResultSelected: (id: ConversationId, targetMessageId: String?) -> Unit,
             onClose: () -> Unit,
         ): SearchComponent
     }

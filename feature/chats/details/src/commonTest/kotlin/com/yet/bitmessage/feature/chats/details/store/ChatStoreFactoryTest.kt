@@ -156,10 +156,12 @@ class ChatStoreFactoryTest {
         peers: List<Peer> = emptyList(),
         id: ConversationId = conversationId,
         contacts: FakeContactRepository = FakeContactRepository(),
+        targetMessageId: String? = null,
     ) = ChatStoreFactory(
         storeFactory = DefaultStoreFactory(),
         conversationId = id,
         title = "dev",
+        targetMessageId = targetMessageId,
         messageRepository = messages,
         identityRepository = identity,
         conversationRepository = conversations,
@@ -274,5 +276,11 @@ class ChatStoreFactoryTest {
     fun channel_chat_is_never_verified() = runTest {
         val store = factory(contacts = FakeContactRepository(verified = true)).create()
         assertFalse(store.state.isVerified)
+    }
+
+    @Test
+    fun target_message_id_is_carried_into_state() = runTest {
+        val store = factory(targetMessageId = "m1").create()
+        assertEquals("m1", store.state.targetMessageId)
     }
 }

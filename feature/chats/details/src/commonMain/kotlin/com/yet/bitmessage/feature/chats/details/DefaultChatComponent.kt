@@ -37,11 +37,11 @@ internal class DefaultChatComponent(
 }
 
 /** Display title until the chat store provides the real one (nickname resolution etc.). */
-private fun ChatConfig.titleFallback(): String = when (this) {
-    is ChatConfig.PublicMesh -> "mesh"
-    is ChatConfig.Channel -> tag
-    is ChatConfig.Private -> peerRaw.take(8)
-    is ChatConfig.Geohash -> "#$geohash"
+private fun ChatConfig.titleFallback(): String = when (val c = conversation) {
+    is ChatConfig.Conversation.PublicMesh -> "mesh"
+    is ChatConfig.Conversation.Channel -> c.tag
+    is ChatConfig.Conversation.Private -> c.peerRaw.take(8)
+    is ChatConfig.Conversation.Geohash -> "#${c.geohash}"
 }
 
 @Inject
@@ -65,6 +65,7 @@ internal class DefaultChatComponentFactory(
             storeFactory = storeFactory,
             conversationId = config.toConversationId(),
             title = config.titleFallback(),
+            targetMessageId = config.targetMessageId,
             messageRepository = messageRepository,
             identityRepository = identityRepository,
             conversationRepository = conversationRepository,
