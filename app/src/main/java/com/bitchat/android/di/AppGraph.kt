@@ -7,6 +7,7 @@ import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.MessageTransport
 import com.app.domain.repository.PeerRepository
+import com.app.domain.repository.PeerVerificationRepository
 import com.app.domain.repository.SearchRepository
 import com.app.domain.repository.SettingsRepository
 import com.app.crypto.identity.PeerFingerprintManager
@@ -109,4 +110,11 @@ interface AppGraph : SharedAppGraph {
 
     /** Bridge the Phase C Activity attaches its runtime-permission launcher into. */
     val runtimePermissionRequester: RuntimePermissionRequester
+
+    /**
+     * Graph-owned QR-verification coordinator. Exposed so the Phase C entry can resolve it eagerly,
+     * forcing it to attach as the BMS verify listener (so inbound challenges are answered even
+     * before the user opens the scanner).
+     */
+    val peerVerificationRepository: PeerVerificationRepository
 }

@@ -24,9 +24,11 @@ import com.app.transport.mesh.MeshNetwork
 import com.app.transport.net.TorPreferenceManager
 import com.app.transport.nostr.PoWPreferenceManager
 import com.app.transport.notification.ServiceNotifier
+import com.app.domain.repository.CameraPermissionRepository
 import com.app.domain.repository.ConnectivityRepository
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.NotificationPermissionRepository
+import com.app.domain.repository.PeerVerificationRepository
 import com.app.domain.repository.PlaceGeocoder
 import com.app.domain.repository.PowRepository
 import com.app.domain.repository.TorRepository
@@ -37,6 +39,8 @@ import com.bitchat.android.connectivity.RuntimePermissionRequester
 import com.bitchat.android.notification.AndroidNotificationPermissionRepository
 import com.bitchat.android.settings.PowRepositoryImpl
 import com.bitchat.android.settings.TorRepositoryImpl
+import com.bitchat.android.verification.AndroidCameraPermissionRepository
+import com.bitchat.android.verification.VerificationCoordinator
 import com.bitchat.android.verification.VerificationRepositoryImpl
 import com.app.transport.VerificationService
 import com.russhwolf.settings.ObservableSettings
@@ -195,4 +199,17 @@ object AndroidDataBindings {
         identityRepository: IdentityRepository,
     ): VerificationRepository =
         VerificationRepositoryImpl(verificationService, identityRepository)
+
+    /** The graph-owned coordinator is the [PeerVerificationRepository] and the BMS verify listener. */
+    @Provides
+    fun providePeerVerificationRepository(coordinator: VerificationCoordinator): PeerVerificationRepository =
+        coordinator
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideCameraPermissionRepository(
+        context: Context,
+        permissionRequester: RuntimePermissionRequester,
+    ): CameraPermissionRepository =
+        AndroidCameraPermissionRepository(context.applicationContext, permissionRequester)
 }

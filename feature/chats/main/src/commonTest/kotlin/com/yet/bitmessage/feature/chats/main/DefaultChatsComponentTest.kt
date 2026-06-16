@@ -23,6 +23,7 @@ import com.yet.bitmessage.feature.chats.conversations.settings.NotifPermissionSt
 import com.yet.bitmessage.feature.chats.conversations.settings.SettingsComponent
 import com.yet.bitmessage.feature.chats.conversations.settings.SettingsDialog
 import com.yet.bitmessage.feature.chats.details.ChatComponent
+import com.yet.bitmessage.feature.chats.details.verify.VerifyScanComponent
 import com.yet.bitmessage.feature.chats.details.ChatConfig
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -185,8 +186,13 @@ class DefaultChatsComponentTest {
                 ),
             )
 
+        override val verifyScan: Value<ChildSlot<*, VerifyScanComponent>> =
+            MutableValue(ChildSlot<Any, VerifyScanComponent>())
+
         override fun onDraftChanged(text: String) = Unit
         override fun onSendClicked() = Unit
+        override fun onVerifyClicked() = Unit
+        override fun onDismissVerifyScan() = Unit
         override fun onBackClicked() = onFinished()
     }
 

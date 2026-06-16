@@ -27,6 +27,7 @@ import com.app.transport.GeohashReadReceiptRouter
 import com.app.transport.SeenMessageStore
 import com.app.transport.meshgraph.MeshGraphService
 import com.app.transport.meshgraph.RoutePlanner
+import com.app.transport.verification.VerifyEventListener
 import kotlinx.coroutines.*
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -113,6 +114,10 @@ class BluetoothMeshService(
 
     // Delegate for message callbacks (maintains same interface)
     var delegate: BluetoothMeshDelegate? = null
+
+    // Narrow SPI for the Phase C app to own QR-verification orchestration without the full
+    // delegate. Additive to [delegate]; both (if set) receive the verify events.
+    var verifyEventListener: VerifyEventListener? = null
 
     // Coroutines
     private var serviceScope = CoroutineScope(dispatchers.io + SupervisorJob())
@@ -577,10 +582,12 @@ class BluetoothMeshService(
 
             override fun onVerifyChallengeReceived(peerID: String, payload: ByteArray, timestampMs: Long) {
                 delegate?.didReceiveVerifyChallenge(peerID, payload, timestampMs)
+                verifyEventListener?.onVerifyChallenge(peerID, payload, timestampMs)
             }
 
             override fun onVerifyResponseReceived(peerID: String, payload: ByteArray, timestampMs: Long) {
                 delegate?.didReceiveVerifyResponse(peerID, payload, timestampMs)
+                verifyEventListener?.onVerifyResponse(peerID, payload, timestampMs)
             }
         }
         

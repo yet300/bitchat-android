@@ -37,6 +37,11 @@ kotlin {
     sourceSets {
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
+            // QR scanner (I7b-2b-2): CameraX preview + ML Kit barcode analysis.
+            implementation(libs.androidx.camera.camera2)
+            implementation(libs.androidx.camera.lifecycle)
+            implementation(libs.androidx.camera.compose)
+            implementation(libs.mlkit.barcode.scanning)
         }
         commonMain.dependencies {
             implementation(projects.core.domain)
