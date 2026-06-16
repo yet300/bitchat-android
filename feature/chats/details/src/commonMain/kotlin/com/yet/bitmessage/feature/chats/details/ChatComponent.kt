@@ -4,7 +4,9 @@ import com.app.domain.model.BitMessage
 import com.app.domain.model.ConversationId
 import com.app.domain.model.Reachability
 import com.arkivanov.decompose.ComponentContext
+import com.arkivanov.decompose.router.slot.ChildSlot
 import com.arkivanov.decompose.value.Value
+import com.yet.bitmessage.feature.chats.details.verify.VerifyScanComponent
 
 /**
  * Single conversation screen (details panel): a live message timeline backed by
@@ -15,9 +17,17 @@ interface ChatComponent {
 
     val model: Value<Model>
 
+    /** The QR-verification scanner sheet (per-contact verify), or none. */
+    val verifyScan: Value<ChildSlot<*, VerifyScanComponent>>
+
     fun onDraftChanged(text: String)
 
     fun onSendClicked()
+
+    /** Open the QR-scan verification sheet for this DM. */
+    fun onVerifyClicked()
+
+    fun onDismissVerifyScan()
 
     /** Close the details panel (panels SINGLE mode back navigation). */
     fun onBackClicked()
