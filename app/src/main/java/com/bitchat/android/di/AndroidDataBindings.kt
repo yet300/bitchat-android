@@ -25,8 +25,10 @@ import com.app.transport.net.TorPreferenceManager
 import com.app.transport.nostr.PoWPreferenceManager
 import com.app.transport.notification.ServiceNotifier
 import com.app.domain.repository.ConnectivityRepository
+import com.app.domain.repository.PlaceGeocoder
 import com.app.domain.repository.PowRepository
 import com.app.domain.repository.TorRepository
+import com.bitchat.android.geohash.AndroidPlaceGeocoder
 import com.bitchat.android.connectivity.AndroidConnectivityRepository
 import com.bitchat.android.connectivity.RuntimePermissionRequester
 import com.bitchat.android.settings.PowRepositoryImpl
@@ -156,6 +158,10 @@ object AndroidDataBindings {
     /** Transport-backed settings ports (Tor, PoW) over the existing managers (DIP for the feature). */
     @Provides
     fun provideTorRepository(manager: TorPreferenceManager): TorRepository = TorRepositoryImpl(manager)
+
+    @Provides
+    fun providePlaceGeocoder(context: Context, dispatchers: AppDispatchers): PlaceGeocoder =
+        AndroidPlaceGeocoder(context.applicationContext, dispatchers)
 
     @Provides
     fun providePowRepository(manager: PoWPreferenceManager): PowRepository = PowRepositoryImpl(manager)

@@ -3,6 +3,7 @@ package com.yet.bitmessage.feature.chats.conversations.search.store
 import com.app.domain.model.SearchResults
 import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.PeerRepository
+import com.app.domain.repository.PlaceGeocoder
 import com.app.domain.usecase.ParseGeohashUseCase
 import com.app.domain.usecase.SearchUseCase
 import com.arkivanov.mvikotlin.core.store.Reducer
@@ -23,6 +24,7 @@ internal class SearchStoreFactory(
     private val peerRepository: PeerRepository,
     private val searchUseCase: SearchUseCase,
     private val parseGeohash: ParseGeohashUseCase,
+    private val placeGeocoder: PlaceGeocoder,
 ) {
     fun create(): SearchStore =
         object : SearchStore,
@@ -42,6 +44,7 @@ internal class SearchStoreFactory(
                 is SearchStore.Msg.ConversationsLoaded -> copy(conversations = msg.conversations)
                 is SearchStore.Msg.PeersLoaded -> copy(peers = msg.peers)
                 is SearchStore.Msg.ResultsLoaded -> copy(results = msg.results)
+                is SearchStore.Msg.GeocodeLoaded -> copy(geocodedGeo = msg.geo)
             }
     }
 
@@ -73,6 +76,17 @@ internal class SearchStoreFactory(
                                 if (query.isBlank()) SearchResults.EMPTY else searchUseCase(query)
                             }
                             .collect { dispatch(SearchStore.Msg.ResultsLoaded(it)) }
+                    }
+                    // Geo tab: a non-geohash query is treated as a place name and forward-geocoded
+                    // (debounced; the instant geohash parse on QueryChanged takes precedence).
+                    scope.launch {
+                        queryFlow
+                            .debounce(SEARCH_DEBOUNCE_MS)
+                            .mapLatest { query ->
+                                if (query.isBlank() || parseGeohash(query) != null) null
+                                else placeGeocoder.toGeohash(query)
+                            }
+                            .collect { dispatch(SearchStore.Msg.GeocodeLoaded(it)) }
                     }
                 }
             }

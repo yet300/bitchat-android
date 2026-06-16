@@ -19,6 +19,7 @@ internal interface SearchStore :
         val peers: List<Peer> = emptyList(),
         val results: SearchResults = SearchResults.EMPTY,
         val parsedGeo: GeohashChannel? = null,
+        val geocodedGeo: GeohashChannel? = null,
     ) {
         val isActive: Boolean get() = query.isNotBlank()
 
@@ -34,8 +35,8 @@ internal interface SearchStore :
         val messages get() = if (!isActive) emptyList() else results.messages
         val channels: List<Channel> get() = if (!isActive) emptyList() else results.channels
 
-        /** Geo tab: the geohash channel the query teleports to, if it parses. */
-        val geo: GeohashChannel? get() = if (!isActive) null else parsedGeo
+        /** Geo tab: a directly-parsed geohash, else a geocoded place name. */
+        val geo: GeohashChannel? get() = if (!isActive) null else parsedGeo ?: geocodedGeo
 
         /** Focused-empty rail: peers currently in range (independent of the query). */
         val onlinePeers: List<Peer> get() = peers
@@ -56,6 +57,7 @@ internal interface SearchStore :
         data class ConversationsLoaded(val conversations: List<Conversation>) : Msg
         data class PeersLoaded(val peers: List<Peer>) : Msg
         data class ResultsLoaded(val results: SearchResults) : Msg
+        data class GeocodeLoaded(val geo: GeohashChannel?) : Msg
     }
 
     sealed interface Label
