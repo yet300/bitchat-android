@@ -20,6 +20,9 @@ interface ContactRepository {
      */
     fun observeContacts(): Flow<List<Contact>>
 
+    /** Stream of whether the identity with this Noise key (hex) is verified (for the chat header). */
+    fun observeVerified(noiseKeyHex: String): Flow<Boolean>
+
     /** Toggle favorite for a peer. */
     suspend fun toggleFavorite(peer: PeerId)
 

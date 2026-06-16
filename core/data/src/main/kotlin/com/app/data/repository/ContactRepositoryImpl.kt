@@ -69,6 +69,13 @@ internal class ContactRepositoryImpl(
             }
         }
 
+    override fun observeVerified(noiseKeyHex: String): Flow<Boolean> {
+        val fingerprint = noiseKeyHex.dataFromHexString()?.let { Fingerprint(fingerprintOf(it)) }
+        return identityRepository.observeVerifiedFingerprints().map { verified ->
+            fingerprint != null && fingerprint in verified
+        }
+    }
+
     override suspend fun toggleFavorite(peer: PeerId) {
         val fp = fingerprintFor(peer) ?: return
         val current = loadSet(KEY_FAVORITES)

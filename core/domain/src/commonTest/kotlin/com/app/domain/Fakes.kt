@@ -120,6 +120,7 @@ class FakeContactRepository(
 
     override fun observeFavorites(): Flow<Set<Fingerprint>> = flowOf(emptySet())
     override fun observeContacts(): Flow<List<Contact>> = flowOf(contactsByNoiseHex.values.toList())
+    override fun observeVerified(noiseKeyHex: String): Flow<Boolean> = flowOf(false)
     override suspend fun toggleFavorite(peer: PeerId) { if (!favorites.add(peer)) favorites.remove(peer) }
     override suspend fun isFavorite(peer: PeerId): Boolean = peer in favorites
     override suspend fun setBlocked(peer: PeerId, blocked: Boolean) {

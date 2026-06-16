@@ -69,6 +69,7 @@ class ConversationsStoreFactoryTest {
     private class FakeContactRepository : ContactRepository {
         override fun observeFavorites(): Flow<Set<com.app.domain.model.Fingerprint>> = flowOf(emptySet())
         override fun observeContacts(): Flow<List<Contact>> = flowOf(emptyList())
+        override fun observeVerified(noiseKeyHex: String): Flow<Boolean> = flowOf(false)
         override suspend fun toggleFavorite(peer: PeerId) = Unit
         override suspend fun isFavorite(peer: PeerId): Boolean = false
         override suspend fun setBlocked(peer: PeerId, blocked: Boolean) = Unit

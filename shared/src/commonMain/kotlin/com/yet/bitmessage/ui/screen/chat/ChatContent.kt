@@ -41,6 +41,7 @@ import com.yet.bitmessage.shared.resources.Res
 import com.yet.bitmessage.shared.resources.chat_back
 import com.yet.bitmessage.shared.resources.chat_empty
 import com.yet.bitmessage.shared.resources.chat_encrypted
+import com.yet.bitmessage.shared.resources.chat_verified
 import com.yet.bitmessage.shared.resources.chat_input_hint
 import com.yet.bitmessage.shared.resources.chat_reach_internet
 import com.yet.bitmessage.shared.resources.chat_reach_nearby
@@ -50,6 +51,7 @@ import com.yet.bitmessage.ui.component.button.IconCircleButton
 import com.yet.bitmessage.ui.component.icon.ArrowBack
 import com.yet.bitmessage.ui.component.icon.Check
 import com.yet.bitmessage.ui.component.icon.Close
+import com.yet.bitmessage.ui.component.icon.Done
 import com.yet.bitmessage.ui.component.icon.DoneAll
 import com.yet.bitmessage.ui.component.icon.Lock
 import com.yet.bitmessage.ui.component.icon.Send
@@ -109,6 +111,14 @@ private fun ChatTitle(model: ChatComponent.Model) {
                 Icon(
                     imageVector = Lock,
                     contentDescription = stringResource(Res.string.chat_encrypted),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(12.dp),
+                )
+            }
+            if (model.isVerified) {
+                Icon(
+                    imageVector = Done,
+                    contentDescription = stringResource(Res.string.chat_verified),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(12.dp),
                 )
