@@ -19,6 +19,7 @@ import com.yet.bitmessage.feature.chats.conversations.connectivity.ConnectivityC
 import com.yet.bitmessage.feature.chats.conversations.contacts.ContactsComponent
 import com.yet.bitmessage.feature.chats.conversations.search.SearchComponent
 import com.yet.bitmessage.feature.chats.conversations.search.SearchTab
+import com.yet.bitmessage.feature.chats.conversations.settings.NotifPermissionStatus
 import com.yet.bitmessage.feature.chats.conversations.settings.SettingsComponent
 import com.yet.bitmessage.feature.chats.conversations.settings.SettingsDialog
 import com.yet.bitmessage.feature.chats.details.ChatComponent
@@ -122,6 +123,8 @@ class DefaultChatsComponentTest {
                     powLevels = emptyList(),
                     autoStartEnabled = true,
                     backgroundEnabled = true,
+                    notifPermission = NotifPermissionStatus.GRANTED,
+                    globalMuteEnabled = false,
                 ),
             )
         override val dialog: Value<ChildSlot<*, SettingsDialog>> = MutableValue(ChildSlot<Any, SettingsDialog>())
@@ -133,6 +136,8 @@ class DefaultChatsComponentTest {
         override fun onPowDifficultySelected(difficulty: Int) = Unit
         override fun onAutoStartToggled(enabled: Boolean) = Unit
         override fun onBackgroundToggled(enabled: Boolean) = Unit
+        override fun onGlobalMuteToggled(enabled: Boolean) = Unit
+        override fun onEnableNotificationsClicked() = Unit
         override fun onPanicWipeClicked() = Unit
         override fun onConfirmPanicWipe() = Unit
         override fun onDismissDialog() = Unit

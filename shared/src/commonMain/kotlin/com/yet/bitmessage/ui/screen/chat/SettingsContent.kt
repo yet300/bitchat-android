@@ -45,6 +45,11 @@ import com.yet.bitmessage.shared.resources.settings_panic_confirm_body
 import com.yet.bitmessage.shared.resources.settings_panic_confirm_title
 import com.yet.bitmessage.shared.resources.settings_panic_desc
 import com.yet.bitmessage.shared.resources.settings_auto_start
+import com.yet.bitmessage.shared.resources.settings_notif_enable
+import com.yet.bitmessage.shared.resources.settings_notif_mute_all
+import com.yet.bitmessage.shared.resources.settings_notif_permission_label
+import com.yet.bitmessage.shared.resources.settings_notif_permission_off
+import com.yet.bitmessage.shared.resources.settings_notif_permission_on
 import com.yet.bitmessage.shared.resources.settings_pow
 import com.yet.bitmessage.shared.resources.settings_pow_difficulty
 import com.yet.bitmessage.shared.resources.settings_run_background
@@ -53,6 +58,7 @@ import com.yet.bitmessage.shared.resources.settings_section_background
 import com.yet.bitmessage.shared.resources.settings_section_danger
 import com.yet.bitmessage.shared.resources.settings_section_identity
 import com.yet.bitmessage.shared.resources.settings_section_network
+import com.yet.bitmessage.shared.resources.settings_section_notifications
 import com.yet.bitmessage.shared.resources.settings_theme
 import com.yet.bitmessage.shared.resources.settings_theme_dark
 import com.yet.bitmessage.shared.resources.settings_theme_light
@@ -61,6 +67,7 @@ import com.yet.bitmessage.shared.resources.settings_title
 import com.yet.bitmessage.shared.resources.settings_tor
 import com.yet.bitmessage.ui.component.button.IconCircleButton
 import com.yet.bitmessage.ui.component.icon.Close
+import com.yet.bitmessage.feature.chats.conversations.settings.NotifPermissionStatus
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -137,6 +144,10 @@ fun SettingsContent(component: SettingsComponent, modifier: Modifier = Modifier)
                 SectionHeader(stringResource(Res.string.settings_section_background))
                 ToggleRow(stringResource(Res.string.settings_auto_start), model.autoStartEnabled, component::onAutoStartToggled)
                 ToggleRow(stringResource(Res.string.settings_run_background), model.backgroundEnabled, component::onBackgroundToggled)
+
+                SectionHeader(stringResource(Res.string.settings_section_notifications))
+                NotifPermissionRow(model.notifPermission, component::onEnableNotificationsClicked)
+                ToggleRow(stringResource(Res.string.settings_notif_mute_all), model.globalMuteEnabled, component::onGlobalMuteToggled)
 
                 SectionHeader(stringResource(Res.string.settings_section_danger))
                 Text(
@@ -239,5 +250,32 @@ private fun ReadOnlyField(label: String, value: String) {
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+@Composable
+private fun NotifPermissionRow(status: NotifPermissionStatus, onEnable: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+    ) {
+        Text(
+            text = stringResource(Res.string.settings_notif_permission_label),
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        when (status) {
+            NotifPermissionStatus.LOADING -> Unit
+            NotifPermissionStatus.GRANTED ->
+                Text(
+                    text = stringResource(Res.string.settings_notif_permission_on),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            NotifPermissionStatus.DENIED ->
+                TextButton(onClick = onEnable) {
+                    Text(stringResource(Res.string.settings_notif_enable))
+                }
+        }
     }
 }

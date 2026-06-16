@@ -15,12 +15,15 @@ import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.MeshSettingsRepository
 import com.app.domain.repository.MessageRepository
+import com.app.domain.repository.NotificationPermissionRepository
+import com.app.domain.repository.NotificationSettingsRepository
 import com.app.domain.repository.PowDifficultyLevel
 import com.app.domain.repository.PowRepository
 import com.app.domain.repository.SettingsRepository
 import com.app.domain.repository.ThemeRepository
 import com.app.domain.repository.TorRepository
 import com.app.domain.usecase.PanicWipeUseCase
+import com.yet.bitmessage.feature.chats.conversations.settings.NotifPermissionStatus
 import com.arkivanov.mvikotlin.main.store.DefaultStoreFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -124,6 +127,19 @@ class SettingsStoreFactoryTest {
         override suspend fun setBackgroundEnabled(enabled: Boolean) { background.value = enabled }
     }
 
+    private class FakeNotificationSettingsRepository : NotificationSettingsRepository {
+        val globalMute = MutableStateFlow(false)
+        override fun observeGlobalMuteEnabled(): Flow<Boolean> = globalMute
+        override suspend fun setGlobalMuteEnabled(enabled: Boolean) { globalMute.value = enabled }
+    }
+
+    private class FakeNotificationPermissionRepository : NotificationPermissionRepository {
+        val granted = MutableStateFlow(false)
+        var requested = false
+        override fun observeGranted(): Flow<Boolean> = granted
+        override suspend fun requestPermission() { requested = true }
+    }
+
     private fun factory(
         settings: FakeSettingsRepository = FakeSettingsRepository(),
         identity: FakeIdentityRepository = FakeIdentityRepository(),
@@ -133,6 +149,8 @@ class SettingsStoreFactoryTest {
         tor: FakeTorRepository = FakeTorRepository(),
         pow: FakePowRepository = FakePowRepository(),
         mesh: FakeMeshSettingsRepository = FakeMeshSettingsRepository(),
+        notifSettings: FakeNotificationSettingsRepository = FakeNotificationSettingsRepository(),
+        notifPermission: FakeNotificationPermissionRepository = FakeNotificationPermissionRepository(),
     ) = SettingsStoreFactory(
         storeFactory = DefaultStoreFactory(),
         settingsRepository = settings,
@@ -141,6 +159,8 @@ class SettingsStoreFactoryTest {
         torRepository = tor,
         powRepository = pow,
         meshSettingsRepository = mesh,
+        notificationSettingsRepository = notifSettings,
+        notificationPermissionRepository = notifPermission,
         panicWipe = PanicWipeUseCase(messages, contacts, identity),
     )
 
@@ -209,6 +229,37 @@ class SettingsStoreFactoryTest {
         assertTrue(pow.enabled.value)
         assertEquals(16, pow.difficulty.value)
         assertEquals(ThemeMode.LIGHT, store.state.theme)
+    }
+
+    @Test
+    fun notification_permission_status_loads() = runTest {
+        val notifPermission = FakeNotificationPermissionRepository().apply { granted.value = true }
+        val store = factory(notifPermission = notifPermission).create()
+
+        assertEquals(NotifPermissionStatus.GRANTED, store.state.notifPermission)
+    }
+
+    @Test
+    fun enable_notifications_requests_permission() = runTest {
+        val notifPermission = FakeNotificationPermissionRepository()
+        val store = factory(notifPermission = notifPermission).create()
+
+        store.accept(SettingsStore.Intent.EnableNotificationsClicked)
+
+        assertTrue(notifPermission.requested)
+    }
+
+    @Test
+    fun global_mute_loads_and_toggles() = runTest {
+        val notifSettings = FakeNotificationSettingsRepository().apply { globalMute.value = true }
+        val store = factory(notifSettings = notifSettings).create()
+
+        assertTrue(store.state.globalMuteEnabled)
+
+        store.accept(SettingsStore.Intent.GlobalMuteToggled(false))
+
+        assertEquals(false, notifSettings.globalMute.value)
+        assertEquals(false, store.state.globalMuteEnabled)
     }
 
     @Test
