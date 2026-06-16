@@ -13,7 +13,9 @@ import com.app.domain.model.PeerIdentity
 import com.app.domain.model.SenderRef
 import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.PeerRepository
+import com.app.domain.model.GeohashChannel
 import com.app.domain.model.GeohashLevel
+import com.app.domain.repository.PlaceGeocoder
 import com.app.domain.repository.SearchRepository
 import com.app.domain.usecase.ParseGeohashUseCase
 import com.app.domain.usecase.SearchUseCase
@@ -73,16 +75,22 @@ class SearchStoreFactoryTest {
         override suspend fun searchChannels(query: String): List<Channel> = channels
     }
 
+    private class FakePlaceGeocoder(private val result: GeohashChannel? = null) : PlaceGeocoder {
+        override suspend fun toGeohash(query: String): GeohashChannel? = result
+    }
+
     private fun factory(
         conversations: FakeConversationRepository = FakeConversationRepository(),
         peers: List<Peer> = emptyList(),
         search: SearchRepository = FakeSearchRepository(),
+        geocoder: PlaceGeocoder = FakePlaceGeocoder(),
     ) = SearchStoreFactory(
         storeFactory = DefaultStoreFactory(),
         conversationRepository = conversations,
         peerRepository = FakePeerRepository(peers),
         searchUseCase = SearchUseCase(search),
         parseGeohash = ParseGeohashUseCase(),
+        placeGeocoder = geocoder,
     )
 
     private fun conversation(title: String) =
@@ -159,6 +167,17 @@ class SearchStoreFactoryTest {
         val geo = searchStateToModel(store.state).geo
         assertEquals("u4pruyd", geo?.geohash)
         assertEquals(GeohashLevel.BLOCK, geo?.level)
+    }
+
+    @Test
+    fun geo_tab_geocodes_a_place_name_when_not_a_geohash() = runTest {
+        val place = GeohashChannel(GeohashLevel.NEIGHBORHOOD, "u33dc0")
+        val store = factory(geocoder = FakePlaceGeocoder(place)).create()
+
+        store.accept(SearchStore.Intent.QueryChanged("berlin"))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(place, searchStateToModel(store.state).geo)
     }
 
     @Test

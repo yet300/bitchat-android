@@ -4,6 +4,7 @@ import com.app.common.decompose.asValue
 import com.app.domain.model.ConversationId
 import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.PeerRepository
+import com.app.domain.repository.PlaceGeocoder
 import com.app.domain.repository.SearchRepository
 import com.app.domain.usecase.ParseGeohashUseCase
 import com.app.domain.usecase.SearchUseCase
@@ -44,6 +45,7 @@ internal class DefaultSearchComponentFactory(
     private val conversationRepository: ConversationRepository,
     private val peerRepository: PeerRepository,
     private val searchRepository: SearchRepository,
+    private val placeGeocoder: PlaceGeocoder,
 ) : SearchComponent.Factory {
     override fun create(
         componentContext: ComponentContext,
@@ -57,6 +59,7 @@ internal class DefaultSearchComponentFactory(
             peerRepository = peerRepository,
             searchUseCase = SearchUseCase(searchRepository),
             parseGeohash = ParseGeohashUseCase(),
+            placeGeocoder = placeGeocoder,
         ),
         onResultSelected = onResultSelected,
         onClose = onClose,
