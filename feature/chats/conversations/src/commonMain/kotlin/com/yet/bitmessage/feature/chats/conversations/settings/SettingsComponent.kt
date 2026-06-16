@@ -37,6 +37,9 @@ interface SettingsComponent {
     /** Triggers the system POST_NOTIFICATIONS dialog (or app-settings on permanent denial). */
     fun onEnableNotificationsClicked()
 
+    /** Build this device's verification QR and open the sheet that renders it. */
+    fun onShowMyQrClicked()
+
     /** Open the panic-wipe confirmation dialog. */
     fun onPanicWipeClicked()
 
@@ -61,6 +64,7 @@ interface SettingsComponent {
         val backgroundEnabled: Boolean,
         val notifPermission: NotifPermissionStatus,
         val globalMuteEnabled: Boolean,
+        val myQr: String?,
     )
 
     fun interface Factory {

@@ -25,16 +25,20 @@ import com.app.transport.net.TorPreferenceManager
 import com.app.transport.nostr.PoWPreferenceManager
 import com.app.transport.notification.ServiceNotifier
 import com.app.domain.repository.ConnectivityRepository
+import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.NotificationPermissionRepository
 import com.app.domain.repository.PlaceGeocoder
 import com.app.domain.repository.PowRepository
 import com.app.domain.repository.TorRepository
+import com.app.domain.repository.VerificationRepository
 import com.bitchat.android.geohash.AndroidPlaceGeocoder
 import com.bitchat.android.connectivity.AndroidConnectivityRepository
 import com.bitchat.android.connectivity.RuntimePermissionRequester
 import com.bitchat.android.notification.AndroidNotificationPermissionRepository
 import com.bitchat.android.settings.PowRepositoryImpl
 import com.bitchat.android.settings.TorRepositoryImpl
+import com.bitchat.android.verification.VerificationRepositoryImpl
+import com.app.transport.VerificationService
 import com.russhwolf.settings.ObservableSettings
 import com.russhwolf.settings.SharedPreferencesSettings
 import dev.zacsweers.metro.AppScope
@@ -184,4 +188,11 @@ object AndroidDataBindings {
         permissionRequester: RuntimePermissionRequester,
     ): NotificationPermissionRepository =
         AndroidNotificationPermissionRepository(context.applicationContext, permissionRequester)
+
+    @Provides
+    fun provideVerificationRepository(
+        verificationService: VerificationService,
+        identityRepository: IdentityRepository,
+    ): VerificationRepository =
+        VerificationRepositoryImpl(verificationService, identityRepository)
 }

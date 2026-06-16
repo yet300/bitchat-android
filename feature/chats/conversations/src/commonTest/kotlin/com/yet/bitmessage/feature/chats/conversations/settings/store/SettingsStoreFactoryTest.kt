@@ -22,6 +22,7 @@ import com.app.domain.repository.PowRepository
 import com.app.domain.repository.SettingsRepository
 import com.app.domain.repository.ThemeRepository
 import com.app.domain.repository.TorRepository
+import com.app.domain.repository.VerificationRepository
 import com.app.domain.usecase.PanicWipeUseCase
 import com.yet.bitmessage.feature.chats.conversations.settings.NotifPermissionStatus
 import com.arkivanov.mvikotlin.main.store.DefaultStoreFactory
@@ -140,6 +141,16 @@ class SettingsStoreFactoryTest {
         override suspend fun requestPermission() { requested = true }
     }
 
+    private class FakeVerificationRepository(
+        private val qr: String? = "bitchat://verify?x=1",
+    ) : VerificationRepository {
+        var built = false
+        override suspend fun buildMyVerificationQr(): String? {
+            built = true
+            return qr
+        }
+    }
+
     private fun factory(
         settings: FakeSettingsRepository = FakeSettingsRepository(),
         identity: FakeIdentityRepository = FakeIdentityRepository(),
@@ -151,6 +162,7 @@ class SettingsStoreFactoryTest {
         mesh: FakeMeshSettingsRepository = FakeMeshSettingsRepository(),
         notifSettings: FakeNotificationSettingsRepository = FakeNotificationSettingsRepository(),
         notifPermission: FakeNotificationPermissionRepository = FakeNotificationPermissionRepository(),
+        verification: FakeVerificationRepository = FakeVerificationRepository(),
     ) = SettingsStoreFactory(
         storeFactory = DefaultStoreFactory(),
         settingsRepository = settings,
@@ -161,6 +173,7 @@ class SettingsStoreFactoryTest {
         meshSettingsRepository = mesh,
         notificationSettingsRepository = notifSettings,
         notificationPermissionRepository = notifPermission,
+        verificationRepository = verification,
         panicWipe = PanicWipeUseCase(messages, contacts, identity),
     )
 
@@ -260,6 +273,17 @@ class SettingsStoreFactoryTest {
 
         assertEquals(false, notifSettings.globalMute.value)
         assertEquals(false, store.state.globalMuteEnabled)
+    }
+
+    @Test
+    fun show_my_qr_builds_and_loads_into_state() = runTest {
+        val verification = FakeVerificationRepository()
+        val store = factory(verification = verification).create()
+
+        store.accept(SettingsStore.Intent.ShowMyQrClicked)
+
+        assertTrue(verification.built)
+        assertEquals("bitchat://verify?x=1", store.state.myQr)
     }
 
     @Test

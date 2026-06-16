@@ -12,6 +12,7 @@ import com.app.domain.repository.PowRepository
 import com.app.domain.repository.SettingsRepository
 import com.app.domain.repository.ThemeRepository
 import com.app.domain.repository.TorRepository
+import com.app.domain.repository.VerificationRepository
 import com.app.domain.usecase.PanicWipeUseCase
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.router.slot.ChildSlot
@@ -59,6 +60,7 @@ internal class DefaultSettingsComponent(
             backgroundEnabled = state.backgroundEnabled,
             notifPermission = state.notifPermission,
             globalMuteEnabled = state.globalMuteEnabled,
+            myQr = state.myQr,
         )
     }
 
@@ -80,6 +82,11 @@ internal class DefaultSettingsComponent(
     override fun onGlobalMuteToggled(enabled: Boolean) = store.accept(SettingsStore.Intent.GlobalMuteToggled(enabled))
 
     override fun onEnableNotificationsClicked() = store.accept(SettingsStore.Intent.EnableNotificationsClicked)
+
+    override fun onShowMyQrClicked() {
+        store.accept(SettingsStore.Intent.ShowMyQrClicked)
+        dialogNav.activate(SettingsDialog.MyQr)
+    }
 
     override fun onPanicWipeClicked() = dialogNav.activate(SettingsDialog.PanicConfirm)
 
@@ -106,6 +113,7 @@ internal class DefaultSettingsComponentFactory(
     private val meshSettingsRepository: MeshSettingsRepository,
     private val notificationSettingsRepository: NotificationSettingsRepository,
     private val notificationPermissionRepository: NotificationPermissionRepository,
+    private val verificationRepository: VerificationRepository,
 ) : SettingsComponent.Factory {
     override fun create(componentContext: ComponentContext, onClose: () -> Unit): SettingsComponent =
         DefaultSettingsComponent(
@@ -120,6 +128,7 @@ internal class DefaultSettingsComponentFactory(
                 meshSettingsRepository = meshSettingsRepository,
                 notificationSettingsRepository = notificationSettingsRepository,
                 notificationPermissionRepository = notificationPermissionRepository,
+                verificationRepository = verificationRepository,
                 panicWipe = PanicWipeUseCase(messageRepository, contactRepository, identityRepository),
             ),
             onClose = onClose,

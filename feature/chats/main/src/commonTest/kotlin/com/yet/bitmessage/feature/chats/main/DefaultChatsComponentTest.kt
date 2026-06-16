@@ -125,6 +125,7 @@ class DefaultChatsComponentTest {
                     backgroundEnabled = true,
                     notifPermission = NotifPermissionStatus.GRANTED,
                     globalMuteEnabled = false,
+                    myQr = null,
                 ),
             )
         override val dialog: Value<ChildSlot<*, SettingsDialog>> = MutableValue(ChildSlot<Any, SettingsDialog>())
@@ -138,6 +139,7 @@ class DefaultChatsComponentTest {
         override fun onBackgroundToggled(enabled: Boolean) = Unit
         override fun onGlobalMuteToggled(enabled: Boolean) = Unit
         override fun onEnableNotificationsClicked() = Unit
+        override fun onShowMyQrClicked() = Unit
         override fun onPanicWipeClicked() = Unit
         override fun onConfirmPanicWipe() = Unit
         override fun onDismissDialog() = Unit

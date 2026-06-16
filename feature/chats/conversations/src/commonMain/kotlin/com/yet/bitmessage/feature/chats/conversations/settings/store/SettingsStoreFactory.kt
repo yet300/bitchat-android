@@ -8,6 +8,7 @@ import com.app.domain.repository.PowRepository
 import com.app.domain.repository.SettingsRepository
 import com.app.domain.repository.ThemeRepository
 import com.app.domain.repository.TorRepository
+import com.app.domain.repository.VerificationRepository
 import com.app.domain.usecase.PanicWipeUseCase
 import com.yet.bitmessage.feature.chats.conversations.settings.NotifPermissionStatus
 import com.arkivanov.mvikotlin.core.store.Reducer
@@ -27,6 +28,7 @@ internal class SettingsStoreFactory(
     private val meshSettingsRepository: MeshSettingsRepository,
     private val notificationSettingsRepository: NotificationSettingsRepository,
     private val notificationPermissionRepository: NotificationPermissionRepository,
+    private val verificationRepository: VerificationRepository,
     private val panicWipe: PanicWipeUseCase,
 ) {
     fun create(): SettingsStore =
@@ -53,6 +55,7 @@ internal class SettingsStoreFactory(
                 is SettingsStore.Msg.BackgroundLoaded -> copy(backgroundEnabled = msg.enabled)
                 is SettingsStore.Msg.NotifPermissionLoaded -> copy(notifPermission = msg.status)
                 is SettingsStore.Msg.GlobalMuteLoaded -> copy(globalMuteEnabled = msg.enabled)
+                is SettingsStore.Msg.MyQrLoaded -> copy(myQr = msg.qr)
             }
     }
 
@@ -126,6 +129,9 @@ internal class SettingsStoreFactory(
                 }
                 SettingsStore.Intent.EnableNotificationsClicked -> scope.launch {
                     notificationPermissionRepository.requestPermission()
+                }
+                SettingsStore.Intent.ShowMyQrClicked -> scope.launch {
+                    dispatch(SettingsStore.Msg.MyQrLoaded(verificationRepository.buildMyVerificationQr()))
                 }
             }
         }

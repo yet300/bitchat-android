@@ -53,6 +53,7 @@ gms-location = "21.3.0"
 
 # QR
 zxing-core = "3.5.4"
+qrose = "1.1.2"
 
 # CameraX / ML Kit
 camerax = "1.6.1"
@@ -130,6 +131,7 @@ gms-location = { module = "com.google.android.gms:play-services-location", versi
 
 # QR
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing-core" }
+qrose = { module = "io.github.alexzhirkevich:qrose", version.ref = "qrose" }
 
 # CameraX / ML Kit
 androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
