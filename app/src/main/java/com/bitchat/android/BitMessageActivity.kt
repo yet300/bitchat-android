@@ -69,6 +69,9 @@ class BitMessageActivity : ComponentActivity() {
 
         appGraph.runtimePermissionRequester.attach(permissionHost)
 
+        // Force eager creation so the verify coordinator attaches as the BMS verify listener.
+        appGraph.peerVerificationRepository
+
         // defaultComponentContext() must be obtained before setContent so Decompose binds to the
         // activity lifecycle / saved-state registry (config-change + process-death survival).
         rootComponent = appGraph.rootFactory.create(defaultComponentContext())
