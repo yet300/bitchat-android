@@ -12,6 +12,11 @@ import com.app.domain.repository.ThemeRepository
 import com.app.domain.repository.TorRepository
 import com.app.domain.usecase.PanicWipeUseCase
 import com.arkivanov.decompose.ComponentContext
+import com.arkivanov.decompose.router.slot.ChildSlot
+import com.arkivanov.decompose.router.slot.SlotNavigation
+import com.arkivanov.decompose.router.slot.activate
+import com.arkivanov.decompose.router.slot.childSlot
+import com.arkivanov.decompose.router.slot.dismiss
 import com.arkivanov.decompose.value.Value
 import com.arkivanov.decompose.value.operator.map
 import com.arkivanov.mvikotlin.core.instancekeeper.getStore
@@ -27,6 +32,15 @@ internal class DefaultSettingsComponent(
 ) : SettingsComponent, ComponentContext by componentContext {
 
     private val store = instanceKeeper.getStore { storeFactory.create() }
+    private val dialogNav = SlotNavigation<SettingsDialog>()
+
+    override val dialog: Value<ChildSlot<*, SettingsDialog>> =
+        childSlot(
+            source = dialogNav,
+            serializer = null,
+            handleBackButton = true,
+            childFactory = { config, _ -> config },
+        )
 
     override val model: Value<SettingsComponent.Model> = store.asValue().map { state ->
         SettingsComponent.Model(
@@ -59,7 +73,14 @@ internal class DefaultSettingsComponent(
 
     override fun onBackgroundToggled(enabled: Boolean) = store.accept(SettingsStore.Intent.BackgroundToggled(enabled))
 
-    override fun onPanicWipe() = store.accept(SettingsStore.Intent.PanicWipe)
+    override fun onPanicWipeClicked() = dialogNav.activate(SettingsDialog.PanicConfirm)
+
+    override fun onConfirmPanicWipe() {
+        store.accept(SettingsStore.Intent.PanicWipe)
+        dialogNav.dismiss()
+    }
+
+    override fun onDismissDialog() = dialogNav.dismiss()
 
     override fun onCloseClicked() = onClose()
 }

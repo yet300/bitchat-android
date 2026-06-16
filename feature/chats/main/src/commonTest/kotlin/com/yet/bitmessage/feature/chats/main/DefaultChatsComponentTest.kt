@@ -20,6 +20,7 @@ import com.yet.bitmessage.feature.chats.conversations.contacts.ContactsComponent
 import com.yet.bitmessage.feature.chats.conversations.search.SearchComponent
 import com.yet.bitmessage.feature.chats.conversations.search.SearchTab
 import com.yet.bitmessage.feature.chats.conversations.settings.SettingsComponent
+import com.yet.bitmessage.feature.chats.conversations.settings.SettingsDialog
 import com.yet.bitmessage.feature.chats.details.ChatComponent
 import com.yet.bitmessage.feature.chats.details.ChatConfig
 import kotlin.test.Test
@@ -122,6 +123,7 @@ class DefaultChatsComponentTest {
                     backgroundEnabled = true,
                 ),
             )
+        override val dialog: Value<ChildSlot<*, SettingsDialog>> = MutableValue(ChildSlot<Any, SettingsDialog>())
 
         override fun onNicknameChanged(text: String) = Unit
         override fun onThemeSelected(mode: com.app.domain.model.ThemeMode) = Unit
@@ -130,7 +132,9 @@ class DefaultChatsComponentTest {
         override fun onPowDifficultySelected(difficulty: Int) = Unit
         override fun onAutoStartToggled(enabled: Boolean) = Unit
         override fun onBackgroundToggled(enabled: Boolean) = Unit
-        override fun onPanicWipe() = Unit
+        override fun onPanicWipeClicked() = Unit
+        override fun onConfirmPanicWipe() = Unit
+        override fun onDismissDialog() = Unit
         override fun onCloseClicked() = onClose()
     }
 

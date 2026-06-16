@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import com.app.domain.model.ThemeMode
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.yet.bitmessage.feature.chats.conversations.settings.SettingsComponent
+import com.yet.bitmessage.feature.chats.conversations.settings.SettingsDialog
 import com.yet.bitmessage.shared.resources.Res
 import com.yet.bitmessage.shared.resources.settings_cancel
 import com.yet.bitmessage.shared.resources.settings_close
@@ -71,7 +72,7 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun SettingsContent(component: SettingsComponent, modifier: Modifier = Modifier) {
     val model by component.model.subscribeAsState()
-    var confirmWipe by remember { mutableStateOf(false) }
+    val dialog by component.dialog.subscribeAsState()
 
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -145,7 +146,7 @@ fun SettingsContent(component: SettingsComponent, modifier: Modifier = Modifier)
                     modifier = Modifier.padding(bottom = 8.dp),
                 )
                 Button(
-                    onClick = { confirmWipe = true },
+                    onClick = component::onPanicWipeClicked,
                     enabled = !model.isWiping,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
@@ -156,13 +157,13 @@ fun SettingsContent(component: SettingsComponent, modifier: Modifier = Modifier)
         }
     }
 
-    if (confirmWipe) {
-        AlertDialog(
-            onDismissRequest = { confirmWipe = false },
+    when (dialog.child?.instance) {
+        is SettingsDialog.PanicConfirm -> AlertDialog(
+            onDismissRequest = component::onDismissDialog,
             title = { Text(stringResource(Res.string.settings_panic_confirm_title)) },
             text = { Text(stringResource(Res.string.settings_panic_confirm_body)) },
             confirmButton = {
-                TextButton(onClick = { confirmWipe = false; component.onPanicWipe() }) {
+                TextButton(onClick = component::onConfirmPanicWipe) {
                     Text(
                         text = stringResource(Res.string.settings_panic_confirm),
                         color = MaterialTheme.colorScheme.error,
@@ -170,11 +171,12 @@ fun SettingsContent(component: SettingsComponent, modifier: Modifier = Modifier)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirmWipe = false }) {
+                TextButton(onClick = component::onDismissDialog) {
                     Text(stringResource(Res.string.settings_cancel))
                 }
             },
         )
+        null -> Unit
     }
 }
 
