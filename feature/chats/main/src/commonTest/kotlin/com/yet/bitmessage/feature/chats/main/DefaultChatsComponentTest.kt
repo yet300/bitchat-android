@@ -68,7 +68,7 @@ class DefaultChatsComponentTest {
     }
 
     private class FakeSearchComponent(
-        val onResultSelected: (ConversationId) -> Unit,
+        val onResultSelected: (ConversationId, String?) -> Unit,
         val onClose: () -> Unit,
     ) : SearchComponent {
         override val model: Value<SearchComponent.Model> =
@@ -89,7 +89,8 @@ class DefaultChatsComponentTest {
 
         override fun onQueryChanged(text: String) = Unit
         override fun onTabSelected(tab: SearchTab) = Unit
-        override fun onResultClicked(id: ConversationId) = onResultSelected(id)
+        override fun onResultClicked(id: ConversationId) = onResultSelected(id, null)
+        override fun onMessageClicked(id: ConversationId, messageId: String) = onResultSelected(id, messageId)
         override fun onCloseClicked() = onClose()
     }
 
@@ -173,6 +174,7 @@ class DefaultChatsComponentTest {
                     reachability = Reachability.OFFLINE,
                     isEncrypted = false,
                     isVerified = false,
+                    targetMessageId = null,
                 ),
             )
 

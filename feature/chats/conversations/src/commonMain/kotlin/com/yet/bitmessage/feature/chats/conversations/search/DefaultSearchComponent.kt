@@ -19,7 +19,7 @@ import dev.zacsweers.metro.Inject
 internal class DefaultSearchComponent(
     componentContext: ComponentContext,
     storeFactory: SearchStoreFactory,
-    private val onResultSelected: (ConversationId) -> Unit,
+    private val onResultSelected: (id: ConversationId, targetMessageId: String?) -> Unit,
     private val onClose: () -> Unit,
 ) : SearchComponent, ComponentContext by componentContext {
 
@@ -31,7 +31,9 @@ internal class DefaultSearchComponent(
 
     override fun onTabSelected(tab: SearchTab) = store.accept(SearchStore.Intent.TabSelected(tab))
 
-    override fun onResultClicked(id: ConversationId) = onResultSelected(id)
+    override fun onResultClicked(id: ConversationId) = onResultSelected(id, null)
+
+    override fun onMessageClicked(id: ConversationId, messageId: String) = onResultSelected(id, messageId)
 
     override fun onCloseClicked() = onClose()
 }
@@ -45,7 +47,7 @@ internal class DefaultSearchComponentFactory(
 ) : SearchComponent.Factory {
     override fun create(
         componentContext: ComponentContext,
-        onResultSelected: (ConversationId) -> Unit,
+        onResultSelected: (id: ConversationId, targetMessageId: String?) -> Unit,
         onClose: () -> Unit,
     ): SearchComponent = DefaultSearchComponent(
         componentContext = componentContext,
