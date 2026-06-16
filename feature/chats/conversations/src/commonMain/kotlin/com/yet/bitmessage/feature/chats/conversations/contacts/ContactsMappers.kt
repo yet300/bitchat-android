@@ -17,4 +17,5 @@ private fun Contact.toRow() = ContactsComponent.ContactRow(
     noiseKeyHex = identity.noiseKeyHex,
     isMutual = isMutual,
     isBlocked = isBlocked,
+    isVerified = isVerified,
 )
