@@ -10,6 +10,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.app.NotificationManagerCompat
+import com.app.domain.repository.NotificationMutePolicy
 import com.app.transport.notification.ServiceNotifier
 import com.bitchat.android.MainActivity
 import com.bitchat.android.R
@@ -29,7 +30,8 @@ import java.util.concurrent.ConcurrentHashMap
 class NotificationManager(
   private val context: Context,
   private val notificationManager: NotificationManagerCompat,
-  private val notificationIntervalManager: NotificationIntervalManager
+  private val notificationIntervalManager: NotificationIntervalManager,
+  private val mutePolicy: NotificationMutePolicy,
 ) : ServiceNotifier {
 
     companion object {
@@ -145,9 +147,13 @@ class NotificationManager(
      * Show a notification for a private message with proper grouping and state awareness
      */
     override fun showPrivateMessageNotification(senderPeerID: String, senderNickname: String, messageContent: String) {
+        if (mutePolicy.isAllMuted() || mutePolicy.isPrivateMuted(senderPeerID)) {
+            Log.d(TAG, "Skipping notification - muted (private $senderPeerID)")
+            return
+        }
         // Only show notifications if app is in background OR user is not viewing this specific chat
         val shouldNotify = isAppInBackground || (!isAppInBackground && currentPrivateChatPeer != senderPeerID)
-        
+
         if (!shouldNotify) {
             Log.d(TAG, "Skipping notification - app in foreground and viewing chat with $senderNickname")
             return
@@ -436,6 +442,10 @@ class NotificationManager(
         isFirstMessage: Boolean = false,
         locationName: String? = null
     ) {
+        if (mutePolicy.isAllMuted() || mutePolicy.isGeohashMuted(geohash)) {
+            Log.d(TAG, "Skipping geohash notification - muted ($geohash)")
+            return
+        }
         // Only show notifications if app is in background OR user is not viewing this specific geohash
         val shouldNotify = isAppInBackground || (!isAppInBackground && currentGeohash != geohash)
 
@@ -657,6 +667,10 @@ class NotificationManager(
         messageContent: String,
         senderPeerID: String? = null
     ) {
+        if (mutePolicy.isAllMuted()) {
+            Log.d(TAG, "Skipping mesh mention notification - globally muted")
+            return
+        }
         // Only show notifications if app is in background OR user is not viewing mesh chat
         // User is viewing mesh chat when: not in private chat AND not in geohash chat
         val isViewingMeshChat = currentPrivateChatPeer == null && currentGeohash == null

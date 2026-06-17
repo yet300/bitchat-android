@@ -10,6 +10,7 @@ import com.app.transport.GeohashReadReceiptRouter
 import com.app.transport.IncomingMessageSink
 import com.app.transport.NicknameSource
 import com.app.transport.model.ReadReceipt
+import com.app.domain.repository.NotificationMutePolicy
 import com.app.transport.notification.ServiceNotifier
 import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.nostr.NostrIdentityBridge
@@ -37,10 +38,14 @@ object AndroidAppBindings {
 
     @Provides
     @SingleIn(AppScope::class)
-    fun provideServiceNotifier(context: Context): ServiceNotifier = NotificationManager(
+    fun provideServiceNotifier(
+        context: Context,
+        notificationMutePolicy: NotificationMutePolicy,
+    ): ServiceNotifier = NotificationManager(
         context,
         NotificationManagerCompat.from(context),
         NotificationIntervalManager(),
+        notificationMutePolicy,
     )
 
     @Provides

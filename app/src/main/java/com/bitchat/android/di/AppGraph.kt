@@ -6,6 +6,7 @@ import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.MessageTransport
+import com.app.domain.repository.NotificationMutePolicy
 import com.app.domain.repository.PeerRepository
 import com.app.domain.repository.PeerVerificationRepository
 import com.app.domain.repository.SearchRepository
@@ -101,6 +102,7 @@ interface AppGraph : SharedAppGraph {
     val locationChannelManager: LocationChannelManager
     val geohashBookmarksStore: GeohashBookmarksStore
     val verificationService: VerificationService
+    val notificationMutePolicy: NotificationMutePolicy
 
     // Graph-owned mesh engine: full surface for the still-living god-classes
     // (MainActivity/ChatViewModel, retires Phase C) and the narrow lifecycle contract
