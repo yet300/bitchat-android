@@ -85,11 +85,6 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
-        <activity
-            android:name=".ui.GeohashPickerActivity"
-            android:exported="false"
-            android:theme="@style/Theme.BitchatAndroid"
-            android:windowSoftInputMode="adjustResize" />
         <!-- New Decompose/CMP UI — the default launcher and bitchat://verify deep-link entry. -->
         <activity
             android:name=".BitMessageActivity"

@@ -38,7 +38,6 @@ import com.yet.bitmessage.android.connectivity.RuntimePermissionRequester
 import com.bitchat.android.geohash.GeohashBookmarksStore
 import com.bitchat.android.geohash.LocationChannelManager
 import com.yet.bitmessage.android.service.MeshServicePreferences
-import com.bitchat.android.ui.theme.ThemePreferenceManager
 import com.russhwolf.settings.ObservableSettings
 import com.yet.bitmessage.di.AppGraph as SharedAppGraph
 
@@ -93,7 +92,6 @@ interface AppGraph : SharedAppGraph {
     // Settings-backed preference managers (formerly `object`s over the global appSettings()).
     // Transitional accessors for framework entry points; dissolve into feature stores in Phase C.
     val observableSettings: ObservableSettings
-    val themePreferenceManager: ThemePreferenceManager
     val meshServicePreferences: MeshServicePreferences
     val locationChannelManager: LocationChannelManager
     val geohashBookmarksStore: GeohashBookmarksStore
