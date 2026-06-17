@@ -15,7 +15,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.bitchat.android.BitchatApplication
 import com.bitchat.android.di.appGraph
-import com.bitchat.android.MainActivity
+import com.bitchat.android.BitMessageActivity
 import com.bitchat.android.R
 import com.app.transport.mesh.MeshLifecycleController
 import kotlinx.coroutines.CoroutineScope
@@ -275,7 +275,7 @@ class MeshForegroundService : Service() {
     }
 
     private fun buildNotification(activePeers: Int): Notification {
-        val openIntent = Intent(this, MainActivity::class.java)
+        val openIntent = Intent(this, BitMessageActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
             this, 0, openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0)

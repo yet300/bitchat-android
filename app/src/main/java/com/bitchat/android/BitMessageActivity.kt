@@ -14,10 +14,12 @@ import com.bitchat.android.connectivity.PermissionOutcome
 import com.bitchat.android.connectivity.RuntimePermissionRequester
 import com.bitchat.android.di.appGraph
 import com.bitchat.android.ui.NotificationManager
+import androidx.lifecycle.lifecycleScope
 import com.yet.bitmessage.feature.root.RootComponent
 import com.yet.bitmessage.ui.App
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -95,9 +97,27 @@ class BitMessageActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    /** Map a notification intent (shared [NotificationManager] extras) to a conversation and open it. */
+    /**
+     * Dispatch an inbound intent: a notification tap (shared [NotificationManager] extras) opens a
+     * conversation; a `bitchat://verify` VIEW link starts the per-contact Noise verification.
+     */
     private fun handleDeepLink(intent: Intent) {
         intent.toConversationId()?.let { rootComponent.openConversation(it) }
+        intent.maybeStartVerification()
+    }
+
+    /**
+     * A scanned/opened `bitchat://verify` link: validate the payload and begin the Noise challenge
+     * against the matching peer. The result surfaces via the verified-fingerprint set (the chat
+     * header indicator reacts), so this is fire-and-forget here.
+     */
+    private fun Intent.maybeStartVerification() {
+        val uri = data ?: return
+        if (uri.scheme != "bitchat" || uri.host != "verify") return
+        val payload = uri.toString()
+        lifecycleScope.launch {
+            appGraph.peerVerificationRepository.verifyScannedQr(payload)
+        }
     }
 
     private fun Intent.toConversationId(): ConversationId? = when {
