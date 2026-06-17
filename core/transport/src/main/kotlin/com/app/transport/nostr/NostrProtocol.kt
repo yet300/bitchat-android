@@ -71,16 +71,30 @@ object NostrProtocol {
                 }
             
             Log.v(TAG, "Successfully unwrapped gift wrap from: ${seal.pubkey.take(16)}...")
-            
+
+            // NIP-17: the seal must be a kind-13 event with a valid signature (iOS audit parity,
+            // upstream #709) — reject forged/mislabelled seals before opening.
+            if (seal.kind != NostrKind.SEAL || !seal.isValidSignature()) {
+                Log.w(TAG, "❌ Invalid NIP-17 seal signature")
+                return null
+            }
+
             // 2. Open the seal
             val rumor = openSeal(seal, recipientIdentity.privateKeyHex)
                 ?: run {
                     Log.w(TAG, "❌ Failed to open seal")
                     return null
                 }
-            
+
+            // NIP-17: the inner rumor must be authored by the same key that signed the seal —
+            // otherwise the sender identity could be spoofed.
+            if (seal.pubkey != rumor.pubkey) {
+                Log.w(TAG, "❌ NIP-17 seal pubkey does not match rumor pubkey")
+                return null
+            }
+
             Log.v(TAG, "Successfully opened seal")
-            
+
             Triple(rumor.content, rumor.pubkey, rumor.createdAt)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to decrypt private message: ${e.message}")
@@ -226,7 +240,8 @@ object NostrProtocol {
             content = encrypted
         )
         
-        // Sign with the ephemeral key
+        // NIP-17 requires the seal to be signed by the sender identity key (not an ephemeral one),
+        // so the recipient can authenticate the sender after opening it.
         return seal.sign(senderPrivateKey)
     }
     

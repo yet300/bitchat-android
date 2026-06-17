@@ -592,7 +592,14 @@ class NoiseSession(
                 }
                 
                 val (extractedNonce, ciphertext) = nonceAndCiphertext
-                
+
+                // Reject ciphertext shorter than the MAC tag (iOS audit parity, upstream #709):
+                // a too-short payload can't carry a valid tag and must not reach the AEAD open.
+                if (ciphertext.size < receiveCipher!!.macLength) {
+                    Log.w(TAG, "Ciphertext too short: ${ciphertext.size} < ${receiveCipher!!.macLength}")
+                    throw SessionError.DecryptionFailed
+                }
+
                 // Validate nonce with sliding window replay protection
                 if (!isValidNonce(extractedNonce, highestReceivedNonce, replayWindow)) {
                     Log.w(TAG, "Replay attack detected: nonce $extractedNonce rejected for $peerID")
