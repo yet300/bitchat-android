@@ -3,6 +3,7 @@ package com.bitchat
 import android.content.Context
 import androidx.core.app.NotificationManagerCompat
 import androidx.test.core.app.ApplicationProvider
+import com.app.domain.repository.NotificationMutePolicy
 import com.bitchat.android.ui.NotificationManager
 import com.bitchat.android.util.NotificationIntervalManager
 import org.junit.Before
@@ -18,6 +19,12 @@ import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.robolectric.RobolectricTestRunner
 
+private object NoMutePolicy : NotificationMutePolicy {
+  override fun isAllMuted() = false
+  override fun isPrivateMuted(peerId: String) = false
+  override fun isGeohashMuted(geohash: String) = false
+}
+
 @RunWith(RobolectricTestRunner::class)
 class NotificationManagerTest {
 
@@ -32,7 +39,8 @@ class NotificationManagerTest {
     notificationManager = NotificationManager(
       context,
       notificationManagerCompat,
-      notificationIntervalManager
+      notificationIntervalManager,
+      NoMutePolicy,
     )
   }
 

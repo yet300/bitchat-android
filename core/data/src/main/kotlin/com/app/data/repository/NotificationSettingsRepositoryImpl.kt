@@ -14,12 +14,8 @@ internal class NotificationSettingsRepositoryImpl(
 ) : NotificationSettingsRepository {
 
     override fun observeGlobalMuteEnabled(): Flow<Boolean> =
-        settings.getBooleanFlow(KEY_GLOBAL_MUTE, defaultValue = false)
+        settings.getBooleanFlow(MutePrefsKeys.GLOBAL_MUTE, defaultValue = false)
 
     override suspend fun setGlobalMuteEnabled(enabled: Boolean) =
-        settings.putBoolean(KEY_GLOBAL_MUTE, enabled)
-
-    private companion object {
-        const val KEY_GLOBAL_MUTE = "notifications_global_mute"
-    }
+        settings.putBoolean(MutePrefsKeys.GLOBAL_MUTE, enabled)
 }

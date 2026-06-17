@@ -119,7 +119,8 @@ class ChatViewModel(
     private val notificationManager = NotificationManager(
       application.applicationContext,
       NotificationManagerCompat.from(application.applicationContext),
-      NotificationIntervalManager()
+      NotificationIntervalManager(),
+      (application as BitchatApplication).appGraph.notificationMutePolicy,
     )
 
     private val verificationHandler = VerificationHandler(
