@@ -1,5 +1,8 @@
 package com.yet.bitmessage.feature.onboarding.store
 
+import com.app.domain.model.TransportKind
+import com.app.domain.repository.ConnectivityRepository
+import com.app.domain.repository.NotificationPermissionRepository
 import com.app.domain.repository.OnboardingRepository
 import com.app.domain.repository.SettingsRepository
 import com.arkivanov.mvikotlin.core.store.Reducer
@@ -14,6 +17,8 @@ internal class OnboardingStoreFactory(
     private val storeFactory: StoreFactory,
     private val settingsRepository: SettingsRepository,
     private val onboardingRepository: OnboardingRepository,
+    private val connectivityRepository: ConnectivityRepository,
+    private val notificationPermissionRepository: NotificationPermissionRepository,
 ) {
     fun create(): OnboardingStore =
         object : OnboardingStore,
@@ -49,8 +54,17 @@ internal class OnboardingStoreFactory(
                 is OnboardingStore.Intent.NicknameChanged -> scope.launch {
                     settingsRepository.setNickname(intent.text)
                 }
-                // A2a: the primer steps just advance; A3 wires the permission request before advancing.
-                OnboardingStore.Intent.Primary, OnboardingStore.Intent.Skip -> advance()
+                // On the primer steps the primary action requests the relevant permission (in-app
+                // dialog, settings fallback) and then advances — denial never blocks the flow.
+                OnboardingStore.Intent.Primary -> scope.launch {
+                    when (state().step) {
+                        OnboardingStep.NEARBY -> connectivityRepository.enable(TransportKind.BLUETOOTH)
+                        OnboardingStep.NOTIFICATIONS -> notificationPermissionRepository.requestPermission()
+                        else -> Unit
+                    }
+                    advance()
+                }
+                OnboardingStore.Intent.Skip -> advance()
                 OnboardingStore.Intent.Back -> regress()
                 OnboardingStore.Intent.Finish -> scope.launch {
                     onboardingRepository.setCompleted()

@@ -2,6 +2,8 @@ package com.yet.bitmessage.feature.onboarding
 
 import com.app.common.decompose.asValue
 import com.app.common.decompose.coroutineScope
+import com.app.domain.repository.ConnectivityRepository
+import com.app.domain.repository.NotificationPermissionRepository
 import com.app.domain.repository.OnboardingRepository
 import com.app.domain.repository.SettingsRepository
 import com.arkivanov.decompose.ComponentContext
@@ -57,6 +59,8 @@ internal class DefaultOnboardingComponentFactory(
     private val storeFactory: StoreFactory,
     private val settingsRepository: SettingsRepository,
     private val onboardingRepository: OnboardingRepository,
+    private val connectivityRepository: ConnectivityRepository,
+    private val notificationPermissionRepository: NotificationPermissionRepository,
 ) : OnboardingComponent.Factory {
     override fun create(componentContext: ComponentContext, onFinished: () -> Unit): OnboardingComponent =
         DefaultOnboardingComponent(
@@ -65,6 +69,8 @@ internal class DefaultOnboardingComponentFactory(
                 storeFactory = storeFactory,
                 settingsRepository = settingsRepository,
                 onboardingRepository = onboardingRepository,
+                connectivityRepository = connectivityRepository,
+                notificationPermissionRepository = notificationPermissionRepository,
             ),
             onFinished = onFinished,
         )
