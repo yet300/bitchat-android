@@ -117,8 +117,12 @@
     <string name="verify_invalid">That QR code is not a valid bitchat verification code.</string>
     <string name="verify_peer_not_found">This contact is not currently reachable on the mesh.</string>
     <string name="verify_close">Close</string>
-    <string name="onboarding_welcome_title">Serverless. No account. Encrypted.</string>
-    <string name="onboarding_welcome_body">bitmessage is a mesh messenger: peer-to-peer over Bluetooth and the internet, no phone number, end-to-end encrypted by default.</string>
+    <string name="onboarding_value_mesh_title">Serverless mesh</string>
+    <string name="onboarding_value_mesh_body">Messages hop phone-to-phone over Bluetooth and Wi-Fi, and across the internet over Nostr. No central server.</string>
+    <string name="onboarding_value_noaccount_title">No account, no phone number</string>
+    <string name="onboarding_value_noaccount_body">Your identity is a key generated on this device. Nothing to sign up for, nothing to leak.</string>
+    <string name="onboarding_value_e2e_title">Encrypted by default</string>
+    <string name="onboarding_value_e2e_body">Every private message is end-to-end encrypted. Verify contacts in person with a QR code.</string>
     <string name="onboarding_nickname_title">Pick a nickname</string>
     <string name="onboarding_nickname_body">This is how others see you. You can change it anytime.</string>
     <string name="onboarding_nearby_title">Chat off-grid</string>
