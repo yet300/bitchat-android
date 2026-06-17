@@ -52,7 +52,6 @@ ktor = "3.5.0"
 gms-location = "21.3.0"
 
 # QR
-zxing-core = "3.5.4"
 qrose = "1.1.2"
 
 # CameraX / ML Kit
@@ -79,18 +78,9 @@ androidx-exifinterface = { module = "androidx.exifinterface:exifinterface", vers
 androidx-lifecycle-process = { module = "androidx.lifecycle:lifecycle-process", version.ref = "lifecycle-process" }
 androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycle-runtime" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity-compose" }
-androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 androidx-lifecycle-runtimeCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle-runtime" }
 
 # Compose
-androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
-androidx-compose-ui = { module = "androidx.compose.ui:ui" }
-androidx-compose-ui-graphics = { module = "androidx.compose.ui:ui-graphics" }
-androidx-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
-androidx-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
-androidx-compose-material3 = { module = "androidx.compose.material3:material3" }
-androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
-
 compose-uiTooling = { module = "org.jetbrains.compose.ui:ui-tooling", version.ref = "composeMultiplatform" }
 compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "composeMultiplatform" }
 compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "composeMultiplatform" }
@@ -130,7 +120,6 @@ ktor-client-websockets = { module = "io.ktor:ktor-client-websockets", version.re
 gms-location = { module = "com.google.android.gms:play-services-location", version.ref = "gms-location" }
 
 # QR
-zxing-core = { module = "com.google.zxing:core", version.ref = "zxing-core" }
 qrose = { module = "io.github.alexzhirkevich:qrose", version.ref = "qrose" }
 
 # CameraX / ML Kit
@@ -197,14 +186,6 @@ local-kotlin-multiplatform = { id = "com.plugins.kotlinMultiplatformPlugin", ver
 local-android-library = { id = "com.plugins.androidLibraryPlugin", version = "unspecified" }
 
 [bundles]
-compose = [
-    "androidx-compose-ui",
-    "androidx-compose-ui-graphics",
-    "androidx-compose-ui-tooling-preview",
-    "androidx-compose-material3",
-    "androidx-compose-material-icons-extended"
-]
-
 decompose = [
     "decompose",
     "essenty-lifecycle",
