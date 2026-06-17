@@ -37,8 +37,8 @@ import com.yet.bitmessage.android.geohash.AndroidPlaceGeocoder
 import com.yet.bitmessage.android.connectivity.AndroidConnectivityRepository
 import com.yet.bitmessage.android.connectivity.RuntimePermissionRequester
 import com.yet.bitmessage.android.notification.AndroidNotificationPermissionRepository
-import com.bitchat.android.settings.PowRepositoryImpl
-import com.bitchat.android.settings.TorRepositoryImpl
+import com.yet.bitmessage.android.settings.PowRepositoryImpl
+import com.yet.bitmessage.android.settings.TorRepositoryImpl
 import com.yet.bitmessage.android.verification.AndroidCameraPermissionRepository
 import com.yet.bitmessage.android.verification.VerificationCoordinator
 import com.yet.bitmessage.android.verification.VerificationRepositoryImpl

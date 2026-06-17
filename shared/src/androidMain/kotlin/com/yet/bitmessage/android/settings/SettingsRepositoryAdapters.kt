@@ -1,4 +1,4 @@
-package com.bitchat.android.settings
+package com.yet.bitmessage.android.settings
 
 import com.app.domain.repository.PowDifficultyLevel
 import com.app.domain.repository.PowRepository
@@ -14,14 +14,14 @@ import kotlinx.coroutines.flow.map
  * domain settings ports, so the feature module depends only on :core:domain (DIP). Theme is backed
  * directly by :core:data over the durable SettingsStore (no dependency on the legacy app manager).
  */
-internal class TorRepositoryImpl(
+class TorRepositoryImpl(
     private val manager: TorPreferenceManager,
 ) : TorRepository {
     override fun observeTorEnabled(): Flow<Boolean> = manager.modeFlow.map { it == TorMode.ON }
     override suspend fun setTorEnabled(enabled: Boolean) = manager.set(if (enabled) TorMode.ON else TorMode.OFF)
 }
 
-internal class PowRepositoryImpl(
+class PowRepositoryImpl(
     private val manager: PoWPreferenceManager,
 ) : PowRepository {
     override fun observePowEnabled(): Flow<Boolean> = manager.powEnabled
