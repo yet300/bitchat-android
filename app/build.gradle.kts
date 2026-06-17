@@ -95,6 +95,7 @@ dependencies {
     // into AndroidAppGraph so rootFactory resolves; RootComponent type for the activity).
     implementation(projects.shared)
     implementation(projects.feature.root)
+    implementation(projects.feature.onboarding)
     implementation(projects.feature.chats.main)
     implementation(projects.feature.chats.conversations)
     implementation(projects.feature.chats.details)

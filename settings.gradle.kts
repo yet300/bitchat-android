@@ -31,6 +31,7 @@ include(":core:data")
 
 include(":feature")
 include(":feature:root")
+include(":feature:onboarding")
 
 include(":feature:chats")
 include(":feature:chats:main")
