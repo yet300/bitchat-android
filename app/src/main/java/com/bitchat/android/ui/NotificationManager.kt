@@ -14,7 +14,7 @@ import com.app.domain.repository.NotificationMutePolicy
 import com.app.transport.notification.ServiceNotifier
 import com.bitchat.android.BitMessageActivity
 import com.bitchat.android.R
-import com.bitchat.android.util.NotificationIntervalManager
+import com.yet.bitmessage.android.notification.NotificationIntervalManager
 import java.util.concurrent.ConcurrentHashMap
 
 /**
