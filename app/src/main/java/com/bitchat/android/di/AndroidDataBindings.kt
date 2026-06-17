@@ -40,8 +40,8 @@ import com.bitchat.android.notification.AndroidNotificationPermissionRepository
 import com.bitchat.android.settings.PowRepositoryImpl
 import com.bitchat.android.settings.TorRepositoryImpl
 import com.bitchat.android.verification.AndroidCameraPermissionRepository
-import com.bitchat.android.verification.VerificationCoordinator
-import com.bitchat.android.verification.VerificationRepositoryImpl
+import com.yet.bitmessage.android.verification.VerificationCoordinator
+import com.yet.bitmessage.android.verification.VerificationRepositoryImpl
 import com.app.transport.VerificationService
 import com.russhwolf.settings.ObservableSettings
 import com.russhwolf.settings.SharedPreferencesSettings

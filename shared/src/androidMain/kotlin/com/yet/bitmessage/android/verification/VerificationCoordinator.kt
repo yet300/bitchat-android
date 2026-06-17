@@ -1,4 +1,4 @@
-package com.bitchat.android.verification
+package com.yet.bitmessage.android.verification
 
 import com.app.common.AppDispatchers
 import com.app.common.encoding.hexEncodedString
