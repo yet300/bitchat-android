@@ -10,9 +10,6 @@ kotlin {
             implementation(projects.core.common)
             implementation(projects.core.domain)
 
-            implementation(projects.feature.chats.main)
-            implementation(projects.feature.onboarding)
-
             implementation(libs.bundles.decompose)
             implementation(libs.bundles.mvi)
         }

@@ -117,4 +117,21 @@
     <string name="verify_invalid">That QR code is not a valid bitchat verification code.</string>
     <string name="verify_peer_not_found">This contact is not currently reachable on the mesh.</string>
     <string name="verify_close">Close</string>
+    <string name="onboarding_welcome_title">Serverless. No account. Encrypted.</string>
+    <string name="onboarding_welcome_body">bitmessage is a mesh messenger: peer-to-peer over Bluetooth and the internet, no phone number, end-to-end encrypted by default.</string>
+    <string name="onboarding_nickname_title">Pick a nickname</string>
+    <string name="onboarding_nickname_body">This is how others see you. You can change it anytime.</string>
+    <string name="onboarding_nearby_title">Chat off-grid</string>
+    <string name="onboarding_nearby_body">Enable nearby to reach people directly over Bluetooth and Wi-Fi, no internet needed.</string>
+    <string name="onboarding_notifications_title">Stay notified</string>
+    <string name="onboarding_notifications_body">Get notified about new messages. Optional — you can enable it later.</string>
+    <string name="onboarding_done_title">You\'re ready</string>
+    <string name="onboarding_done_body">Messages already work over the internet. Enable nearby anytime in Connectivity.</string>
+    <string name="onboarding_action_get_started">Get started</string>
+    <string name="onboarding_action_continue">Continue</string>
+    <string name="onboarding_action_enable_nearby">Enable nearby</string>
+    <string name="onboarding_action_enable_notifications">Enable notifications</string>
+    <string name="onboarding_action_start">Start messaging</string>
+    <string name="onboarding_action_not_now">Not now</string>
+    <string name="onboarding_action_back">Back</string>
 </resources>

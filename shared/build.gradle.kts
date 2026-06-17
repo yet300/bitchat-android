@@ -46,6 +46,7 @@ kotlin {
         commonMain.dependencies {
             implementation(projects.core.domain)
             implementation(projects.feature.root)
+            implementation(projects.feature.onboarding)
             implementation(projects.feature.chats.main)
             implementation(projects.feature.chats.conversations)
             implementation(projects.feature.chats.details)
