@@ -90,10 +90,22 @@
             android:exported="false"
             android:theme="@style/Theme.BitchatAndroid"
             android:windowSoftInputMode="adjustResize" />
+        <!-- Phase D/B: demoted. No longer a launcher or deep-link entry point (the new
+             BitMessageActivity owns MAIN/LAUNCHER and bitchat://verify). Kept building until
+             Phase D removes the legacy UI. -->
         <activity
             android:name=".MainActivity"
-            android:exported="true"
+            android:exported="false"
             android:label="@string/app_name"
+            android:theme="@style/Theme.BitchatAndroid"
+            android:windowSoftInputMode="adjustResize"
+            android:launchMode="singleTop" />
+
+        <!-- New Decompose/CMP UI — the default launcher and bitchat://verify deep-link entry. -->
+        <activity
+            android:name=".BitMessageActivity"
+            android:exported="true"
+            android:label="bitMessage"
             android:theme="@style/Theme.BitchatAndroid"
             android:windowSoftInputMode="adjustResize"
             android:launchMode="singleTop">
@@ -106,21 +118,6 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="bitchat" android:host="verify" />
-            </intent-filter>
-        </activity>
-
-        <!-- Phase C preview: new Decompose/CMP UI. Separate launcher entry while the
-             legacy MainActivity remains the default; both share one application graph. -->
-        <activity
-            android:name=".BitMessageActivity"
-            android:exported="true"
-            android:label="bitMessage"
-            android:theme="@style/Theme.BitchatAndroid"
-            android:windowSoftInputMode="adjustResize"
-            android:launchMode="singleTop">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
