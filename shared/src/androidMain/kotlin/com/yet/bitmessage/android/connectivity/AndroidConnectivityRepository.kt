@@ -1,4 +1,4 @@
-package com.bitchat.android.connectivity
+package com.yet.bitmessage.android.connectivity
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter

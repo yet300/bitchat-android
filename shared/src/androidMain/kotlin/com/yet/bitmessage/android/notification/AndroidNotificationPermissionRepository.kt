@@ -1,4 +1,4 @@
-package com.bitchat.android.notification
+package com.yet.bitmessage.android.notification
 
 import android.Manifest
 import android.content.Context
@@ -9,8 +9,8 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 import com.app.domain.repository.NotificationPermissionRepository
-import com.bitchat.android.connectivity.PermissionOutcome
-import com.bitchat.android.connectivity.RuntimePermissionRequester
+import com.yet.bitmessage.android.connectivity.PermissionOutcome
+import com.yet.bitmessage.android.connectivity.RuntimePermissionRequester
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow

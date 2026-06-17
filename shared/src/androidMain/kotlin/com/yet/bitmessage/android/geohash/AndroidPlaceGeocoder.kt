@@ -1,4 +1,4 @@
-package com.bitchat.android.geohash
+package com.yet.bitmessage.android.geohash
 
 import android.content.Context
 import android.location.Geocoder
@@ -15,7 +15,7 @@ import kotlinx.coroutines.withContext
  * when geocoding is unavailable or the name doesn't resolve. (OpenStreetMap forward fallback —
  * mirroring [GeocoderFactory]'s reverse path — is a follow-up.)
  */
-internal class AndroidPlaceGeocoder(
+class AndroidPlaceGeocoder(
     private val context: Context,
     private val dispatchers: AppDispatchers,
 ) : PlaceGeocoder {

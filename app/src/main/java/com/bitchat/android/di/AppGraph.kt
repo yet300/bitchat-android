@@ -34,7 +34,7 @@ import com.app.transport.nostr.NostrRelayManager
 import com.app.transport.nostr.PoWPreferenceManager
 import com.app.transport.nostr.RelayDirectory
 import com.app.data.nostr.NostrMessageSender
-import com.bitchat.android.connectivity.RuntimePermissionRequester
+import com.yet.bitmessage.android.connectivity.RuntimePermissionRequester
 import com.bitchat.android.geohash.GeohashBookmarksStore
 import com.bitchat.android.geohash.LocationChannelManager
 import com.bitchat.android.onboarding.BackgroundLocationPreferenceManager
