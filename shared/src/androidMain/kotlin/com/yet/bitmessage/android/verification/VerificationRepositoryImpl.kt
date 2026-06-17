@@ -1,4 +1,4 @@
-package com.bitchat.android.verification
+package com.yet.bitmessage.android.verification
 
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.VerificationRepository

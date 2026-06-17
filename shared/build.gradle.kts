@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.android.kotlin.multiplatform.library)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.metro)
 }
 
 kotlin {
@@ -45,6 +46,11 @@ kotlin {
         }
         commonMain.dependencies {
             implementation(projects.core.domain)
+            implementation(projects.core.common)
+            implementation(projects.core.crypto)
+            implementation(projects.core.transport)
+            implementation(projects.core.data)
+
             implementation(projects.feature.root)
             implementation(projects.feature.onboarding)
             implementation(projects.feature.chats.main)
