@@ -19,6 +19,9 @@ internal interface ConversationsStore :
         val nearby: List<Peer> = emptyList(),
         val pinned: Set<ConversationId> = emptySet(),
         val muted: Set<ConversationId> = emptySet(),
+        // Row id → stable (Noise-keyed) id for pin/mute comparison. Missing entries fall back to
+        // the row's own id, so behavior is identical when no stable key can be resolved.
+        val canonicalKeys: Map<ConversationId, ConversationId> = emptyMap(),
         val transports: List<TransportStatus> = emptyList(),
         val bannerDismissed: Boolean = false,
     ) {
@@ -47,6 +50,7 @@ internal interface ConversationsStore :
         data class NearbyLoaded(val nearby: List<Peer>) : Msg
         data class PinnedLoaded(val pinned: Set<ConversationId>) : Msg
         data class MutedLoaded(val muted: Set<ConversationId>) : Msg
+        data class CanonicalKeysLoaded(val canonicalKeys: Map<ConversationId, ConversationId>) : Msg
         data class TransportsLoaded(val transports: List<TransportStatus>) : Msg
         data object BannerDismissed : Msg
     }

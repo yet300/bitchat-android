@@ -13,6 +13,7 @@ import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationPrefsRepository
 import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.PeerRepository
+import com.app.domain.usecase.CanonicalConversationKeyUseCase
 import com.app.domain.usecase.ResolveReachabilityUseCase
 import com.yet.bitmessage.feature.chats.conversations.integration.stateToModel
 import com.yet.bitmessage.feature.chats.conversations.store.ConversationsStore
@@ -81,6 +82,7 @@ internal class DefaultConversationsComponentFactory(
             conversationPrefsRepository = conversationPrefsRepository,
             connectivityRepository = connectivityRepository,
             resolveReachability = ResolveReachabilityUseCase(peerRepository, contactRepository),
+            canonicalConversationKey = CanonicalConversationKeyUseCase(peerRepository, contactRepository),
         ),
         onConversationSelected = onConversationSelected,
         onConnectivityRequested = onConnectivityRequested,
