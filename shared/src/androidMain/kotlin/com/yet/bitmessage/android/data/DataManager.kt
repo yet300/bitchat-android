@@ -1,4 +1,4 @@
-package com.bitchat.android.ui
+package com.yet.bitmessage.android.data
 
 import android.util.Log
 import com.app.common.serialization.JsonConfig

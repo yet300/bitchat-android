@@ -5,7 +5,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.test.core.app.ApplicationProvider
 import com.app.domain.repository.NotificationMutePolicy
 import com.bitchat.android.ui.NotificationManager
-import com.bitchat.android.util.NotificationIntervalManager
+import com.yet.bitmessage.android.notification.NotificationIntervalManager
 import org.junit.Before
 import org.junit.Ignore
 import org.junit.Test
