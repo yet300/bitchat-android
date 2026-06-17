@@ -5,6 +5,9 @@ import com.app.domain.model.ConversationId
 import com.app.domain.model.GeohashChannel
 import com.app.domain.model.GeohashLevel
 import com.app.domain.model.PeerId
+import com.app.transport.mesh.BluetoothMeshService
+import com.app.transport.mesh.PeerInfo
+import dev.zacsweers.metro.Provider
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -12,8 +15,34 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.whenever
 
 class NotificationMutePolicyImplTest {
+
+    private val noiseHex = "aa".repeat(32) // 64 hex → NOISE_STABLE
+    private val noiseBytes = ByteArray(32) { 0xAA.toByte() }
+
+    /** A mesh provider that maps the given mesh peerIDs to a peer carrying [noiseBytes]. */
+    private fun meshFor(vararg knownPeerIds: String): Provider<BluetoothMeshService> {
+        val mesh = mock<BluetoothMeshService> {
+            knownPeerIds.forEach { id ->
+                whenever(it.getPeerInfo(id)).thenReturn(
+                    PeerInfo(
+                        id = id,
+                        nickname = "bob",
+                        isConnected = true,
+                        isDirectConnection = true,
+                        noisePublicKey = noiseBytes,
+                        signingPublicKey = null,
+                        isVerifiedNickname = false,
+                        lastSeen = 0L,
+                    ),
+                )
+            }
+        }
+        return Provider { mesh }
+    }
 
     private class FakeSettingsStore : SettingsStore {
         private val data = MutableStateFlow<Map<String, String>>(emptyMap())
@@ -40,7 +69,7 @@ class NotificationMutePolicyImplTest {
     fun honors_per_conversation_mute_written_by_the_prefs_repo() = runTest {
         val settings = FakeSettingsStore()
         val prefs = ConversationPrefsRepositoryImpl(settings)
-        val policy = NotificationMutePolicyImpl(settings)
+        val policy = NotificationMutePolicyImpl(settings, meshFor())
 
         prefs.setMuted(ConversationId.Private(PeerId("peer1")), true)
         prefs.setMuted(ConversationId.Geohash(GeohashChannel(GeohashLevel.CITY, "u4pruyd")), true)
@@ -58,6 +87,21 @@ class NotificationMutePolicyImplTest {
         val settings = FakeSettingsStore()
         NotificationSettingsRepositoryImpl(settings).setGlobalMuteEnabled(true)
 
-        assertTrue(NotificationMutePolicyImpl(settings).isAllMuted())
+        assertTrue(NotificationMutePolicyImpl(settings, meshFor()).isAllMuted())
+    }
+
+    @Test
+    fun private_mute_stored_by_noise_key_suppresses_a_fresh_session_mesh_peer() = runTest {
+        val settings = FakeSettingsStore()
+        // The conversation-list store persists mute under the stable Noise key (I12-2).
+        ConversationPrefsRepositoryImpl(settings).setMuted(ConversationId.Private(PeerId(noiseHex)), true)
+
+        // A NEW session: a different ephemeral mesh peerID that resolves to the same Noise key.
+        val freshMeshId = "1234567890abcdef"
+        val policy = NotificationMutePolicyImpl(settings, meshFor(freshMeshId))
+
+        assertTrue(policy.isPrivateMuted(freshMeshId))
+        // An unrelated peer (no Noise mapping) is not suppressed.
+        assertFalse(policy.isPrivateMuted("fedcba0987654321"))
     }
 }
