@@ -1,4 +1,4 @@
-package com.bitchat.android.di
+package com.yet.bitmessage.android.di
 
 import android.app.Application
 import android.content.Context
