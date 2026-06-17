@@ -71,6 +71,9 @@ kotlin {
             implementation(libs.bundles.decompose)
             implementation(libs.decompose.compose)
             implementation(libs.decompose.compose.experimental)
+
+            implementation(libs.bundles.multiplatform.settings)
+
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
