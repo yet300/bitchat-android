@@ -5,6 +5,7 @@ import com.app.domain.repository.ConnectivityRepository
 import com.app.domain.repository.ConversationPrefsRepository
 import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.PeerRepository
+import com.app.domain.usecase.CanonicalConversationKeyUseCase
 import com.app.domain.usecase.ResolveReachabilityUseCase
 import com.arkivanov.mvikotlin.core.store.Reducer
 import com.arkivanov.mvikotlin.core.store.Store
@@ -25,6 +26,7 @@ internal class ConversationsStoreFactory(
     private val conversationPrefsRepository: ConversationPrefsRepository,
     private val connectivityRepository: ConnectivityRepository,
     private val resolveReachability: ResolveReachabilityUseCase,
+    private val canonicalConversationKey: CanonicalConversationKeyUseCase,
 ) {
     fun create(): ConversationsStore =
         object : ConversationsStore,
@@ -44,6 +46,7 @@ internal class ConversationsStoreFactory(
                 is ConversationsStore.Msg.NearbyLoaded -> copy(nearby = msg.nearby)
                 is ConversationsStore.Msg.PinnedLoaded -> copy(pinned = msg.pinned)
                 is ConversationsStore.Msg.MutedLoaded -> copy(muted = msg.muted)
+                is ConversationsStore.Msg.CanonicalKeysLoaded -> copy(canonicalKeys = msg.canonicalKeys)
                 is ConversationsStore.Msg.TransportsLoaded -> {
                     val next = copy(transports = msg.transports)
                     // Once everything is resolved, arm the banner again for any future issue.
@@ -89,6 +92,18 @@ internal class ConversationsStoreFactory(
                             dispatch(ConversationsStore.Msg.NearbyLoaded(peers.filter { it.isConnected }.sortedByNearby()))
                         }
                     }
+                    // Stable key per row: pin/mute live in Noise-keyed space, but rows are keyed by
+                    // the ephemeral mesh peerID. Resolve each row's canonical key so membership is
+                    // tested in the same stable space (and survives sessions).
+                    scope.launch {
+                        conversationRepository.observeConversations()
+                            .map { conversations ->
+                                buildMap {
+                                    conversations.forEach { put(it.id, canonicalConversationKey(it.id)) }
+                                }
+                            }
+                            .collect { dispatch(ConversationsStore.Msg.CanonicalKeysLoaded(it)) }
+                    }
                     scope.launch {
                         conversationPrefsRepository.observePinned().collect {
                             dispatch(ConversationsStore.Msg.PinnedLoaded(it))
@@ -111,10 +126,16 @@ internal class ConversationsStoreFactory(
         override fun executeIntent(intent: ConversationsStore.Intent) {
             when (intent) {
                 is ConversationsStore.Intent.TogglePin ->
-                    scope.launch { conversationPrefsRepository.setPinned(intent.id, intent.id !in state().pinned) }
+                    scope.launch {
+                        val key = canonicalConversationKey(intent.id)
+                        conversationPrefsRepository.setPinned(key, key !in state().pinned)
+                    }
 
                 is ConversationsStore.Intent.ToggleMute ->
-                    scope.launch { conversationPrefsRepository.setMuted(intent.id, intent.id !in state().muted) }
+                    scope.launch {
+                        val key = canonicalConversationKey(intent.id)
+                        conversationPrefsRepository.setMuted(key, key !in state().muted)
+                    }
 
                 is ConversationsStore.Intent.DismissBanner ->
                     dispatch(ConversationsStore.Msg.BannerDismissed)

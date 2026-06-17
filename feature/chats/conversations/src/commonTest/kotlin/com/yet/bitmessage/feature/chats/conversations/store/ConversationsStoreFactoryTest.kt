@@ -15,6 +15,7 @@ import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationPrefsRepository
 import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.PeerRepository
+import com.app.domain.usecase.CanonicalConversationKeyUseCase
 import com.app.domain.usecase.ResolveReachabilityUseCase
 import com.yet.bitmessage.feature.chats.conversations.integration.stateToModel
 import com.arkivanov.mvikotlin.main.store.DefaultStoreFactory
@@ -113,6 +114,7 @@ class ConversationsStoreFactoryTest {
             conversationPrefsRepository = prefs,
             connectivityRepository = connectivity,
             resolveReachability = ResolveReachabilityUseCase(peerRepository, FakeContactRepository()),
+            canonicalConversationKey = CanonicalConversationKeyUseCase(peerRepository, FakeContactRepository()),
         )
     }
 
@@ -177,6 +179,25 @@ class ConversationsStoreFactoryTest {
 
         store.accept(ConversationsStore.Intent.TogglePin(id))
         assertEquals(emptySet(), store.state.pinned)
+    }
+
+    @Test
+    fun private_pin_is_stored_by_stable_noise_key_and_flags_the_mesh_row() = runTest {
+        val noiseHex = "aa".repeat(32)
+        val meshId = PeerId("1234567890abcdef")
+        val peer = Peer(id = meshId, nickname = "bob", isConnected = true, isDirect = true, noiseKeyHex = noiseHex)
+        val prefs = FakeConversationPrefsRepository()
+        val repository = FakeConversationRepository(
+            MutableStateFlow(listOf(Conversation(id = ConversationId.Private(meshId), title = "bob"))),
+        )
+        val store = storeFactory(repository, peers = listOf(peer), prefs = prefs).create()
+
+        store.accept(ConversationsStore.Intent.TogglePin(ConversationId.Private(meshId)))
+
+        // Persisted under the stable Noise key, not the ephemeral mesh id.
+        assertEquals(setOf(ConversationId.Private(PeerId(noiseHex))), prefs.pinned.value)
+        // The mesh-keyed row still reads as pinned (membership resolved via canonicalKeys).
+        assertTrue(stateToModel(store.state).conversations.single().isPinned)
     }
 
     @Test
