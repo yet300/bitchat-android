@@ -9,6 +9,7 @@ import com.app.data.repository.MeshSettingsRepositoryImpl
 import com.app.data.repository.MessageRepositoryImpl
 import com.app.data.repository.NotificationMutePolicyImpl
 import com.app.data.repository.NotificationSettingsRepositoryImpl
+import com.app.data.repository.OnboardingRepositoryImpl
 import com.app.data.repository.PeerRepositoryImpl
 import com.app.data.repository.SearchRepositoryImpl
 import com.app.data.repository.SettingsRepositoryImpl
@@ -30,6 +31,7 @@ import com.app.domain.repository.MeshSettingsRepository
 import com.app.domain.repository.MessageTransport
 import com.app.domain.repository.NotificationMutePolicy
 import com.app.domain.repository.NotificationSettingsRepository
+import com.app.domain.repository.OnboardingRepository
 import com.app.domain.repository.PeerRepository
 import com.app.domain.repository.SearchRepository
 import com.app.domain.repository.SettingsRepository
@@ -63,6 +65,9 @@ abstract class DataBindings {
 
     @Binds
     internal abstract val NotificationSettingsRepositoryImpl.bindNotificationSettings: NotificationSettingsRepository
+
+    @Binds
+    internal abstract val OnboardingRepositoryImpl.bindOnboarding: OnboardingRepository
 
     @Binds
     internal abstract val NotificationMutePolicyImpl.bindNotificationMutePolicy: NotificationMutePolicy
