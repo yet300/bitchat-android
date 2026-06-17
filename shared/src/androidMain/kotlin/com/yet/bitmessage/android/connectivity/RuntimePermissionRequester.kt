@@ -1,8 +1,8 @@
-package com.bitchat.android.connectivity
+package com.yet.bitmessage.android.connectivity
 
 /**
- * Graph-scoped bridge between the in-app system permission dialog (ActivityResult API, owned by
- * [com.bitchat.android.BitMessageActivity]) and the data layer's [AndroidConnectivityRepository].
+ * Graph-scoped bridge between the in-app system permission dialog (ActivityResult API, owned by the
+ * host Activity) and the data layer's [AndroidConnectivityRepository].
  *
  * The Activity attaches a [Host] in `onCreate` and detaches it in `onDestroy`; while no Activity is
  * attached (background, between launches) a request resolves to [PermissionOutcome.NO_HOST] so the

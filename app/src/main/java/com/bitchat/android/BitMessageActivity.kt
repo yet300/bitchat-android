@@ -10,8 +10,8 @@ import com.app.domain.model.ConversationId
 import com.app.domain.model.PeerId
 import com.app.domain.usecase.ParseGeohashUseCase
 import com.arkivanov.decompose.defaultComponentContext
-import com.bitchat.android.connectivity.PermissionOutcome
-import com.bitchat.android.connectivity.RuntimePermissionRequester
+import com.yet.bitmessage.android.connectivity.PermissionOutcome
+import com.yet.bitmessage.android.connectivity.RuntimePermissionRequester
 import com.bitchat.android.di.appGraph
 import com.bitchat.android.ui.NotificationManager
 import androidx.lifecycle.lifecycleScope
