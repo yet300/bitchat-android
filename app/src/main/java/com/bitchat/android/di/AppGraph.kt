@@ -39,7 +39,7 @@ import com.bitchat.android.geohash.GeohashBookmarksStore
 import com.bitchat.android.geohash.LocationChannelManager
 import com.bitchat.android.onboarding.BackgroundLocationPreferenceManager
 import com.bitchat.android.onboarding.BatteryOptimizationPreferenceManager
-import com.bitchat.android.service.MeshServicePreferences
+import com.yet.bitmessage.android.service.MeshServicePreferences
 import com.bitchat.android.ui.theme.ThemePreferenceManager
 import com.russhwolf.settings.ObservableSettings
 import com.yet.bitmessage.di.AppGraph as SharedAppGraph

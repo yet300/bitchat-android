@@ -1,4 +1,4 @@
-package com.bitchat.android.service
+package com.yet.bitmessage.android.service
 
 import com.russhwolf.settings.ObservableSettings
 import dev.zacsweers.metro.AppScope
