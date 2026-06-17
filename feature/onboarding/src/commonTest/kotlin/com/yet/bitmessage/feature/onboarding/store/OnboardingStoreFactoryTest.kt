@@ -2,6 +2,10 @@
 
 package com.yet.bitmessage.feature.onboarding.store
 
+import com.app.domain.model.TransportKind
+import com.app.domain.model.TransportStatus
+import com.app.domain.repository.ConnectivityRepository
+import com.app.domain.repository.NotificationPermissionRepository
 import com.app.domain.repository.OnboardingRepository
 import com.app.domain.repository.SettingsRepository
 import com.arkivanov.mvikotlin.extensions.coroutines.labels
@@ -46,10 +50,24 @@ class OnboardingStoreFactoryTest {
         override suspend fun setCompleted() { completed = true }
     }
 
+    private class FakeConnectivityRepository : ConnectivityRepository {
+        val enabled = mutableListOf<TransportKind>()
+        override fun observe(): Flow<List<TransportStatus>> = MutableStateFlow(emptyList())
+        override suspend fun enable(kind: TransportKind) { enabled += kind }
+    }
+
+    private class FakeNotificationPermissionRepository : NotificationPermissionRepository {
+        var requests = 0
+        override fun observeGranted(): Flow<Boolean> = MutableStateFlow(false)
+        override suspend fun requestPermission() { requests++ }
+    }
+
     private fun store(
         settings: SettingsRepository = FakeSettingsRepository(),
         onboarding: OnboardingRepository = FakeOnboardingRepository(),
-    ) = OnboardingStoreFactory(DefaultStoreFactory(), settings, onboarding).create()
+        connectivity: ConnectivityRepository = FakeConnectivityRepository(),
+        notifications: NotificationPermissionRepository = FakeNotificationPermissionRepository(),
+    ) = OnboardingStoreFactory(DefaultStoreFactory(), settings, onboarding, connectivity, notifications).create()
 
     @Test
     fun loads_the_current_nickname() = runTest {
@@ -80,6 +98,42 @@ class OnboardingStoreFactoryTest {
         store.accept(OnboardingStore.Intent.NicknameChanged("bob"))
         assertEquals("bob", settings.nickname.value)
         assertEquals("bob", store.state.nickname)
+    }
+
+    @Test
+    fun primer_steps_request_permission_then_advance_and_denial_does_not_block() = runTest {
+        val connectivity = FakeConnectivityRepository()
+        val notifications = FakeNotificationPermissionRepository()
+        val store = store(connectivity = connectivity, notifications = notifications)
+
+        store.accept(OnboardingStore.Intent.Primary) // WELCOME -> NICKNAME (no request)
+        store.accept(OnboardingStore.Intent.Primary) // NICKNAME -> NEARBY (no request)
+        assertEquals(OnboardingStep.NEARBY, store.state.step)
+        assertTrue(connectivity.enabled.isEmpty())
+
+        store.accept(OnboardingStore.Intent.Primary) // NEARBY: enable bluetooth, then advance
+        assertEquals(listOf(TransportKind.BLUETOOTH), connectivity.enabled)
+        assertEquals(OnboardingStep.NOTIFICATIONS, store.state.step)
+
+        store.accept(OnboardingStore.Intent.Primary) // NOTIFICATIONS: request, then advance
+        assertEquals(1, notifications.requests)
+        assertEquals(OnboardingStep.DONE, store.state.step)
+    }
+
+    @Test
+    fun skip_on_a_primer_step_advances_without_requesting() = runTest {
+        val connectivity = FakeConnectivityRepository()
+        val notifications = FakeNotificationPermissionRepository()
+        val store = store(connectivity = connectivity, notifications = notifications)
+
+        store.accept(OnboardingStore.Intent.Primary) // -> NICKNAME
+        store.accept(OnboardingStore.Intent.Primary) // -> NEARBY
+        store.accept(OnboardingStore.Intent.Skip)    // NEARBY -> NOTIFICATIONS, no request
+        store.accept(OnboardingStore.Intent.Skip)    // NOTIFICATIONS -> DONE, no request
+
+        assertEquals(OnboardingStep.DONE, store.state.step)
+        assertTrue(connectivity.enabled.isEmpty())
+        assertEquals(0, notifications.requests)
     }
 
     @Test
