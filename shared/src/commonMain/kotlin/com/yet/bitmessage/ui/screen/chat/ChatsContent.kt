@@ -28,6 +28,8 @@ import com.yet.bitmessage.shared.resources.connectivity_action_enable
 import com.yet.bitmessage.shared.resources.connectivity_action_grant
 import com.yet.bitmessage.shared.resources.connectivity_bluetooth
 import com.yet.bitmessage.shared.resources.connectivity_internet
+import com.yet.bitmessage.shared.resources.connectivity_count_peers
+import com.yet.bitmessage.shared.resources.connectivity_count_relays
 import com.yet.bitmessage.shared.resources.connectivity_state_off
 import com.yet.bitmessage.shared.resources.connectivity_state_on
 import com.yet.bitmessage.shared.resources.connectivity_state_permission
@@ -97,7 +99,7 @@ private fun ConnectivitySheet(component: ConnectivityComponent, onDismiss: () ->
 private fun TransportRow(status: TransportStatus, onEnable: (TransportKind) -> Unit) {
     ListItem(
         headlineContent = { Text(text = stringResource(status.kind.label())) },
-        supportingContent = { Text(text = stringResource(status.state.label())) },
+        supportingContent = { Text(text = supportingLine(status)) },
         trailingContent = {
             val action = status.state.actionLabel()
             if (action != null) {
@@ -107,6 +109,19 @@ private fun TransportRow(status: TransportStatus, onEnable: (TransportKind) -> U
             }
         },
     )
+}
+
+/** State label plus a live connected count where meaningful (mesh peers / Nostr relays). */
+@Composable
+private fun supportingLine(status: TransportStatus): String {
+    val base = stringResource(status.state.label())
+    val count = status.count ?: return base
+    val suffix = when (status.kind) {
+        TransportKind.BLUETOOTH -> stringResource(Res.string.connectivity_count_peers, count)
+        TransportKind.INTERNET -> stringResource(Res.string.connectivity_count_relays, count)
+        else -> return base
+    }
+    return "$base · $suffix"
 }
 
 private fun TransportKind.label(): StringResource = when (this) {
