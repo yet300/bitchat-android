@@ -177,27 +177,37 @@ class AppStateStore(
         is DeliveryStatus.Failed -> 0
     }
 
-    fun updatePrivateMessageStatus(messageID: String, status: DeliveryStatus) {
+    /**
+     * Apply a delivery/transfer status to whichever timeline holds [messageID] (private, public or
+     * channel). Used by DM ACKs and by media transfer-progress updates, which can target any kind.
+     * Never downgrades (e.g. Read -> Delivered), so out-of-order events are safe.
+     */
+    fun updateMessageStatus(messageID: String, status: DeliveryStatus) {
         synchronized(this) {
-            val map = _privateMessages.value.toMutableMap()
-            var changed = false
-            map.keys.toList().forEach { peer ->
-                val list = map[peer]?.toMutableList() ?: mutableListOf()
-                val idx = list.indexOfFirst { it.id == messageID }
-                if (idx >= 0) {
-                    val current = list[idx].deliveryStatus
-                    // Do not downgrade (e.g., Read -> Delivered)
-                    if (statusPriority(status) >= statusPriority(current)) {
-                        list[idx] = list[idx].copy(deliveryStatus = status)
-                        map[peer] = list
-                        changed = true
-                    }
+            _privateMessages.value.toMutableMap().let { map ->
+                var changed = false
+                map.keys.toList().forEach { peer ->
+                    map[peer]?.withStatus(messageID, status)?.let { map[peer] = it; changed = true }
                 }
+                if (changed) _privateMessages.value = map
             }
-            if (changed) {
-                _privateMessages.value = map
+            _publicMessages.value.withStatus(messageID, status)?.let { _publicMessages.value = it }
+            _channelMessages.value.toMutableMap().let { map ->
+                var changed = false
+                map.keys.toList().forEach { tag ->
+                    map[tag]?.withStatus(messageID, status)?.let { map[tag] = it; changed = true }
+                }
+                if (changed) _channelMessages.value = map
             }
         }
+    }
+
+    /** Returns a copy with [messageID]'s status updated, or null if absent / would downgrade. */
+    private fun List<BitchatMessage>.withStatus(messageID: String, status: DeliveryStatus): List<BitchatMessage>? {
+        val idx = indexOfFirst { it.id == messageID }
+        if (idx < 0) return null
+        if (statusPriority(status) < statusPriority(this[idx].deliveryStatus)) return null
+        return toMutableList().apply { this[idx] = this[idx].copy(deliveryStatus = status) }
     }
 
     override fun addChannelMessage(channel: String, msg: BitchatMessage) {

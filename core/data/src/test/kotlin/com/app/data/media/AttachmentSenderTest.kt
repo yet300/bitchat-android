@@ -27,13 +27,15 @@ class AttachmentSenderTest {
     private val bytes = byteArrayOf(1, 2, 3, 4, 5)
     private lateinit var file: File
     private lateinit var mesh: BluetoothMeshService
+    private lateinit var progressBridge: TransferProgressBridge
     private lateinit var sender: AttachmentSender
 
     @Before
     fun setUp() {
         file = File.createTempFile("att", ".jpg").apply { writeBytes(bytes); deleteOnExit() }
         mesh = mock()
-        sender = AttachmentSender(mesh)
+        progressBridge = mock()
+        sender = AttachmentSender(mesh, progressBridge)
     }
 
     @After
@@ -50,11 +52,12 @@ class AttachmentSenderTest {
 
     @Test
     fun private_target_sends_an_encrypted_file_to_the_peer() = runTest {
-        sender.send(attachment(), ConversationId.Private(PeerId("1234567890abcdef")))
+        sender.send(attachment(), ConversationId.Private(PeerId("1234567890abcdef")), "MSG-1")
 
         val packet = argumentCaptor<BitchatFilePacket>()
         verify(mesh).sendFilePrivate(eq("1234567890abcdef"), packet.capture())
         verify(mesh, never()).sendFileBroadcast(any())
+        verify(progressBridge).track(any(), eq("MSG-1"))
         assertEquals(file.name, packet.firstValue.fileName)
         assertEquals("image/jpeg", packet.firstValue.mimeType)
         assertArrayEquals(bytes, packet.firstValue.content)
@@ -62,7 +65,7 @@ class AttachmentSenderTest {
 
     @Test
     fun public_mesh_target_broadcasts_the_file() = runTest {
-        sender.send(attachment(), ConversationId.PublicMesh)
+        sender.send(attachment(), ConversationId.PublicMesh, "MSG-1")
 
         verify(mesh).sendFileBroadcast(any())
         verify(mesh, never()).sendFilePrivate(any(), any())
@@ -70,7 +73,7 @@ class AttachmentSenderTest {
 
     @Test
     fun channel_target_broadcasts_the_file() = runTest {
-        sender.send(attachment(), ConversationId.Channel("dev"))
+        sender.send(attachment(), ConversationId.Channel("dev"), "MSG-1")
 
         verify(mesh).sendFileBroadcast(any())
         verify(mesh, never()).sendFilePrivate(any(), any())
@@ -78,7 +81,7 @@ class AttachmentSenderTest {
 
     @Test
     fun geohash_target_is_dropped_not_misrouted_to_the_mesh() = runTest {
-        sender.send(attachment(), ConversationId.Geohash(GeohashChannel(GeohashLevel.CITY, "u4pru")))
+        sender.send(attachment(), ConversationId.Geohash(GeohashChannel(GeohashLevel.CITY, "u4pru")), "MSG-1")
 
         verify(mesh, never()).sendFileBroadcast(any())
         verify(mesh, never()).sendFilePrivate(any(), any())
@@ -87,9 +90,10 @@ class AttachmentSenderTest {
     @Test
     fun missing_file_sends_nothing() = runTest {
         val missing = Attachment(kind = AttachmentKind.FILE, ref = "/no/such/path.bin")
-        sender.send(missing, ConversationId.PublicMesh)
+        sender.send(missing, ConversationId.PublicMesh, "MSG-1")
 
         verify(mesh, never()).sendFileBroadcast(any())
         verify(mesh, never()).sendFilePrivate(any(), any())
+        verify(progressBridge, never()).track(any(), any())
     }
 }
