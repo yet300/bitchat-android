@@ -42,6 +42,7 @@ interface ChatComponent {
         val reachability: Reachability,
         val isEncrypted: Boolean,
         val isVerified: Boolean,
+        val participantCount: Int,
         val targetMessageId: String?,
     )
 

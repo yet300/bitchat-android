@@ -15,6 +15,7 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
         val draft: String = "",
         val reachability: Reachability = Reachability.OFFLINE,
         val isVerified: Boolean = false,
+        val participantCount: Int = 0,
         /** Message to scroll to / highlight on open (from a Messages search result); static. */
         val targetMessageId: String? = null,
     ) {
@@ -39,6 +40,7 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
         data class TitleResolved(val title: String) : Msg
         data class ReachabilityChanged(val reachability: Reachability) : Msg
         data class VerifiedChanged(val verified: Boolean) : Msg
+        data class ParticipantCountChanged(val count: Int) : Msg
     }
 
     sealed interface Label

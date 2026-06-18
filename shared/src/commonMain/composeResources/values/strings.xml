@@ -108,6 +108,7 @@
     <string name="chat_reach_nearby">Nearby</string>
     <string name="chat_reach_internet">via Nostr</string>
     <string name="chat_reach_offline">Offline</string>
+    <string name="chat_geo_here">%1$d here</string>
     <string name="chat_input_hint">Message</string>
     <string name="chat_send">Send</string>
     <string name="verify_action">Verify contact</string>

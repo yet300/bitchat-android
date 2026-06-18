@@ -182,6 +182,7 @@ class DefaultChatsComponentTest {
                     reachability = Reachability.OFFLINE,
                     isEncrypted = false,
                     isVerified = false,
+                    participantCount = 0,
                     targetMessageId = null,
                 ),
             )

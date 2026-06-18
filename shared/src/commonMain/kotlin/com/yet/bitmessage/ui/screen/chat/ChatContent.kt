@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.app.domain.model.BitMessage
+import com.app.domain.model.ConversationId
 import com.app.domain.model.DeliveryStatus
 import com.app.domain.model.Reachability
 import com.app.domain.repository.VerifyScanResult
@@ -54,6 +55,7 @@ import com.yet.bitmessage.shared.resources.chat_empty
 import com.yet.bitmessage.shared.resources.chat_encrypted
 import com.yet.bitmessage.shared.resources.chat_verified
 import com.yet.bitmessage.shared.resources.chat_input_hint
+import com.yet.bitmessage.shared.resources.chat_geo_here
 import com.yet.bitmessage.shared.resources.chat_reach_internet
 import com.yet.bitmessage.shared.resources.chat_reach_nearby
 import com.yet.bitmessage.shared.resources.chat_reach_offline
@@ -216,8 +218,13 @@ private fun ChatTitle(model: ChatComponent.Model) {
                     modifier = Modifier.size(12.dp),
                 )
             }
+            val subtitle = if (model.conversationId is ConversationId.Geohash) {
+                stringResource(Res.string.chat_geo_here, model.participantCount)
+            } else {
+                stringResource(model.reachability.label())
+            }
             Text(
-                text = stringResource(model.reachability.label()),
+                text = subtitle,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
