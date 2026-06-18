@@ -88,24 +88,6 @@ class MeshForegroundService : Service() {
             context.startService(intent)
         }
 
-        private fun shouldStartAsForeground(context: Context): Boolean {
-            return context.appGraph.meshServicePreferences.isBackgroundEnabled(true) &&
-                    hasBluetoothPermissionsStatic(context) &&
-                    hasNotificationPermissionStatic(context)
-        }
-
-        private fun hasBluetoothPermissionsStatic(ctx: Context): Boolean {
-            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.BLUETOOTH_ADVERTISE) == android.content.pm.PackageManager.PERMISSION_GRANTED &&
-                androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.BLUETOOTH_CONNECT) == android.content.pm.PackageManager.PERMISSION_GRANTED &&
-                androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.BLUETOOTH_SCAN) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            } else {
-                val fine = androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                val coarse = androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                fine || coarse
-            }
-        }
-
         private fun hasNotificationPermissionStatic(ctx: Context): Boolean {
             return if (Build.VERSION.SDK_INT >= 33) {
                 androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -170,28 +152,32 @@ class MeshForegroundService : Service() {
                 )
                 return START_NOT_STICKY
             }
-            ACTION_UPDATE_NOTIFICATION -> {
-                // If we became eligible and are not in foreground yet, promote once
-                if (appGraph.meshServicePreferences.isBackgroundEnabled(true) && hasAllRequiredPermissions() && !isInForeground) {
-                    val n = buildNotification(meshLifecycle.activePeerCount())
-                    startForegroundCompat(n)
-                    isInForeground = true
-                } else {
-                    updateNotification(force = true)
-                }
-            }
+            ACTION_UPDATE_NOTIFICATION -> { /* promotion / refresh handled uniformly below */ }
             else -> { /* ACTION_START or null */ }
         }
 
-        // Ensure mesh is running (only after permissions are granted)
-        ensureMeshStarted()
-
-        // Promote exactly once when eligible, otherwise stay background (or stop)
-        if (appGraph.meshServicePreferences.isBackgroundEnabled(true) && hasAllRequiredPermissions() && !isInForeground) {
-            val notification = buildNotification(meshLifecycle.activePeerCount())
-            startForegroundCompat(notification)
+        // FGS contract: once started via startForegroundService(), we MUST call startForeground()
+        // promptly — independent of optional BLE/location permissions — or the OS kills us with
+        // ForegroundServiceDidNotStartInTimeException. startForegroundCompat falls back to the
+        // DATA_SYNC type when device/location perms are absent (Nostr-only needs no mesh radio).
+        if (!isInForeground) {
+            startForegroundCompat(buildNotification(meshLifecycle.activePeerCount()))
             isInForeground = true
+        } else {
+            updateNotification(force = true)
         }
+
+        // Honor "run in background" being turned off: drop foreground and stop.
+        if (!appGraph.meshServicePreferences.isBackgroundEnabled(true)) {
+            try { stopForeground(true) } catch (_: Exception) { }
+            notificationManager.cancel(NOTIFICATION_ID)
+            isInForeground = false
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        // Start the BLE mesh only when its runtime permissions are present (Nostr-only runs without).
+        ensureMeshStarted()
 
         // Periodically refresh the notification with live network size
         if (updateJob == null) {
@@ -199,12 +185,12 @@ class MeshForegroundService : Service() {
                 while (isActive) {
                     // Retry enabling mesh/foreground once permissions become available
                     ensureMeshStarted()
-                    val eligible = appGraph.meshServicePreferences.isBackgroundEnabled(true) && hasAllRequiredPermissions()
-                    if (eligible) {
+                    // Stay foreground while background is enabled; BLE/location are optional
+                    // (Nostr-only keeps the relay alive). Only background-off tears us down.
+                    if (appGraph.meshServicePreferences.isBackgroundEnabled(true)) {
                         // Only update the notification; do not re-call startForeground()
                         updateNotification(force = false)
                     } else {
-                        // If disabled or perms missing, ensure we are not in foreground and clear notif
                         if (isInForeground) {
                             try { stopForeground(false) } catch (_: Exception) { }
                             isInForeground = false
@@ -237,7 +223,7 @@ class MeshForegroundService : Service() {
         }
         val count = meshLifecycle.activePeerCount()
         val notification = buildNotification(count)
-        if (appGraph.meshServicePreferences.isBackgroundEnabled(true) && hasAllRequiredPermissions()) {
+        if (appGraph.meshServicePreferences.isBackgroundEnabled(true)) {
             notificationManager.notify(NOTIFICATION_ID, notification)
         } else if (force) {
             // If disabled and forced, make sure to remove any prior foreground state
@@ -245,14 +231,6 @@ class MeshForegroundService : Service() {
             notificationManager.cancel(NOTIFICATION_ID)
             isInForeground = false
         }
-    }
-
-    private fun hasAllRequiredPermissions(): Boolean {
-        // For starting FGS with connectedDevice|dataSync, we need:
-        // - Foreground service permissions (declared in manifest)
-        // - One of the device-related permissions (we request BL perms at runtime)
-        // - On Android 13+, POST_NOTIFICATIONS to actually show notification
-        return hasBluetoothPermissions() && hasNotificationPermission()
     }
 
     private fun hasBluetoothPermissions(): Boolean {
