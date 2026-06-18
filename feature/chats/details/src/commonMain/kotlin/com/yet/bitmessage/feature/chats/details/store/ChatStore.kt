@@ -2,6 +2,7 @@ package com.yet.bitmessage.feature.chats.details.store
 
 import com.app.domain.model.BitMessage
 import com.app.domain.model.ConversationId
+import com.app.domain.model.GeoPerson
 import com.app.domain.model.Reachability
 import com.arkivanov.mvikotlin.core.store.Store
 
@@ -16,6 +17,8 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
         val reachability: Reachability = Reachability.OFFLINE,
         val isVerified: Boolean = false,
         val participantCount: Int = 0,
+        /** Live participants for a geo chat (empty for other kinds). */
+        val participants: List<GeoPerson> = emptyList(),
         /** Message to scroll to / highlight on open (from a Messages search result); static. */
         val targetMessageId: String? = null,
     ) {
@@ -41,6 +44,7 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
         data class ReachabilityChanged(val reachability: Reachability) : Msg
         data class VerifiedChanged(val verified: Boolean) : Msg
         data class ParticipantCountChanged(val count: Int) : Msg
+        data class ParticipantsChanged(val participants: List<GeoPerson>) : Msg
     }
 
     sealed interface Label

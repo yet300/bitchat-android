@@ -144,9 +144,10 @@ class ChatStoreFactoryTest {
 
     private class FakeGeohashRepository(
         private val counts: MutableStateFlow<Map<String, Int>> = MutableStateFlow(emptyMap()),
+        private val people: MutableStateFlow<List<GeoPerson>> = MutableStateFlow(emptyList()),
     ) : GeohashRepository {
         val selected = mutableListOf<ConversationId>()
-        override fun observeParticipants(): Flow<List<GeoPerson>> = MutableStateFlow(emptyList())
+        override fun observeParticipants(): Flow<List<GeoPerson>> = people
         override fun observeSelectedChannel(): Flow<ConversationId> = MutableStateFlow(ConversationId.PublicMesh)
         override fun observeParticipantCounts(): Flow<Map<String, Int>> = counts
         override suspend fun select(channel: ConversationId) { selected += channel }
@@ -333,5 +334,18 @@ class ChatStoreFactoryTest {
 
         counts.value = mapOf("u4pru" to 5)
         assertEquals(5, store.state.participantCount)
+    }
+
+    @Test
+    fun geohash_participants_flow_into_state() = runTest {
+        val people = MutableStateFlow(listOf(GeoPerson(pubkeyHex = "ab", displayName = "bob")))
+        val geohash = FakeGeohashRepository(people = people)
+        val geoId = ConversationId.Geohash(GeohashChannel(GeohashLevel.CITY, "u4pru"))
+        val store = factory(id = geoId, geohash = geohash).create()
+
+        assertEquals(listOf("bob"), store.state.participants.map { it.displayName })
+
+        people.value = emptyList()
+        assertTrue(store.state.participants.isEmpty())
     }
 }

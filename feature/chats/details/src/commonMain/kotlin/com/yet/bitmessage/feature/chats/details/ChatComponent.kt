@@ -2,6 +2,7 @@ package com.yet.bitmessage.feature.chats.details
 
 import com.app.domain.model.BitMessage
 import com.app.domain.model.ConversationId
+import com.app.domain.model.GeoPerson
 import com.app.domain.model.Reachability
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.router.slot.ChildSlot
@@ -17,8 +18,7 @@ interface ChatComponent {
 
     val model: Value<Model>
 
-    /** The QR-verification scanner sheet (per-contact verify), or none. */
-    val verifyScan: Value<ChildSlot<*, VerifyScanComponent>>
+    val sheetSlot: Value<ChildSlot<*, ChatSheetChild>>
 
     fun onDraftChanged(text: String)
 
@@ -27,10 +27,17 @@ interface ChatComponent {
     /** Open the QR-scan verification sheet for this DM. */
     fun onVerifyClicked()
 
-    fun onDismissVerifyScan()
+    /** Open the geo-participants sheet ("who's here"). */
+    fun onParticipantsClicked()
 
-    /** Close the details panel (panels SINGLE mode back navigation). */
+    fun onDismissSheet()
+
     fun onBackClicked()
+
+    sealed interface ChatSheetChild {
+        class VerifyScan(val component: VerifyScanComponent) : ChatSheetChild
+        data object Participants : ChatSheetChild
+    }
 
     data class Model(
         val conversationId: ConversationId,
@@ -43,6 +50,7 @@ interface ChatComponent {
         val isEncrypted: Boolean,
         val isVerified: Boolean,
         val participantCount: Int,
+        val participants: List<GeoPerson>,
         val targetMessageId: String?,
     )
 

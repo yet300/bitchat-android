@@ -22,6 +22,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -44,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import com.app.domain.model.BitMessage
 import com.app.domain.model.ConversationId
 import com.app.domain.model.DeliveryStatus
+import com.app.domain.model.GeoPerson
 import com.app.domain.model.Reachability
 import com.app.domain.repository.VerifyScanResult
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
@@ -56,6 +58,9 @@ import com.yet.bitmessage.shared.resources.chat_encrypted
 import com.yet.bitmessage.shared.resources.chat_verified
 import com.yet.bitmessage.shared.resources.chat_input_hint
 import com.yet.bitmessage.shared.resources.chat_geo_here
+import com.yet.bitmessage.shared.resources.chat_geo_participants
+import com.yet.bitmessage.shared.resources.chat_geo_participants_empty
+import com.yet.bitmessage.shared.resources.chat_geo_teleported
 import com.yet.bitmessage.shared.resources.chat_reach_internet
 import com.yet.bitmessage.shared.resources.chat_reach_nearby
 import com.yet.bitmessage.shared.resources.chat_reach_offline
@@ -71,10 +76,12 @@ import com.yet.bitmessage.shared.resources.verify_scan_title
 import com.yet.bitmessage.shared.resources.verify_started
 import com.yet.bitmessage.ui.component.CameraScanner
 import com.yet.bitmessage.ui.component.button.IconCircleButton
+import com.yet.bitmessage.ui.component.icon.AccountCircle
 import com.yet.bitmessage.ui.component.icon.ArrowBack
 import com.yet.bitmessage.ui.component.icon.Check
 import com.yet.bitmessage.ui.component.icon.Close
 import com.yet.bitmessage.ui.component.icon.Done
+import com.yet.bitmessage.ui.component.icon.LocationOn
 import com.yet.bitmessage.ui.component.icon.DoneAll
 import com.yet.bitmessage.ui.component.icon.Lock
 import com.yet.bitmessage.ui.component.icon.QrCodeScanner
@@ -85,7 +92,7 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun ChatContent(component: ChatComponent, modifier: Modifier = Modifier) {
     val model by component.model.subscribeAsState()
-    val verifyScan by component.verifyScan.subscribeAsState()
+    val sheet by component.sheetSlot.subscribeAsState()
 
     Scaffold(
         modifier = modifier,
@@ -106,6 +113,15 @@ fun ChatContent(component: ChatComponent, modifier: Modifier = Modifier) {
                             Icon(
                                 imageVector = QrCodeScanner,
                                 contentDescription = stringResource(Res.string.verify_action),
+                            )
+                        }
+                    }
+                    // Geo chats: who's present in this geohash.
+                    if (model.conversationId is ConversationId.Geohash) {
+                        IconButton(onClick = component::onParticipantsClicked) {
+                            Icon(
+                                imageVector = AccountCircle,
+                                contentDescription = stringResource(Res.string.chat_geo_participants),
                             )
                         }
                     }
@@ -137,8 +153,69 @@ fun ChatContent(component: ChatComponent, modifier: Modifier = Modifier) {
         }
     }
 
-    verifyScan.child?.instance?.let { scanComponent ->
-        VerifyScanSheet(component = scanComponent, onDismiss = component::onDismissVerifyScan)
+    when (val child = sheet.child?.instance) {
+        is ChatComponent.ChatSheetChild.VerifyScan ->
+            VerifyScanSheet(component = child.component, onDismiss = component::onDismissSheet)
+        ChatComponent.ChatSheetChild.Participants ->
+            GeoParticipantsSheet(participants = model.participants, onDismiss = component::onDismissSheet)
+        null -> Unit
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GeoParticipantsSheet(participants: List<GeoPerson>, onDismiss: () -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Text(
+            text = stringResource(Res.string.chat_geo_participants),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+        )
+        if (participants.isEmpty()) {
+            Text(
+                text = stringResource(Res.string.chat_geo_participants_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+            )
+        } else {
+            LazyColumn(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+                items(participants, key = { it.pubkeyHex }) { person ->
+                    GeoParticipantRow(person)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GeoParticipantRow(person: GeoPerson) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(
+            imageVector = AccountCircle,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(28.dp),
+        )
+        Text(
+            text = person.displayName,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (person.isTeleported) {
+            Icon(
+                imageVector = LocationOn,
+                contentDescription = stringResource(Res.string.chat_geo_teleported),
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(16.dp),
+            )
+        }
     }
 }
 
