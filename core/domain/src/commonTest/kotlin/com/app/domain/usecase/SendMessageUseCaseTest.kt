@@ -69,12 +69,16 @@ class SendMessageUseCaseTest {
         assertEquals("MSG-1", sent.messageId)
     }
 
-    @Test fun `geohash sends via transport without local echo`() = runTest {
+    @Test fun `geohash echoes locally and sends via transport`() = runTest {
         val transport = FakeMessageTransport(); val repo = FakeMessageRepository()
         val gh = GeohashChannel(GeohashLevel.CITY, "u4pruyd")
-        useCase(transport, repo).invoke(ConversationId.Geohash(gh), "loc", sender)
+        val target = ConversationId.Geohash(gh)
+        useCase(transport, repo).invoke(target, "loc", sender)
 
-        assertTrue(repo.appended.isEmpty())
+        val echo = repo.appended.single()
+        assertEquals(target, echo.first)
+        assertEquals("loc", echo.second.content)
+        assertTrue(echo.second.isMine)
         assertEquals(1, transport.geos.size)
         assertEquals(gh, transport.geos.single().channel)
     }

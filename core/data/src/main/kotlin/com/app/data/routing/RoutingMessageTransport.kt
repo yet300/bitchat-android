@@ -1,6 +1,6 @@
 package com.app.data.routing
 
-import android.util.Log
+import com.app.data.nostr.GeohashMessageSender
 import com.app.domain.model.Attachment
 import com.app.domain.model.ConversationId
 import com.app.domain.model.GeohashChannel
@@ -23,6 +23,7 @@ import dev.zacsweers.metro.SingleIn
 internal class RoutingMessageTransport(
     private val mesh: BluetoothMeshService,
     private val router: MessageRouter,
+    private val geohashSender: GeohashMessageSender,
 ) : MessageTransport {
 
     override suspend fun sendPublic(content: String, mentions: List<String>, channel: String?) {
@@ -34,16 +35,9 @@ internal class RoutingMessageTransport(
     }
 
     override suspend fun sendGeohash(content: String, channel: GeohashChannel, nickname: String?) {
-        // The whole geohash chat subsystem (subscribe + ingest incoming, presence, public posting,
-        // per-geohash identity, local echo) is not yet ported to the data layer — MessageRepository
-        // also stubs the geo timeline. Its legacy orchestration (GeohashViewModel/GeohashMessageHandler)
-        // was removed in the Phase D cleanup without a replacement. Until a GeohashRepository lands,
-        // no-op instead of throwing: the new chat UI reaches this port and must NOT crash the app.
-        // TRACKING: geohash data-layer port.
-        Log.w(
-            "RoutingMessageTransport",
-            "Dropping geohash post to ${channel.geohash}: geohash chat is not yet wired through the data layer",
-        )
+        // Post a kind-20000 ephemeral event signed by the per-geohash identity (the local echo is
+        // added by SendMessageUseCase; incoming + presence are ingested by GeohashRepository).
+        geohashSender.sendPublic(content, channel.geohash, nickname)
     }
 
     override suspend fun sendAttachment(attachment: Attachment, target: ConversationId, messageId: String) {
