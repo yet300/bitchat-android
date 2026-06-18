@@ -74,6 +74,7 @@ internal class ChatStoreFactory(
                 is ChatStore.Msg.TitleResolved -> copy(title = msg.title)
                 is ChatStore.Msg.ReachabilityChanged -> copy(reachability = msg.reachability)
                 is ChatStore.Msg.VerifiedChanged -> copy(isVerified = msg.verified)
+                is ChatStore.Msg.ParticipantCountChanged -> copy(participantCount = msg.count)
             }
     }
 
@@ -114,9 +115,16 @@ internal class ChatStoreFactory(
                         }
                     }
                     // Geo chats: select the location channel so the repository subscribes to the
-                    // geohash's Nostr events and ingests them into this timeline (incoming receive).
+                    // geohash's Nostr events and ingests them into this timeline (incoming receive),
+                    // and surface the live participant count ("N here") in the header.
                     if (conversationId is ConversationId.Geohash) {
+                        val geohash = conversationId.channel.geohash
                         scope.launch { runCatching { geohashRepository.select(conversationId) } }
+                        scope.launch {
+                            geohashRepository.observeParticipantCounts().collect { counts ->
+                                dispatch(ChatStore.Msg.ParticipantCountChanged(counts[geohash] ?: 0))
+                            }
+                        }
                     }
                     // Reset unread count and (private chats) flush read receipts; best-effort.
                     scope.launch { runCatching { markRead(conversationId) } }
