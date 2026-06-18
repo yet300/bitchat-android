@@ -1,7 +1,7 @@
 # bitMessage (bitchat rewrite) — project rules
 
 ## Process
-- One iteration = branch `bitMessage/<slug>` → green gate (`:core:*:test`, `:app:testDebugUnitTest`, `assembleDebug`) → `merge --no-ff` into `bitMessage/main`.
+- One iteration = branch `bitMessage/<slug>` → green gate (`:core:*` + `:feature:*` tests, `:shared:assemble`, `:androidApp:testDebugUnitTest`, `:androidApp:assembleDebug`) → `merge --no-ff` into `bitMessage/main`. (The legacy `:app` module was removed in the A–D rewrite; the application module is now `:androidApp`.)
 - Commits and code comments in English. Responses to the user in Russian.
 - `docs/MIGRATION_PLAN.md` and `docs/FEATURE_MAP.md` are deliberately untracked — never `git add` them.
 
