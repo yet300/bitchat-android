@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -147,14 +148,22 @@ fun ChatContent(component: ChatComponent, modifier: Modifier = Modifier) {
             )
         },
         bottomBar = {
-            MessageInput(
-                draft = model.draft,
-                canSend = model.canSend,
-                canAttach = canAttach,
-                onDraftChanged = component::onDraftChanged,
-                onSendClicked = component::onSendClicked,
-                onAttachClicked = launchAttachmentPicker,
-            )
+            Column {
+                if (model.mentionSuggestions.isNotEmpty()) {
+                    MentionSuggestions(
+                        suggestions = model.mentionSuggestions,
+                        onSelect = component::onMentionSelected,
+                    )
+                }
+                MessageInput(
+                    draft = model.draft,
+                    canSend = model.canSend,
+                    canAttach = canAttach,
+                    onDraftChanged = component::onDraftChanged,
+                    onSendClicked = component::onSendClicked,
+                    onAttachClicked = launchAttachmentPicker,
+                )
+            }
         },
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
@@ -527,6 +536,31 @@ internal fun DeliveryStatus.glyph(): Pair<ImageVector, Color> = when (this) {
     is DeliveryStatus.PartiallyDelivered -> DoneAll to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
     is DeliveryStatus.Read -> DoneAll to MaterialTheme.colorScheme.primary
     is DeliveryStatus.Failed -> Close to MaterialTheme.colorScheme.error
+}
+
+@Composable
+private fun MentionSuggestions(suggestions: List<String>, onSelect: (String) -> Unit) {
+    Surface(tonalElevation = 3.dp) {
+        LazyRow(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(suggestions, key = { it }) { nickname ->
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.clickable { onSelect(nickname) },
+                ) {
+                    Text(
+                        text = "@$nickname",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable

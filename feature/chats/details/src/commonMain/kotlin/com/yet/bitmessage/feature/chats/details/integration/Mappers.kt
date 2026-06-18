@@ -16,6 +16,7 @@ internal val stateToModel: (ChatStore.State) -> ChatComponent.Model = { state ->
         isVerified = state.isVerified,
         participantCount = state.participantCount,
         participants = state.participants,
+        mentionSuggestions = state.mentionSuggestions,
         targetMessageId = state.targetMessageId,
     )
 }

@@ -87,6 +87,7 @@ internal class ChatStoreFactory(
                 is ChatStore.Msg.VerifiedChanged -> copy(isVerified = msg.verified)
                 is ChatStore.Msg.ParticipantCountChanged -> copy(participantCount = msg.count)
                 is ChatStore.Msg.ParticipantsChanged -> copy(participants = msg.participants)
+                is ChatStore.Msg.MentionCandidatesChanged -> copy(mentionCandidates = msg.nicknames)
             }
     }
 
@@ -140,6 +141,19 @@ internal class ChatStoreFactory(
                         scope.launch {
                             geohashRepository.observeParticipants().collect { people ->
                                 dispatch(ChatStore.Msg.ParticipantsChanged(people))
+                                // @-mention candidates = geo participants (base nick, without #suffix).
+                                dispatch(ChatStore.Msg.MentionCandidatesChanged(
+                                    people.mapTo(mutableSetOf()) { it.displayName.substringBefore('#') },
+                                ))
+                            }
+                        }
+                    } else {
+                        // @-mention candidates = live mesh peers (for public / channel / DM).
+                        scope.launch {
+                            peerRepository.observePeers().collect { peers ->
+                                dispatch(ChatStore.Msg.MentionCandidatesChanged(
+                                    peers.mapTo(mutableSetOf()) { it.nickname },
+                                ))
                             }
                         }
                     }
@@ -170,6 +184,11 @@ internal class ChatStoreFactory(
                 is ChatStore.Intent.SendAttachment -> scope.launch { runSendAttachment(intent.attachment) }
 
                 is ChatStore.Intent.CancelTransfer -> scope.launch { cancelTransfer(intent.messageId) }
+
+                is ChatStore.Intent.MentionSelected -> {
+                    val completed = state().draft.replace(TRAILING_MENTION_REGEX, "@${intent.nickname} ")
+                    dispatch(ChatStore.Msg.DraftChanged(completed))
+                }
             }
         }
 

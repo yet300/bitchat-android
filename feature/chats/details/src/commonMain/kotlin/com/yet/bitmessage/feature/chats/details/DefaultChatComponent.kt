@@ -83,6 +83,9 @@ internal class DefaultChatComponent(
     override fun onCancelTransfer(messageId: String) =
         store.accept(ChatStore.Intent.CancelTransfer(messageId))
 
+    override fun onMentionSelected(nickname: String) =
+        store.accept(ChatStore.Intent.MentionSelected(nickname))
+
     override fun onVerifyClicked() = sheetNavigation.activate(SheetConfig.VerifyScan)
 
     override fun onParticipantsClicked() = sheetNavigation.activate(SheetConfig.Participants)
