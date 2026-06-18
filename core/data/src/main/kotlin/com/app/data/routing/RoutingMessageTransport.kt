@@ -1,5 +1,6 @@
 package com.app.data.routing
 
+import com.app.data.media.AttachmentSender
 import com.app.data.nostr.GeohashMessageSender
 import com.app.domain.model.Attachment
 import com.app.domain.model.ConversationId
@@ -24,6 +25,7 @@ internal class RoutingMessageTransport(
     private val mesh: BluetoothMeshService,
     private val router: MessageRouter,
     private val geohashSender: GeohashMessageSender,
+    private val attachmentSender: AttachmentSender,
 ) : MessageTransport {
 
     override suspend fun sendPublic(content: String, mentions: List<String>, channel: String?) {
@@ -41,11 +43,7 @@ internal class RoutingMessageTransport(
     }
 
     override suspend fun sendAttachment(attachment: Attachment, target: ConversationId, messageId: String) {
-        // TRACKING(Phase B / data-media): media attachment orchestration (Attachment ->
-        // BitchatFilePacket, broadcast vs private) still lives in :app (MediaSendingManager).
-        throw UnsupportedOperationException(
-            "Attachment sending is not yet routed through the data layer (lives in :app MediaSendingManager)",
-        )
+        attachmentSender.send(attachment, target)
     }
 
     override suspend fun cancelTransfer(messageId: String): Boolean =
