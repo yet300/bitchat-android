@@ -43,7 +43,7 @@ internal class RoutingMessageTransport(
     }
 
     override suspend fun sendAttachment(attachment: Attachment, target: ConversationId, messageId: String) {
-        attachmentSender.send(attachment, target)
+        attachmentSender.send(attachment, target, messageId)
     }
 
     override suspend fun cancelTransfer(messageId: String): Boolean =
