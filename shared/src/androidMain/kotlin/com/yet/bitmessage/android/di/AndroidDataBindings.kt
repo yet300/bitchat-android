@@ -20,6 +20,7 @@ import com.app.transport.mesh.FragmentManager
 import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.mesh.MeshBearer
 import com.app.transport.mesh.MeshLifecycleController
+import com.app.transport.nostr.NostrRelayManager
 import com.app.transport.mesh.MeshNetwork
 import com.app.transport.net.TorPreferenceManager
 import com.app.transport.nostr.PoWPreferenceManager
@@ -182,8 +183,16 @@ object AndroidDataBindings {
         context: Context,
         torPreferenceManager: TorPreferenceManager,
         permissionRequester: RuntimePermissionRequester,
+        meshLifecycle: MeshLifecycleController,
+        nostrRelayManager: NostrRelayManager,
     ): ConnectivityRepository =
-        AndroidConnectivityRepository(context.applicationContext, torPreferenceManager, permissionRequester)
+        AndroidConnectivityRepository(
+            context.applicationContext,
+            torPreferenceManager,
+            permissionRequester,
+            meshLifecycle,
+            nostrRelayManager,
+        )
 
     @Provides
     @SingleIn(AppScope::class)

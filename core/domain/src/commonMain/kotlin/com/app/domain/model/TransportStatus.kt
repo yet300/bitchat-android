@@ -21,4 +21,5 @@ enum class TransportState {
 data class TransportStatus(
     val kind: TransportKind,
     val state: TransportState,
+    val count: Int? = null,
 )

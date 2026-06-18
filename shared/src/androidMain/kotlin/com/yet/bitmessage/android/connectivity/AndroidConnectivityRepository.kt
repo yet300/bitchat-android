@@ -16,9 +16,11 @@ import com.app.domain.model.TransportKind
 import com.app.domain.model.TransportState
 import com.app.domain.model.TransportStatus
 import com.app.domain.repository.ConnectivityRepository
+import com.app.transport.mesh.MeshLifecycleController
 import com.app.transport.mesh.aware.WifiAwareSupport
 import com.app.transport.net.TorMode
 import com.app.transport.net.TorPreferenceManager
+import com.app.transport.nostr.NostrRelayManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.delay
@@ -34,6 +36,8 @@ class AndroidConnectivityRepository(
     private val context: Context,
     private val torPreferenceManager: TorPreferenceManager,
     private val permissionRequester: RuntimePermissionRequester,
+    private val meshLifecycle: MeshLifecycleController,
+    private val nostrRelayManager: NostrRelayManager,
 ) : ConnectivityRepository {
 
     override fun observe(): Flow<List<TransportStatus>> = flow {
@@ -43,12 +47,27 @@ class AndroidConnectivityRepository(
         }
     }
 
-    private fun snapshot(): List<TransportStatus> = listOf(
-        TransportStatus(TransportKind.BLUETOOTH, bluetoothState()),
-        TransportStatus(TransportKind.WIFI_AWARE, wifiAwareState()),
-        TransportStatus(TransportKind.INTERNET, internetState()),
-        TransportStatus(TransportKind.TOR, torState()),
-    )
+    private fun snapshot(): List<TransportStatus> {
+        val bluetooth = bluetoothState()
+        val internet = internetState()
+        return listOf(
+            // Mesh peers ride BLE (primary) and Wi-Fi Aware; surfaced under Bluetooth as "nearby".
+            TransportStatus(TransportKind.BLUETOOTH, bluetooth, count = meshPeerCount(bluetooth)),
+            TransportStatus(TransportKind.WIFI_AWARE, wifiAwareState()),
+            TransportStatus(TransportKind.INTERNET, internet, count = connectedRelayCount(internet)),
+            TransportStatus(TransportKind.TOR, torState()),
+        )
+    }
+
+    private fun meshPeerCount(state: TransportState): Int? =
+        if (state == TransportState.ON) runCatching { meshLifecycle.activePeerCount() }.getOrNull() else null
+
+    private fun connectedRelayCount(state: TransportState): Int? =
+        if (state == TransportState.ON) {
+            runCatching { nostrRelayManager.relays.value.count { it.isConnected } }.getOrNull()
+        } else {
+            null
+        }
 
     private fun bluetoothState(): TransportState {
         if (!context.packageManager.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
