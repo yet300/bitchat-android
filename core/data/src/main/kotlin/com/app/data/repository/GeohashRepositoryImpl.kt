@@ -1,0 +1,290 @@
+@file:OptIn(ExperimentalTime::class)
+
+package com.app.data.repository
+
+import android.util.Log
+import com.app.common.settings.SettingsStore
+import com.app.data.AppStateStore
+import com.app.data.nostr.CurrentGeohashSource
+import com.app.domain.model.ConversationId
+import com.app.domain.model.GeoPerson
+import com.app.domain.model.PeerId
+import com.app.domain.repository.GeohashRepository
+import com.app.transport.model.BitchatMessage
+import com.app.transport.nostr.GeohashAliasRegistry
+import com.app.transport.nostr.GeohashConversationRegistry
+import com.app.transport.nostr.NostrEvent
+import com.app.transport.nostr.NostrFilter
+import com.app.transport.nostr.NostrIdentityBridge
+import com.app.transport.nostr.NostrKind
+import com.app.transport.nostr.NostrProofOfWork
+import com.app.transport.nostr.NostrRelayManager
+import com.app.transport.nostr.PoWPreferenceManager
+import com.app.transport.nostr.RelayDirectory
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+
+/**
+ * Geohash (location) chat over the existing :core:transport Nostr stack. Subscribes to the selected
+ * geohash's ephemeral events (kind 20000 chat + 20001 presence), ingests incoming posts into the
+ * shared `geo:<geohash>` channel timeline ([AppStateStore]) and tracks live participants/presence.
+ *
+ * Re-homes the logic that previously lived in the deleted `GeohashViewModel`/`GeohashMessageHandler`
+ * (Phase D), without resurrecting a god-class: a single app-scoped repository over the Nostr ports.
+ * Identity derivation, relay selection and dedup stay infrastructure concerns handled here; the
+ * domain sees only [GeohashRepository].
+ */
+@SingleIn(AppScope::class)
+@Inject
+internal class GeohashRepositoryImpl(
+    private val appStateStore: AppStateStore,
+    private val relayManager: NostrRelayManager,
+    private val relayDirectory: RelayDirectory,
+    private val nostrIdentityBridge: NostrIdentityBridge,
+    private val powPreferenceManager: PoWPreferenceManager,
+    private val aliasRegistry: GeohashAliasRegistry,
+    private val conversationRegistry: GeohashConversationRegistry,
+    private val settings: SettingsStore,
+) : GeohashRepository, CurrentGeohashSource {
+
+    private val lock = Any()
+
+    // geohash -> (pubkeyHex(lower) -> last seen)
+    private val participants = mutableMapOf<String, MutableMap<String, Instant>>()
+    // pubkeyHex(lower) -> nickname (without #suffix)
+    private val nicknames = mutableMapOf<String, String>()
+    // pubkeyHex(lower) of participants that announced a teleport tag
+    private val teleported = mutableSetOf<String>()
+
+    // Bounded event-id dedup (matches the legacy handler's horizon).
+    private val seenOrder = ArrayDeque<String>()
+    private val seenSet = HashSet<String>()
+
+    private var activeGeohash: String? = null
+
+    private val _selected = MutableStateFlow<ConversationId>(ConversationId.PublicMesh)
+    private val _participants = MutableStateFlow<List<GeoPerson>>(emptyList())
+    private val _counts = MutableStateFlow<Map<String, Int>>(emptyMap())
+
+    override fun observeParticipants(): Flow<List<GeoPerson>> = _participants.asStateFlow()
+    override fun observeSelectedChannel(): Flow<ConversationId> = _selected.asStateFlow()
+    override fun observeParticipantCounts(): Flow<Map<String, Int>> = _counts.asStateFlow()
+
+    override fun currentGeohash(): String? = synchronized(lock) { activeGeohash }
+
+    override suspend fun select(channel: ConversationId) {
+        when (channel) {
+            is ConversationId.Geohash -> {
+                subscribe(channel.channel.geohash)
+                _selected.value = channel
+            }
+            ConversationId.PublicMesh -> {
+                unsubscribe()
+                _selected.value = channel
+            }
+            else -> Unit // DMs / classic channels are not this repository's concern
+        }
+        refreshDerived()
+    }
+
+    override suspend fun startDirectMessage(pubkeyHex: String): ConversationId {
+        val alias = aliasFor(pubkeyHex)
+        aliasRegistry.put(alias, pubkeyHex)
+        synchronized(lock) { activeGeohash }?.let { conversationRegistry.set(alias, it) }
+        return ConversationId.Private(PeerId(alias))
+    }
+
+    override suspend fun setBlocked(pubkeyHex: String, blocked: Boolean) {
+        val key = pubkeyHex.lowercase()
+        val current = blockedSet()
+        val next = if (blocked) current + key else current - key
+        settings.putString(BLOCKED_KEY, next.joinToString(","))
+        refreshDerived()
+    }
+
+    override suspend fun isTeleported(pubkeyHex: String): Boolean =
+        synchronized(lock) { teleported.contains(pubkeyHex.lowercase()) }
+
+    override suspend fun pubkeyForNickname(nickname: String): String? = synchronized(lock) {
+        nicknames.entries.firstOrNull { (_, n) -> (n.substringBefore('#')) == nickname }?.key
+    }
+
+    override suspend fun pubkeyForShortId(shortId: String): String? = synchronized(lock) {
+        nicknames.keys.firstOrNull { it.startsWith(shortId, ignoreCase = true) }
+            ?: participants.values.firstNotNullOfOrNull { ps ->
+                ps.keys.firstOrNull { it.startsWith(shortId, ignoreCase = true) }
+            }
+    }
+
+    // --- subscription lifecycle ---
+
+    private fun subscribe(geohash: String) {
+        synchronized(lock) {
+            if (activeGeohash == geohash) return
+            activeGeohash?.let { relayManager.unsubscribe(subscriptionId(it)) }
+            activeGeohash = geohash
+        }
+        val filter = NostrFilter.geohashEphemeral(
+            geohash = geohash,
+            since = System.currentTimeMillis() - SUBSCRIBE_WINDOW_MS,
+            limit = SUBSCRIBE_LIMIT,
+        )
+        runCatching {
+            relayManager.subscribeForGeohash(
+                geohash = geohash,
+                filter = filter,
+                relayDirectory = relayDirectory,
+                id = subscriptionId(geohash),
+                handler = { event -> ingest(event, geohash) },
+            )
+        }.onFailure { Log.e(TAG, "subscribe($geohash) failed: ${it.message}") }
+    }
+
+    private fun unsubscribe() {
+        synchronized(lock) {
+            activeGeohash?.let { relayManager.unsubscribe(subscriptionId(it)) }
+            activeGeohash = null
+        }
+    }
+
+    // --- ingest (visible for tests) ---
+
+    /** Process one incoming Nostr event for [geohash]. Public for unit tests; the relay calls it. */
+    internal fun ingest(event: NostrEvent, geohash: String) {
+        try {
+            if (event.kind != NostrKind.EPHEMERAL_EVENT && event.kind != NostrKind.GEOHASH_PRESENCE) return
+            val tagGeo = event.tags.firstOrNull { it.size >= 2 && it[0] == "g" }?.getOrNull(1)
+            if (tagGeo == null || !tagGeo.equals(geohash, ignoreCase = true)) return
+            if (dedupe(event.id)) return
+
+            if (event.kind == NostrKind.EPHEMERAL_EVENT) {
+                val pow = powPreferenceManager.getCurrentSettings()
+                if (pow.enabled && pow.difficulty > 0 &&
+                    !NostrProofOfWork.validateDifficulty(event, pow.difficulty)
+                ) {
+                    return
+                }
+            }
+
+            if (isBlocked(event.pubkey)) return
+
+            val lastSeen = Instant.fromEpochMilliseconds(event.createdAt * 1000L)
+            val isTeleport = event.tags.any { it.size >= 2 && it[0] == "t" && it[1] == "teleport" }
+            synchronized(lock) {
+                participants.getOrPut(geohash) { mutableMapOf() }[event.pubkey.lowercase()] = lastSeen
+                event.tags.firstOrNull { it.size >= 2 && it[0] == "n" }
+                    ?.let { nicknames[event.pubkey.lowercase()] = it[1] }
+                if (isTeleport) teleported.add(event.pubkey.lowercase())
+            }
+            runCatching { aliasRegistry.put(aliasFor(event.pubkey), event.pubkey) }
+            refreshDerived()
+
+            // Presence heartbeats only update participants; they carry no chat content.
+            if (event.kind == NostrKind.GEOHASH_PRESENCE) return
+
+            // Skip our own posts (they appear via local echo) and empty teleport presence beacons.
+            val myHex = runCatching { nostrIdentityBridge.deriveIdentity(geohash).publicKeyHex }.getOrNull()
+            if (myHex != null && myHex.equals(event.pubkey, ignoreCase = true)) return
+            if (isTeleport && event.content.trim().isEmpty()) return
+
+            val message = BitchatMessage(
+                id = event.id,
+                sender = displayName(event.pubkey, geohash, disambiguate = true),
+                content = event.content,
+                timestamp = lastSeen,
+                isRelay = false,
+                originalSender = displayName(event.pubkey, geohash, disambiguate = false) + "#" + event.pubkey.takeLast(4),
+                senderPeerID = "nostr:${event.pubkey.take(8)}",
+                mentions = null,
+                channel = "#$geohash",
+                powDifficulty = powDifficultyOf(event),
+            )
+            appStateStore.addChannelMessage(AppStateStore.geoChannelName(geohash), message)
+        } catch (e: Exception) {
+            Log.e(TAG, "ingest error: ${e.message}")
+        }
+    }
+
+    // --- derived state ---
+
+    private fun refreshDerived() {
+        val cutoff = Instant.fromEpochMilliseconds(System.currentTimeMillis() - PRESENCE_TTL_MS)
+        val blocked = blockedSet()
+        synchronized(lock) {
+            pruneExpired(cutoff)
+            _counts.value = participants.mapValues { (_, ps) ->
+                ps.count { (pk, seen) -> seen >= cutoff && pk !in blocked }
+            }
+            val geohash = activeGeohash
+            _participants.value = if (geohash == null) {
+                emptyList()
+            } else {
+                (participants[geohash] ?: emptyMap())
+                    .filterKeys { it !in blocked }
+                    .map { (pk, seen) ->
+                        GeoPerson(
+                            pubkeyHex = pk,
+                            displayName = displayName(pk, geohash, disambiguate = true),
+                            isTeleported = pk in teleported,
+                            lastSeen = seen,
+                        )
+                    }
+                    .sortedByDescending { it.lastSeen }
+            }
+        }
+    }
+
+    private fun pruneExpired(cutoff: Instant) {
+        participants.values.forEach { ps -> ps.entries.removeAll { it.value < cutoff } }
+    }
+
+    /** Display nickname; with [disambiguate], append `#<last4>` when the base nick is not unique. */
+    private fun displayName(pubkeyHex: String, geohash: String, disambiguate: Boolean): String {
+        val lower = pubkeyHex.lowercase()
+        val base = nicknames[lower] ?: ANON
+        if (!disambiguate) return base
+        val ps = participants[geohash] ?: return base
+        val collisions = ps.keys.count { (nicknames[it] ?: ANON).equals(base, ignoreCase = true) }
+        return if (collisions > 1) "$base#${pubkeyHex.takeLast(4)}" else base
+    }
+
+    private fun powDifficultyOf(event: NostrEvent): Int? = runCatching {
+        if (NostrProofOfWork.hasNonce(event)) {
+            NostrProofOfWork.calculateDifficulty(event.id).takeIf { it > 0 }
+        } else {
+            null
+        }
+    }.getOrNull()
+
+    private fun dedupe(id: String): Boolean = synchronized(lock) {
+        if (!seenSet.add(id)) return@synchronized true
+        seenOrder.addLast(id)
+        if (seenOrder.size > SEEN_CAP) seenSet.remove(seenOrder.removeFirst())
+        false
+    }
+
+    private fun isBlocked(pubkeyHex: String): Boolean = pubkeyHex.lowercase() in blockedSet()
+
+    private fun blockedSet(): Set<String> =
+        settings.getStringOrNull(BLOCKED_KEY)?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+
+    private fun aliasFor(pubkeyHex: String): String = "nostr_${pubkeyHex.take(16)}"
+
+    private fun subscriptionId(geohash: String): String = "geohash-$geohash"
+
+    private companion object {
+        const val TAG = "GeohashRepositoryImpl"
+        const val ANON = "anon"
+        const val BLOCKED_KEY = "geohash_blocked_pubkeys"
+        const val SEEN_CAP = 2000
+        const val PRESENCE_TTL_MS = 5 * 60 * 1000L
+        const val SUBSCRIBE_WINDOW_MS = 60 * 60 * 1000L
+        const val SUBSCRIBE_LIMIT = 200
+    }
+}

@@ -43,6 +43,12 @@ class AppStateStore(
         fun publicConversationKey() = "public"
         fun privateConversationKey(peerID: String) = "private:" + peerID
         fun channelConversationKey(channel: String) = "channel:" + channel
+
+        /** Geo (location) chats ride the channel timelines under a reserved tag prefix. */
+        const val GEO_TAG_PREFIX = "geo:"
+
+        /** Channel-bucket name a [ConversationId.Geohash] timeline is stored under. */
+        fun geoChannelName(geohash: String) = GEO_TAG_PREFIX + geohash
     }
 
     // Global de-dup set by message id to avoid duplicate keys in Compose lists.

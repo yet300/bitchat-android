@@ -138,6 +138,6 @@ internal class ConversationRepositoryImpl(
 
     private companion object {
         const val PUBLIC_TITLE = "Public"
-        const val GEO_TAG_PREFIX = "geo:"
+        const val GEO_TAG_PREFIX = AppStateStore.GEO_TAG_PREFIX
     }
 }

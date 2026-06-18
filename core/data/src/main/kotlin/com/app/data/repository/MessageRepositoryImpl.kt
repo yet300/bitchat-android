@@ -13,7 +13,6 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 /**
@@ -38,14 +37,14 @@ internal class MessageRepositoryImpl(
         is ConversationId.Channel ->
             appStateStore.channelMessages.map { (it[id.tag] ?: emptyList()).toDomainList(id) }
         is ConversationId.Geohash ->
-            flowOf(emptyList()) // geo timelines live in GeohashRepository (a later Phase B step)
+            appStateStore.channelMessages.map { (it[id.geoTag()] ?: emptyList()).toDomainList(id) }
     }
 
     override suspend fun snapshot(id: ConversationId): List<BitMessage> = when (id) {
         ConversationId.PublicMesh -> appStateStore.publicMessages.value.toDomainList(id)
         is ConversationId.Private -> (appStateStore.privateMessages.value[id.peer.raw] ?: emptyList()).toDomainList(id)
         is ConversationId.Channel -> (appStateStore.channelMessages.value[id.tag] ?: emptyList()).toDomainList(id)
-        is ConversationId.Geohash -> emptyList()
+        is ConversationId.Geohash -> (appStateStore.channelMessages.value[id.geoTag()] ?: emptyList()).toDomainList(id)
     }
 
     override suspend fun append(id: ConversationId, message: BitMessage) {
@@ -54,7 +53,7 @@ internal class MessageRepositoryImpl(
             ConversationId.PublicMesh -> appStateStore.addPublicMessage(wire)
             is ConversationId.Private -> appStateStore.addPrivateMessage(id.peer.raw, wire)
             is ConversationId.Channel -> appStateStore.addChannelMessage(id.tag, wire)
-            is ConversationId.Geohash -> Unit // geo timelines handled elsewhere for now
+            is ConversationId.Geohash -> appStateStore.addChannelMessage(id.geoTag(), wire)
         }
     }
 
@@ -71,7 +70,7 @@ internal class MessageRepositoryImpl(
             ConversationId.PublicMesh -> appStateStore.clearPublic()
             is ConversationId.Private -> appStateStore.clearPrivate(id.peer.raw)
             is ConversationId.Channel -> appStateStore.clearChannel(id.tag)
-            is ConversationId.Geohash -> Unit
+            is ConversationId.Geohash -> appStateStore.clearChannel(id.geoTag())
         }
     }
 
@@ -81,4 +80,6 @@ internal class MessageRepositoryImpl(
 
     private fun List<BitchatMessage>.toDomainList(id: ConversationId): List<BitMessage> =
         map { it.toDomain(id, myPeerId) }
+
+    private fun ConversationId.Geohash.geoTag(): String = AppStateStore.geoChannelName(channel.geohash)
 }
