@@ -35,30 +35,45 @@ internal class DefaultChatComponent(
 ) : ChatComponent, ComponentContext by componentContext {
 
     private val store = instanceKeeper.getStore { storeFactory.create() }
-    private val verifyScanNavigation = SlotNavigation<VerifyScanConfig>()
+    private val sheetNavigation = SlotNavigation<SheetConfig>()
 
     override val model: Value<ChatComponent.Model> = store.asValue().map(stateToModel)
 
-    override val verifyScan: Value<ChildSlot<*, VerifyScanComponent>> =
+    override val sheetSlot: Value<ChildSlot<*, ChatComponent.ChatSheetChild>> =
         childSlot(
-            source = verifyScanNavigation,
-            serializer = VerifyScanConfig.serializer(),
+            source = sheetNavigation,
+            serializer = SheetConfig.serializer(),
             handleBackButton = true,
-            childFactory = { _, ctx -> verifyScanFactory.create(ctx) { verifyScanNavigation.dismiss() } },
+            childFactory = { config, ctx ->
+                when (config) {
+                    SheetConfig.VerifyScan -> ChatComponent.ChatSheetChild.VerifyScan(
+                        verifyScanFactory.create(ctx) { sheetNavigation.dismiss() },
+                    )
+                    SheetConfig.Participants -> ChatComponent.ChatSheetChild.Participants
+                }
+            },
         )
 
     override fun onDraftChanged(text: String) = store.accept(ChatStore.Intent.DraftChanged(text))
 
     override fun onSendClicked() = store.accept(ChatStore.Intent.SendClicked)
 
-    override fun onVerifyClicked() = verifyScanNavigation.activate(VerifyScanConfig)
+    override fun onVerifyClicked() = sheetNavigation.activate(SheetConfig.VerifyScan)
 
-    override fun onDismissVerifyScan() = verifyScanNavigation.dismiss()
+    override fun onParticipantsClicked() = sheetNavigation.activate(SheetConfig.Participants)
+
+    override fun onDismissSheet() = sheetNavigation.dismiss()
 
     override fun onBackClicked() = onFinished()
 
     @Serializable
-    private data object VerifyScanConfig
+    private sealed interface SheetConfig {
+        @Serializable
+        data object VerifyScan : SheetConfig
+
+        @Serializable
+        data object Participants : SheetConfig
+    }
 }
 
 /** Display title until the chat store provides the real one (nickname resolution etc.). */

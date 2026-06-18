@@ -75,6 +75,7 @@ internal class ChatStoreFactory(
                 is ChatStore.Msg.ReachabilityChanged -> copy(reachability = msg.reachability)
                 is ChatStore.Msg.VerifiedChanged -> copy(isVerified = msg.verified)
                 is ChatStore.Msg.ParticipantCountChanged -> copy(participantCount = msg.count)
+                is ChatStore.Msg.ParticipantsChanged -> copy(participants = msg.participants)
             }
     }
 
@@ -123,6 +124,11 @@ internal class ChatStoreFactory(
                         scope.launch {
                             geohashRepository.observeParticipantCounts().collect { counts ->
                                 dispatch(ChatStore.Msg.ParticipantCountChanged(counts[geohash] ?: 0))
+                            }
+                        }
+                        scope.launch {
+                            geohashRepository.observeParticipants().collect { people ->
+                                dispatch(ChatStore.Msg.ParticipantsChanged(people))
                             }
                         }
                     }

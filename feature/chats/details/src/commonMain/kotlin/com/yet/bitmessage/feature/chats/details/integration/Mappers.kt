@@ -15,6 +15,7 @@ internal val stateToModel: (ChatStore.State) -> ChatComponent.Model = { state ->
         isEncrypted = state.isEncrypted,
         isVerified = state.isVerified,
         participantCount = state.participantCount,
+        participants = state.participants,
         targetMessageId = state.targetMessageId,
     )
 }
