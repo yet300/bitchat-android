@@ -58,7 +58,7 @@ internal class MessageRepositoryImpl(
     }
 
     override suspend fun updateDeliveryStatus(messageId: String, status: DeliveryStatus) {
-        appStateStore.updatePrivateMessageStatus(messageId, status.toWireStatus())
+        appStateStore.updateMessageStatus(messageId, status.toWireStatus())
     }
 
     override suspend fun remove(messageId: String) {

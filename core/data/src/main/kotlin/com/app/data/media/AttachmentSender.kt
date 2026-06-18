@@ -12,6 +12,7 @@ import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.security.MessageDigest
 
 /**
  * Re-homes the media orchestration deleted with the legacy `MediaSendingManager` (Phase D): turns a
@@ -23,9 +24,10 @@ import java.io.File
 @Inject
 class AttachmentSender(
     private val mesh: BluetoothMeshService,
+    private val progressBridge: TransferProgressBridge,
 ) {
 
-    suspend fun send(attachment: Attachment, target: ConversationId): Unit = withContext(Dispatchers.IO) {
+    suspend fun send(attachment: Attachment, target: ConversationId, messageId: String): Unit = withContext(Dispatchers.IO) {
         val file = File(attachment.ref)
         if (!file.exists()) {
             Log.e(TAG, "Attachment file does not exist: ${attachment.ref}")
@@ -40,6 +42,9 @@ class AttachmentSender(
             mimeType = mime,
             content = file.readBytes(),
         )
+        // Link the mesh transferId (sha256 of the encoded payload, derived identically inside BMS)
+        // to this message so TransferProgressBridge can advance its delivery status.
+        packet.encode()?.let { progressBridge.track(sha256Hex(it), messageId) }
         when (target) {
             is ConversationId.Private -> mesh.sendFilePrivate(target.peer.raw, packet)
             ConversationId.PublicMesh, is ConversationId.Channel -> mesh.sendFileBroadcast(packet)
@@ -49,6 +54,9 @@ class AttachmentSender(
                 Log.w(TAG, "Geohash attachments are not supported yet; dropping ${file.name}")
         }
     }
+
+    private fun sha256Hex(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
     private companion object {
         const val TAG = "AttachmentSender"
