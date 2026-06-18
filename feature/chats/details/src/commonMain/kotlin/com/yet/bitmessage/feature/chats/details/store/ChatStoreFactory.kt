@@ -17,6 +17,7 @@ import com.app.domain.usecase.ChatCommand
 import com.app.domain.usecase.CommandResult
 import com.app.domain.usecase.MarkConversationReadUseCase
 import com.app.domain.usecase.ParseCommandUseCase
+import com.app.domain.usecase.ParseMentionsUseCase
 import com.app.domain.usecase.ProcessCommandUseCase
 import com.app.domain.usecase.AttachmentSendResult
 import com.app.domain.usecase.CancelTransferUseCase
@@ -47,8 +48,8 @@ internal class ChatStoreFactory(
     private val resolveReachability: ResolveReachabilityUseCase,
     private val contactRepository: ContactRepository,
     private val geohashRepository: GeohashRepository,
+    private val peerRepository: PeerRepository,
     channelRepository: ChannelRepository,
-    peerRepository: PeerRepository,
     messageTransport: MessageTransport,
 ) {
     private val sendMessage = SendMessageUseCase(messageTransport, messageRepository)
@@ -57,6 +58,7 @@ internal class ChatStoreFactory(
     private val markRead =
         MarkConversationReadUseCase(conversationRepository, messageRepository, messageTransport)
     private val parseCommand = ParseCommandUseCase()
+    private val parseMentions = ParseMentionsUseCase()
     private val processCommand =
         ProcessCommandUseCase(messageRepository, channelRepository, contactRepository, peerRepository)
     private val startGeohashDm = StartGeohashDmUseCase(geohashRepository)
@@ -184,7 +186,8 @@ internal class ChatStoreFactory(
         private suspend fun send(text: String) {
             val me = identityRepository.myIdentity()
             val sender = SenderRef(peerId = me.peerId, displayName = me.nickname)
-            sendMessage(target = conversationId, content = text, sender = sender)
+            val known = peerRepository.snapshot().mapTo(mutableSetOf()) { it.nickname }.apply { add(me.nickname) }
+            sendMessage(target = conversationId, content = text, sender = sender, mentions = parseMentions(text, known))
         }
 
         private suspend fun runCommand(command: ChatCommand) {
