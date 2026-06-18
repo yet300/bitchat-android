@@ -19,6 +19,7 @@ import com.app.domain.usecase.MarkConversationReadUseCase
 import com.app.domain.usecase.ParseCommandUseCase
 import com.app.domain.usecase.ProcessCommandUseCase
 import com.app.domain.usecase.AttachmentSendResult
+import com.app.domain.usecase.CancelTransferUseCase
 import com.app.domain.usecase.GeohashDmTarget
 import com.app.domain.usecase.ResolveReachabilityUseCase
 import com.app.domain.usecase.SendAttachmentUseCase
@@ -52,6 +53,7 @@ internal class ChatStoreFactory(
 ) {
     private val sendMessage = SendMessageUseCase(messageTransport, messageRepository)
     private val sendAttachment = SendAttachmentUseCase(messageTransport, messageRepository)
+    private val cancelTransfer = CancelTransferUseCase(messageTransport, messageRepository)
     private val markRead =
         MarkConversationReadUseCase(conversationRepository, messageRepository, messageTransport)
     private val parseCommand = ParseCommandUseCase()
@@ -164,6 +166,8 @@ internal class ChatStoreFactory(
                 }
 
                 is ChatStore.Intent.SendAttachment -> scope.launch { runSendAttachment(intent.attachment) }
+
+                is ChatStore.Intent.CancelTransfer -> scope.launch { cancelTransfer(intent.messageId) }
             }
         }
 

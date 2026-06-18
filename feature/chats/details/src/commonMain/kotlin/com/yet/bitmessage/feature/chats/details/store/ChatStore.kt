@@ -36,6 +36,8 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
         data class ParticipantClicked(val pubkeyHex: String) : Intent
 
         data class SendAttachment(val attachment: Attachment) : Intent
+
+        data class CancelTransfer(val messageId: String) : Intent
     }
 
     sealed interface Action {

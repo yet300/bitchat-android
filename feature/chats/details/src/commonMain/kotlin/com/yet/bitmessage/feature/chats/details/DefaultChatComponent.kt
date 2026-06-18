@@ -80,6 +80,9 @@ internal class DefaultChatComponent(
     override fun onAttachmentPicked(attachment: Attachment) =
         store.accept(ChatStore.Intent.SendAttachment(attachment))
 
+    override fun onCancelTransfer(messageId: String) =
+        store.accept(ChatStore.Intent.CancelTransfer(messageId))
+
     override fun onVerifyClicked() = sheetNavigation.activate(SheetConfig.VerifyScan)
 
     override fun onParticipantsClicked() = sheetNavigation.activate(SheetConfig.Participants)

@@ -22,6 +22,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -47,6 +48,7 @@ import com.app.domain.model.BitMessage
 import com.app.domain.model.ConversationId
 import com.app.domain.model.DeliveryStatus
 import com.app.domain.model.GeoPerson
+import com.app.domain.model.MessageType
 import com.app.domain.model.Reachability
 import com.app.domain.repository.VerifyScanResult
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
@@ -67,6 +69,10 @@ import com.yet.bitmessage.shared.resources.chat_reach_internet
 import com.yet.bitmessage.shared.resources.chat_reach_nearby
 import com.yet.bitmessage.shared.resources.chat_reach_offline
 import com.yet.bitmessage.shared.resources.chat_send
+import com.yet.bitmessage.shared.resources.media_audio
+import com.yet.bitmessage.shared.resources.media_cancel
+import com.yet.bitmessage.shared.resources.media_file
+import com.yet.bitmessage.shared.resources.media_image
 import com.yet.bitmessage.shared.resources.verify_action
 import com.yet.bitmessage.shared.resources.verify_camera_grant
 import com.yet.bitmessage.shared.resources.verify_camera_needed
@@ -157,7 +163,11 @@ fun ChatContent(component: ChatComponent, modifier: Modifier = Modifier) {
                     modifier = Modifier.align(Alignment.Center),
                 )
 
-                else -> MessageTimeline(messages = model.messages, targetMessageId = model.targetMessageId)
+                else -> MessageTimeline(
+                    messages = model.messages,
+                    targetMessageId = model.targetMessageId,
+                    onCancelAttachment = component::onCancelTransfer,
+                )
             }
         }
     }
@@ -337,6 +347,7 @@ private fun Reachability.label() = when (this) {
 private fun MessageTimeline(
     messages: List<BitMessage>,
     targetMessageId: String?,
+    onCancelAttachment: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -364,13 +375,22 @@ private fun MessageTimeline(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         items(messages, key = { it.id }) { message ->
-            MessageBubble(message, highlighted = message.id == targetMessageId)
+            MessageBubble(
+                message,
+                highlighted = message.id == targetMessageId,
+                onCancelAttachment = onCancelAttachment,
+            )
         }
     }
 }
 
 @Composable
-private fun MessageBubble(message: BitMessage, highlighted: Boolean = false, modifier: Modifier = Modifier) {
+private fun MessageBubble(
+    message: BitMessage,
+    onCancelAttachment: (String) -> Unit,
+    highlighted: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
     val alignment = if (message.isMine) Alignment.CenterEnd else Alignment.CenterStart
     val bubbleColor =
         if (message.isMine) MaterialTheme.colorScheme.primaryContainer
@@ -394,7 +414,11 @@ private fun MessageBubble(message: BitMessage, highlighted: Boolean = false, mod
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
-                Text(text = message.content, style = MaterialTheme.typography.bodyMedium)
+                if (message.type == MessageType.TEXT) {
+                    Text(text = message.content, style = MaterialTheme.typography.bodyMedium)
+                } else {
+                    AttachmentContent(message, onCancel = { onCancelAttachment(message.id) })
+                }
                 if (message.isMine && message.deliveryStatus != null) {
                     Row(
                         modifier = Modifier.align(Alignment.End),
@@ -407,6 +431,59 @@ private fun MessageBubble(message: BitMessage, highlighted: Boolean = false, mod
             }
         }
     }
+}
+
+@Composable
+private fun AttachmentContent(message: BitMessage, onCancel: () -> Unit) {
+    val label = message.attachment?.ref?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
+        ?: when (message.type) {
+            MessageType.IMAGE -> stringResource(Res.string.media_image)
+            MessageType.AUDIO -> stringResource(Res.string.media_audio)
+            else -> stringResource(Res.string.media_file)
+        }
+    val status = message.deliveryStatus
+    val inProgress = message.isMine && status is DeliveryStatus.PartiallyDelivered && status.reached < status.total
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            message.attachment?.sizeBytes?.let { size ->
+                Text(
+                    text = formatSize(size),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (inProgress) {
+                IconButton(onClick = onCancel, modifier = Modifier.size(24.dp)) {
+                    Icon(
+                        imageVector = Close,
+                        contentDescription = stringResource(Res.string.media_cancel),
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+        }
+        if (inProgress) {
+            val progress = status as DeliveryStatus.PartiallyDelivered
+            LinearProgressIndicator(
+                progress = { if (progress.total > 0) (progress.reached.toFloat() / progress.total).coerceIn(0f, 1f) else 0f },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+private fun formatSize(bytes: Long): String = when {
+    bytes >= 1024 * 1024 -> "${bytes / (1024 * 1024)} MB"
+    bytes >= 1024 -> "${bytes / 1024} KB"
+    else -> "$bytes B"
 }
 
 @Composable
