@@ -30,6 +30,8 @@ interface ChatComponent {
     /** Open the geo-participants sheet ("who's here"). */
     fun onParticipantsClicked()
 
+    fun onParticipantSelected(pubkeyHex: String)
+
     fun onDismissSheet()
 
     fun onBackClicked()
@@ -59,6 +61,7 @@ interface ChatComponent {
             componentContext: ComponentContext,
             config: ChatConfig,
             onFinished: () -> Unit,
+            onOpenConversation: (ConversationId) -> Unit,
         ): ChatComponent
     }
 }

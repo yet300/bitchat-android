@@ -31,6 +31,8 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
     sealed interface Intent {
         data class DraftChanged(val text: String) : Intent
         data object SendClicked : Intent
+
+        data class ParticipantClicked(val pubkeyHex: String) : Intent
     }
 
     sealed interface Action {
@@ -47,5 +49,7 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
         data class ParticipantsChanged(val participants: List<GeoPerson>) : Msg
     }
 
-    sealed interface Label
+    sealed interface Label {
+        data class OpenConversation(val id: ConversationId) : Label
+    }
 }

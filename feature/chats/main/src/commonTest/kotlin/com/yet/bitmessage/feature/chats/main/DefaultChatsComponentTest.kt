@@ -194,6 +194,7 @@ class DefaultChatsComponentTest {
         override fun onSendClicked() = Unit
         override fun onVerifyClicked() = Unit
         override fun onParticipantsClicked() = Unit
+        override fun onParticipantSelected(pubkeyHex: String) = Unit
         override fun onDismissSheet() = Unit
         override fun onBackClicked() = onFinished()
     }
@@ -205,7 +206,7 @@ class DefaultChatsComponentTest {
             conversationsFactory = { _, onSelected, onConnectivity, onSearch, onContacts, onSettings, onChannels ->
                 FakeConversationsComponent(onSelected, onConnectivity, onSearch, onContacts, onSettings, onChannels)
             },
-            chatFactory = { _: ComponentContext, config: ChatConfig, onFinished: () -> Unit ->
+            chatFactory = { _: ComponentContext, config: ChatConfig, onFinished: () -> Unit, _ ->
                 FakeChatComponent(config, onFinished)
             },
             connectivityFactory = { _: ComponentContext -> FakeConnectivityComponent() },

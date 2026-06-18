@@ -52,6 +52,7 @@ The application follows a clean architecture pattern, heavily modularized by fea
 - **Compose**: Use functional components. Hoist state to ViewModels where possible.
 - **Coroutines**: Use `suspend` functions for all I/O operations. strictly avoid blocking the main thread.
 - **Naming**: Clear, descriptive names. Follow standard Android naming patterns (e.g., `*ViewModel`, `*Repository`, `*Screen`).
+- **Comments**: Write comments only for constraints the code can't express — non-obvious business logic, invariants, wire-compat requirements, or *why* a thing is done. Do NOT write doc comments that merely restate a declaration's name or signature (e.g. `/** Open a DM with a geohash participant. */ fun onParticipantSelected(pubkeyHex: String)`); a clear name is the documentation. Delete a comment rather than write a redundant one.
 
 ### Testing
 - **Unit Tests**: Located in `app/src/test/`. Use for business logic, protocols, and utility testing.

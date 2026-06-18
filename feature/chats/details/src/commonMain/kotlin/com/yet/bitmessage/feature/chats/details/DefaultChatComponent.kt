@@ -19,12 +19,16 @@ import com.arkivanov.decompose.value.Value
 import com.arkivanov.decompose.value.operator.map
 import com.arkivanov.mvikotlin.core.instancekeeper.getStore
 import com.arkivanov.mvikotlin.core.store.StoreFactory
+import com.arkivanov.mvikotlin.extensions.coroutines.labels
 import com.app.common.decompose.asValue
+import com.app.common.decompose.componentCoroutineScope
+import com.app.domain.model.ConversationId
 import com.yet.bitmessage.feature.chats.details.integration.stateToModel
 import com.yet.bitmessage.feature.chats.details.store.ChatStore
 import com.yet.bitmessage.feature.chats.details.store.ChatStoreFactory
 import com.yet.bitmessage.feature.chats.details.verify.VerifyScanComponent
 import dev.zacsweers.metro.Inject
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
 internal class DefaultChatComponent(
@@ -32,10 +36,24 @@ internal class DefaultChatComponent(
     storeFactory: ChatStoreFactory,
     private val verifyScanFactory: VerifyScanComponent.Factory,
     private val onFinished: () -> Unit,
+    private val onOpenConversation: (ConversationId) -> Unit,
 ) : ChatComponent, ComponentContext by componentContext {
 
     private val store = instanceKeeper.getStore { storeFactory.create() }
     private val sheetNavigation = SlotNavigation<SheetConfig>()
+
+    init {
+        componentCoroutineScope().launch {
+            store.labels.collect { label ->
+                when (label) {
+                    is ChatStore.Label.OpenConversation -> {
+                        sheetNavigation.dismiss()
+                        onOpenConversation(label.id)
+                    }
+                }
+            }
+        }
+    }
 
     override val model: Value<ChatComponent.Model> = store.asValue().map(stateToModel)
 
@@ -61,6 +79,9 @@ internal class DefaultChatComponent(
     override fun onVerifyClicked() = sheetNavigation.activate(SheetConfig.VerifyScan)
 
     override fun onParticipantsClicked() = sheetNavigation.activate(SheetConfig.Participants)
+
+    override fun onParticipantSelected(pubkeyHex: String) =
+        store.accept(ChatStore.Intent.ParticipantClicked(pubkeyHex))
 
     override fun onDismissSheet() = sheetNavigation.dismiss()
 
@@ -101,6 +122,7 @@ internal class DefaultChatComponentFactory(
         componentContext: ComponentContext,
         config: ChatConfig,
         onFinished: () -> Unit,
+        onOpenConversation: (ConversationId) -> Unit,
     ): ChatComponent = DefaultChatComponent(
         componentContext = componentContext,
         storeFactory = ChatStoreFactory(
@@ -120,5 +142,6 @@ internal class DefaultChatComponentFactory(
         ),
         verifyScanFactory = verifyScanFactory,
         onFinished = onFinished,
+        onOpenConversation = onOpenConversation,
     )
 }

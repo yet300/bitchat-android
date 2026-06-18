@@ -30,11 +30,14 @@ import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.MessageTransport
 import com.app.domain.repository.PeerRepository
 import com.app.domain.usecase.ResolveReachabilityUseCase
+import com.arkivanov.mvikotlin.extensions.coroutines.labels
 import com.arkivanov.mvikotlin.main.store.DefaultStoreFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -347,5 +350,19 @@ class ChatStoreFactoryTest {
 
         people.value = emptyList()
         assertTrue(store.state.participants.isEmpty())
+    }
+
+    @Test
+    fun clicking_a_participant_publishes_open_conversation_for_the_geohash_dm() = runTest {
+        val geohash = FakeGeohashRepository()
+        val geoId = ConversationId.Geohash(GeohashChannel(GeohashLevel.CITY, "u4pru"))
+        val store = factory(id = geoId, geohash = geohash).create()
+        val labels = mutableListOf<ChatStore.Label>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { store.labels.toList(labels) }
+
+        store.accept(ChatStore.Intent.ParticipantClicked("abcd"))
+
+        val opened = labels.filterIsInstance<ChatStore.Label.OpenConversation>().single()
+        assertEquals(ConversationId.Private(PeerId("nostr_abcd")), opened.id)
     }
 }

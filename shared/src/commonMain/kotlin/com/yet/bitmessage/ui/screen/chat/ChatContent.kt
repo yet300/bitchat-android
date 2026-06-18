@@ -1,6 +1,7 @@
 package com.yet.bitmessage.ui.screen.chat
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -157,14 +158,22 @@ fun ChatContent(component: ChatComponent, modifier: Modifier = Modifier) {
         is ChatComponent.ChatSheetChild.VerifyScan ->
             VerifyScanSheet(component = child.component, onDismiss = component::onDismissSheet)
         ChatComponent.ChatSheetChild.Participants ->
-            GeoParticipantsSheet(participants = model.participants, onDismiss = component::onDismissSheet)
+            GeoParticipantsSheet(
+                participants = model.participants,
+                onParticipantClick = component::onParticipantSelected,
+                onDismiss = component::onDismissSheet,
+            )
         null -> Unit
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun GeoParticipantsSheet(participants: List<GeoPerson>, onDismiss: () -> Unit) {
+private fun GeoParticipantsSheet(
+    participants: List<GeoPerson>,
+    onParticipantClick: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Text(
             text = stringResource(Res.string.chat_geo_participants),
@@ -181,7 +190,7 @@ private fun GeoParticipantsSheet(participants: List<GeoPerson>, onDismiss: () ->
         } else {
             LazyColumn(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
                 items(participants, key = { it.pubkeyHex }) { person ->
-                    GeoParticipantRow(person)
+                    GeoParticipantRow(person, onClick = { onParticipantClick(person.pubkeyHex) })
                 }
             }
         }
@@ -189,9 +198,10 @@ private fun GeoParticipantsSheet(participants: List<GeoPerson>, onDismiss: () ->
 }
 
 @Composable
-private fun GeoParticipantRow(person: GeoPerson) {
+private fun GeoParticipantRow(person: GeoPerson, onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 10.dp),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
+            .padding(horizontal = 24.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
