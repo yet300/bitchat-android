@@ -2,6 +2,7 @@ package com.yet.bitmessage.android
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -13,7 +14,9 @@ import com.arkivanov.decompose.defaultComponentContext
 import com.yet.bitmessage.android.connectivity.PermissionOutcome
 import com.yet.bitmessage.android.connectivity.RuntimePermissionRequester
 import com.yet.bitmessage.android.di.appGraph
+import com.yet.bitmessage.android.service.MeshForegroundService
 import com.yet.bitmessage.android.ui.NotificationManager
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import com.yet.bitmessage.feature.root.RootComponent
 import com.yet.bitmessage.ui.App
@@ -23,23 +26,21 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Phase C entry point for the new Decompose + Compose Multiplatform UI.
+ * The app's launcher entry: the Decompose + Compose Multiplatform UI from :shared, bound to the
+ * single application graph ([com.yet.bitmessage.android.BitchatApplication.appGraph]).
  *
- * Runs the :shared scaffold against the single application graph (the same
- * [com.yet.bitmessage.android.BitchatApplication.appGraph] the legacy [MainActivity] uses), so the
- * conversation list is backed by the live `ConversationRepository`. Registered as a separate
- * preview launcher while the legacy UI is still the default; both share one graph and one mesh
- * engine instance.
- *
- * Also bridges the data layer's connectivity repair to an in-app system permission dialog: it
- * attaches a [RuntimePermissionRequester.Host] backed by an ActivityResult launcher for the
- * Activity's lifetime, so "Grant" in the connectivity sheet shows the OS dialog rather than always
- * deep-linking to app settings.
+ * It also:
+ * - bridges the data layer's connectivity repair to an in-app system permission dialog via a
+ *   [RuntimePermissionRequester.Host] backed by an ActivityResult launcher;
+ * - starts the mesh foreground service in a lifecycle-aware, best-effort way (deferred to onStart
+ *   when the process can't yet promote to foreground — avoids ForegroundServiceStartNotAllowed on
+ *   Android 12+; upstream parity #714). The service is the foreground owner of the mesh lifecycle.
  */
 class BitMessageActivity : ComponentActivity() {
 
     private lateinit var rootComponent: RootComponent
     private var pendingPermission: CompletableDeferred<Map<String, Boolean>>? = null
+    private var pendingMeshForegroundServiceStart = false
 
     // Must be registered before the Activity is STARTED, hence a field initializer.
     private val permissionLauncher =
@@ -84,6 +85,8 @@ class BitMessageActivity : ComponentActivity() {
         setContent {
             App(rootComponent = rootComponent)
         }
+
+        startMeshForegroundServiceBestEffort()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -92,9 +95,33 @@ class BitMessageActivity : ComponentActivity() {
         handleDeepLink(intent)
     }
 
+    override fun onStart() {
+        super.onStart()
+        if (pendingMeshForegroundServiceStart) startMeshForegroundServiceBestEffort()
+    }
+
     override fun onDestroy() {
         appGraph.runtimePermissionRequester.detach(permissionHost)
         super.onDestroy()
+    }
+
+    /**
+     * Start the mesh foreground service only when the process may promote to foreground (the
+     * activity is at least STARTED); otherwise defer to [onStart]. Eligibility (background pref /
+     * notification permission) is enforced inside [MeshForegroundService.start].
+     */
+    private fun startMeshForegroundServiceBestEffort() {
+        if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+            pendingMeshForegroundServiceStart = true
+            return
+        }
+        pendingMeshForegroundServiceStart = try {
+            MeshForegroundService.start(applicationContext)
+            false
+        } catch (e: Exception) {
+            Log.w("BitMessageActivity", "Deferring mesh foreground service start", e)
+            true
+        }
     }
 
     /**

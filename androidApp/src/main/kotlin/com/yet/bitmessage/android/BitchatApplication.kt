@@ -7,7 +7,6 @@ import dev.zacsweers.metro.createGraphFactory
 import dev.zacsweers.metrox.android.MetroAppComponentProviders
 import dev.zacsweers.metrox.android.MetroApplication
 import com.app.transport.nostr.LocationNotesInitializer
-import com.app.transport.nostr.NostrIdentityBridge
 
 /**
  * Main application class for bitchat Android
@@ -46,9 +45,6 @@ class BitchatApplication : Application(), MetroApplication {
         try {
             appGraph.nostrIdentityBridge.getCurrentNostrIdentity()
         } catch (_: Exception) { }
-
-        // Proactively start the foreground service to keep mesh alive
-        try { com.yet.bitmessage.android.service.MeshForegroundService.start(this) } catch (_: Exception) { }
 
     }
 }
