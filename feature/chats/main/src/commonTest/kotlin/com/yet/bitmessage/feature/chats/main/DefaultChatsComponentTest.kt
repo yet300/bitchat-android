@@ -194,6 +194,7 @@ class DefaultChatsComponentTest {
         override fun onDraftChanged(text: String) = Unit
         override fun onSendClicked() = Unit
         override fun onAttachmentPicked(attachment: Attachment) = Unit
+        override fun onCancelTransfer(messageId: String) = Unit
         override fun onVerifyClicked() = Unit
         override fun onParticipantsClicked() = Unit
         override fun onParticipantSelected(pubkeyHex: String) = Unit

@@ -74,7 +74,8 @@ class ChatStoreFactoryTest {
             flow.value = flow.value + message
         }
         override suspend fun updateDeliveryStatus(messageId: String, status: DeliveryStatus) = Unit
-        override suspend fun remove(messageId: String) = Unit
+        val removed = mutableListOf<String>()
+        override suspend fun remove(messageId: String) { removed += messageId }
         override suspend fun clear(id: ConversationId) = Unit
         override suspend fun clearAll() = Unit
     }
@@ -90,7 +91,11 @@ class ChatStoreFactoryTest {
         override suspend fun sendAttachment(attachment: Attachment, target: ConversationId, messageId: String) {
             attachments += attachment to target
         }
-        override suspend fun cancelTransfer(messageId: String): Boolean = false
+        val cancelled = mutableListOf<String>()
+        override suspend fun cancelTransfer(messageId: String): Boolean {
+            cancelled += messageId
+            return true
+        }
         override suspend fun sendReadReceipt(messageId: String, to: PeerId) = Unit
         override suspend fun sendFavoriteNotification(to: PeerId, isFavorite: Boolean) = Unit
         override suspend fun announceSelf() = Unit
@@ -368,6 +373,18 @@ class ChatStoreFactoryTest {
         assertEquals(listOf(attachment), transport.attachments.map { it.first })
         assertEquals(conversationId, transport.attachments.single().second)
         assertEquals(listOf("/cache/pic.jpg"), messages.appended.map { it.content })
+    }
+
+    @Test
+    fun cancelling_a_transfer_routes_to_the_transport_and_removes_the_message() = runTest {
+        val transport = RecordingTransport()
+        val messages = FakeMessageRepository()
+        val store = factory(messages = messages, transport = transport).create()
+
+        store.accept(ChatStore.Intent.CancelTransfer("MID-9"))
+
+        assertEquals(listOf("MID-9"), transport.cancelled)
+        assertEquals(listOf("MID-9"), messages.removed)
     }
 
     @Test

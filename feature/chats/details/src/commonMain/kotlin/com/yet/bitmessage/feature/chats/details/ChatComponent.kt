@@ -28,6 +28,9 @@ interface ChatComponent {
     /** Send a picked media attachment (image / audio / file) into this conversation. */
     fun onAttachmentPicked(attachment: Attachment)
 
+    /** Cancel an in-flight outgoing attachment transfer and drop its message. */
+    fun onCancelTransfer(messageId: String)
+
     /** Open the QR-scan verification sheet for this DM. */
     fun onVerifyClicked()
 
