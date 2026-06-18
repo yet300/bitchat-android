@@ -287,6 +287,19 @@ class ChatStoreFactoryTest {
     }
 
     @Test
+    fun send_parses_known_at_mentions_into_the_echo() = runTest {
+        val messages = FakeMessageRepository()
+        val bob = Peer(id = PeerId("2222222222222222"), nickname = "bob", isConnected = true, isDirect = true)
+        val store = factory(messages = messages, peers = listOf(bob)).create()
+
+        store.accept(ChatStore.Intent.DraftChanged("hi @bob and @carol"))
+        store.accept(ChatStore.Intent.SendClicked)
+
+        // Only the known nickname (bob) is a mention; carol is not a peer.
+        assertEquals(listOf("bob"), messages.appended.single().mentions)
+    }
+
+    @Test
     fun send_clicked_with_blank_draft_is_ignored() = runTest {
         val transport = RecordingTransport()
         val store = factory(transport = transport).create()

@@ -42,7 +42,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.app.domain.model.BitMessage
 import com.app.domain.model.ConversationId
@@ -415,7 +420,10 @@ private fun MessageBubble(
                     )
                 }
                 if (message.type == MessageType.TEXT) {
-                    Text(text = message.content, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = highlightMentions(message.content, MaterialTheme.colorScheme.primary),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                 } else {
                     AttachmentContent(message, onCancel = { onCancelAttachment(message.id) })
                 }
@@ -478,6 +486,19 @@ private fun AttachmentContent(message: BitMessage, onCancel: () -> Unit) {
             )
         }
     }
+}
+
+private val MENTION_REGEX = Regex("@[a-zA-Z0-9_]+")
+
+/** Styles @-mentions in a message body (display only; the known-mention set is computed on send). */
+private fun highlightMentions(content: String, color: Color): AnnotatedString = buildAnnotatedString {
+    var last = 0
+    for (match in MENTION_REGEX.findAll(content)) {
+        append(content.substring(last, match.range.first))
+        withStyle(SpanStyle(color = color, fontWeight = FontWeight.SemiBold)) { append(match.value) }
+        last = match.range.last + 1
+    }
+    append(content.substring(last))
 }
 
 private fun formatSize(bytes: Long): String = when {
