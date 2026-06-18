@@ -1,5 +1,6 @@
 package com.yet.bitmessage.feature.chats.main
 
+import com.app.domain.model.Attachment
 import com.app.domain.model.ConversationId
 import com.app.domain.model.Peer
 import com.app.domain.model.PeerId
@@ -192,6 +193,7 @@ class DefaultChatsComponentTest {
 
         override fun onDraftChanged(text: String) = Unit
         override fun onSendClicked() = Unit
+        override fun onAttachmentPicked(attachment: Attachment) = Unit
         override fun onVerifyClicked() = Unit
         override fun onParticipantsClicked() = Unit
         override fun onParticipantSelected(pubkeyHex: String) = Unit

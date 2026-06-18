@@ -1,5 +1,6 @@
 package com.yet.bitmessage.feature.chats.details.store
 
+import com.app.domain.model.Attachment
 import com.app.domain.model.BitMessage
 import com.app.domain.model.ConversationId
 import com.app.domain.model.PeerId
@@ -17,8 +18,10 @@ import com.app.domain.usecase.CommandResult
 import com.app.domain.usecase.MarkConversationReadUseCase
 import com.app.domain.usecase.ParseCommandUseCase
 import com.app.domain.usecase.ProcessCommandUseCase
+import com.app.domain.usecase.AttachmentSendResult
 import com.app.domain.usecase.GeohashDmTarget
 import com.app.domain.usecase.ResolveReachabilityUseCase
+import com.app.domain.usecase.SendAttachmentUseCase
 import com.app.domain.usecase.SendMessageUseCase
 import com.app.domain.usecase.StartGeohashDmUseCase
 import com.arkivanov.mvikotlin.core.store.Reducer
@@ -48,6 +51,7 @@ internal class ChatStoreFactory(
     messageTransport: MessageTransport,
 ) {
     private val sendMessage = SendMessageUseCase(messageTransport, messageRepository)
+    private val sendAttachment = SendAttachmentUseCase(messageTransport, messageRepository)
     private val markRead =
         MarkConversationReadUseCase(conversationRepository, messageRepository, messageTransport)
     private val parseCommand = ParseCommandUseCase()
@@ -158,6 +162,18 @@ internal class ChatStoreFactory(
                     val id = startGeohashDm(GeohashDmTarget.Pubkey(intent.pubkeyHex)) ?: return@launch
                     publish(ChatStore.Label.OpenConversation(id))
                 }
+
+                is ChatStore.Intent.SendAttachment -> scope.launch { runSendAttachment(intent.attachment) }
+            }
+        }
+
+        private suspend fun runSendAttachment(attachment: Attachment) {
+            val me = identityRepository.myIdentity()
+            val sender = SenderRef(peerId = me.peerId, displayName = me.nickname)
+            val result = sendAttachment(target = conversationId, attachment = attachment, sender = sender)
+            if (result is AttachmentSendResult.RejectedTooLarge) {
+                val mb = result.maxBytes / (1024 * 1024)
+                messageRepository.append(conversationId, systemMessage("Attachment too large (max $mb MB)"))
             }
         }
 

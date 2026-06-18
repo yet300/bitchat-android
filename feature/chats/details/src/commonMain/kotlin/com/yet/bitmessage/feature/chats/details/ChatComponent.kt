@@ -1,5 +1,6 @@
 package com.yet.bitmessage.feature.chats.details
 
+import com.app.domain.model.Attachment
 import com.app.domain.model.BitMessage
 import com.app.domain.model.ConversationId
 import com.app.domain.model.GeoPerson
@@ -23,6 +24,9 @@ interface ChatComponent {
     fun onDraftChanged(text: String)
 
     fun onSendClicked()
+
+    /** Send a picked media attachment (image / audio / file) into this conversation. */
+    fun onAttachmentPicked(attachment: Attachment)
 
     /** Open the QR-scan verification sheet for this DM. */
     fun onVerifyClicked()

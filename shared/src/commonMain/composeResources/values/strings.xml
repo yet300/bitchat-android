@@ -114,6 +114,7 @@
     <string name="chat_geo_teleported">Teleported</string>
     <string name="chat_input_hint">Message</string>
     <string name="chat_send">Send</string>
+    <string name="chat_attach">Attach file</string>
     <string name="verify_action">Verify contact</string>
     <string name="verify_scan_title">Scan verification QR</string>
     <string name="verify_scan_prompt">Point the camera at your contact\'s verification QR.</string>
