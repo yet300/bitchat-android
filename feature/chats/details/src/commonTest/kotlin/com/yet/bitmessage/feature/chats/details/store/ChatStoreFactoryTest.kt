@@ -300,6 +300,21 @@ class ChatStoreFactoryTest {
     }
 
     @Test
+    fun typing_an_at_prefix_suggests_matching_peers_and_selection_completes_the_token() = runTest {
+        val bob = Peer(id = PeerId("2222222222222222"), nickname = "bob", isConnected = true, isDirect = true)
+        val bea = Peer(id = PeerId("3333333333333333"), nickname = "bea", isConnected = true, isDirect = true)
+        val store = factory(peers = listOf(bob, bea)).create()
+
+        store.accept(ChatStore.Intent.DraftChanged("hey @b"))
+        assertEquals(listOf("bea", "bob"), store.state.mentionSuggestions)
+
+        store.accept(ChatStore.Intent.MentionSelected("bob"))
+        assertEquals("hey @bob ", store.state.draft)
+        // Token is complete -> no further suggestions.
+        assertTrue(store.state.mentionSuggestions.isEmpty())
+    }
+
+    @Test
     fun send_clicked_with_blank_draft_is_ignored() = runTest {
         val transport = RecordingTransport()
         val store = factory(transport = transport).create()

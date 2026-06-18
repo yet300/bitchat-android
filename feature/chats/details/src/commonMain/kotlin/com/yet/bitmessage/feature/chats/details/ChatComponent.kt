@@ -31,6 +31,9 @@ interface ChatComponent {
     /** Cancel an in-flight outgoing attachment transfer and drop its message. */
     fun onCancelTransfer(messageId: String)
 
+    /** Complete the @-token being typed with [nickname]. */
+    fun onMentionSelected(nickname: String)
+
     /** Open the QR-scan verification sheet for this DM. */
     fun onVerifyClicked()
 
@@ -60,6 +63,7 @@ interface ChatComponent {
         val isVerified: Boolean,
         val participantCount: Int,
         val participants: List<GeoPerson>,
+        val mentionSuggestions: List<String>,
         val targetMessageId: String?,
     )
 

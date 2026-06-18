@@ -20,6 +20,8 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
         val participantCount: Int = 0,
         /** Live participants for a geo chat (empty for other kinds). */
         val participants: List<GeoPerson> = emptyList(),
+        /** Nicknames the composer can @-mention (live peers / geo participants). */
+        val mentionCandidates: Set<String> = emptySet(),
         /** Message to scroll to / highlight on open (from a Messages search result); static. */
         val targetMessageId: String? = null,
     ) {
@@ -27,6 +29,9 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
 
         /** Private DMs are Noise end-to-end encrypted; public/channel/geo are broadcast. */
         val isEncrypted: Boolean get() = conversationId is ConversationId.Private
+
+        /** Candidates for the @-token currently being typed at the end of the draft. */
+        val mentionSuggestions: List<String> get() = mentionSuggestionsFor(draft, mentionCandidates)
     }
 
     sealed interface Intent {
@@ -38,6 +43,9 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
         data class SendAttachment(val attachment: Attachment) : Intent
 
         data class CancelTransfer(val messageId: String) : Intent
+
+        /** Complete the in-progress @-token with [nickname]. */
+        data class MentionSelected(val nickname: String) : Intent
     }
 
     sealed interface Action {
@@ -52,9 +60,24 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
         data class VerifiedChanged(val verified: Boolean) : Msg
         data class ParticipantCountChanged(val count: Int) : Msg
         data class ParticipantsChanged(val participants: List<GeoPerson>) : Msg
+        data class MentionCandidatesChanged(val nicknames: Set<String>) : Msg
     }
 
     sealed interface Label {
         data class OpenConversation(val id: ConversationId) : Label
     }
 }
+
+/** The @-token being typed at the very end of the draft (empty group right after a bare `@`). */
+internal val TRAILING_MENTION_REGEX = Regex("@([a-zA-Z0-9_]*)$")
+
+/** Candidates that match the trailing @-token (excluding an already-complete exact match). */
+private fun mentionSuggestionsFor(draft: String, candidates: Set<String>): List<String> {
+    val query = TRAILING_MENTION_REGEX.find(draft)?.groupValues?.get(1) ?: return emptyList()
+    return candidates
+        .filter { it.startsWith(query, ignoreCase = true) && !it.equals(query, ignoreCase = true) }
+        .sorted()
+        .take(MAX_MENTION_SUGGESTIONS)
+}
+
+private const val MAX_MENTION_SUGGESTIONS = 5
