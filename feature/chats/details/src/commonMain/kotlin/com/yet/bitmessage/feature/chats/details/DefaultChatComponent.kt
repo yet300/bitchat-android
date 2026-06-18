@@ -3,6 +3,7 @@ package com.yet.bitmessage.feature.chats.details
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationRepository
+import com.app.domain.repository.GeohashRepository
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.MessageTransport
@@ -78,6 +79,7 @@ internal class DefaultChatComponentFactory(
     private val peerRepository: PeerRepository,
     private val contactRepository: ContactRepository,
     private val channelRepository: ChannelRepository,
+    private val geohashRepository: GeohashRepository,
     private val verifyScanFactory: VerifyScanComponent.Factory,
 ) : ChatComponent.Factory {
     override fun create(
@@ -99,6 +101,7 @@ internal class DefaultChatComponentFactory(
             contactRepository = contactRepository,
             peerRepository = peerRepository,
             messageTransport = messageTransport,
+            geohashRepository = geohashRepository,
         ),
         verifyScanFactory = verifyScanFactory,
         onFinished = onFinished,

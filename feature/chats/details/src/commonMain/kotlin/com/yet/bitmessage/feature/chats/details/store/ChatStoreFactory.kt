@@ -7,6 +7,7 @@ import com.app.domain.model.SenderRef
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationRepository
+import com.app.domain.repository.GeohashRepository
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.MessageTransport
@@ -39,6 +40,7 @@ internal class ChatStoreFactory(
     private val conversationRepository: ConversationRepository,
     private val resolveReachability: ResolveReachabilityUseCase,
     private val contactRepository: ContactRepository,
+    private val geohashRepository: GeohashRepository,
     channelRepository: ChannelRepository,
     peerRepository: PeerRepository,
     messageTransport: MessageTransport,
@@ -110,6 +112,11 @@ internal class ChatStoreFactory(
                                 dispatch(ChatStore.Msg.VerifiedChanged(it))
                             }
                         }
+                    }
+                    // Geo chats: select the location channel so the repository subscribes to the
+                    // geohash's Nostr events and ingests them into this timeline (incoming receive).
+                    if (conversationId is ConversationId.Geohash) {
+                        scope.launch { runCatching { geohashRepository.select(conversationId) } }
                     }
                     // Reset unread count and (private chats) flush read receipts; best-effort.
                     scope.launch { runCatching { markRead(conversationId) } }
