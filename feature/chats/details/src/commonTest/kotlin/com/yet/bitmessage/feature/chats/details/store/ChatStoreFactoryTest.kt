@@ -9,6 +9,7 @@ import com.app.domain.model.ConversationId
 import com.app.domain.model.DeliveryStatus
 import com.app.domain.model.Fingerprint
 import com.app.domain.model.GeohashChannel
+import com.app.domain.model.GeohashLevel
 import com.app.domain.model.MyIdentity
 import com.app.domain.model.Peer
 import com.app.domain.model.PeerId
@@ -20,7 +21,9 @@ import com.app.domain.model.Contact
 import com.app.domain.model.RetentionPolicy
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
+import com.app.domain.model.GeoPerson
 import com.app.domain.repository.ConversationRepository
+import com.app.domain.repository.GeohashRepository
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.JoinResult
 import com.app.domain.repository.MessageRepository
@@ -139,6 +142,20 @@ class ChatStoreFactoryTest {
         override suspend fun setRetention(tag: String, policy: RetentionPolicy) = Unit
     }
 
+    private class FakeGeohashRepository : GeohashRepository {
+        val selected = mutableListOf<ConversationId>()
+        override fun observeParticipants(): Flow<List<GeoPerson>> = MutableStateFlow(emptyList())
+        override fun observeSelectedChannel(): Flow<ConversationId> = MutableStateFlow(ConversationId.PublicMesh)
+        override fun observeParticipantCounts(): Flow<Map<String, Int>> = MutableStateFlow(emptyMap())
+        override suspend fun select(channel: ConversationId) { selected += channel }
+        override suspend fun startDirectMessage(pubkeyHex: String): ConversationId =
+            ConversationId.Private(PeerId("nostr_$pubkeyHex"))
+        override suspend fun setBlocked(pubkeyHex: String, blocked: Boolean) = Unit
+        override suspend fun isTeleported(pubkeyHex: String): Boolean = false
+        override suspend fun pubkeyForNickname(nickname: String): String? = null
+        override suspend fun pubkeyForShortId(shortId: String): String? = null
+    }
+
     private fun message(id: String, content: String, mine: Boolean = false) = BitMessage(
         id = id,
         conversationId = conversationId,
@@ -157,6 +174,7 @@ class ChatStoreFactoryTest {
         id: ConversationId = conversationId,
         contacts: FakeContactRepository = FakeContactRepository(),
         targetMessageId: String? = null,
+        geohash: FakeGeohashRepository = FakeGeohashRepository(),
     ) = ChatStoreFactory(
         storeFactory = DefaultStoreFactory(),
         conversationId = id,
@@ -170,6 +188,7 @@ class ChatStoreFactoryTest {
         contactRepository = contacts,
         peerRepository = FakePeerRepository(peers),
         messageTransport = transport,
+        geohashRepository = geohash,
     )
 
     @Test
@@ -282,5 +301,22 @@ class ChatStoreFactoryTest {
     fun target_message_id_is_carried_into_state() = runTest {
         val store = factory(targetMessageId = "m1").create()
         assertEquals("m1", store.state.targetMessageId)
+    }
+
+    @Test
+    fun opening_a_geohash_conversation_selects_it_to_start_the_subscription() = runTest {
+        val geohash = FakeGeohashRepository()
+        val geoId = ConversationId.Geohash(GeohashChannel(GeohashLevel.CITY, "u4pru"))
+        factory(id = geoId, geohash = geohash).create()
+
+        assertEquals(listOf<ConversationId>(geoId), geohash.selected)
+    }
+
+    @Test
+    fun opening_a_non_geohash_conversation_does_not_select_a_location_channel() = runTest {
+        val geohash = FakeGeohashRepository()
+        factory(geohash = geohash).create()
+
+        assertTrue(geohash.selected.isEmpty())
     }
 }
