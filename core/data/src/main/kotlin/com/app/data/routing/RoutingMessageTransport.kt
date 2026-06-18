@@ -1,5 +1,6 @@
 package com.app.data.routing
 
+import android.util.Log
 import com.app.domain.model.Attachment
 import com.app.domain.model.ConversationId
 import com.app.domain.model.GeohashChannel
@@ -33,12 +34,15 @@ internal class RoutingMessageTransport(
     }
 
     override suspend fun sendGeohash(content: String, channel: GeohashChannel, nickname: String?) {
-        // TRACKING(Phase B / data-geohash): public geo-channel posting is still orchestrated in
-        // :app (GeohashViewModel -> NostrClient: identity derivation, relay selection, local
-        // echo). No production caller reaches this port yet — fail explicitly, not with a
-        // TODO() NotImplementedError, so a future mis-wiring is diagnosable.
-        throw UnsupportedOperationException(
-            "Geohash public posting is not yet routed through the data layer (lives in :app GeohashViewModel)",
+        // The whole geohash chat subsystem (subscribe + ingest incoming, presence, public posting,
+        // per-geohash identity, local echo) is not yet ported to the data layer — MessageRepository
+        // also stubs the geo timeline. Its legacy orchestration (GeohashViewModel/GeohashMessageHandler)
+        // was removed in the Phase D cleanup without a replacement. Until a GeohashRepository lands,
+        // no-op instead of throwing: the new chat UI reaches this port and must NOT crash the app.
+        // TRACKING: geohash data-layer port.
+        Log.w(
+            "RoutingMessageTransport",
+            "Dropping geohash post to ${channel.geohash}: geohash chat is not yet wired through the data layer",
         )
     }
 
