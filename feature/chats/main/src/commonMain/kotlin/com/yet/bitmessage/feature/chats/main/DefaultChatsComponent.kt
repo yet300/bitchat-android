@@ -69,6 +69,9 @@ internal class DefaultChatsComponent(
                         componentContext = ctx,
                         config = config,
                         onFinished = { navigation.navigate { it.copy(details = null) } },
+                        onOpenConversation = { id ->
+                            navigation.navigate { it.copy(details = ChatConfig.from(id)) }
+                        },
                     ),
                 )
             },

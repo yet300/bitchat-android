@@ -17,8 +17,10 @@ import com.app.domain.usecase.CommandResult
 import com.app.domain.usecase.MarkConversationReadUseCase
 import com.app.domain.usecase.ParseCommandUseCase
 import com.app.domain.usecase.ProcessCommandUseCase
+import com.app.domain.usecase.GeohashDmTarget
 import com.app.domain.usecase.ResolveReachabilityUseCase
 import com.app.domain.usecase.SendMessageUseCase
+import com.app.domain.usecase.StartGeohashDmUseCase
 import com.arkivanov.mvikotlin.core.store.Reducer
 import com.arkivanov.mvikotlin.core.store.SimpleBootstrapper
 import com.arkivanov.mvikotlin.core.store.Store
@@ -51,6 +53,7 @@ internal class ChatStoreFactory(
     private val parseCommand = ParseCommandUseCase()
     private val processCommand =
         ProcessCommandUseCase(messageRepository, channelRepository, contactRepository, peerRepository)
+    private val startGeohashDm = StartGeohashDmUseCase(geohashRepository)
 
     fun create(): ChatStore =
         object : ChatStore,
@@ -149,6 +152,11 @@ internal class ChatStoreFactory(
                     val command = parseCommand(text)
                     if (command != null) scope.launch { runCommand(command) }
                     else scope.launch { send(text) }
+                }
+
+                is ChatStore.Intent.ParticipantClicked -> scope.launch {
+                    val id = startGeohashDm(GeohashDmTarget.Pubkey(intent.pubkeyHex)) ?: return@launch
+                    publish(ChatStore.Label.OpenConversation(id))
                 }
             }
         }
