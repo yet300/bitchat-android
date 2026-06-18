@@ -58,8 +58,9 @@ class SendMessageUseCase(
             }
 
             is ConversationId.Geohash -> {
-                // The local echo for a geo-chat is added by the transport (as the current
-                // GeohashViewModel does) to avoid duplication — so we only send here.
+                // Echo locally then post: the geohash ingest skips our own relayed events, so the
+                // echo is the only local copy (no duplication). Mirrors the broadcast kinds above.
+                messages.append(target, echo(id, target, sender, content, now, mentions))
                 transport.sendGeohash(content, target.channel, sender.displayName)
             }
         }
