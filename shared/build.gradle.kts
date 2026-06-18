@@ -43,6 +43,8 @@ kotlin {
             implementation(libs.androidx.camera.lifecycle)
             implementation(libs.androidx.camera.compose)
             implementation(libs.mlkit.barcode.scanning)
+            // Attachment picker (P10): system GetContent launcher.
+            implementation(libs.androidx.activity.compose)
         }
         commonMain.dependencies {
             implementation(projects.core.domain)

@@ -53,6 +53,7 @@ import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.yet.bitmessage.feature.chats.details.ChatComponent
 import com.yet.bitmessage.feature.chats.details.verify.VerifyScanComponent
 import com.yet.bitmessage.shared.resources.Res
+import com.yet.bitmessage.shared.resources.chat_attach
 import com.yet.bitmessage.shared.resources.chat_back
 import com.yet.bitmessage.shared.resources.chat_empty
 import com.yet.bitmessage.shared.resources.chat_encrypted
@@ -76,8 +77,10 @@ import com.yet.bitmessage.shared.resources.verify_scan_prompt
 import com.yet.bitmessage.shared.resources.verify_scan_title
 import com.yet.bitmessage.shared.resources.verify_started
 import com.yet.bitmessage.ui.component.CameraScanner
+import com.yet.bitmessage.ui.component.rememberAttachmentPicker
 import com.yet.bitmessage.ui.component.button.IconCircleButton
 import com.yet.bitmessage.ui.component.icon.AccountCircle
+import com.yet.bitmessage.ui.component.icon.Add
 import com.yet.bitmessage.ui.component.icon.ArrowBack
 import com.yet.bitmessage.ui.component.icon.Check
 import com.yet.bitmessage.ui.component.icon.Close
@@ -94,6 +97,9 @@ import org.jetbrains.compose.resources.stringResource
 fun ChatContent(component: ChatComponent, modifier: Modifier = Modifier) {
     val model by component.model.subscribeAsState()
     val sheet by component.sheetSlot.subscribeAsState()
+    val launchAttachmentPicker = rememberAttachmentPicker(onPicked = component::onAttachmentPicked)
+    // Geo media has no Nostr file path yet (AttachmentSender drops it), so hide attach there.
+    val canAttach = model.conversationId !is ConversationId.Geohash
 
     Scaffold(
         modifier = modifier,
@@ -133,8 +139,10 @@ fun ChatContent(component: ChatComponent, modifier: Modifier = Modifier) {
             MessageInput(
                 draft = model.draft,
                 canSend = model.canSend,
+                canAttach = canAttach,
                 onDraftChanged = component::onDraftChanged,
                 onSendClicked = component::onSendClicked,
+                onAttachClicked = launchAttachmentPicker,
             )
         },
     ) { padding ->
@@ -427,8 +435,10 @@ internal fun DeliveryStatus.glyph(): Pair<ImageVector, Color> = when (this) {
 private fun MessageInput(
     draft: String,
     canSend: Boolean,
+    canAttach: Boolean,
     onDraftChanged: (String) -> Unit,
     onSendClicked: () -> Unit,
+    onAttachClicked: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(tonalElevation = 2.dp) {
@@ -440,6 +450,13 @@ private fun MessageInput(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (canAttach) {
+                IconCircleButton(
+                    icon = Add,
+                    contentDescription = stringResource(Res.string.chat_attach),
+                    onClick = onAttachClicked,
+                )
+            }
             OutlinedTextField(
                 value = draft,
                 onValueChange = onDraftChanged,

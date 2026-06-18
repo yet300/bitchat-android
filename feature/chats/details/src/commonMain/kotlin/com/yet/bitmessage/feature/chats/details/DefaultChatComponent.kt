@@ -22,6 +22,7 @@ import com.arkivanov.mvikotlin.core.store.StoreFactory
 import com.arkivanov.mvikotlin.extensions.coroutines.labels
 import com.app.common.decompose.asValue
 import com.app.common.decompose.componentCoroutineScope
+import com.app.domain.model.Attachment
 import com.app.domain.model.ConversationId
 import com.yet.bitmessage.feature.chats.details.integration.stateToModel
 import com.yet.bitmessage.feature.chats.details.store.ChatStore
@@ -75,6 +76,9 @@ internal class DefaultChatComponent(
     override fun onDraftChanged(text: String) = store.accept(ChatStore.Intent.DraftChanged(text))
 
     override fun onSendClicked() = store.accept(ChatStore.Intent.SendClicked)
+
+    override fun onAttachmentPicked(attachment: Attachment) =
+        store.accept(ChatStore.Intent.SendAttachment(attachment))
 
     override fun onVerifyClicked() = sheetNavigation.activate(SheetConfig.VerifyScan)
 

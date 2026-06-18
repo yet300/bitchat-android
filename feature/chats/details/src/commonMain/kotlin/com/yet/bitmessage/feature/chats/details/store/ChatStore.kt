@@ -1,5 +1,6 @@
 package com.yet.bitmessage.feature.chats.details.store
 
+import com.app.domain.model.Attachment
 import com.app.domain.model.BitMessage
 import com.app.domain.model.ConversationId
 import com.app.domain.model.GeoPerson
@@ -33,6 +34,8 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
         data object SendClicked : Intent
 
         data class ParticipantClicked(val pubkeyHex: String) : Intent
+
+        data class SendAttachment(val attachment: Attachment) : Intent
     }
 
     sealed interface Action {

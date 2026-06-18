@@ -3,6 +3,7 @@
 package com.yet.bitmessage.feature.chats.details.store
 
 import com.app.domain.model.Attachment
+import com.app.domain.model.AttachmentKind
 import com.app.domain.model.BitMessage
 import com.app.domain.model.Conversation
 import com.app.domain.model.ConversationId
@@ -80,12 +81,15 @@ class ChatStoreFactoryTest {
 
     private class RecordingTransport : MessageTransport {
         val publicSends = mutableListOf<Pair<String, String?>>()
+        val attachments = mutableListOf<Pair<Attachment, ConversationId>>()
         override suspend fun sendPublic(content: String, mentions: List<String>, channel: String?) {
             publicSends += content to channel
         }
         override suspend fun sendPrivate(content: String, to: PeerId, recipientNickname: String?, messageId: String) = Unit
         override suspend fun sendGeohash(content: String, channel: GeohashChannel, nickname: String?) = Unit
-        override suspend fun sendAttachment(attachment: Attachment, target: ConversationId, messageId: String) = Unit
+        override suspend fun sendAttachment(attachment: Attachment, target: ConversationId, messageId: String) {
+            attachments += attachment to target
+        }
         override suspend fun cancelTransfer(messageId: String): Boolean = false
         override suspend fun sendReadReceipt(messageId: String, to: PeerId) = Unit
         override suspend fun sendFavoriteNotification(to: PeerId, isFavorite: Boolean) = Unit
@@ -350,6 +354,20 @@ class ChatStoreFactoryTest {
 
         people.value = emptyList()
         assertTrue(store.state.participants.isEmpty())
+    }
+
+    @Test
+    fun sending_an_attachment_echoes_locally_and_routes_through_the_transport() = runTest {
+        val transport = RecordingTransport()
+        val messages = FakeMessageRepository()
+        val store = factory(messages = messages, transport = transport).create()
+
+        val attachment = Attachment(kind = AttachmentKind.IMAGE, ref = "/cache/pic.jpg", mime = "image/jpeg")
+        store.accept(ChatStore.Intent.SendAttachment(attachment))
+
+        assertEquals(listOf(attachment), transport.attachments.map { it.first })
+        assertEquals(conversationId, transport.attachments.single().second)
+        assertEquals(listOf("/cache/pic.jpg"), messages.appended.map { it.content })
     }
 
     @Test
