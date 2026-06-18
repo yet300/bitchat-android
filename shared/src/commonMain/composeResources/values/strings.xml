@@ -101,6 +101,12 @@
     <string name="connectivity_banner_title">Some transports need permission</string>
     <string name="connectivity_banner_action">Review</string>
     <string name="connectivity_banner_dismiss">Dismiss</string>
+    <string name="connectivity_peers_title">Mesh peers</string>
+    <string name="connectivity_peers_empty">No peers nearby</string>
+    <string name="connectivity_peer_direct">Direct</string>
+    <string name="connectivity_peer_relayed">Relayed</string>
+    <string name="connectivity_peer_favorite">Favorite</string>
+    <string name="connectivity_peer_verified">Verified</string>
     <string name="chat_back">Back</string>
     <string name="chat_empty">No messages yet</string>
     <string name="chat_encrypted">Encrypted</string>

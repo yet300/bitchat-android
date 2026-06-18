@@ -64,9 +64,10 @@ class DefaultChatsComponentTest {
 
     private class FakeConnectivityComponent : ConnectivityComponent {
         override val model: Value<ConnectivityComponent.Model> =
-            MutableValue(ConnectivityComponent.Model(statuses = emptyList()))
+            MutableValue(ConnectivityComponent.Model(statuses = emptyList(), peers = emptyList()))
 
         override fun onEnableClicked(kind: com.app.domain.model.TransportKind) = Unit
+        override fun onToggleFavorite(peerIdRaw: String) = Unit
     }
 
     private class FakeSearchComponent(

@@ -1,8 +1,13 @@
 package com.yet.bitmessage.ui.screen.chat
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -12,8 +17,10 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.yet.bitmessage.ui.component.icon.Done
 import com.app.domain.model.TransportKind
 import com.app.domain.model.TransportState
 import com.app.domain.model.TransportStatus
@@ -30,6 +37,11 @@ import com.yet.bitmessage.shared.resources.connectivity_bluetooth
 import com.yet.bitmessage.shared.resources.connectivity_internet
 import com.yet.bitmessage.shared.resources.connectivity_count_peers
 import com.yet.bitmessage.shared.resources.connectivity_count_relays
+import com.yet.bitmessage.shared.resources.connectivity_peer_direct
+import com.yet.bitmessage.shared.resources.connectivity_peer_relayed
+import com.yet.bitmessage.shared.resources.connectivity_peer_verified
+import com.yet.bitmessage.shared.resources.connectivity_peers_empty
+import com.yet.bitmessage.shared.resources.connectivity_peers_title
 import com.yet.bitmessage.shared.resources.connectivity_state_off
 import com.yet.bitmessage.shared.resources.connectivity_state_on
 import com.yet.bitmessage.shared.resources.connectivity_state_permission
@@ -92,7 +104,61 @@ private fun ConnectivitySheet(component: ConnectivityComponent, onDismiss: () ->
         model.statuses.forEach { status ->
             TransportRow(status, component::onEnableClicked)
         }
+
+        Text(
+            text = stringResource(Res.string.connectivity_peers_title),
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 4.dp),
+        )
+        if (model.peers.isEmpty()) {
+            Text(
+                text = stringResource(Res.string.connectivity_peers_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            )
+        } else {
+            model.peers.forEach { peer ->
+                PeerRow(peer, onToggleFavorite = component::onToggleFavorite)
+            }
+        }
     }
+}
+
+@Composable
+private fun PeerRow(peer: ConnectivityComponent.PeerRow, onToggleFavorite: (String) -> Unit) {
+    ListItem(
+        headlineContent = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(text = peer.name)
+                if (peer.isVerified) {
+                    Icon(
+                        imageVector = Done,
+                        contentDescription = stringResource(Res.string.connectivity_peer_verified),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
+        },
+        supportingContent = { Text(text = peerDetail(peer)) },
+        trailingContent = {
+            IconButton(onClick = { onToggleFavorite(peer.peerIdRaw) }) {
+                Text(
+                    text = if (peer.isFavorite) "★" else "☆",
+                    color = if (peer.isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+    )
+}
+
+@Composable
+private fun peerDetail(peer: ConnectivityComponent.PeerRow): String {
+    val link = stringResource(
+        if (peer.isDirect) Res.string.connectivity_peer_direct else Res.string.connectivity_peer_relayed,
+    )
+    return peer.rssi?.let { "$link · $it dBm" } ?: link
 }
 
 @Composable

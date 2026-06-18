@@ -16,8 +16,23 @@ interface ConnectivityComponent {
 
     fun onEnableClicked(kind: TransportKind)
 
+    /** Favorite / unfavorite the mesh peer (by raw peer id). */
+    fun onToggleFavorite(peerIdRaw: String)
+
     data class Model(
         val statuses: List<TransportStatus>,
+        val peers: List<PeerRow>,
+    )
+
+    /** A mesh peer with its live link detail, for the connectivity panel's peer list. */
+    data class PeerRow(
+        val peerIdRaw: String,
+        val name: String,
+        val rssi: Int?,
+        val isDirect: Boolean,
+        val isConnected: Boolean,
+        val isVerified: Boolean,
+        val isFavorite: Boolean,
     )
 
     fun interface Factory {
