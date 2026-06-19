@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -54,11 +55,13 @@ import com.app.domain.model.BitMessage
 import com.app.domain.model.ConversationId
 import com.app.domain.model.DeliveryStatus
 import com.app.domain.model.GeoPerson
+import com.app.domain.model.LocationNote
 import com.app.domain.model.MessageType
 import com.app.domain.model.Reachability
 import com.app.domain.repository.VerifyScanResult
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.yet.bitmessage.feature.chats.details.ChatComponent
+import com.yet.bitmessage.feature.chats.details.notes.LocationNotesComponent
 import com.yet.bitmessage.feature.chats.details.verify.VerifyScanComponent
 import com.yet.bitmessage.shared.resources.Res
 import com.yet.bitmessage.shared.resources.chat_attach
@@ -79,6 +82,10 @@ import com.yet.bitmessage.shared.resources.media_audio
 import com.yet.bitmessage.shared.resources.media_cancel
 import com.yet.bitmessage.shared.resources.media_file
 import com.yet.bitmessage.shared.resources.media_image
+import com.yet.bitmessage.shared.resources.notes_empty
+import com.yet.bitmessage.shared.resources.notes_hint
+import com.yet.bitmessage.shared.resources.notes_send
+import com.yet.bitmessage.shared.resources.notes_title
 import com.yet.bitmessage.shared.resources.verify_action
 import com.yet.bitmessage.shared.resources.verify_camera_grant
 import com.yet.bitmessage.shared.resources.verify_camera_needed
@@ -150,6 +157,15 @@ fun ChatContent(component: ChatComponent, modifier: Modifier = Modifier) {
                                 contentDescription = stringResource(Res.string.chat_geo_participants),
                             )
                         }
+                        // Location notes are building-level (8-char geohash) only.
+                        if ((model.conversationId as? ConversationId.Geohash)?.channel?.geohash?.length == 8) {
+                            IconButton(onClick = component::onNotesClicked) {
+                                Icon(
+                                    imageVector = LocationOn,
+                                    contentDescription = stringResource(Res.string.notes_title),
+                                )
+                            }
+                        }
                     }
                 },
             )
@@ -202,6 +218,8 @@ fun ChatContent(component: ChatComponent, modifier: Modifier = Modifier) {
                 onParticipantClick = component::onParticipantSelected,
                 onDismiss = component::onDismissSheet,
             )
+        is ChatComponent.ChatSheetChild.LocationNotes ->
+            LocationNotesSheet(component = child.component, onDismiss = component::onDismissSheet)
         null -> Unit
     }
 }
@@ -265,6 +283,65 @@ private fun GeoParticipantRow(person: GeoPerson, onClick: () -> Unit) {
                 modifier = Modifier.size(16.dp),
             )
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LocationNotesSheet(component: LocationNotesComponent, onDismiss: () -> Unit) {
+    val model by component.model.subscribeAsState()
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Text(
+            text = stringResource(Res.string.notes_title),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+        )
+        Box(modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 360.dp)) {
+            when {
+                model.isLoading && model.notes.isEmpty() ->
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                model.notes.isEmpty() -> Text(
+                    text = stringResource(Res.string.notes_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.align(Alignment.Center),
+                )
+                else -> LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                    items(model.notes, key = { it.id }) { note -> LocationNoteRow(note) }
+                }
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedTextField(
+                value = model.draft,
+                onValueChange = component::onDraftChanged,
+                modifier = Modifier.weight(1f),
+                placeholder = { Text(text = stringResource(Res.string.notes_hint)) },
+                maxLines = 3,
+            )
+            IconCircleButton(
+                icon = Send,
+                contentDescription = stringResource(Res.string.notes_send),
+                onClick = component::onSendClicked,
+                enabled = model.canSend,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LocationNoteRow(note: LocationNote) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp)) {
+        Text(
+            text = note.authorName,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Text(text = note.content, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

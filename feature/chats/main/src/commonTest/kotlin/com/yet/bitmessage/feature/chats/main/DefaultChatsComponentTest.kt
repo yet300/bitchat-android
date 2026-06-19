@@ -203,6 +203,7 @@ class DefaultChatsComponentTest {
         override fun onToggleBookmark() = Unit
         override fun onVerifyClicked() = Unit
         override fun onParticipantsClicked() = Unit
+        override fun onNotesClicked() = Unit
         override fun onParticipantSelected(pubkeyHex: String) = Unit
         override fun onDismissSheet() = Unit
         override fun onBackClicked() = onFinished()

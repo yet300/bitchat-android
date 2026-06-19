@@ -26,6 +26,7 @@ import com.app.common.decompose.componentCoroutineScope
 import com.app.domain.model.Attachment
 import com.app.domain.model.ConversationId
 import com.yet.bitmessage.feature.chats.details.integration.stateToModel
+import com.yet.bitmessage.feature.chats.details.notes.LocationNotesComponent
 import com.yet.bitmessage.feature.chats.details.store.ChatStore
 import com.yet.bitmessage.feature.chats.details.store.ChatStoreFactory
 import com.yet.bitmessage.feature.chats.details.verify.VerifyScanComponent
@@ -37,6 +38,7 @@ internal class DefaultChatComponent(
     componentContext: ComponentContext,
     storeFactory: ChatStoreFactory,
     private val verifyScanFactory: VerifyScanComponent.Factory,
+    private val locationNotesFactory: LocationNotesComponent.Factory,
     private val onFinished: () -> Unit,
     private val onOpenConversation: (ConversationId) -> Unit,
 ) : ChatComponent, ComponentContext by componentContext {
@@ -70,6 +72,9 @@ internal class DefaultChatComponent(
                         verifyScanFactory.create(ctx) { sheetNavigation.dismiss() },
                     )
                     SheetConfig.Participants -> ChatComponent.ChatSheetChild.Participants
+                    is SheetConfig.LocationNotes -> ChatComponent.ChatSheetChild.LocationNotes(
+                        locationNotesFactory.create(ctx, config.geohash) { sheetNavigation.dismiss() },
+                    )
                 }
             },
         )
@@ -93,6 +98,11 @@ internal class DefaultChatComponent(
 
     override fun onParticipantsClicked() = sheetNavigation.activate(SheetConfig.Participants)
 
+    override fun onNotesClicked() {
+        val geohash = (store.state.conversationId as? ConversationId.Geohash)?.channel?.geohash ?: return
+        sheetNavigation.activate(SheetConfig.LocationNotes(geohash))
+    }
+
     override fun onParticipantSelected(pubkeyHex: String) =
         store.accept(ChatStore.Intent.ParticipantClicked(pubkeyHex))
 
@@ -107,6 +117,9 @@ internal class DefaultChatComponent(
 
         @Serializable
         data object Participants : SheetConfig
+
+        @Serializable
+        data class LocationNotes(val geohash: String) : SheetConfig
     }
 }
 
@@ -131,6 +144,7 @@ internal class DefaultChatComponentFactory(
     private val geohashRepository: GeohashRepository,
     private val geohashBookmarks: GeohashBookmarksRepository,
     private val verifyScanFactory: VerifyScanComponent.Factory,
+    private val locationNotesFactory: LocationNotesComponent.Factory,
 ) : ChatComponent.Factory {
     override fun create(
         componentContext: ComponentContext,
@@ -156,6 +170,7 @@ internal class DefaultChatComponentFactory(
             geohashBookmarks = geohashBookmarks,
         ),
         verifyScanFactory = verifyScanFactory,
+        locationNotesFactory = locationNotesFactory,
         onFinished = onFinished,
         onOpenConversation = onOpenConversation,
     )
