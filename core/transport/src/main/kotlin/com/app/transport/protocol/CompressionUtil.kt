@@ -1,6 +1,6 @@
 package com.app.transport.protocol
 
-import android.util.Log
+import com.app.common.utils.Log
 import java.io.ByteArrayOutputStream
 import java.util.zip.Deflater
 import java.util.zip.Inflater

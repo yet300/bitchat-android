@@ -1,5 +1,6 @@
 package com.app.transport.nostr
 
+import com.app.common.utils.Log
 import org.bouncycastle.crypto.ec.CustomNamedCurves
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.crypto.params.ECPrivateKeyParameters
@@ -252,7 +253,7 @@ internal object NostrCrypto {
             val aead = XChaCha20Poly1305(encryptionKey)
             val combined = aead.encrypt(plaintext.toByteArray(Charsets.UTF_8), null) // nonce||ct||tag
             val b64 = base64UrlNoPad(combined)
-            android.util.Log.d("NostrCrypto", "NIP44 v2 encrypt: len=${b64.length}")
+            Log.d("NostrCrypto", "NIP44 v2 encrypt: len=${b64.length}")
             return "v2:$b64"
         } catch (e: Exception) {
             throw RuntimeException("NIP-44 v2 encryption failed: ${e.message}", e)

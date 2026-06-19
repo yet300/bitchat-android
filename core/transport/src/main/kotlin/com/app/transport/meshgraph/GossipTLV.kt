@@ -1,6 +1,6 @@
 package com.app.transport.meshgraph
 
-import android.util.Log
+import com.app.common.utils.Log
 
 /**
  * Gossip TLV helpers for embedding direct neighbor peer IDs in ANNOUNCE payloads.

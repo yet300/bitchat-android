@@ -1,7 +1,7 @@
 package com.app.transport.nostr
 
 import android.content.Context
-import android.util.Log
+import com.app.common.utils.Log
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn

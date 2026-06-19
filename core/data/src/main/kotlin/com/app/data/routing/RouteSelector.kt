@@ -1,6 +1,6 @@
 package com.app.data.routing
 
-import android.util.Log
+import com.app.common.utils.Log
 import com.app.transport.routing.OutgoingEnvelope
 import com.app.transport.routing.PeerKeyResolver
 import com.app.transport.routing.Reachability

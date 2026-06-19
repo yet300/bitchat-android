@@ -1,6 +1,6 @@
 package com.app.crypto.noise
 
-import android.util.Log
+import com.app.common.utils.Log
 import java.util.concurrent.ConcurrentHashMap
 
 /**

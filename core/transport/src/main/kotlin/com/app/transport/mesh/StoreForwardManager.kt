@@ -1,6 +1,6 @@
 package com.app.transport.mesh
 
-import android.util.Log
+import com.app.common.utils.Log
 import com.app.transport.MeshConstants
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType

@@ -3,7 +3,7 @@ package com.app.data.nostr
 import com.app.transport.nostr.*
 
 import android.content.Context
-import android.util.Log
+import com.app.common.utils.Log
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.transport.NostrConstants
 import com.app.transport.model.ReadReceipt

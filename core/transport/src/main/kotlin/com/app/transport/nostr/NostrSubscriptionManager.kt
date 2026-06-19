@@ -1,6 +1,6 @@
 package com.app.transport.nostr
 
-import android.util.Log
+import com.app.common.utils.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 

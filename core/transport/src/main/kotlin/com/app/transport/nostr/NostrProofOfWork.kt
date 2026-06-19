@@ -1,9 +1,8 @@
 package com.app.transport.nostr
 
-import android.util.Log
+import com.app.common.utils.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.security.MessageDigest
 import kotlin.random.Random
 
 /**

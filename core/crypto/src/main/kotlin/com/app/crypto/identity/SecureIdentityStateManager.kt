@@ -5,7 +5,7 @@ import com.app.crypto.secure.SecureKeyValueStore
 import com.app.crypto.secure.TinkSecureKeyValueStore
 import java.security.MessageDigest
 import android.util.Base64
-import android.util.Log
+import com.app.common.utils.Log
 import com.app.common.encoding.hexEncodedString
 
 /**

@@ -1,7 +1,7 @@
 package info.guardianproject.arti
 
 import android.app.Application
-import android.util.Log
+import com.app.common.utils.Log
 import org.torproject.arti.ArtiNative
 import java.io.File
 

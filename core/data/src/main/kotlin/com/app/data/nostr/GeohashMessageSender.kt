@@ -1,6 +1,6 @@
 package com.app.data.nostr
 
-import android.util.Log
+import com.app.common.utils.Log
 import com.app.transport.nostr.NostrIdentityBridge
 import com.app.transport.nostr.NostrProtocol
 import com.app.transport.nostr.NostrRelayManager

@@ -1,7 +1,7 @@
 package com.app.transport.nostr
 
 import android.content.Context
-import android.util.Log
+import com.app.common.utils.Log
 
 /**
  * Initializer for LocationNotesManager with all dependencies

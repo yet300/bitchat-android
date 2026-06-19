@@ -1,5 +1,6 @@
 package com.yet.bitmessage.android.service
 
+import com.app.common.utils.Log
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -51,7 +52,7 @@ class MeshForegroundService : Service() {
                 } else {
                     // Do not attempt to start a background service from headless context without notif permission
                     // or when background is disabled, to avoid BackgroundServiceStartNotAllowedException.
-                    android.util.Log.i(
+                    Log.i(
                         "MeshForegroundService",
                         "Not starting service on API>=26 (bgEnabled=$bgEnabled, hasNotifPerm=$hasNotifPerm)"
                     )
@@ -60,7 +61,7 @@ class MeshForegroundService : Service() {
                 if (bgEnabled) {
                     context.startService(intent)
                 } else {
-                    android.util.Log.i("MeshForegroundService", "Background disabled; not starting service (pre-O)")
+                    Log.i("MeshForegroundService", "Background disabled; not starting service (pre-O)")
                 }
             }
         }
@@ -209,10 +210,10 @@ class MeshForegroundService : Service() {
         if (isShuttingDown) return
         if (!hasBluetoothPermissions()) return
         try {
-            android.util.Log.d("MeshForegroundService", "Ensuring mesh service is started")
+            Log.d("MeshForegroundService", "Ensuring mesh service is started")
             meshLifecycle.start()
         } catch (e: Exception) {
-            android.util.Log.e("MeshForegroundService", "Failed to start mesh service: ${e.message}")
+            Log.e("MeshForegroundService", "Failed to start mesh service: ${e.message}")
         }
     }
 
@@ -330,7 +331,7 @@ class MeshForegroundService : Service() {
         } catch (e: SecurityException) {
             // "While In Use" grants can still be rejected on background starts —
             // strip the conditional types and keep the service alive on DATA_SYNC.
-            android.util.Log.w("MeshForegroundService", "startForeground(type=$type) rejected, falling back to DATA_SYNC: ${e.message}")
+            Log.w("MeshForegroundService", "startForeground(type=$type) rejected, falling back to DATA_SYNC: ${e.message}")
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         }
     }

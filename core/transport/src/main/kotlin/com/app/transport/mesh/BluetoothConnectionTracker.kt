@@ -3,7 +3,7 @@ package com.app.transport.mesh
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
-import android.util.Log
+import com.app.common.utils.Log
 import com.app.transport.MeshConstants
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay

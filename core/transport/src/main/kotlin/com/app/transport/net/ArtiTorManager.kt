@@ -1,7 +1,7 @@
 package com.app.transport.net
 
 import android.app.Application
-import android.util.Log
+import com.app.common.utils.Log
 import com.app.transport.TorConstants
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject

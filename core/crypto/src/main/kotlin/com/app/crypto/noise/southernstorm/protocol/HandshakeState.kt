@@ -21,7 +21,7 @@
  */
 package com.app.crypto.noise.southernstorm.protocol
 
-import android.util.Log
+import com.app.common.utils.Log
 import com.app.crypto.noise.southernstorm.protocol.Noise.copySubArray
 import com.app.crypto.noise.southernstorm.protocol.Noise.createDH
 import com.app.crypto.noise.southernstorm.protocol.Noise.destroy

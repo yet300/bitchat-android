@@ -1,6 +1,6 @@
 package com.app.transport.mesh
 
-import android.util.Log
+import com.app.common.utils.Log
 import com.app.crypto.EncryptionService
 import com.app.transport.model.IdentityAnnouncement
 import com.app.transport.protocol.BitchatPacket

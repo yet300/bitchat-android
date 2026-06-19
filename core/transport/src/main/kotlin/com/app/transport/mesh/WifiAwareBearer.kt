@@ -20,7 +20,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.system.OsConstants
-import android.util.Log
+import com.app.common.utils.Log
 import androidx.annotation.RequiresApi
 import com.app.common.encoding.toHexString
 import com.app.crypto.EncryptionService

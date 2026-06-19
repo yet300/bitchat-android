@@ -2,7 +2,7 @@ package com.yet.bitmessage.ui.component
 
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
+import com.app.common.utils.Log
 import androidx.camera.compose.CameraXViewfinder
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage

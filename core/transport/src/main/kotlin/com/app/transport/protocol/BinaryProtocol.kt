@@ -2,7 +2,7 @@ package com.app.transport.protocol
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import android.util.Log
+import com.app.common.utils.Log
 import kotlinx.serialization.Serializable
 
 /**

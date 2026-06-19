@@ -11,7 +11,7 @@ import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.content.Context
 import android.os.ParcelUuid
-import android.util.Log
+import com.app.common.utils.Log
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.MeshConstants
 import kotlinx.coroutines.CoroutineScope

@@ -1,5 +1,6 @@
 package com.app.transport.model
 
+import com.app.common.utils.Log
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -31,18 +32,18 @@ data class BitchatFilePacket(
 
     fun encode(): ByteArray? {
         try {
-            android.util.Log.d("BitchatFilePacket", "🔄 Encoding: name=$fileName, size=$fileSize, mime=$mimeType")
+            Log.d("BitchatFilePacket", "🔄 Encoding: name=$fileName, size=$fileSize, mime=$mimeType")
         val nameBytes = fileName.toByteArray(Charsets.UTF_8)
         val mimeBytes = mimeType.toByteArray(Charsets.UTF_8)
         // Validate bounds for 2-byte TLV lengths (per-TLV). CONTENT may exceed 65535 and will be chunked.
         if (nameBytes.size > 0xFFFF || mimeBytes.size > 0xFFFF) {
-                android.util.Log.e("BitchatFilePacket", "❌ TLV field too large: name=${nameBytes.size}, mime=${mimeBytes.size} (max: 65535)")
+                Log.e("BitchatFilePacket", "❌ TLV field too large: name=${nameBytes.size}, mime=${mimeBytes.size} (max: 65535)")
                 return null
             }
             if (content.size > 0xFFFF) {
-                android.util.Log.d("BitchatFilePacket", "📦 Content exceeds 65535 bytes (${content.size}); will be split into multiple CONTENT TLVs")
+                Log.d("BitchatFilePacket", "📦 Content exceeds 65535 bytes (${content.size}); will be split into multiple CONTENT TLVs")
             } else {
-                android.util.Log.d("BitchatFilePacket", "📏 TLV sizes OK: name=${nameBytes.size}, mime=${mimeBytes.size}, content=${content.size}")
+                Log.d("BitchatFilePacket", "📏 TLV sizes OK: name=${nameBytes.size}, mime=${mimeBytes.size}, content=${content.size}")
             }
         val sizeFieldLen = 4 // UInt32 for FILE_SIZE (changed from 8 bytes)
         val contentLenFieldLen = 4 // UInt32 for CONTENT TLV as requested
@@ -73,17 +74,17 @@ data class BitchatFilePacket(
         buf.put(content)
 
         val result = buf.array()
-            android.util.Log.d("BitchatFilePacket", "✅ Encoded successfully: ${result.size} bytes total")
+            Log.d("BitchatFilePacket", "✅ Encoded successfully: ${result.size} bytes total")
             return result
         } catch (e: Exception) {
-            android.util.Log.e("BitchatFilePacket", "❌ Encoding failed: ${e.message}", e)
+            Log.e("BitchatFilePacket", "❌ Encoding failed: ${e.message}", e)
             return null
         }
     }
 
     companion object {
         fun decode(data: ByteArray): BitchatFilePacket? {
-            android.util.Log.d("BitchatFilePacket", "🔄 Decoding ${data.size} bytes")
+            Log.d("BitchatFilePacket", "🔄 Decoding ${data.size} bytes")
             try {
                 var off = 0
                 var name: String? = null
@@ -129,10 +130,10 @@ data class BitchatFilePacket(
                 val s = size ?: c.size.toLong()
                 val m = mime ?: "application/octet-stream"
                 val result = BitchatFilePacket(n, s, m, c)
-                android.util.Log.d("BitchatFilePacket", "✅ Decoded: name=$n, size=$s, mime=$m, content=${c.size} bytes")
+                Log.d("BitchatFilePacket", "✅ Decoded: name=$n, size=$s, mime=$m, content=${c.size} bytes")
                 return result
             } catch (e: Exception) {
-                android.util.Log.e("BitchatFilePacket", "❌ Decoding failed: ${e.message}", e)
+                Log.e("BitchatFilePacket", "❌ Decoding failed: ${e.message}", e)
                 return null
             }
         }

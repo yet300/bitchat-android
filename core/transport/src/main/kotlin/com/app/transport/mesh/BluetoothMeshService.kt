@@ -1,7 +1,7 @@
 package com.app.transport.mesh
 
 import android.content.Context
-import android.util.Log
+import com.app.common.utils.Log
 import com.app.crypto.EncryptionService
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.transport.model.BitchatMessage

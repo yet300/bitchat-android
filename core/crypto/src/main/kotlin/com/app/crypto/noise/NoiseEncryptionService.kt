@@ -1,13 +1,11 @@
 package com.app.crypto.noise
 
 import android.content.Context
-import android.util.Log
+import com.app.common.utils.Log
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.crypto.identity.PeerFingerprintManager
-import com.app.crypto.noise.southernstorm.protocol.Noise
 import java.security.MessageDigest
 import java.security.SecureRandom
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Main Noise encryption service - 100% compatible with iOS implementation

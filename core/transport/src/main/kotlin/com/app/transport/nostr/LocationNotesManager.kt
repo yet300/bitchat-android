@@ -1,6 +1,6 @@
 package com.app.transport.nostr
 
-import android.util.Log
+import com.app.common.utils.Log
 import androidx.annotation.MainThread
 import com.app.common.geohash.Geohash
 import dev.zacsweers.metro.AppScope

@@ -1,6 +1,6 @@
 package com.app.transport
 
-import android.util.Log
+import com.app.common.utils.Log
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.common.serialization.JsonConfig
 import dev.zacsweers.metro.AppScope

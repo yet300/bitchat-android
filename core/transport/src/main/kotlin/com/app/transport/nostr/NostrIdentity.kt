@@ -4,7 +4,7 @@ import android.content.Context
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import android.util.Log
+import com.app.common.utils.Log
 import com.app.crypto.identity.SecureIdentityStateManager
 import java.security.MessageDigest
 import java.security.SecureRandom

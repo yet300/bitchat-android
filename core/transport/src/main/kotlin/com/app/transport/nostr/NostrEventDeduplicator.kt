@@ -1,6 +1,6 @@
 package com.app.transport.nostr
 
-import android.util.Log
+import com.app.common.utils.Log
 import com.app.transport.NostrConstants
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject

@@ -1,7 +1,7 @@
 package com.app.transport.nostr
 
 import android.util.Base64
-import android.util.Log
+import com.app.common.utils.Log
 import com.app.transport.MeshConstants
 import com.app.transport.model.PrivateMessagePacket
 import com.app.transport.model.NoisePayloadType

@@ -1,6 +1,6 @@
 package com.app.transport.nostr
 
-import android.util.Log
+import com.app.common.utils.Log
 import com.app.common.serialization.JsonConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

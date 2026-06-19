@@ -2,7 +2,7 @@ package com.app.crypto
 
 import android.content.Context
 import android.util.Base64
-import android.util.Log
+import com.app.common.utils.Log
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.secure.SecureKeyValueStore
 import com.app.crypto.secure.TinkSecureKeyValueStore

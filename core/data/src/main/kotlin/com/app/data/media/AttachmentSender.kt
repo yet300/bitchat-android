@@ -1,6 +1,6 @@
 package com.app.data.media
 
-import android.util.Log
+import com.app.common.utils.Log
 import com.app.domain.model.Attachment
 import com.app.domain.model.ConversationId
 import com.app.transport.features.file.FileUtils

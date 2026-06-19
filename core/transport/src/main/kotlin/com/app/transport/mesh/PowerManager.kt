@@ -9,14 +9,13 @@ import android.content.IntentFilter
 import android.os.BatteryManager
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
+import com.app.common.utils.Log
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.app.transport.MeshConstants
 import kotlinx.coroutines.*
-import kotlin.math.max
 
 /**
  * Power-aware Bluetooth management for bitchat

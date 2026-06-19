@@ -1,6 +1,6 @@
 package com.yet.bitmessage.android.data
 
-import android.util.Log
+import com.app.common.utils.Log
 import com.app.common.serialization.JsonConfig
 import com.russhwolf.settings.Settings
 import kotlinx.serialization.builtins.MapSerializer

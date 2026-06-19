@@ -1,6 +1,6 @@
 package com.app.crypto.identity
 
-import android.util.Log
+import com.app.common.utils.Log
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn

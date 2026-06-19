@@ -7,7 +7,7 @@ import android.bluetooth.le.AdvertiseSettings
 import android.bluetooth.le.BluetoothLeAdvertiser
 import android.content.Context
 import android.os.ParcelUuid
-import android.util.Log
+import com.app.common.utils.Log
 import com.app.transport.MeshDebugToggles
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.MeshConstants

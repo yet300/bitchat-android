@@ -1,6 +1,6 @@
 package com.app.transport.nostr
 
-import android.util.Log
+import com.app.common.utils.Log
 import com.app.common.serialization.JsonConfig
 import com.app.transport.NostrConstants
 import com.app.transport.net.HttpClientProvider
@@ -736,9 +736,10 @@ class NostrRelayManager internal constructor(
                     val wasGiftWrap = pendingGiftWrapIDs.remove(response.eventId)
                     if (response.accepted) {
                         Log.d(TAG, "✅ Event accepted id=${response.eventId.take(16)}... by relay: $relayUrl")
+                    } else if (wasGiftWrap) {
+                        Log.w(TAG, message)
                     } else {
-                        val level = if (wasGiftWrap) Log.WARN else Log.ERROR
-                        Log.println(level, TAG, "📮 Event ${response.eventId.take(16)}... rejected by relay: ${response.message ?: "no reason"}")
+                        Log.e(TAG, message)
                     }
                 }
                 
