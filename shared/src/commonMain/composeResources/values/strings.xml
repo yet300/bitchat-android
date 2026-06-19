@@ -119,6 +119,10 @@
     <string name="chat_geo_participants">People here</string>
     <string name="chat_geo_participants_empty">No one here yet</string>
     <string name="chat_geo_teleported">Teleported</string>
+    <string name="notes_title">Location notes</string>
+    <string name="notes_empty">No notes here yet</string>
+    <string name="notes_hint">Leave a note…</string>
+    <string name="notes_send">Post note</string>
     <string name="chat_input_hint">Message</string>
     <string name="chat_send">Send</string>
     <string name="chat_attach">Attach file</string>

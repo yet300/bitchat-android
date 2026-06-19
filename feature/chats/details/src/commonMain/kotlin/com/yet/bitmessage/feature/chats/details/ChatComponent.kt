@@ -8,6 +8,7 @@ import com.app.domain.model.Reachability
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.router.slot.ChildSlot
 import com.arkivanov.decompose.value.Value
+import com.yet.bitmessage.feature.chats.details.notes.LocationNotesComponent
 import com.yet.bitmessage.feature.chats.details.verify.VerifyScanComponent
 
 /**
@@ -43,6 +44,9 @@ interface ChatComponent {
     /** Open the geo-participants sheet ("who's here"). */
     fun onParticipantsClicked()
 
+    /** Open the location-notes sheet (building-level geohash feed). */
+    fun onNotesClicked()
+
     fun onParticipantSelected(pubkeyHex: String)
 
     fun onDismissSheet()
@@ -52,6 +56,7 @@ interface ChatComponent {
     sealed interface ChatSheetChild {
         class VerifyScan(val component: VerifyScanComponent) : ChatSheetChild
         data object Participants : ChatSheetChild
+        class LocationNotes(val component: LocationNotesComponent) : ChatSheetChild
     }
 
     data class Model(
