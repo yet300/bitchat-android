@@ -24,6 +24,7 @@ import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.model.GeoPerson
 import com.app.domain.repository.ConversationRepository
+import com.app.domain.repository.GeohashBookmarksRepository
 import com.app.domain.repository.GeohashRepository
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.JoinResult
@@ -37,6 +38,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -154,6 +156,17 @@ class ChatStoreFactoryTest {
         override suspend fun setRetention(tag: String, policy: RetentionPolicy) = Unit
     }
 
+    private class FakeGeohashBookmarks : GeohashBookmarksRepository {
+        private val set = MutableStateFlow<Set<String>>(emptySet())
+        val toggled = mutableListOf<String>()
+        override fun observeBookmarks(): Flow<List<String>> = set.map { it.toMutableList() }
+        override fun observeIsBookmarked(geohash: String): Flow<Boolean> = set.map { geohash in it }
+        override suspend fun toggle(geohash: String) {
+            toggled += geohash
+            set.value = if (geohash in set.value) set.value - geohash else set.value + geohash
+        }
+    }
+
     private class FakeGeohashRepository(
         private val counts: MutableStateFlow<Map<String, Int>> = MutableStateFlow(emptyMap()),
         private val people: MutableStateFlow<List<GeoPerson>> = MutableStateFlow(emptyList()),
@@ -190,6 +203,7 @@ class ChatStoreFactoryTest {
         contacts: FakeContactRepository = FakeContactRepository(),
         targetMessageId: String? = null,
         geohash: FakeGeohashRepository = FakeGeohashRepository(),
+        bookmarks: FakeGeohashBookmarks = FakeGeohashBookmarks(),
     ) = ChatStoreFactory(
         storeFactory = DefaultStoreFactory(),
         conversationId = id,
@@ -204,6 +218,7 @@ class ChatStoreFactoryTest {
         peerRepository = FakePeerRepository(peers),
         messageTransport = transport,
         geohashRepository = geohash,
+        geohashBookmarks = bookmarks,
     )
 
     @Test
@@ -344,6 +359,18 @@ class ChatStoreFactoryTest {
     fun target_message_id_is_carried_into_state() = runTest {
         val store = factory(targetMessageId = "m1").create()
         assertEquals("m1", store.state.targetMessageId)
+    }
+
+    @Test
+    fun toggling_a_geohash_bookmark_persists_and_reflects_in_state() = runTest {
+        val bookmarks = FakeGeohashBookmarks()
+        val geoId = ConversationId.Geohash(GeohashChannel(GeohashLevel.CITY, "u4pru"))
+        val store = factory(id = geoId, bookmarks = bookmarks).create()
+
+        assertFalse(store.state.isBookmarked)
+        store.accept(ChatStore.Intent.ToggleBookmark)
+        assertEquals(listOf("u4pru"), bookmarks.toggled)
+        assertTrue(store.state.isBookmarked)
     }
 
     @Test

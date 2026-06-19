@@ -8,6 +8,7 @@ import com.app.domain.model.SenderRef
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationRepository
+import com.app.domain.repository.GeohashBookmarksRepository
 import com.app.domain.repository.GeohashRepository
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.MessageRepository
@@ -48,6 +49,7 @@ internal class ChatStoreFactory(
     private val resolveReachability: ResolveReachabilityUseCase,
     private val contactRepository: ContactRepository,
     private val geohashRepository: GeohashRepository,
+    private val geohashBookmarks: GeohashBookmarksRepository,
     private val peerRepository: PeerRepository,
     channelRepository: ChannelRepository,
     messageTransport: MessageTransport,
@@ -88,6 +90,7 @@ internal class ChatStoreFactory(
                 is ChatStore.Msg.ParticipantCountChanged -> copy(participantCount = msg.count)
                 is ChatStore.Msg.ParticipantsChanged -> copy(participants = msg.participants)
                 is ChatStore.Msg.MentionCandidatesChanged -> copy(mentionCandidates = msg.nicknames)
+                is ChatStore.Msg.BookmarkChanged -> copy(isBookmarked = msg.isBookmarked)
             }
     }
 
@@ -147,6 +150,11 @@ internal class ChatStoreFactory(
                                 ))
                             }
                         }
+                        scope.launch {
+                            geohashBookmarks.observeIsBookmarked(geohash).collect {
+                                dispatch(ChatStore.Msg.BookmarkChanged(it))
+                            }
+                        }
                     } else {
                         // @-mention candidates = live mesh peers (for public / channel / DM).
                         scope.launch {
@@ -188,6 +196,11 @@ internal class ChatStoreFactory(
                 is ChatStore.Intent.MentionSelected -> {
                     val completed = state().draft.replace(TRAILING_MENTION_REGEX, "@${intent.nickname} ")
                     dispatch(ChatStore.Msg.DraftChanged(completed))
+                }
+
+                ChatStore.Intent.ToggleBookmark -> {
+                    val geo = conversationId as? ConversationId.Geohash ?: return
+                    scope.launch { geohashBookmarks.toggle(geo.channel.geohash) }
                 }
             }
         }

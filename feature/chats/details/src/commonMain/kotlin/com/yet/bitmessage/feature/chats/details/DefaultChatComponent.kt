@@ -3,6 +3,7 @@ package com.yet.bitmessage.feature.chats.details
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationRepository
+import com.app.domain.repository.GeohashBookmarksRepository
 import com.app.domain.repository.GeohashRepository
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.MessageRepository
@@ -86,6 +87,8 @@ internal class DefaultChatComponent(
     override fun onMentionSelected(nickname: String) =
         store.accept(ChatStore.Intent.MentionSelected(nickname))
 
+    override fun onToggleBookmark() = store.accept(ChatStore.Intent.ToggleBookmark)
+
     override fun onVerifyClicked() = sheetNavigation.activate(SheetConfig.VerifyScan)
 
     override fun onParticipantsClicked() = sheetNavigation.activate(SheetConfig.Participants)
@@ -126,6 +129,7 @@ internal class DefaultChatComponentFactory(
     private val contactRepository: ContactRepository,
     private val channelRepository: ChannelRepository,
     private val geohashRepository: GeohashRepository,
+    private val geohashBookmarks: GeohashBookmarksRepository,
     private val verifyScanFactory: VerifyScanComponent.Factory,
 ) : ChatComponent.Factory {
     override fun create(
@@ -149,6 +153,7 @@ internal class DefaultChatComponentFactory(
             peerRepository = peerRepository,
             messageTransport = messageTransport,
             geohashRepository = geohashRepository,
+            geohashBookmarks = geohashBookmarks,
         ),
         verifyScanFactory = verifyScanFactory,
         onFinished = onFinished,
