@@ -45,6 +45,7 @@ import com.yet.bitmessage.shared.resources.Res
 import com.yet.bitmessage.shared.resources.search_close
 import com.yet.bitmessage.shared.resources.search_empty
 import com.yet.bitmessage.shared.resources.search_geo_action
+import com.yet.bitmessage.shared.resources.search_geo_bookmark
 import com.yet.bitmessage.shared.resources.search_hint
 import com.yet.bitmessage.shared.resources.search_prompt
 import com.yet.bitmessage.shared.resources.search_recent
@@ -138,7 +139,7 @@ private fun BoxScope.SearchResults(
         SearchTab.PEOPLE -> model.people.isEmpty()
         SearchTab.MESSAGES -> model.messages.isEmpty()
         SearchTab.CHANNELS -> model.channels.isEmpty()
-        SearchTab.GEO -> model.geo == null
+        SearchTab.GEO -> model.geo == null && model.bookmarks.isEmpty()
     }
     if (empty) {
         CenteredHint(stringResource(Res.string.search_empty))
@@ -178,13 +179,26 @@ private fun BoxScope.SearchResults(
                     onClick = { onResultClicked(ConversationId.Channel(channel.tag)) },
                 )
             }
-            SearchTab.GEO -> model.geo?.let { geo ->
-                item(key = geo.geohash) {
+            SearchTab.GEO -> {
+                model.geo?.let { geo ->
+                    item(key = "geo:${geo.geohash}") {
+                        ResultRow(
+                            title = "#${geo.geohash}",
+                            subtitle = stringResource(Res.string.search_geo_action),
+                            reachability = Reachability.OFFLINE,
+                            onClick = { onResultClicked(ConversationId.Geohash(geo)) },
+                        )
+                    }
+                }
+                items(
+                    model.bookmarks.filter { it.geohash != model.geo?.geohash },
+                    key = { "bookmark:${it.geohash}" },
+                ) { bookmark ->
                     ResultRow(
-                        title = "#${geo.geohash}",
-                        subtitle = stringResource(Res.string.search_geo_action),
+                        title = "#${bookmark.geohash}",
+                        subtitle = stringResource(Res.string.search_geo_bookmark),
                         reachability = Reachability.OFFLINE,
-                        onClick = { onResultClicked(ConversationId.Geohash(geo)) },
+                        onClick = { onResultClicked(ConversationId.Geohash(bookmark)) },
                     )
                 }
             }

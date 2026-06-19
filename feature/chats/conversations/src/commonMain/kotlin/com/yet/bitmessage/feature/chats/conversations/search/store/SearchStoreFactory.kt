@@ -2,6 +2,7 @@ package com.yet.bitmessage.feature.chats.conversations.search.store
 
 import com.app.domain.model.SearchResults
 import com.app.domain.repository.ConversationRepository
+import com.app.domain.repository.GeohashBookmarksRepository
 import com.app.domain.repository.PeerRepository
 import com.app.domain.repository.PlaceGeocoder
 import com.app.domain.usecase.ParseGeohashUseCase
@@ -25,6 +26,7 @@ internal class SearchStoreFactory(
     private val searchUseCase: SearchUseCase,
     private val parseGeohash: ParseGeohashUseCase,
     private val placeGeocoder: PlaceGeocoder,
+    private val geohashBookmarks: GeohashBookmarksRepository,
 ) {
     fun create(): SearchStore =
         object : SearchStore,
@@ -45,6 +47,7 @@ internal class SearchStoreFactory(
                 is SearchStore.Msg.PeersLoaded -> copy(peers = msg.peers)
                 is SearchStore.Msg.ResultsLoaded -> copy(results = msg.results)
                 is SearchStore.Msg.GeocodeLoaded -> copy(geocodedGeo = msg.geo)
+                is SearchStore.Msg.BookmarksLoaded -> copy(bookmarks = msg.bookmarks)
             }
     }
 
@@ -67,6 +70,11 @@ internal class SearchStoreFactory(
                     scope.launch {
                         peerRepository.observePeers().collect {
                             dispatch(SearchStore.Msg.PeersLoaded(it.filter { peer -> peer.isConnected }))
+                        }
+                    }
+                    scope.launch {
+                        geohashBookmarks.observeBookmarks().collect { marks ->
+                            dispatch(SearchStore.Msg.BookmarksLoaded(marks.mapNotNull { parseGeohash(it) }))
                         }
                     }
                     scope.launch {

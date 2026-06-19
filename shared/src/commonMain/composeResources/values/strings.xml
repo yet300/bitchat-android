@@ -85,6 +85,7 @@
     <string name="search_empty">Nothing found</string>
     <string name="search_recent">Recent</string>
     <string name="search_geo_action">Teleport here</string>
+    <string name="search_geo_bookmark">Bookmarked · tap to open</string>
     <string name="connectivity_title">Connectivity</string>
     <string name="connectivity_bluetooth">Bluetooth</string>
     <string name="connectivity_wifi_aware">Wi-Fi Aware</string>
