@@ -20,6 +20,7 @@ internal interface SearchStore :
         val results: SearchResults = SearchResults.EMPTY,
         val parsedGeo: GeohashChannel? = null,
         val geocodedGeo: GeohashChannel? = null,
+        val bookmarks: List<GeohashChannel> = emptyList(),
     ) {
         val isActive: Boolean get() = query.isNotBlank()
 
@@ -58,6 +59,7 @@ internal interface SearchStore :
         data class PeersLoaded(val peers: List<Peer>) : Msg
         data class ResultsLoaded(val results: SearchResults) : Msg
         data class GeocodeLoaded(val geo: GeohashChannel?) : Msg
+        data class BookmarksLoaded(val bookmarks: List<GeohashChannel>) : Msg
     }
 
     sealed interface Label

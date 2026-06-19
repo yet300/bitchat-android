@@ -28,6 +28,7 @@ internal val searchStateToModel: (SearchStore.State) -> SearchComponent.Model = 
         messages = state.messages,
         channels = state.channels,
         geo = state.geo,
+        bookmarks = state.bookmarks,
         nearby = state.onlinePeers.map { it.toPersonResult() },
         recent = state.conversations.take(RECENT_LIMIT),
     )

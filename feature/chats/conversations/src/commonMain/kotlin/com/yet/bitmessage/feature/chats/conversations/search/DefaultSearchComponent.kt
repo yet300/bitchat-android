@@ -3,6 +3,7 @@ package com.yet.bitmessage.feature.chats.conversations.search
 import com.app.common.decompose.asValue
 import com.app.domain.model.ConversationId
 import com.app.domain.repository.ConversationRepository
+import com.app.domain.repository.GeohashBookmarksRepository
 import com.app.domain.repository.PeerRepository
 import com.app.domain.repository.PlaceGeocoder
 import com.app.domain.repository.SearchRepository
@@ -46,6 +47,7 @@ internal class DefaultSearchComponentFactory(
     private val peerRepository: PeerRepository,
     private val searchRepository: SearchRepository,
     private val placeGeocoder: PlaceGeocoder,
+    private val geohashBookmarks: GeohashBookmarksRepository,
 ) : SearchComponent.Factory {
     override fun create(
         componentContext: ComponentContext,
@@ -60,6 +62,7 @@ internal class DefaultSearchComponentFactory(
             searchUseCase = SearchUseCase(searchRepository),
             parseGeohash = ParseGeohashUseCase(),
             placeGeocoder = placeGeocoder,
+            geohashBookmarks = geohashBookmarks,
         ),
         onResultSelected = onResultSelected,
         onClose = onClose,

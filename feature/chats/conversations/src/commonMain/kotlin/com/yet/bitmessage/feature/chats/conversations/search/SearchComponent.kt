@@ -37,6 +37,7 @@ interface SearchComponent {
         val messages: List<BitMessage>,
         val channels: List<Channel>,
         val geo: GeohashChannel?,
+        val bookmarks: List<GeohashChannel>,
         // Focused-empty state (no query yet): nearby people + recent conversations.
         val nearby: List<PersonResult>,
         val recent: List<Conversation>,

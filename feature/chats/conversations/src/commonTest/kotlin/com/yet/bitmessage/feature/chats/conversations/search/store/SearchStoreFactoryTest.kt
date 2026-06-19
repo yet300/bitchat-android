@@ -12,6 +12,7 @@ import com.app.domain.model.PeerId
 import com.app.domain.model.PeerIdentity
 import com.app.domain.model.SenderRef
 import com.app.domain.repository.ConversationRepository
+import com.app.domain.repository.GeohashBookmarksRepository
 import com.app.domain.repository.PeerRepository
 import com.app.domain.model.GeohashChannel
 import com.app.domain.model.GeohashLevel
@@ -79,11 +80,18 @@ class SearchStoreFactoryTest {
         override suspend fun toGeohash(query: String): GeohashChannel? = result
     }
 
+    private class FakeGeohashBookmarks(private val marks: List<String>) : GeohashBookmarksRepository {
+        override fun observeBookmarks(): Flow<List<String>> = MutableStateFlow(marks)
+        override fun observeIsBookmarked(geohash: String): Flow<Boolean> = MutableStateFlow(geohash in marks)
+        override suspend fun toggle(geohash: String) = Unit
+    }
+
     private fun factory(
         conversations: FakeConversationRepository = FakeConversationRepository(),
         peers: List<Peer> = emptyList(),
         search: SearchRepository = FakeSearchRepository(),
         geocoder: PlaceGeocoder = FakePlaceGeocoder(),
+        bookmarks: List<String> = emptyList(),
     ) = SearchStoreFactory(
         storeFactory = DefaultStoreFactory(),
         conversationRepository = conversations,
@@ -91,10 +99,19 @@ class SearchStoreFactoryTest {
         searchUseCase = SearchUseCase(search),
         parseGeohash = ParseGeohashUseCase(),
         placeGeocoder = geocoder,
+        geohashBookmarks = FakeGeohashBookmarks(bookmarks),
     )
 
     private fun conversation(title: String) =
         Conversation(id = ConversationId.Channel(title), title = title)
+
+    @Test
+    fun bookmarks_load_as_geohash_channels_for_the_geo_tab() = runTest {
+        val store = factory(bookmarks = listOf("u4pru", "9q8yy")).create()
+
+        val model = searchStateToModel(store.state)
+        assertEquals(listOf("u4pru", "9q8yy"), model.bookmarks.map { it.geohash })
+    }
 
     @Test
     fun blank_query_keeps_every_tab_empty() = runTest {
