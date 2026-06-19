@@ -9,6 +9,8 @@ kotlin {
         commonMain.dependencies {
             implementation(libs.bundles.decompose)
             implementation(libs.bundles.mvi)
+
+            implementation(libs.kermit)
         }
     }
 }

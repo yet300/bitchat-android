@@ -24,6 +24,8 @@ decompose = "3.5.0"
 essenty = "2.5.0"
 mvi = "4.4.0"
 
+kermit = "2.1.0"
+
 # Accompanist
 accompanist-permissions = "0.37.3"
 
@@ -94,6 +96,8 @@ androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-
 
 # Accompanist
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist-permissions" }
+
+kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
 
 # Cryptography
 bouncycastle-bcprov = { module = "org.bouncycastle:bcprov-jdk15on", version.ref = "bouncycastle" }
