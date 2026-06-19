@@ -184,6 +184,7 @@ class DefaultChatsComponentTest {
                     isEncrypted = false,
                     isVerified = false,
                     participantCount = 0,
+                    isBookmarked = false,
                     participants = emptyList(),
                     mentionSuggestions = emptyList(),
                     targetMessageId = null,
@@ -198,6 +199,7 @@ class DefaultChatsComponentTest {
         override fun onAttachmentPicked(attachment: Attachment) = Unit
         override fun onCancelTransfer(messageId: String) = Unit
         override fun onMentionSelected(nickname: String) = Unit
+        override fun onToggleBookmark() = Unit
         override fun onVerifyClicked() = Unit
         override fun onParticipantsClicked() = Unit
         override fun onParticipantSelected(pubkeyHex: String) = Unit

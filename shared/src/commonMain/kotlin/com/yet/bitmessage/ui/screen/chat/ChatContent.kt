@@ -135,8 +135,15 @@ fun ChatContent(component: ChatComponent, modifier: Modifier = Modifier) {
                             )
                         }
                     }
-                    // Geo chats: who's present in this geohash.
+                    // Geo chats: bookmark the room + see who's present in this geohash.
                     if (model.conversationId is ConversationId.Geohash) {
+                        IconButton(onClick = component::onToggleBookmark) {
+                            Text(
+                                text = if (model.isBookmarked) "★" else "☆",
+                                color = if (model.isBookmarked) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                         IconButton(onClick = component::onParticipantsClicked) {
                             Icon(
                                 imageVector = AccountCircle,

@@ -4,6 +4,7 @@ import com.app.data.repository.ChannelRepositoryImpl
 import com.app.data.repository.ContactRepositoryImpl
 import com.app.data.repository.ConversationPrefsRepositoryImpl
 import com.app.data.repository.ConversationRepositoryImpl
+import com.app.data.repository.GeohashBookmarksRepositoryImpl
 import com.app.data.repository.GeohashRepositoryImpl
 import com.app.data.repository.IdentityRepositoryImpl
 import com.app.data.repository.MeshSettingsRepositoryImpl
@@ -26,6 +27,7 @@ import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationPrefsRepository
 import com.app.domain.repository.ConversationRepository
+import com.app.domain.repository.GeohashBookmarksRepository
 import com.app.domain.repository.GeohashRepository
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.MessageRepository
@@ -88,6 +90,9 @@ abstract class DataBindings {
 
     @Binds
     internal abstract val GeohashRepositoryImpl.bindGeohash: GeohashRepository
+
+    @Binds
+    internal abstract val GeohashBookmarksRepositoryImpl.bindGeohashBookmarks: GeohashBookmarksRepository
 
     @Binds
     internal abstract val ConversationPrefsRepositoryImpl.bindConversationPrefs: ConversationPrefsRepository

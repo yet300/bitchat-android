@@ -18,6 +18,8 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
         val reachability: Reachability = Reachability.OFFLINE,
         val isVerified: Boolean = false,
         val participantCount: Int = 0,
+        /** Whether the current geohash is bookmarked (false for non-geo chats). */
+        val isBookmarked: Boolean = false,
         /** Live participants for a geo chat (empty for other kinds). */
         val participants: List<GeoPerson> = emptyList(),
         /** Nicknames the composer can @-mention (live peers / geo participants). */
@@ -46,6 +48,9 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
 
         /** Complete the in-progress @-token with [nickname]. */
         data class MentionSelected(val nickname: String) : Intent
+
+        /** Bookmark / unbookmark the current geohash channel. */
+        data object ToggleBookmark : Intent
     }
 
     sealed interface Action {
@@ -61,6 +66,7 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
         data class ParticipantCountChanged(val count: Int) : Msg
         data class ParticipantsChanged(val participants: List<GeoPerson>) : Msg
         data class MentionCandidatesChanged(val nicknames: Set<String>) : Msg
+        data class BookmarkChanged(val isBookmarked: Boolean) : Msg
     }
 
     sealed interface Label {

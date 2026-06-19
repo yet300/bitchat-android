@@ -34,6 +34,9 @@ interface ChatComponent {
     /** Complete the @-token being typed with [nickname]. */
     fun onMentionSelected(nickname: String)
 
+    /** Bookmark / unbookmark the current geohash channel. */
+    fun onToggleBookmark()
+
     /** Open the QR-scan verification sheet for this DM. */
     fun onVerifyClicked()
 
@@ -62,6 +65,7 @@ interface ChatComponent {
         val isEncrypted: Boolean,
         val isVerified: Boolean,
         val participantCount: Int,
+        val isBookmarked: Boolean,
         val participants: List<GeoPerson>,
         val mentionSuggestions: List<String>,
         val targetMessageId: String?,
