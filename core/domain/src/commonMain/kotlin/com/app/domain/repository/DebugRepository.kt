@@ -1,5 +1,6 @@
 package com.app.domain.repository
 
+import com.app.domain.model.MeshTopology
 import com.app.domain.model.PacketLogEntry
 import kotlinx.coroutines.flow.Flow
 
@@ -33,4 +34,7 @@ interface DebugRepository {
 
     /** Live, newest-last packet/event log from the mesh traffic recorder. */
     fun observePacketLog(): Flow<List<PacketLogEntry>>
+
+    /** Live mesh neighbour graph from gossip announcements. */
+    fun observeMeshTopology(): Flow<MeshTopology>
 }

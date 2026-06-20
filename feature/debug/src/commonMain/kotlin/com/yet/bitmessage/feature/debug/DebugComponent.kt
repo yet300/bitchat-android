@@ -1,5 +1,6 @@
 package com.yet.bitmessage.feature.debug
 
+import com.app.domain.model.MeshTopology
 import com.app.domain.model.PacketLogEntry
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.value.Value
@@ -29,6 +30,7 @@ interface DebugComponent {
         val seenPacketCapacity: Int,
         val status: String,
         val packetLog: List<PacketLogEntry>,
+        val topology: MeshTopology,
     )
 
     fun interface Factory {
