@@ -55,6 +55,7 @@ kotlin {
 
             implementation(projects.feature.root)
             implementation(projects.feature.onboarding)
+            implementation(projects.feature.map)
             implementation(projects.feature.chats.main)
             implementation(projects.feature.chats.conversations)
             implementation(projects.feature.chats.details)

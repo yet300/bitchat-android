@@ -46,6 +46,8 @@ import com.yet.bitmessage.shared.resources.search_close
 import com.yet.bitmessage.shared.resources.search_empty
 import com.yet.bitmessage.shared.resources.search_geo_action
 import com.yet.bitmessage.shared.resources.search_geo_bookmark
+import com.yet.bitmessage.shared.resources.search_geo_pick_map
+import com.yet.bitmessage.shared.resources.search_geo_pick_map_subtitle
 import com.yet.bitmessage.shared.resources.search_hint
 import com.yet.bitmessage.shared.resources.search_prompt
 import com.yet.bitmessage.shared.resources.search_recent
@@ -108,10 +110,11 @@ fun SearchContent(component: SearchComponent, modifier: Modifier = Modifier) {
             }
 
             Box(modifier = Modifier.fillMaxSize()) {
-                if (!model.isActive) {
+                // The Geo tab always offers "pick on map" + bookmarks, even with a blank query.
+                if (!model.isActive && model.tab != SearchTab.GEO) {
                     FocusedEmpty(model, component::onResultClicked)
                 } else {
-                    SearchResults(model, component::onResultClicked, component::onMessageClicked)
+                    SearchResults(model, component::onResultClicked, component::onMessageClicked, component::onPickOnMapClicked)
                 }
             }
         }
@@ -133,13 +136,14 @@ private fun BoxScope.SearchResults(
     model: SearchComponent.Model,
     onResultClicked: (ConversationId) -> Unit,
     onMessageClicked: (ConversationId, String) -> Unit,
+    onPickOnMap: () -> Unit,
 ) {
     val empty = when (model.tab) {
         SearchTab.CHATS -> model.chats.isEmpty()
         SearchTab.PEOPLE -> model.people.isEmpty()
         SearchTab.MESSAGES -> model.messages.isEmpty()
         SearchTab.CHANNELS -> model.channels.isEmpty()
-        SearchTab.GEO -> model.geo == null && model.bookmarks.isEmpty()
+        SearchTab.GEO -> false // always offers "pick on map"
     }
     if (empty) {
         CenteredHint(stringResource(Res.string.search_empty))
@@ -180,6 +184,14 @@ private fun BoxScope.SearchResults(
                 )
             }
             SearchTab.GEO -> {
+                item(key = "pick-on-map") {
+                    ResultRow(
+                        title = stringResource(Res.string.search_geo_pick_map),
+                        subtitle = stringResource(Res.string.search_geo_pick_map_subtitle),
+                        reachability = Reachability.OFFLINE,
+                        onClick = onPickOnMap,
+                    )
+                }
                 model.geo?.let { geo ->
                     item(key = "geo:${geo.geohash}") {
                         ResultRow(

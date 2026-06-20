@@ -86,6 +86,10 @@
     <string name="search_recent">Recent</string>
     <string name="search_geo_action">Teleport here</string>
     <string name="search_geo_bookmark">Bookmarked · tap to open</string>
+    <string name="search_geo_pick_map">Pick on map</string>
+    <string name="search_geo_pick_map_subtitle">Choose a location on the map</string>
+    <string name="map_title">Pick a location</string>
+    <string name="map_hint">Tap the map to choose</string>
     <string name="connectivity_title">Connectivity</string>
     <string name="connectivity_bluetooth">Bluetooth</string>
     <string name="connectivity_wifi_aware">Wi-Fi Aware</string>

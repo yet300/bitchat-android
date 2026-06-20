@@ -37,6 +37,7 @@ internal class DefaultChatsComponent(
     private val contactsFactory: ContactsComponent.Factory,
     private val settingsFactory: SettingsComponent.Factory,
     private val channelsFactory: ChannelsComponent.Factory,
+    private val onOpenMap: (initialGeohash: String?) -> Unit,
 ) : ChatsComponent, ComponentContext by componentContext {
 
     private val navigation = PanelsNavigation<Unit, ChatConfig, Nothing>()
@@ -93,6 +94,10 @@ internal class DefaultChatsComponent(
                                 onResultSelected = { id, targetMessageId ->
                                     sheetNavigation.dismiss()
                                     navigation.navigate { it.copy(details = ChatConfig.from(id, targetMessageId)) }
+                                },
+                                onPickOnMapRequested = {
+                                    sheetNavigation.dismiss()
+                                    onOpenMap(null)
                                 },
                                 onClose = { sheetNavigation.dismiss() },
                             ),
@@ -172,7 +177,10 @@ internal class DefaultChatsComponentFactory(
     private val settingsFactory: SettingsComponent.Factory,
     private val channelsFactory: ChannelsComponent.Factory,
 ) : ChatsComponent.Factory {
-    override fun create(componentContext: ComponentContext): ChatsComponent =
+    override fun create(
+        componentContext: ComponentContext,
+        onOpenMap: (initialGeohash: String?) -> Unit,
+    ): ChatsComponent =
         DefaultChatsComponent(
             componentContext = componentContext,
             conversationsFactory = conversationsFactory,
@@ -182,5 +190,6 @@ internal class DefaultChatsComponentFactory(
             contactsFactory = contactsFactory,
             settingsFactory = settingsFactory,
             channelsFactory = channelsFactory,
+            onOpenMap = onOpenMap,
         )
 }
