@@ -58,6 +58,7 @@ interface ChatsComponent : BackHandlerOwner {
         fun create(
             componentContext: ComponentContext,
             onOpenMap: (initialGeohash: String?) -> Unit,
+            onOpenDebug: () -> Unit,
         ): ChatsComponent
     }
 }

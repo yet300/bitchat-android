@@ -59,7 +59,9 @@ import com.yet.bitmessage.shared.resources.settings_pow_difficulty
 import com.yet.bitmessage.shared.resources.settings_run_background
 import com.yet.bitmessage.shared.resources.settings_section_appearance
 import com.yet.bitmessage.shared.resources.settings_section_background
+import com.yet.bitmessage.shared.resources.settings_open_debug
 import com.yet.bitmessage.shared.resources.settings_section_danger
+import com.yet.bitmessage.shared.resources.settings_section_developer
 import com.yet.bitmessage.shared.resources.settings_section_identity
 import com.yet.bitmessage.shared.resources.settings_section_network
 import com.yet.bitmessage.shared.resources.settings_section_notifications
@@ -159,6 +161,14 @@ fun SettingsContent(component: SettingsComponent, modifier: Modifier = Modifier)
                 SectionHeader(stringResource(Res.string.settings_section_notifications))
                 NotifPermissionRow(model.notifPermission, component::onEnableNotificationsClicked)
                 ToggleRow(stringResource(Res.string.settings_notif_mute_all), model.globalMuteEnabled, component::onGlobalMuteToggled)
+
+                SectionHeader(stringResource(Res.string.settings_section_developer))
+                TextButton(
+                    onClick = component::onOpenDebugClicked,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                ) {
+                    Text(stringResource(Res.string.settings_open_debug))
+                }
 
                 SectionHeader(stringResource(Res.string.settings_section_danger))
                 Text(

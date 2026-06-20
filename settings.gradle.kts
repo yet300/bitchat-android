@@ -33,6 +33,7 @@ include(":feature")
 include(":feature:root")
 include(":feature:onboarding")
 include(":feature:map")
+include(":feature:debug")
 
 include(":feature:chats")
 include(":feature:chats:main")

@@ -48,6 +48,9 @@ interface SettingsComponent {
 
     fun onDismissDialog()
 
+    /** Open the developer/debug tooling screen (hosted at the root). */
+    fun onOpenDebugClicked()
+
     fun onCloseClicked()
 
     data class Model(
@@ -68,6 +71,10 @@ interface SettingsComponent {
     )
 
     fun interface Factory {
-        fun create(componentContext: ComponentContext, onClose: () -> Unit): SettingsComponent
+        fun create(
+            componentContext: ComponentContext,
+            onClose: () -> Unit,
+            onOpenDebug: () -> Unit,
+        ): SettingsComponent
     }
 }

@@ -147,6 +147,7 @@ class DefaultChatsComponentTest {
         override fun onPanicWipeClicked() = Unit
         override fun onConfirmPanicWipe() = Unit
         override fun onDismissDialog() = Unit
+        override fun onOpenDebugClicked() = Unit
         override fun onCloseClicked() = onClose()
     }
 
@@ -227,11 +228,12 @@ class DefaultChatsComponentTest {
             contactsFactory = { _, onContactSelected, onClose ->
                 FakeContactsComponent(onContactSelected, onClose)
             },
-            settingsFactory = { _, onClose -> FakeSettingsComponent(onClose) },
+            settingsFactory = { _, onClose, _ -> FakeSettingsComponent(onClose) },
             channelsFactory = { _, onChannelSelected, onClose ->
                 FakeChannelsComponent(onChannelSelected, onClose)
             },
             onOpenMap = {},
+            onOpenDebug = {},
         )
     }
 

@@ -10,17 +10,8 @@ kotlin {
             implementation(projects.core.common)
             implementation(projects.core.domain)
 
-            implementation(projects.feature.chats.main)
-            implementation(projects.feature.onboarding)
-            implementation(projects.feature.map)
-            implementation(projects.feature.debug)
-
             implementation(libs.bundles.decompose)
             implementation(libs.bundles.mvi)
-        }
-
-        commonTest.dependencies {
-            implementation(libs.bundles.testing)
         }
     }
 }

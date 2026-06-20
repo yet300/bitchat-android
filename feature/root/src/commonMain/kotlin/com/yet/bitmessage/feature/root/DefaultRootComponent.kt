@@ -15,6 +15,7 @@ import com.arkivanov.decompose.router.stack.replaceAll
 import com.arkivanov.decompose.value.MutableValue
 import com.arkivanov.decompose.value.Value
 import com.yet.bitmessage.feature.chats.main.ChatsComponent
+import com.yet.bitmessage.feature.debug.DebugComponent
 import com.yet.bitmessage.feature.map.MapComponent
 import com.yet.bitmessage.feature.onboarding.OnboardingComponent
 import dev.zacsweers.metro.Inject
@@ -26,6 +27,7 @@ internal class DefaultRootComponent(
     private val onboardingFactory: OnboardingComponent.Factory,
     private val chatsFactory: ChatsComponent.Factory,
     private val mapFactory: MapComponent.Factory,
+    private val debugFactory: DebugComponent.Factory,
     onboardingRepository: OnboardingRepository,
     themeRepository: ThemeRepository,
 ) : RootComponent, ComponentContext by componentContext {
@@ -60,6 +62,7 @@ internal class DefaultRootComponent(
                 chatsFactory.create(
                     componentContext,
                     onOpenMap = { initialGeohash -> navigation.push(Config.Map(initialGeohash)) },
+                    onOpenDebug = { navigation.push(Config.Debug) },
                 ),
             )
             is Config.Map -> RootComponent.Child.Map(
@@ -72,6 +75,9 @@ internal class DefaultRootComponent(
                     },
                     onClose = { navigation.pop() },
                 ),
+            )
+            is Config.Debug -> RootComponent.Child.Debug(
+                debugFactory.create(componentContext, onClose = { navigation.pop() }),
             )
         }
 
@@ -92,6 +98,9 @@ internal class DefaultRootComponent(
 
         @Serializable
         data class Map(val initialGeohash: String?) : Config
+
+        @Serializable
+        data object Debug : Config
     }
 }
 
@@ -100,6 +109,7 @@ internal class DefaultRootComponentFactory(
     private val onboardingFactory: OnboardingComponent.Factory,
     private val chatsFactory: ChatsComponent.Factory,
     private val mapFactory: MapComponent.Factory,
+    private val debugFactory: DebugComponent.Factory,
     private val onboardingRepository: OnboardingRepository,
     private val themeRepository: ThemeRepository,
 ) : RootComponent.Factory {
@@ -109,6 +119,7 @@ internal class DefaultRootComponentFactory(
             onboardingFactory = onboardingFactory,
             chatsFactory = chatsFactory,
             mapFactory = mapFactory,
+            debugFactory = debugFactory,
             onboardingRepository = onboardingRepository,
             themeRepository = themeRepository,
         )

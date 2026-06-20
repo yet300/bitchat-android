@@ -38,6 +38,7 @@ internal class DefaultChatsComponent(
     private val settingsFactory: SettingsComponent.Factory,
     private val channelsFactory: ChannelsComponent.Factory,
     private val onOpenMap: (initialGeohash: String?) -> Unit,
+    private val onOpenDebug: () -> Unit,
 ) : ChatsComponent, ComponentContext by componentContext {
 
     private val navigation = PanelsNavigation<Unit, ChatConfig, Nothing>()
@@ -118,6 +119,10 @@ internal class DefaultChatsComponent(
                             settingsFactory.create(
                                 componentContext = ctx,
                                 onClose = { sheetNavigation.dismiss() },
+                                onOpenDebug = {
+                                    sheetNavigation.dismiss()
+                                    onOpenDebug()
+                                },
                             ),
                         )
                     SheetConfig.Channels ->
@@ -180,6 +185,7 @@ internal class DefaultChatsComponentFactory(
     override fun create(
         componentContext: ComponentContext,
         onOpenMap: (initialGeohash: String?) -> Unit,
+        onOpenDebug: () -> Unit,
     ): ChatsComponent =
         DefaultChatsComponent(
             componentContext = componentContext,
@@ -191,5 +197,6 @@ internal class DefaultChatsComponentFactory(
             settingsFactory = settingsFactory,
             channelsFactory = channelsFactory,
             onOpenMap = onOpenMap,
+            onOpenDebug = onOpenDebug,
         )
 }
