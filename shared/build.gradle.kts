@@ -69,6 +69,7 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
 
             implementation(libs.qrose)
+            implementation(libs.maplibre.compose)
 
             implementation(libs.bundles.decompose)
             implementation(libs.decompose.compose)
