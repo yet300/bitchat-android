@@ -148,6 +148,8 @@
     <string name="media_audio">Voice message</string>
     <string name="media_file">File</string>
     <string name="media_cancel">Cancel transfer</string>
+    <string name="media_play">Play</string>
+    <string name="media_stop">Stop</string>
     <string name="verify_action">Verify contact</string>
     <string name="verify_scan_title">Scan verification QR</string>
     <string name="verify_scan_prompt">Point the camera at your contact\'s verification QR.</string>
