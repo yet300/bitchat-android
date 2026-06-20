@@ -13,10 +13,12 @@ import com.app.domain.repository.GeohashRepository
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.MessageTransport
+import com.app.domain.repository.NoiseSessionPort
 import com.app.domain.repository.PeerRepository
 import com.app.domain.usecase.ChatCommand
 import com.app.domain.usecase.CommandResult
 import com.app.domain.usecase.MarkConversationReadUseCase
+import com.app.domain.usecase.OpenConversationUseCase
 import com.app.domain.usecase.ParseCommandUseCase
 import com.app.domain.usecase.ParseMentionsUseCase
 import com.app.domain.usecase.ProcessCommandUseCase
@@ -53,6 +55,7 @@ internal class ChatStoreFactory(
     private val peerRepository: PeerRepository,
     channelRepository: ChannelRepository,
     messageTransport: MessageTransport,
+    noiseSession: NoiseSessionPort,
 ) {
     private val sendMessage = SendMessageUseCase(messageTransport, messageRepository)
     private val sendAttachment = SendAttachmentUseCase(messageTransport, messageRepository)
@@ -64,6 +67,7 @@ internal class ChatStoreFactory(
     private val processCommand =
         ProcessCommandUseCase(messageRepository, channelRepository, contactRepository, peerRepository)
     private val startGeohashDm = StartGeohashDmUseCase(geohashRepository)
+    private val openConversation = OpenConversationUseCase(noiseSession)
 
     fun create(): ChatStore =
         object : ChatStore,
@@ -121,8 +125,13 @@ internal class ChatStoreFactory(
                             dispatch(ChatStore.Msg.ReachabilityChanged(it))
                         }
                     }
-                    // Verified-trust indicator for a DM keyed by a stable Noise key.
+                    // Opening a mesh DM ensures a Noise session (handshake if none); no-op for
+                    // stable-key / Nostr peers and when a session already exists.
                     val privateId = conversationId as? ConversationId.Private
+                    if (privateId != null) {
+                        scope.launch { runCatching { openConversation(conversationId) } }
+                    }
+                    // Verified-trust indicator for a DM keyed by a stable Noise key.
                     if (privateId != null && privateId.peer.kind == PeerId.Kind.NOISE_STABLE) {
                         scope.launch {
                             contactRepository.observeVerified(privateId.peer.raw).collect {
