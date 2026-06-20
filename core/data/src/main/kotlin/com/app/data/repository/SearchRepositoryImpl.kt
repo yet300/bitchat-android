@@ -12,6 +12,7 @@ import com.app.domain.model.PeerId
 import com.app.domain.repository.SearchRepository
 import com.app.common.settings.SettingsStore
 import com.app.transport.model.BitchatMessage
+import com.app.transport.routing.MeshPeerIdSource
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -29,20 +30,22 @@ internal class SearchRepositoryImpl(
     private val settings: SettingsStore,
     private val favorites: FavoritesPersistenceService,
     private val appStateStore: AppStateStore,
+    private val peerIdSource: MeshPeerIdSource,
 ) : SearchRepository {
 
     override suspend fun searchMessages(query: String): List<BitMessage> {
         val matches = ArrayList<BitMessage>()
+        val mine = peerIdSource.current().takeIf { it.isNotEmpty() }
         appStateStore.publicMessages.value
             .filterByContent(query)
-            .mapTo(matches) { it.toDomain(ConversationId.PublicMesh, MY_PEER_ID) }
+            .mapTo(matches) { it.toDomain(ConversationId.PublicMesh, mine) }
         appStateStore.privateMessages.value.forEach { (peerId, list) ->
             val id = ConversationId.Private(PeerId(peerId))
-            list.filterByContent(query).mapTo(matches) { it.toDomain(id, MY_PEER_ID) }
+            list.filterByContent(query).mapTo(matches) { it.toDomain(id, mine) }
         }
         appStateStore.channelMessages.value.forEach { (tag, list) ->
             val id = ConversationId.Channel(tag)
-            list.filterByContent(query).mapTo(matches) { it.toDomain(id, MY_PEER_ID) }
+            list.filterByContent(query).mapTo(matches) { it.toDomain(id, mine) }
         }
         return matches
     }
@@ -69,9 +72,6 @@ internal class SearchRepositoryImpl(
     }
 
     private companion object {
-        // Ownership marker for mapped messages; resolving "mine" needs the identity layer's peer id
-        // (a later Phase B step), so matches map with a null peer id (isMine == false) for now.
-        val MY_PEER_ID: String? = null
         const val KEY_JOINED = "joined_channels"
         const val KEY_PROTECTED = "password_protected_channels"
         val SET_SERIALIZER = SetSerializer(String.serializer())
