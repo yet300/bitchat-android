@@ -49,9 +49,11 @@ class AttachmentSender(
             is ConversationId.Private -> mesh.sendFilePrivate(target.peer.raw, packet)
             ConversationId.PublicMesh, is ConversationId.Channel -> mesh.sendFileBroadcast(packet)
             is ConversationId.Geohash ->
-                // Geohash media would need a Nostr file transfer, which the legacy mesh path never
-                // implemented; drop rather than mis-broadcast it onto the mesh.
-                Log.w(TAG, "Geohash attachments are not supported yet; dropping ${file.name}")
+                // Parity boundary, not a gap: original bitchat transfers media over the BLE mesh
+                // Noise session only. Files are never routed over Nostr — geohash channels are public
+                // kind-20000 text events, and gift-wrapped DMs would exceed relay event-size limits.
+                // Drop rather than mis-broadcast onto the mesh.
+                Log.w(TAG, "Geohash/Nostr file transfer is unsupported by design (mesh-only); dropping ${file.name}")
         }
     }
 
