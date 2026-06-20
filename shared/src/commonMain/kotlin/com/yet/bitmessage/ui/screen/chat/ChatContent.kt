@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -51,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import com.app.domain.model.BitMessage
 import com.app.domain.model.ConversationId
 import com.app.domain.model.DeliveryStatus
@@ -546,6 +548,10 @@ private fun AttachmentContent(message: BitMessage, onCancel: () -> Unit) {
     val inProgress = message.isMine && status is DeliveryStatus.PartiallyDelivered && status.reached < status.total
 
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        // For image messages the local file path lives in `content`; show it once the transfer lands.
+        if (message.type == MessageType.IMAGE && !inProgress && message.content.isNotBlank()) {
+            ImageThumbnail(message.content, label)
+        }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 text = label,
@@ -579,6 +585,20 @@ private fun AttachmentContent(message: BitMessage, onCancel: () -> Unit) {
             )
         }
     }
+}
+
+/** Bounded, rounded inline preview of a received/sent image, loaded from its local file path. */
+@Composable
+private fun ImageThumbnail(path: String, contentDescription: String) {
+    AsyncImage(
+        model = "file://$path",
+        contentDescription = contentDescription,
+        contentScale = ContentScale.Crop,
+        modifier = Modifier
+            .heightIn(max = 200.dp)
+            .widthIn(max = 240.dp)
+            .clip(RoundedCornerShape(12.dp)),
+    )
 }
 
 private val MENTION_REGEX = Regex("@[a-zA-Z0-9_]+")

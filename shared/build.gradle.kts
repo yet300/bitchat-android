@@ -68,6 +68,7 @@ kotlin {
             implementation(libs.compose.ui)
             implementation(libs.compose.components.resources)
             implementation(libs.compose.uiToolingPreview)
+            implementation(libs.coil.compose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
 
             implementation(libs.qrose)
