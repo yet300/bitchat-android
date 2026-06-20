@@ -9,6 +9,7 @@ import com.app.domain.model.ConversationId
 import com.app.domain.model.DeliveryStatus
 import com.app.domain.repository.MessageRepository
 import com.app.transport.model.BitchatMessage
+import com.app.transport.routing.MeshPeerIdSource
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -23,11 +24,12 @@ import kotlinx.coroutines.flow.map
 @Inject
 internal class MessageRepositoryImpl(
     private val appStateStore: AppStateStore,
+    private val peerIdSource: MeshPeerIdSource,
 ) : MessageRepository {
 
-    // Ownership (isMine) needs my current mesh peer id from the identity layer (a later Phase B step);
-    // until then messages map with a null peer id, i.e. isMine == false.
-    private val myPeerId: String? = null
+    // Ownership (isMine): my current mesh peer id. Ephemeral (rotates), so this is best-effort for
+    // received copies of my own messages; blank early in app life means "no match" (isMine == false).
+    private val myPeerId: String? get() = peerIdSource.current().takeIf { it.isNotEmpty() }
 
     override fun observeMessages(id: ConversationId): Flow<List<BitMessage>> = when (id) {
         ConversationId.PublicMesh ->
@@ -78,8 +80,10 @@ internal class MessageRepositoryImpl(
         appStateStore.clear()
     }
 
-    private fun List<BitchatMessage>.toDomainList(id: ConversationId): List<BitMessage> =
-        map { it.toDomain(id, myPeerId) }
+    private fun List<BitchatMessage>.toDomainList(id: ConversationId): List<BitMessage> {
+        val mine = myPeerId
+        return map { it.toDomain(id, mine) }
+    }
 
     private fun ConversationId.Geohash.geoTag(): String = AppStateStore.geoChannelName(channel.geohash)
 }
