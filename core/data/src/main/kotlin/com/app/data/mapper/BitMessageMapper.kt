@@ -2,13 +2,18 @@
 
 package com.app.data.mapper
 
+import com.app.domain.model.Attachment
+import com.app.domain.model.AttachmentKind
 import com.app.domain.model.BitMessage
 import com.app.domain.model.ConversationId
 import com.app.domain.model.MessageType
 import com.app.domain.model.PeerId
 import com.app.domain.model.SenderRef
+import com.app.domain.model.TransferState
 import com.app.transport.model.BitchatMessage
 import com.app.transport.model.BitchatMessageType
+import java.io.File
+import java.util.Locale
 import kotlin.time.ExperimentalTime
 import com.app.domain.model.DeliveryStatus as DomainDeliveryStatus
 import com.app.transport.model.DeliveryStatus as WireDeliveryStatus
@@ -36,9 +41,49 @@ internal fun BitchatMessage.toDomain(conversationId: ConversationId, myPeerId: S
         isRelay = isRelay,
         mentions = mentions ?: emptyList(),
         deliveryStatus = deliveryStatus?.toDomainStatus(),
-        attachment = null, // attachments are carried separately (FileSharingManager); not mapped here yet
+        attachment = type.toAttachment(content),
         powDifficulty = powDifficulty,
     )
+
+/**
+ * Build a domain [Attachment] for an incoming media message. For media types the decoded local
+ * file path already lives in [content]; size is read from disk (null if the file is gone). TEXT and
+ * blank-content media carry no attachment.
+ */
+private fun BitchatMessageType.toAttachment(content: String): Attachment? {
+    val kind = when (this) {
+        BitchatMessageType.Audio -> AttachmentKind.AUDIO
+        BitchatMessageType.Image -> AttachmentKind.IMAGE
+        BitchatMessageType.File -> AttachmentKind.FILE
+        BitchatMessageType.Message -> return null
+    }
+    if (content.isBlank()) return null
+    val size = runCatching { File(content).takeIf { it.isFile }?.length() }.getOrNull()
+    return Attachment(
+        kind = kind,
+        ref = content,
+        mime = content.mimeFromExtension(),
+        sizeBytes = size,
+        transfer = TransferState.Done,
+    )
+}
+
+private fun String.mimeFromExtension(): String? = when (substringAfterLast('.', "").lowercase(Locale.US)) {
+    "jpg", "jpeg" -> "image/jpeg"
+    "png" -> "image/png"
+    "gif" -> "image/gif"
+    "webp" -> "image/webp"
+    "heic" -> "image/heic"
+    "m4a" -> "audio/mp4"
+    "aac" -> "audio/aac"
+    "mp3" -> "audio/mpeg"
+    "opus" -> "audio/opus"
+    "ogg" -> "audio/ogg"
+    "wav" -> "audio/wav"
+    "pdf" -> "application/pdf"
+    "" -> null
+    else -> null
+}
 
 internal fun BitMessage.toWire(): BitchatMessage =
     BitchatMessage(
