@@ -52,9 +52,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.CompositionLocalProvider
+import com.arkivanov.decompose.router.slot.ChildSlot
 import coil3.compose.AsyncImage
 import com.app.domain.model.BitMessage
 import com.app.domain.model.ConversationId
+import com.yet.bitmessage.ui.audio.LocalAudioPlayer
+import com.yet.bitmessage.ui.audio.rememberAudioPlayerController
+import com.yet.bitmessage.ui.component.icon.PlayArrow
+import com.yet.bitmessage.ui.component.icon.Stop
 import com.app.domain.model.DeliveryStatus
 import com.app.domain.model.GeoPerson
 import com.app.domain.model.LocationNote
@@ -82,6 +88,8 @@ import com.yet.bitmessage.shared.resources.chat_reach_offline
 import com.yet.bitmessage.shared.resources.chat_send
 import com.yet.bitmessage.shared.resources.media_audio
 import com.yet.bitmessage.shared.resources.media_cancel
+import com.yet.bitmessage.shared.resources.media_play
+import com.yet.bitmessage.shared.resources.media_stop
 import com.yet.bitmessage.shared.resources.media_file
 import com.yet.bitmessage.shared.resources.media_image
 import com.yet.bitmessage.shared.resources.notes_empty
@@ -113,7 +121,6 @@ import com.yet.bitmessage.ui.component.icon.QrCodeScanner
 import com.yet.bitmessage.ui.component.icon.Send
 import org.jetbrains.compose.resources.stringResource
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatContent(component: ChatComponent, modifier: Modifier = Modifier) {
     val model by component.model.subscribeAsState()
@@ -122,6 +129,21 @@ fun ChatContent(component: ChatComponent, modifier: Modifier = Modifier) {
     // Geo media has no Nostr file path yet (AttachmentSender drops it), so hide attach there.
     val canAttach = model.conversationId !is ConversationId.Geohash
 
+    CompositionLocalProvider(LocalAudioPlayer provides rememberAudioPlayerController()) {
+        ChatScaffold(component, model, sheet, launchAttachmentPicker, canAttach, modifier)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChatScaffold(
+    component: ChatComponent,
+    model: ChatComponent.Model,
+    sheet: ChildSlot<*, ChatComponent.ChatSheetChild>,
+    launchAttachmentPicker: () -> Unit,
+    canAttach: Boolean,
+    modifier: Modifier = Modifier,
+) {
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -553,6 +575,9 @@ private fun AttachmentContent(message: BitMessage, onCancel: () -> Unit) {
             ImageThumbnail(message.content, label)
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (message.type == MessageType.AUDIO && !inProgress && message.content.isNotBlank()) {
+                AudioPlayButton(message.content)
+            }
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyMedium,
@@ -578,12 +603,26 @@ private fun AttachmentContent(message: BitMessage, onCancel: () -> Unit) {
             }
         }
         if (inProgress) {
-            val progress = status as DeliveryStatus.PartiallyDelivered
+            val progress = status
             LinearProgressIndicator(
                 progress = { if (progress.total > 0) (progress.reached.toFloat() / progress.total).coerceIn(0f, 1f) else 0f },
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+    }
+}
+
+/** Play/stop toggle for a voice/audio attachment, driven by the screen-scoped [LocalAudioPlayer]. */
+@Composable
+private fun AudioPlayButton(path: String) {
+    val player = LocalAudioPlayer.current
+    val isPlaying = player.playingPath.value == path
+    IconButton(onClick = { player.toggle(path) }, modifier = Modifier.size(28.dp)) {
+        Icon(
+            imageVector = if (isPlaying) Stop else PlayArrow,
+            contentDescription = stringResource(if (isPlaying) Res.string.media_stop else Res.string.media_play),
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 
