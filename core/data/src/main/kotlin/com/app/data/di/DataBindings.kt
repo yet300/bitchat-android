@@ -24,6 +24,7 @@ import com.app.data.routing.NostrRouteStrategy
 import com.app.data.routing.RoutingCore
 import com.app.data.routing.RoutingMessageTransport
 import com.app.data.routing.RouteSelector
+import com.app.data.session.MeshNoiseSessionPort
 import com.app.transport.routing.RouteStrategy
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
@@ -37,6 +38,7 @@ import com.app.domain.repository.LocationNotesRepository
 import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.MeshSettingsRepository
 import com.app.domain.repository.MessageTransport
+import com.app.domain.repository.NoiseSessionPort
 import com.app.domain.repository.NotificationMutePolicy
 import com.app.domain.repository.NotificationSettingsRepository
 import com.app.domain.repository.OnboardingRepository
@@ -118,6 +120,9 @@ abstract class DataBindings {
 
     @Binds
     internal abstract val RoutingMessageTransport.bindTransport: MessageTransport
+
+    @Binds
+    internal abstract val MeshNoiseSessionPort.bindNoiseSession: NoiseSessionPort
 
     @Binds
     internal abstract val RouteSelector.bindRoutingCore: RoutingCore

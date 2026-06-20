@@ -30,6 +30,7 @@ import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.JoinResult
 import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.MessageTransport
+import com.app.domain.repository.NoiseSessionPort
 import com.app.domain.repository.PeerRepository
 import com.app.domain.usecase.ResolveReachabilityUseCase
 import com.arkivanov.mvikotlin.extensions.coroutines.labels
@@ -101,6 +102,13 @@ class ChatStoreFactoryTest {
         override suspend fun sendReadReceipt(messageId: String, to: PeerId) = Unit
         override suspend fun sendFavoriteNotification(to: PeerId, isFavorite: Boolean) = Unit
         override suspend fun announceSelf() = Unit
+    }
+
+    private class NoopNoiseSessionPort : NoiseSessionPort {
+        override fun hasSession(peerId: PeerId): Boolean = true
+        override fun myPeerId(): String = "0000000000000000"
+        override fun initiateHandshake(peerId: PeerId) = Unit
+        override fun announceTo(peerId: PeerId) = Unit
     }
 
     private class FakeConversationRepository(
@@ -204,6 +212,7 @@ class ChatStoreFactoryTest {
         targetMessageId: String? = null,
         geohash: FakeGeohashRepository = FakeGeohashRepository(),
         bookmarks: FakeGeohashBookmarks = FakeGeohashBookmarks(),
+        noiseSession: NoiseSessionPort = NoopNoiseSessionPort(),
     ) = ChatStoreFactory(
         storeFactory = DefaultStoreFactory(),
         conversationId = id,
@@ -219,6 +228,7 @@ class ChatStoreFactoryTest {
         messageTransport = transport,
         geohashRepository = geohash,
         geohashBookmarks = bookmarks,
+        noiseSession = noiseSession,
     )
 
     @Test
