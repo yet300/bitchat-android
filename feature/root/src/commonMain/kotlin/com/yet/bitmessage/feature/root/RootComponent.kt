@@ -7,6 +7,7 @@ import com.arkivanov.decompose.router.stack.ChildStack
 import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.backhandler.BackHandlerOwner
 import com.yet.bitmessage.feature.chats.main.ChatsComponent
+import com.yet.bitmessage.feature.map.MapComponent
 import com.yet.bitmessage.feature.onboarding.OnboardingComponent
 
 /**
@@ -29,6 +30,7 @@ interface RootComponent : BackHandlerOwner {
     sealed interface Child {
         class Onboarding(val component: OnboardingComponent) : Child
         class Chats(val component: ChatsComponent) : Child
+        class Map(val component: MapComponent) : Child
     }
 
     fun interface Factory {

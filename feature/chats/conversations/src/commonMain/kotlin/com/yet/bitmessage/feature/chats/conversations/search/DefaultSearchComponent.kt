@@ -22,6 +22,7 @@ internal class DefaultSearchComponent(
     componentContext: ComponentContext,
     storeFactory: SearchStoreFactory,
     private val onResultSelected: (id: ConversationId, targetMessageId: String?) -> Unit,
+    private val onPickOnMapRequested: () -> Unit,
     private val onClose: () -> Unit,
 ) : SearchComponent, ComponentContext by componentContext {
 
@@ -36,6 +37,8 @@ internal class DefaultSearchComponent(
     override fun onResultClicked(id: ConversationId) = onResultSelected(id, null)
 
     override fun onMessageClicked(id: ConversationId, messageId: String) = onResultSelected(id, messageId)
+
+    override fun onPickOnMapClicked() = onPickOnMapRequested()
 
     override fun onCloseClicked() = onClose()
 }
@@ -52,6 +55,7 @@ internal class DefaultSearchComponentFactory(
     override fun create(
         componentContext: ComponentContext,
         onResultSelected: (id: ConversationId, targetMessageId: String?) -> Unit,
+        onPickOnMapRequested: () -> Unit,
         onClose: () -> Unit,
     ): SearchComponent = DefaultSearchComponent(
         componentContext = componentContext,
@@ -65,6 +69,7 @@ internal class DefaultSearchComponentFactory(
             geohashBookmarks = geohashBookmarks,
         ),
         onResultSelected = onResultSelected,
+        onPickOnMapRequested = onPickOnMapRequested,
         onClose = onClose,
     )
 }

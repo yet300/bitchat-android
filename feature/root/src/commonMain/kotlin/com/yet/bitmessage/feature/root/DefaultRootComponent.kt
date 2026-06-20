@@ -10,10 +10,12 @@ import com.arkivanov.decompose.router.stack.ChildStack
 import com.arkivanov.decompose.router.stack.StackNavigation
 import com.arkivanov.decompose.router.stack.childStack
 import com.arkivanov.decompose.router.stack.pop
+import com.arkivanov.decompose.router.stack.push
 import com.arkivanov.decompose.router.stack.replaceAll
 import com.arkivanov.decompose.value.MutableValue
 import com.arkivanov.decompose.value.Value
 import com.yet.bitmessage.feature.chats.main.ChatsComponent
+import com.yet.bitmessage.feature.map.MapComponent
 import com.yet.bitmessage.feature.onboarding.OnboardingComponent
 import dev.zacsweers.metro.Inject
 import kotlinx.coroutines.launch
@@ -23,6 +25,7 @@ internal class DefaultRootComponent(
     componentContext: ComponentContext,
     private val onboardingFactory: OnboardingComponent.Factory,
     private val chatsFactory: ChatsComponent.Factory,
+    private val mapFactory: MapComponent.Factory,
     onboardingRepository: OnboardingRepository,
     themeRepository: ThemeRepository,
 ) : RootComponent, ComponentContext by componentContext {
@@ -53,7 +56,23 @@ internal class DefaultRootComponent(
                 // replaceAll, not push: onboarding must not be back-reachable once completed.
                 onboardingFactory.create(componentContext, onFinished = { navigation.replaceAll(Config.Chats) }),
             )
-            is Config.Chats -> RootComponent.Child.Chats(chatsFactory.create(componentContext))
+            is Config.Chats -> RootComponent.Child.Chats(
+                chatsFactory.create(
+                    componentContext,
+                    onOpenMap = { initialGeohash -> navigation.push(Config.Map(initialGeohash)) },
+                ),
+            )
+            is Config.Map -> RootComponent.Child.Map(
+                mapFactory.create(
+                    componentContext = componentContext,
+                    initialGeohash = config.initialGeohash,
+                    onConfirm = { id ->
+                        navigation.pop()
+                        openConversation(id)
+                    },
+                    onClose = { navigation.pop() },
+                ),
+            )
         }
 
     override fun openConversation(id: ConversationId) {
@@ -70,6 +89,9 @@ internal class DefaultRootComponent(
 
         @Serializable
         data object Chats : Config
+
+        @Serializable
+        data class Map(val initialGeohash: String?) : Config
     }
 }
 
@@ -77,6 +99,7 @@ internal class DefaultRootComponent(
 internal class DefaultRootComponentFactory(
     private val onboardingFactory: OnboardingComponent.Factory,
     private val chatsFactory: ChatsComponent.Factory,
+    private val mapFactory: MapComponent.Factory,
     private val onboardingRepository: OnboardingRepository,
     private val themeRepository: ThemeRepository,
 ) : RootComponent.Factory {
@@ -85,6 +108,7 @@ internal class DefaultRootComponentFactory(
             componentContext = componentContext,
             onboardingFactory = onboardingFactory,
             chatsFactory = chatsFactory,
+            mapFactory = mapFactory,
             onboardingRepository = onboardingRepository,
             themeRepository = themeRepository,
         )

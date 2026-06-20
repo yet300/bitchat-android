@@ -26,6 +26,9 @@ interface SearchComponent {
     /** A message hit was tapped — open its conversation and scroll to that message. */
     fun onMessageClicked(id: ConversationId, messageId: String)
 
+    /** Open the full-screen map geohash picker (Geo tab "pick on map"). */
+    fun onPickOnMapClicked()
+
     fun onCloseClicked()
 
     data class Model(
@@ -54,6 +57,7 @@ interface SearchComponent {
         fun create(
             componentContext: ComponentContext,
             onResultSelected: (id: ConversationId, targetMessageId: String?) -> Unit,
+            onPickOnMapRequested: () -> Unit,
             onClose: () -> Unit,
         ): SearchComponent
     }

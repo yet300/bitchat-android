@@ -95,6 +95,7 @@ class DefaultChatsComponentTest {
         override fun onTabSelected(tab: SearchTab) = Unit
         override fun onResultClicked(id: ConversationId) = onResultSelected(id, null)
         override fun onMessageClicked(id: ConversationId, messageId: String) = onResultSelected(id, messageId)
+        override fun onPickOnMapClicked() = Unit
         override fun onCloseClicked() = onClose()
     }
 
@@ -220,7 +221,7 @@ class DefaultChatsComponentTest {
                 FakeChatComponent(config, onFinished)
             },
             connectivityFactory = { _: ComponentContext -> FakeConnectivityComponent() },
-            searchFactory = { _, onResultSelected, onClose ->
+            searchFactory = { _, onResultSelected, _, onClose ->
                 FakeSearchComponent(onResultSelected, onClose)
             },
             contactsFactory = { _, onContactSelected, onClose ->
@@ -230,6 +231,7 @@ class DefaultChatsComponentTest {
             channelsFactory = { _, onChannelSelected, onClose ->
                 FakeChannelsComponent(onChannelSelected, onClose)
             },
+            onOpenMap = {},
         )
     }
 

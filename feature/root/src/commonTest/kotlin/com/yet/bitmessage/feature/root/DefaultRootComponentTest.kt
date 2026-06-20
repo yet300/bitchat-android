@@ -13,6 +13,7 @@ import com.arkivanov.decompose.value.MutableValue
 import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.yet.bitmessage.feature.chats.main.ChatsComponent
+import com.yet.bitmessage.feature.map.MapComponent
 import com.yet.bitmessage.feature.onboarding.OnboardingComponent
 import com.yet.bitmessage.feature.onboarding.OnboardingStep
 import kotlinx.coroutines.Dispatchers
@@ -87,10 +88,19 @@ class DefaultRootComponentTest {
     ) = DefaultRootComponent(
         componentContext = DefaultComponentContext(LifecycleRegistry()),
         onboardingFactory = { ctx, onFinished -> FakeOnboardingComponent(ctx, onFinished).also(onOnboardingCreated) },
-        chatsFactory = { ctx -> FakeChatsComponent(ctx).also(onChatsCreated) },
+        chatsFactory = { ctx, _ -> FakeChatsComponent(ctx).also(onChatsCreated) },
+        mapFactory = { _, _, _, _ -> FakeMapComponent() },
         onboardingRepository = FakeOnboardingRepository(onboardingCompleted),
         themeRepository = FakeThemeRepository(),
     )
+
+    private class FakeMapComponent : MapComponent {
+        override val model: Value<MapComponent.Model> =
+            MutableValue(MapComponent.Model(initialGeohash = null, selectedGeohash = null))
+        override fun onMapTapped(latitude: Double, longitude: Double, zoom: Double) = Unit
+        override fun onConfirmClicked() = Unit
+        override fun onCloseClicked() = Unit
+    }
 
     @Test
     fun fresh_install_starts_in_onboarding() {

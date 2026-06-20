@@ -55,6 +55,9 @@ interface ChatsComponent : BackHandlerOwner {
     }
 
     fun interface Factory {
-        fun create(componentContext: ComponentContext): ChatsComponent
+        fun create(
+            componentContext: ComponentContext,
+            onOpenMap: (initialGeohash: String?) -> Unit,
+        ): ChatsComponent
     }
 }
