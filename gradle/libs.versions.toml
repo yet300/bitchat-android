@@ -9,15 +9,13 @@ targetSdk = "35"
 # AndroidX Core
 core-ktx = "1.19.0"
 lifecycle-runtime = "2.10.0"
+lifecycle-process = "2.10.0"
 activity-compose = "1.13.0"
-appcompat = "1.7.1"
 exifinterface = "1.4.2"
 
 # Compose
 composeMultiplatform = "1.11.1"
 material3 = "1.10.0-alpha05"
-
-compose-bom = "2026.05.01" # delete when continue migrate to bitmessage
 
 
 decompose = "3.5.0"
@@ -26,12 +24,9 @@ mvi = "4.4.0"
 
 kermit = "2.1.0"
 
-# Accompanist
-accompanist-permissions = "0.37.3"
-
 # Cryptography
 bouncycastle = "1.70"
-tink-android = "1.21.0"
+tink-android = "1.22.0"
 
 multiplatformSettings = "1.3.0"
 
@@ -42,9 +37,6 @@ kotlinx-serialization = "1.11.0"
 # Coroutines
 kotlinx-coroutines = "1.11.0"
 kotlinxDatetime = "0.8.0"
-
-# Bluetooth
-nordic-ble = "2.11.0"
 
 # Ktor (HTTP + WebSocket client; OkHttp engine honors the Arti SOCKS proxy)
 ktor = "3.5.0"
@@ -72,8 +64,6 @@ mockito-inline = "5.2.0"
 roboelectric = "4.16.1"
 turbine = "1.2.1"
 
-lifecycle-process = "2.10.0"
-
 [libraries]
 # AndroidX Core
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "core-ktx" }
@@ -95,9 +85,6 @@ compose-uiToolingPreview = { module = "org.jetbrains.compose.ui:ui-tooling-previ
 # Lifecycle
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle-runtime" } # delete when migrate to mvi-kotlin
 
-# Accompanist
-accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist-permissions" }
-
 kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
 
 # Cryptography
@@ -113,8 +100,6 @@ kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-c
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines"}
 
-# Bluetooth
-nordic-ble = { module = "no.nordicsemi.android:ble", version.ref = "nordic-ble" }
 
 # Ktor (multiplatform HTTP + WebSocket client; OkHttp engine for SOCKS/Tor support)
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
@@ -168,8 +153,6 @@ turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 junit = { module = "junit:junit", version.ref = "junit" }
 androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-test-ext" }
 androidx-test-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso" }
-androidx-compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
-androidx-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
 mockito-kotlin = { module = "org.mockito.kotlin:mockito-kotlin", version.ref = "mockito-kotlin" }
 mockito-inline = { module = "org.mockito:mockito-inline", version.ref = "mockito-inline" }
 roboelectric = { module = "org.robolectric:robolectric", version.ref = "roboelectric"}
@@ -240,8 +223,3 @@ android-testing = [
     "roboelectric",
     "kotlinx-coroutines-test"
 ]
-
-compose-testing = [
-    "androidx-compose-ui-test-junit4",
-    "androidx-compose-ui-test-manifest"
-] 
