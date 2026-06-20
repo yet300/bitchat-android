@@ -11,5 +11,6 @@ internal val stateToModel: (DebugStore.State) -> DebugComponent.Model =  { state
         packetRelayEnabled = state.packetRelayEnabled,
         seenPacketCapacity = state.seenPacketCapacity,
         status = state.status,
+        packetLog = state.packetLog,
     )
 }

@@ -24,11 +24,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.app.domain.model.PacketLogEntry
+import com.app.domain.model.PacketLogKind
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.yet.bitmessage.feature.debug.DebugComponent
 import com.yet.bitmessage.shared.resources.Res
 import com.yet.bitmessage.shared.resources.debug_gatt_client
 import com.yet.bitmessage.shared.resources.debug_gatt_server
+import com.yet.bitmessage.shared.resources.debug_packet_log
+import com.yet.bitmessage.shared.resources.debug_packet_log_empty
 import com.yet.bitmessage.shared.resources.debug_packet_relay
 import com.yet.bitmessage.shared.resources.debug_refresh
 import com.yet.bitmessage.shared.resources.debug_seen_cap
@@ -101,9 +105,52 @@ fun DebugContent(component: DebugComponent, modifier: Modifier = Modifier) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 )
+                HorizontalDivider()
+
+                Text(
+                    text = stringResource(Res.string.debug_packet_log),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(start = 16.dp, top = 8.dp),
+                )
+                PacketLog(model.packetLog)
             }
         }
     }
+}
+
+private const val PACKET_LOG_LIMIT = 100
+
+/** Newest-first tail of the traffic log; capped because it renders inside the parent's scroll. */
+@Composable
+private fun PacketLog(entries: List<PacketLogEntry>, modifier: Modifier = Modifier) {
+    if (entries.isEmpty()) {
+        Text(
+            text = stringResource(Res.string.debug_packet_log_empty),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+        return
+    }
+    Column(modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+        entries.asReversed().take(PACKET_LOG_LIMIT).forEach { entry ->
+            Text(
+                text = entry.text,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                color = entry.kind.color(),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun PacketLogKind.color() = when (this) {
+    PacketLogKind.SYSTEM -> MaterialTheme.colorScheme.onSurfaceVariant
+    PacketLogKind.PEER -> MaterialTheme.colorScheme.tertiary
+    PacketLogKind.PACKET -> MaterialTheme.colorScheme.primary
+    PacketLogKind.RELAY -> MaterialTheme.colorScheme.secondary
 }
 
 @Composable

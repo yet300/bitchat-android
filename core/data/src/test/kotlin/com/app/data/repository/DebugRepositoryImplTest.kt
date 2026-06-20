@@ -1,8 +1,14 @@
 package com.app.data.repository
 
+import com.app.domain.model.PacketLogKind
+import com.app.transport.debug.DebugMessage
 import com.app.transport.debug.DebugPreferenceManager
+import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.mesh.BleDebugHandle
 import com.app.transport.mesh.BluetoothMeshService
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -17,6 +23,8 @@ class DebugRepositoryImplTest {
     private lateinit var prefs: DebugPreferenceManager
     private lateinit var ble: BleDebugHandle
     private lateinit var mesh: BluetoothMeshService
+    private lateinit var telemetry: DebugSettingsManager
+    private val messages = MutableStateFlow<List<DebugMessage>>(emptyList())
     private lateinit var repo: DebugRepositoryImpl
 
     @Before
@@ -24,8 +32,25 @@ class DebugRepositoryImplTest {
         prefs = mock()
         ble = mock()
         mesh = mock()
+        telemetry = mock()
         whenever(mesh.bleDebug).thenReturn(ble)
-        repo = DebugRepositoryImpl(prefs, mesh)
+        whenever(telemetry.debugMessages).thenReturn(messages)
+        repo = DebugRepositoryImpl(prefs, mesh, telemetry)
+    }
+
+    @Test
+    fun packet_log_maps_message_classes_to_kinds() = runTest {
+        messages.value = listOf(
+            DebugMessage.SystemMessage("boot"),
+            DebugMessage.PacketEvent("pkt"),
+            DebugMessage.RelayEvent("relay"),
+            DebugMessage.PeerEvent("peer"),
+        )
+        val entries = repo.observePacketLog().first()
+        assertEquals(
+            listOf(PacketLogKind.SYSTEM, PacketLogKind.PACKET, PacketLogKind.RELAY, PacketLogKind.PEER),
+            entries.map { it.kind },
+        )
     }
 
     @Test

@@ -2,9 +2,13 @@
 
 package com.yet.bitmessage.feature.debug.store
 
+import com.app.domain.model.PacketLogEntry
+import com.app.domain.model.PacketLogKind
 import com.app.domain.repository.DebugRepository
 import com.arkivanov.mvikotlin.main.store.DefaultStoreFactory
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -42,6 +46,8 @@ class DebugStoreFactoryTest {
         override fun seenPacketCapacity() = seenCap
         override fun setSeenPacketCapacity(value: Int) { seenCap = value }
         override fun debugStatus(): String { statusReads++; return "status-$statusReads" }
+        val packetLog = MutableStateFlow<List<PacketLogEntry>>(emptyList())
+        override fun observePacketLog(): Flow<List<PacketLogEntry>> = packetLog
     }
 
     @Test
@@ -73,5 +79,15 @@ class DebugStoreFactoryTest {
         store.accept(DebugStore.Intent.RefreshStatus)
 
         assertEquals("status-2", store.state.status)
+    }
+
+    @Test
+    fun packet_log_updates_flow_into_state() = runTest {
+        val repo = FakeDebugRepository()
+        val store = DebugStoreFactory(DefaultStoreFactory(), repo).create()
+
+        repo.packetLog.value = listOf(PacketLogEntry(PacketLogKind.PACKET, "hello", 1L))
+
+        assertEquals(listOf("hello"), store.state.packetLog.map { it.text })
     }
 }
