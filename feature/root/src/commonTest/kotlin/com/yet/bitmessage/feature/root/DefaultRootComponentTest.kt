@@ -114,6 +114,7 @@ class DefaultRootComponentTest {
                     packetRelayEnabled = true,
                     seenPacketCapacity = 0,
                     status = "",
+                    packetLog = emptyList(),
                 ),
             )
         override fun onGattServerToggled(enabled: Boolean) = Unit

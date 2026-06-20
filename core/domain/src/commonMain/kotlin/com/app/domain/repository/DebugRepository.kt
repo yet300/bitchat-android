@@ -1,5 +1,8 @@
 package com.app.domain.repository
 
+import com.app.domain.model.PacketLogEntry
+import kotlinx.coroutines.flow.Flow
+
 /**
  * Developer/diagnostic controls for the mesh (P24). Re-homes the GATT-role toggles, logging and
  * sync caps that lived in the legacy debug sheet, plus a live human-readable status dump. Values are
@@ -27,4 +30,7 @@ interface DebugRepository {
 
     /** Live human-readable BLE/mesh debug summary. */
     fun debugStatus(): String
+
+    /** Live, newest-last packet/event log from the mesh traffic recorder. */
+    fun observePacketLog(): Flow<List<PacketLogEntry>>
 }

@@ -1,5 +1,6 @@
 package com.yet.bitmessage.feature.debug.store
 
+import com.app.domain.model.PacketLogEntry
 import com.arkivanov.mvikotlin.core.store.Store
 
 internal interface DebugStore : Store<DebugStore.Intent, DebugStore.State, Nothing> {
@@ -11,6 +12,7 @@ internal interface DebugStore : Store<DebugStore.Intent, DebugStore.State, Nothi
         val packetRelayEnabled: Boolean = true,
         val seenPacketCapacity: Int = 0,
         val status: String = "",
+        val packetLog: List<PacketLogEntry> = emptyList(),
     )
 
     sealed interface Intent {
@@ -34,5 +36,6 @@ internal interface DebugStore : Store<DebugStore.Intent, DebugStore.State, Nothi
         data class PacketRelayChanged(val enabled: Boolean) : Msg
         data class SeenCapacityChanged(val value: Int) : Msg
         data class StatusChanged(val status: String) : Msg
+        data class PacketLogChanged(val entries: List<PacketLogEntry>) : Msg
     }
 }

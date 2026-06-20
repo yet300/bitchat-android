@@ -6,6 +6,7 @@ import com.arkivanov.mvikotlin.core.store.SimpleBootstrapper
 import com.arkivanov.mvikotlin.core.store.Store
 import com.arkivanov.mvikotlin.core.store.StoreFactory
 import com.arkivanov.mvikotlin.extensions.coroutines.CoroutineExecutor
+import kotlinx.coroutines.launch
 
 internal class DebugStoreFactory(
     private val storeFactory: StoreFactory,
@@ -31,6 +32,7 @@ internal class DebugStoreFactory(
                 is DebugStore.Msg.PacketRelayChanged -> copy(packetRelayEnabled = msg.enabled)
                 is DebugStore.Msg.SeenCapacityChanged -> copy(seenPacketCapacity = msg.value)
                 is DebugStore.Msg.StatusChanged -> copy(status = msg.status)
+                is DebugStore.Msg.PacketLogChanged -> copy(packetLog = msg.entries)
             }
     }
 
@@ -39,18 +41,23 @@ internal class DebugStoreFactory(
 
         override fun executeAction(action: DebugStore.Action) {
             when (action) {
-                DebugStore.Action.Load -> dispatch(
-                    DebugStore.Msg.Loaded(
-                        DebugStore.State(
-                            gattServerEnabled = debug.gattServerEnabled(),
-                            gattClientEnabled = debug.gattClientEnabled(),
-                            verboseLogging = debug.verboseLoggingEnabled(),
-                            packetRelayEnabled = debug.packetRelayEnabled(),
-                            seenPacketCapacity = debug.seenPacketCapacity(),
-                            status = debug.debugStatus(),
+                DebugStore.Action.Load -> {
+                    dispatch(
+                        DebugStore.Msg.Loaded(
+                            DebugStore.State(
+                                gattServerEnabled = debug.gattServerEnabled(),
+                                gattClientEnabled = debug.gattClientEnabled(),
+                                verboseLogging = debug.verboseLoggingEnabled(),
+                                packetRelayEnabled = debug.packetRelayEnabled(),
+                                seenPacketCapacity = debug.seenPacketCapacity(),
+                                status = debug.debugStatus(),
+                            ),
                         ),
-                    ),
-                )
+                    )
+                    scope.launch {
+                        debug.observePacketLog().collect { dispatch(DebugStore.Msg.PacketLogChanged(it)) }
+                    }
+                }
             }
         }
 

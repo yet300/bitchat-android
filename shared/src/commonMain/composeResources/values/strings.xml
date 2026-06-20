@@ -66,6 +66,8 @@
     <string name="debug_seen_cap">Seen-packet capacity</string>
     <string name="debug_status">Live status</string>
     <string name="debug_refresh">Refresh</string>
+    <string name="debug_packet_log">Packet log</string>
+    <string name="debug_packet_log_empty">No packets yet</string>
     <string name="channels_title">Channels</string>
     <string name="channels_close">Close</string>
     <string name="channels_join_hint">Join a channel (#name)</string>

@@ -1,5 +1,6 @@
 package com.yet.bitmessage.feature.debug
 
+import com.app.domain.model.PacketLogEntry
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.value.Value
 
@@ -27,6 +28,7 @@ interface DebugComponent {
         val packetRelayEnabled: Boolean,
         val seenPacketCapacity: Int,
         val status: String,
+        val packetLog: List<PacketLogEntry>,
     )
 
     fun interface Factory {
