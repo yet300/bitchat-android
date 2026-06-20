@@ -26,6 +26,7 @@ class ProcessCommandUseCaseTest {
     ) : ChannelRepository {
         val joinedFlow = MutableStateFlow(joined)
         val passwordsSet = mutableListOf<Pair<String, String>>()
+        val retentionSet = mutableListOf<Pair<String, RetentionPolicy>>()
         override fun observeJoinedChannels(): Flow<Set<String>> = joinedFlow
         override fun observeChannels(): Flow<List<Channel>> = MutableStateFlow(emptyList())
         override suspend fun join(tag: String, password: String?): JoinResult =
@@ -35,7 +36,7 @@ class ProcessCommandUseCaseTest {
         override suspend fun isCreator(tag: String): Boolean = false
         override fun observeRetention(tag: String): Flow<RetentionPolicy> =
             MutableStateFlow(RetentionPolicy.KEEP_ALL)
-        override suspend fun setRetention(tag: String, policy: RetentionPolicy) = Unit
+        override suspend fun setRetention(tag: String, policy: RetentionPolicy) { retentionSet += tag to policy }
     }
 
     private fun useCase(
@@ -95,6 +96,33 @@ class ProcessCommandUseCaseTest {
         val result = useCase(contacts = contacts, peers = peers).invoke(ConversationId.PublicMesh, cmd("/block spam"))
         assertIs<CommandResult.Feedback>(result)
         assertTrue(peerId in contacts.blocked)
+    }
+
+    @Test fun save_in_a_channel_keeps_messages_locally() = runTest {
+        val channels = FakeChannelRepository()
+        val result = useCase(channels = channels).invoke(ConversationId.Channel("#kotlin"), cmd("/save"))
+        assertIs<CommandResult.Feedback>(result)
+        assertEquals(listOf("#kotlin" to RetentionPolicy.KEEP_ALL), channels.retentionSet)
+    }
+
+    @Test fun save_outside_a_channel_is_usage() = runTest {
+        val channels = FakeChannelRepository()
+        val result = useCase(channels = channels).invoke(ConversationId.PublicMesh, cmd("/save"))
+        val feedback = assertIs<CommandResult.Feedback>(result)
+        assertTrue(feedback.text.startsWith("usage"))
+        assertTrue(channels.retentionSet.isEmpty())
+    }
+
+    @Test fun transfer_with_nickname_reports_unavailable() = runTest {
+        val result = useCase().invoke(ConversationId.Channel("#kotlin"), cmd("/transfer @bob"))
+        val feedback = assertIs<CommandResult.Feedback>(result)
+        assertTrue(feedback.text.contains("not available"))
+    }
+
+    @Test fun transfer_without_nickname_is_usage() = runTest {
+        val result = useCase().invoke(ConversationId.Channel("#kotlin"), cmd("/transfer"))
+        val feedback = assertIs<CommandResult.Feedback>(result)
+        assertTrue(feedback.text.startsWith("usage"))
     }
 
     @Test fun hug_is_sent_as_a_message() = runTest {

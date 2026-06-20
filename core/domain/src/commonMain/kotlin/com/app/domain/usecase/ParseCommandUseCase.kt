@@ -19,6 +19,10 @@ sealed interface ChatCommand {
     data class Block(val nickname: String?) : ChatCommand
     data class Unblock(val nickname: String) : ChatCommand
     data class Pass(val password: String?) : ChatCommand
+    /** Retain the current channel's messages locally (`/save`). */
+    data object Save : ChatCommand
+    /** Transfer channel ownership to [nickname] (`/transfer`); null -> usage. */
+    data class Transfer(val nickname: String?) : ChatCommand
     data class Action(val kind: ActionKind, val target: String) : ChatCommand
     data class Unknown(val name: String) : ChatCommand
     /** Command recognized but arguments are invalid — hint text for the user. */
@@ -58,6 +62,10 @@ class ParseCommandUseCase {
                 else ChatCommand.Unblock(args[0].removePrefix("@"))
 
             "/pass" -> ChatCommand.Pass(args.firstOrNull())
+
+            "/save" -> ChatCommand.Save
+
+            "/transfer" -> ChatCommand.Transfer(args.firstOrNull()?.removePrefix("@"))
 
             "/hug" ->
                 if (args.isEmpty()) ChatCommand.Usage("usage: /hug <nickname>")

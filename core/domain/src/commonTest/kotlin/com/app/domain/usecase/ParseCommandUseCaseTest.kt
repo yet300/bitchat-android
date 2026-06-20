@@ -48,6 +48,12 @@ class ParseCommandUseCaseTest {
         assertEquals(ChatCommand.Action(ActionKind.SLAP, "sam"), parse("/slap sam"))
     }
 
+    @Test fun `save and transfer`() {
+        assertEquals(ChatCommand.Save, parse("/save"))
+        assertEquals(ChatCommand.Transfer("alice"), parse("/transfer @alice"))
+        assertEquals(ChatCommand.Transfer(null), parse("/transfer"))
+    }
+
     @Test fun `unknown command`() {
         assertEquals(ChatCommand.Unknown("/foo"), parse("/foo bar"))
     }
