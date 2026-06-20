@@ -33,6 +33,7 @@ internal class DebugStoreFactory(
                 is DebugStore.Msg.SeenCapacityChanged -> copy(seenPacketCapacity = msg.value)
                 is DebugStore.Msg.StatusChanged -> copy(status = msg.status)
                 is DebugStore.Msg.PacketLogChanged -> copy(packetLog = msg.entries)
+                is DebugStore.Msg.TopologyChanged -> copy(topology = msg.topology)
             }
     }
 
@@ -56,6 +57,9 @@ internal class DebugStoreFactory(
                     )
                     scope.launch {
                         debug.observePacketLog().collect { dispatch(DebugStore.Msg.PacketLogChanged(it)) }
+                    }
+                    scope.launch {
+                        debug.observeMeshTopology().collect { dispatch(DebugStore.Msg.TopologyChanged(it)) }
                     }
                 }
             }

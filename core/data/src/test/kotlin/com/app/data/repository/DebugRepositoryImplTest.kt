@@ -6,6 +6,7 @@ import com.app.transport.debug.DebugPreferenceManager
 import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.mesh.BleDebugHandle
 import com.app.transport.mesh.BluetoothMeshService
+import com.app.transport.meshgraph.MeshGraphService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -24,7 +25,9 @@ class DebugRepositoryImplTest {
     private lateinit var ble: BleDebugHandle
     private lateinit var mesh: BluetoothMeshService
     private lateinit var telemetry: DebugSettingsManager
+    private lateinit var meshGraph: MeshGraphService
     private val messages = MutableStateFlow<List<DebugMessage>>(emptyList())
+    private val graph = MutableStateFlow(MeshGraphService.GraphSnapshot(emptyList(), emptyList()))
     private lateinit var repo: DebugRepositoryImpl
 
     @Before
@@ -33,9 +36,23 @@ class DebugRepositoryImplTest {
         ble = mock()
         mesh = mock()
         telemetry = mock()
+        meshGraph = mock()
         whenever(mesh.bleDebug).thenReturn(ble)
         whenever(telemetry.debugMessages).thenReturn(messages)
-        repo = DebugRepositoryImpl(prefs, mesh, telemetry)
+        whenever(meshGraph.graphState).thenReturn(graph)
+        repo = DebugRepositoryImpl(prefs, mesh, telemetry, meshGraph)
+    }
+
+    @Test
+    fun mesh_topology_maps_nodes_and_confirmed_edges() = runTest {
+        graph.value = MeshGraphService.GraphSnapshot(
+            nodes = listOf(MeshGraphService.GraphNode("aa", "alice"), MeshGraphService.GraphNode("bb", null)),
+            edges = listOf(MeshGraphService.GraphEdge("aa", "bb", isConfirmed = true)),
+        )
+        val topology = repo.observeMeshTopology().first()
+        assertEquals(listOf("alice", null), topology.nodes.map { it.nickname })
+        assertEquals(1, topology.edges.size)
+        assertTrue(topology.edges.single().confirmed)
     }
 
     @Test

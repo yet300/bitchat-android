@@ -1,5 +1,8 @@
 package com.app.data.repository
 
+import com.app.domain.model.MeshEdge
+import com.app.domain.model.MeshNode
+import com.app.domain.model.MeshTopology
 import com.app.domain.model.PacketLogEntry
 import com.app.domain.model.PacketLogKind
 import com.app.domain.repository.DebugRepository
@@ -7,6 +10,7 @@ import com.app.transport.debug.DebugMessage
 import com.app.transport.debug.DebugPreferenceManager
 import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.mesh.BluetoothMeshService
+import com.app.transport.meshgraph.MeshGraphService
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -24,6 +28,7 @@ internal class DebugRepositoryImpl(
     private val prefs: DebugPreferenceManager,
     private val mesh: BluetoothMeshService,
     private val telemetry: DebugSettingsManager,
+    private val meshGraph: MeshGraphService,
 ) : DebugRepository {
 
     override fun gattServerEnabled(): Boolean = prefs.getGattServerEnabled()
@@ -56,6 +61,13 @@ internal class DebugRepositoryImpl(
 
     override fun observePacketLog(): Flow<List<PacketLogEntry>> =
         telemetry.debugMessages.map { messages -> messages.map { it.toEntry() } }
+
+    override fun observeMeshTopology(): Flow<MeshTopology> = meshGraph.graphState.map { snapshot ->
+        MeshTopology(
+            nodes = snapshot.nodes.map { MeshNode(it.peerID, it.nickname) },
+            edges = snapshot.edges.map { MeshEdge(it.a, it.b, it.isConfirmed) },
+        )
+    }
 
     private fun DebugMessage.toEntry(): PacketLogEntry = PacketLogEntry(
         kind = when (this) {

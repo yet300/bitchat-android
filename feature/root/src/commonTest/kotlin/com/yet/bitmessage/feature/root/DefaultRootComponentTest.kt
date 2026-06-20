@@ -1,6 +1,7 @@
 package com.yet.bitmessage.feature.root
 
 import com.app.domain.model.ConversationId
+import com.app.domain.model.MeshTopology
 import com.app.domain.model.ThemeMode
 import com.app.domain.repository.OnboardingRepository
 import com.app.domain.repository.ThemeRepository
@@ -115,6 +116,7 @@ class DefaultRootComponentTest {
                     seenPacketCapacity = 0,
                     status = "",
                     packetLog = emptyList(),
+                    topology = MeshTopology(emptyList(), emptyList()),
                 ),
             )
         override fun onGattServerToggled(enabled: Boolean) = Unit

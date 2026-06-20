@@ -2,6 +2,7 @@
 
 package com.yet.bitmessage.feature.debug.store
 
+import com.app.domain.model.MeshTopology
 import com.app.domain.model.PacketLogEntry
 import com.app.domain.model.PacketLogKind
 import com.app.domain.repository.DebugRepository
@@ -48,6 +49,8 @@ class DebugStoreFactoryTest {
         override fun debugStatus(): String { statusReads++; return "status-$statusReads" }
         val packetLog = MutableStateFlow<List<PacketLogEntry>>(emptyList())
         override fun observePacketLog(): Flow<List<PacketLogEntry>> = packetLog
+        val topology = MutableStateFlow(MeshTopology(emptyList(), emptyList()))
+        override fun observeMeshTopology(): Flow<MeshTopology> = topology
     }
 
     @Test
