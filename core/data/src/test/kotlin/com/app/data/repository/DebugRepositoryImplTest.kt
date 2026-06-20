@@ -1,0 +1,60 @@
+package com.app.data.repository
+
+import com.app.transport.debug.DebugPreferenceManager
+import com.app.transport.mesh.BleDebugHandle
+import com.app.transport.mesh.BluetoothMeshService
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
+
+class DebugRepositoryImplTest {
+
+    private lateinit var prefs: DebugPreferenceManager
+    private lateinit var ble: BleDebugHandle
+    private lateinit var mesh: BluetoothMeshService
+    private lateinit var repo: DebugRepositoryImpl
+
+    @Before
+    fun setUp() {
+        prefs = mock()
+        ble = mock()
+        mesh = mock()
+        whenever(mesh.bleDebug).thenReturn(ble)
+        repo = DebugRepositoryImpl(prefs, mesh)
+    }
+
+    @Test
+    fun enabling_the_gatt_server_persists_and_starts_the_bearer() {
+        repo.setGattServerEnabled(true)
+        verify(prefs).setGattServerEnabled(true)
+        verify(ble).startServer()
+        verify(ble, never()).stopServer()
+    }
+
+    @Test
+    fun disabling_the_gatt_client_persists_and_stops_the_bearer() {
+        repo.setGattClientEnabled(false)
+        verify(prefs).setGattClientEnabled(false)
+        verify(ble).stopClient()
+        verify(ble, never()).startClient()
+    }
+
+    @Test
+    fun getters_delegate_to_the_preference_manager() {
+        whenever(prefs.getSeenPacketCapacity()).thenReturn(750)
+        whenever(prefs.getVerboseLogging()).thenReturn(true)
+        assertEquals(750, repo.seenPacketCapacity())
+        assertTrue(repo.verboseLoggingEnabled())
+    }
+
+    @Test
+    fun debug_status_survives_a_thrown_mesh_call() {
+        whenever(mesh.getDebugStatus()).thenThrow(RuntimeException("boom"))
+        assertEquals("unavailable", repo.debugStatus())
+    }
+}
