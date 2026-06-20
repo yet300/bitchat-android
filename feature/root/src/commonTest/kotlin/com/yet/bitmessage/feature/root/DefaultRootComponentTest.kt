@@ -13,6 +13,7 @@ import com.arkivanov.decompose.value.MutableValue
 import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.yet.bitmessage.feature.chats.main.ChatsComponent
+import com.yet.bitmessage.feature.debug.DebugComponent
 import com.yet.bitmessage.feature.map.MapComponent
 import com.yet.bitmessage.feature.onboarding.OnboardingComponent
 import com.yet.bitmessage.feature.onboarding.OnboardingStep
@@ -88,8 +89,9 @@ class DefaultRootComponentTest {
     ) = DefaultRootComponent(
         componentContext = DefaultComponentContext(LifecycleRegistry()),
         onboardingFactory = { ctx, onFinished -> FakeOnboardingComponent(ctx, onFinished).also(onOnboardingCreated) },
-        chatsFactory = { ctx, _ -> FakeChatsComponent(ctx).also(onChatsCreated) },
+        chatsFactory = { ctx, _, _ -> FakeChatsComponent(ctx).also(onChatsCreated) },
         mapFactory = { _, _, _, _ -> FakeMapComponent() },
+        debugFactory = { _, _ -> FakeDebugComponent() },
         onboardingRepository = FakeOnboardingRepository(onboardingCompleted),
         themeRepository = FakeThemeRepository(),
     )
@@ -99,6 +101,27 @@ class DefaultRootComponentTest {
             MutableValue(MapComponent.Model(initialGeohash = null, selectedGeohash = null))
         override fun onMapTapped(latitude: Double, longitude: Double, zoom: Double) = Unit
         override fun onConfirmClicked() = Unit
+        override fun onCloseClicked() = Unit
+    }
+
+    private class FakeDebugComponent : DebugComponent {
+        override val model: Value<DebugComponent.Model> =
+            MutableValue(
+                DebugComponent.Model(
+                    gattServerEnabled = true,
+                    gattClientEnabled = true,
+                    verboseLogging = false,
+                    packetRelayEnabled = true,
+                    seenPacketCapacity = 0,
+                    status = "",
+                ),
+            )
+        override fun onGattServerToggled(enabled: Boolean) = Unit
+        override fun onGattClientToggled(enabled: Boolean) = Unit
+        override fun onVerboseToggled(enabled: Boolean) = Unit
+        override fun onPacketRelayToggled(enabled: Boolean) = Unit
+        override fun onSeenCapacityChanged(value: Int) = Unit
+        override fun onRefreshStatus() = Unit
         override fun onCloseClicked() = Unit
     }
 

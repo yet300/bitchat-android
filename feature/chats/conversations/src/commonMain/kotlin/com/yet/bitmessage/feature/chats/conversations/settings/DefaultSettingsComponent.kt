@@ -32,6 +32,7 @@ internal class DefaultSettingsComponent(
     componentContext: ComponentContext,
     storeFactory: SettingsStoreFactory,
     private val onClose: () -> Unit,
+    private val onOpenDebug: () -> Unit,
 ) : SettingsComponent, ComponentContext by componentContext {
 
     private val store = instanceKeeper.getStore { storeFactory.create() }
@@ -97,6 +98,8 @@ internal class DefaultSettingsComponent(
 
     override fun onDismissDialog() = dialogNav.dismiss()
 
+    override fun onOpenDebugClicked() = onOpenDebug()
+
     override fun onCloseClicked() = onClose()
 }
 
@@ -115,7 +118,11 @@ internal class DefaultSettingsComponentFactory(
     private val notificationPermissionRepository: NotificationPermissionRepository,
     private val verificationRepository: VerificationRepository,
 ) : SettingsComponent.Factory {
-    override fun create(componentContext: ComponentContext, onClose: () -> Unit): SettingsComponent =
+    override fun create(
+        componentContext: ComponentContext,
+        onClose: () -> Unit,
+        onOpenDebug: () -> Unit,
+    ): SettingsComponent =
         DefaultSettingsComponent(
             componentContext = componentContext,
             storeFactory = SettingsStoreFactory(
@@ -132,5 +139,6 @@ internal class DefaultSettingsComponentFactory(
                 panicWipe = PanicWipeUseCase(messageRepository, contactRepository, identityRepository),
             ),
             onClose = onClose,
+            onOpenDebug = onOpenDebug,
         )
 }

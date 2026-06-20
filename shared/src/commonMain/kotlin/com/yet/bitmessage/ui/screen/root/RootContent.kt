@@ -5,6 +5,7 @@ import androidx.compose.ui.Modifier
 import com.arkivanov.decompose.extensions.compose.stack.Children
 import com.yet.bitmessage.feature.root.RootComponent
 import com.yet.bitmessage.ui.screen.chat.ChatsContent
+import com.yet.bitmessage.ui.screen.debug.DebugContent
 import com.yet.bitmessage.ui.screen.map.MapContent
 import com.yet.bitmessage.ui.screen.onboarding.OnboardingContent
 
@@ -15,6 +16,7 @@ fun RootContent(component: RootComponent, modifier: Modifier = Modifier) {
             is RootComponent.Child.Onboarding -> OnboardingContent(child.component)
             is RootComponent.Child.Chats -> ChatsContent(child.component)
             is RootComponent.Child.Map -> MapContent(child.component)
+            is RootComponent.Child.Debug -> DebugContent(child.component)
         }
     }
 }
