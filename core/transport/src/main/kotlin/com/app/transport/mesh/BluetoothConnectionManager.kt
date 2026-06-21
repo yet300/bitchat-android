@@ -315,6 +315,9 @@ internal class BluetoothConnectionManager(
     // Inject nickname resolver for broadcaster logs
     fun setNicknameResolver(resolver: (String) -> String?) { packetBroadcaster.setNicknameResolver(resolver) }
 
+    /** Forward the mesh-foreground-service signal to the power manager (see [PowerManager.setMeshServiceActive]). */
+    fun setMeshServiceActive(active: Boolean) { powerManager.setMeshServiceActive(active) }
+
     // Debug snapshots for connected devices
     fun getConnectedDeviceEntries(): List<Triple<String, Boolean, Int?>> {
         return try {

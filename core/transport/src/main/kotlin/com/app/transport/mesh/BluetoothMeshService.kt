@@ -816,6 +816,7 @@ class BluetoothMeshService(
     override fun stop() = stopServices()
     override val isMeshActive: Boolean get() = isActive
     override fun activePeerCount(): Int = getActivePeerCount()
+    override fun setMeshServiceActive(active: Boolean) = bleBearer.setMeshServiceActive(active)
 
 
     /**

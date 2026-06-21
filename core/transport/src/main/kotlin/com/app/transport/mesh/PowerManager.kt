@@ -35,7 +35,7 @@ internal class PowerManager(private val context: Context) : LifecycleEventObserv
         private const val SCAN_ON_DURATION_NORMAL = MeshConstants.Power.SCAN_ON_DURATION_NORMAL_MS    // 8 seconds on
         private const val SCAN_OFF_DURATION_NORMAL = MeshConstants.Power.SCAN_OFF_DURATION_NORMAL_MS   // 2 seconds off
         private const val SCAN_ON_DURATION_POWER_SAVE = MeshConstants.Power.SCAN_ON_DURATION_POWER_SAVE_MS    // 2 seconds on
-        private const val SCAN_OFF_DURATION_POWER_SAVE = MeshConstants.Power.SCAN_OFF_DURATION_POWER_SAVE_MS  // 8 seconds off
+        private const val SCAN_OFF_DURATION_POWER_SAVE = MeshConstants.Power.SCAN_OFF_DURATION_POWER_SAVE_MS  // 28 seconds off
         private const val SCAN_ON_DURATION_ULTRA_LOW = MeshConstants.Power.SCAN_ON_DURATION_ULTRA_LOW_MS      // 1 second on
         private const val SCAN_OFF_DURATION_ULTRA_LOW = MeshConstants.Power.SCAN_OFF_DURATION_ULTRA_LOW_MS   // 10 seconds off
         
@@ -43,6 +43,47 @@ internal class PowerManager(private val context: Context) : LifecycleEventObserv
         private const val MAX_CONNECTIONS_NORMAL = MeshConstants.Power.MAX_CONNECTIONS_NORMAL
         private const val MAX_CONNECTIONS_POWER_SAVE = MeshConstants.Power.MAX_CONNECTIONS_POWER_SAVE
         private const val MAX_CONNECTIONS_ULTRA_LOW = MeshConstants.Power.MAX_CONNECTIONS_ULTRA_LOW
+
+        /**
+         * Pure power-mode decision — extracted so it is testable without a [Context].
+         *
+         * When [meshServiceActive] is true the process is treated as foreground even if
+         * ProcessLifecycleOwner reports background: the mesh foreground service owns the
+         * lifecycle, yet an FGS does not count as foreground for ProcessLifecycleOwner.
+         * In that case the background→POWER_SAVER cap is skipped so discovery stays on the
+         * BALANCED 8s/2s duty cycle instead of the 2s/28s power-save cadence. Low- and
+         * critical-battery downgrades still apply regardless of the flag.
+         */
+        internal fun computePowerMode(
+            batteryLevel: Int,
+            isCharging: Boolean,
+            isAppInBackground: Boolean,
+            meshServiceActive: Boolean,
+        ): PowerMode {
+            // Determine the base mode from battery/charging state only
+            val baseMode = when {
+                // Charging in foreground may use performance
+                isCharging && !isAppInBackground -> PowerMode.PERFORMANCE
+
+                // Critical battery - force ultra low power regardless of foreground/background
+                batteryLevel <= CRITICAL_BATTERY -> PowerMode.ULTRA_LOW_POWER
+
+                // Low battery - prefer power saver
+                batteryLevel <= LOW_BATTERY -> PowerMode.POWER_SAVER
+
+                // Otherwise balanced
+                else -> PowerMode.BALANCED
+            }
+
+            // The mesh foreground service makes the process effectively foreground.
+            val treatAsForeground = !isAppInBackground || meshServiceActive
+            return if (!treatAsForeground) {
+                // Background (no FGS): cap to POWER_SAVER but preserve ULTRA_LOW_POWER.
+                if (baseMode == PowerMode.ULTRA_LOW_POWER) PowerMode.ULTRA_LOW_POWER else PowerMode.POWER_SAVER
+            } else {
+                baseMode
+            }
+        }
     }
     
     enum class PowerMode {
@@ -56,7 +97,11 @@ internal class PowerManager(private val context: Context) : LifecycleEventObserv
     private var isCharging = false
     private var batteryLevel = 100
     private var isAppInBackground = true
-    
+
+    // Set by the mesh foreground service (via the transport seam) — see [setMeshServiceActive].
+    @Volatile
+    private var meshServiceActive = false
+
     private val powerScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var dutyCycleJob: Job? = null
     
@@ -250,35 +295,26 @@ internal class PowerManager(private val context: Context) : LifecycleEventObserv
             appendLine("Battery Level: $batteryLevel%")
             appendLine("Is Charging: $isCharging")
             appendLine("App In Background: $isAppInBackground")
+            appendLine("Mesh Service Active: $meshServiceActive")
             appendLine("Max Connections: ${getMaxConnections()}")
             appendLine("RSSI Threshold: ${getRSSIThreshold()} dBm")
             appendLine("Use Duty Cycle: ${shouldUseDutyCycle()}")
         }
     }
     
+    /**
+     * Mark the mesh foreground service active/inactive. While active, power decisions treat
+     * the process as foreground (the FGS owns the mesh lifecycle), keeping discovery on the
+     * BALANCED duty cycle when the screen is off instead of throttling to POWER_SAVER.
+     */
+    fun setMeshServiceActive(active: Boolean) {
+        if (meshServiceActive == active) return
+        meshServiceActive = active
+        updatePowerMode()
+    }
+
     private fun updatePowerMode() {
-        // Determine the base mode from battery/charging state only
-        val baseMode = when {
-            // Charging in foreground may use performance
-            isCharging && !isAppInBackground -> PowerMode.PERFORMANCE
-
-            // Critical battery - force ultra low power regardless of foreground/background
-            batteryLevel <= CRITICAL_BATTERY -> PowerMode.ULTRA_LOW_POWER
-
-            // Low battery - prefer power saver
-            batteryLevel <= LOW_BATTERY -> PowerMode.POWER_SAVER
-
-            // Otherwise balanced
-            else -> PowerMode.BALANCED
-        }
-
-        // If app is in background (including when running as a foreground service),
-        // cap the power mode to at least POWER_SAVER. Preserve ULTRA_LOW_POWER.
-        val newMode = if (isAppInBackground) {
-            if (baseMode == PowerMode.ULTRA_LOW_POWER) PowerMode.ULTRA_LOW_POWER else PowerMode.POWER_SAVER
-        } else {
-            baseMode
-        }
+        val newMode = computePowerMode(batteryLevel, isCharging, isAppInBackground, meshServiceActive)
 
         if (newMode != currentMode) {
             val oldMode = currentMode

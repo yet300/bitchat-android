@@ -152,6 +152,9 @@ class MeshForegroundService : Service() {
         if (!isInForeground) {
             startForegroundCompat(buildNotification(meshLifecycle.activePeerCount()))
             isInForeground = true
+            // The FGS owns the mesh lifecycle: tell power management the process is
+            // effectively foreground so BLE discovery is not throttled with the screen off.
+            try { meshLifecycle.setMeshServiceActive(true) } catch (_: Exception) { }
         } else {
             updateNotification(force = true)
         }
@@ -327,6 +330,8 @@ class MeshForegroundService : Service() {
     override fun onDestroy() {
         updateJob?.cancel()
         updateJob = null
+        // No longer foreground: restore background power throttling.
+        try { meshLifecycle.setMeshServiceActive(false) } catch (_: Exception) { }
         // Cancel the service coroutine scope to prevent leaks
         try { serviceJob.cancel() } catch (_: Exception) { }
         // Best-effort ensure we are not marked foreground
