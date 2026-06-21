@@ -73,6 +73,7 @@ fun MapContent(component: MapComponent, modifier: Modifier = Modifier) {
         ) { padding ->
             GeohashMapPicker(
                 initialGeohash = model.initialGeohash,
+                selectedGeohash = model.selectedGeohash,
                 onTap = component::onMapTapped,
                 modifier = Modifier.fillMaxSize().padding(padding),
             )
