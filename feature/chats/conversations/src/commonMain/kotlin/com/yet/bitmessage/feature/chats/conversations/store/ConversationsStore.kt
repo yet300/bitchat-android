@@ -26,11 +26,24 @@ internal interface ConversationsStore :
         val bannerDismissed: Boolean = false,
     ) {
         /**
-         * Transports a denied-earlier user can re-enable in one tap. Only PERMISSION_REQUIRED
-         * surfaces here — an OFF radio / Tor is a deliberate user choice, never a nag.
+         * Transports the user can re-enable in one tap. PERMISSION_REQUIRED surfaces for every
+         * kind; OFF surfaces only for BLUETOOTH — the primary mesh radio, where an off adapter
+         * silently breaks discovery. An off Wi-Fi Aware / Internet / Tor is a deliberate choice,
+         * never a nag.
          */
         val transportsNeedingAttention: List<TransportKind>
-            get() = transports.filter { it.state == TransportState.PERMISSION_REQUIRED }.map { it.kind }
+            get() = transports.filter { it.state.needsAttention(it.kind) }.map { it.kind }
+
+        /**
+         * Whether the surfaced attention is at least partly a missing permission (vs. only an
+         * off Bluetooth radio). Drives the banner copy: permission framing vs "Bluetooth is off".
+         */
+        val attentionNeedsPermission: Boolean
+            get() = transports.any { it.state == TransportState.PERMISSION_REQUIRED }
+
+        private fun TransportState.needsAttention(kind: TransportKind): Boolean =
+            this == TransportState.PERMISSION_REQUIRED ||
+                (this == TransportState.OFF && kind == TransportKind.BLUETOOTH)
     }
 
     /** Selection is navigation, owned by the component. */

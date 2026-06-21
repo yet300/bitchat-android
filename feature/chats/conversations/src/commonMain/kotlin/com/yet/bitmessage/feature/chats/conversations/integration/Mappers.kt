@@ -25,6 +25,15 @@ internal val stateToModel: (ConversationsStore.State) -> ConversationsComponent.
         nearby = state.nearby,
         connectivityBanner = state.transportsNeedingAttention
             .takeIf { it.isNotEmpty() && !state.bannerDismissed }
-            ?.let { ConversationsComponent.ConnectivityBanner(it) },
+            ?.let { kinds ->
+                ConversationsComponent.ConnectivityBanner(
+                    transports = kinds,
+                    reason = if (state.attentionNeedsPermission) {
+                        ConversationsComponent.ConnectivityBanner.Reason.PERMISSION
+                    } else {
+                        ConversationsComponent.ConnectivityBanner.Reason.BLUETOOTH_OFF
+                    },
+                )
+            },
     )
 }

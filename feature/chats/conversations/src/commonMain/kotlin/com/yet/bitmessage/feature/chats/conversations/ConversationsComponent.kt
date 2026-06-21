@@ -49,7 +49,13 @@ interface ConversationsComponent {
     )
 
     /** A dismissible prompt atop the list when one or more transports need re-enabling. */
-    data class ConnectivityBanner(val transports: List<TransportKind>)
+    data class ConnectivityBanner(
+        val transports: List<TransportKind>,
+        val reason: Reason,
+    ) {
+        /** Drives the banner copy: a missing permission vs. an off Bluetooth adapter. */
+        enum class Reason { PERMISSION, BLUETOOTH_OFF }
+    }
 
     fun interface Factory {
         fun create(
