@@ -118,7 +118,9 @@
     <string name="connectivity_count_peers">%1$d nearby</string>
     <string name="connectivity_count_relays">%1$d relays</string>
     <string name="connectivity_banner_title">Some transports need permission</string>
+    <string name="connectivity_banner_title_bluetooth_off">Bluetooth is off</string>
     <string name="connectivity_banner_action">Review</string>
+    <string name="connectivity_banner_action_enable">Enable</string>
     <string name="connectivity_banner_dismiss">Dismiss</string>
     <string name="connectivity_peers_title">Mesh peers</string>
     <string name="connectivity_peers_empty">No peers nearby</string>

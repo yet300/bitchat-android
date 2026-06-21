@@ -17,6 +17,7 @@ import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.PeerRepository
 import com.app.domain.usecase.CanonicalConversationKeyUseCase
 import com.app.domain.usecase.ResolveReachabilityUseCase
+import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
 import com.yet.bitmessage.feature.chats.conversations.integration.stateToModel
 import com.arkivanov.mvikotlin.main.store.DefaultStoreFactory
 import kotlinx.coroutines.Dispatchers
@@ -228,6 +229,59 @@ class ConversationsStoreFactoryTest {
 
         store.accept(ConversationsStore.Intent.DismissBanner)
         assertNull(stateToModel(store.state).connectivityBanner)
+    }
+
+    @Test
+    fun bluetooth_off_raises_a_banner_with_off_reason() = runTest {
+        val connectivity = FakeConnectivityRepository(
+            MutableStateFlow(listOf(TransportStatus(TransportKind.BLUETOOTH, TransportState.OFF))),
+        )
+        val store = storeFactory(FakeConversationRepository(), connectivity = connectivity).create()
+
+        // The exact field scenario: BT permission granted, adapter OFF must still surface.
+        assertEquals(listOf(TransportKind.BLUETOOTH), store.state.transportsNeedingAttention)
+        val banner = stateToModel(store.state).connectivityBanner
+        assertNotNull(banner)
+        assertEquals(ConversationsComponent.ConnectivityBanner.Reason.BLUETOOTH_OFF, banner.reason)
+    }
+
+    @Test
+    fun off_does_not_surface_for_non_bluetooth_transports() = runTest {
+        val connectivity = FakeConnectivityRepository(
+            MutableStateFlow(
+                listOf(
+                    TransportStatus(TransportKind.WIFI_AWARE, TransportState.OFF),
+                    TransportStatus(TransportKind.TOR, TransportState.OFF),
+                    TransportStatus(TransportKind.INTERNET, TransportState.OFF),
+                ),
+            ),
+        )
+        val store = storeFactory(FakeConversationRepository(), connectivity = connectivity).create()
+
+        // Off Wi-Fi Aware / Tor / Internet are deliberate choices, never a nag.
+        assertTrue(store.state.transportsNeedingAttention.isEmpty())
+        assertNull(stateToModel(store.state).connectivityBanner)
+    }
+
+    @Test
+    fun mixed_off_bluetooth_and_permission_surfaces_both_with_permission_reason() = runTest {
+        val connectivity = FakeConnectivityRepository(
+            MutableStateFlow(
+                listOf(
+                    TransportStatus(TransportKind.BLUETOOTH, TransportState.OFF),
+                    TransportStatus(TransportKind.WIFI_AWARE, TransportState.PERMISSION_REQUIRED),
+                ),
+            ),
+        )
+        val store = storeFactory(FakeConversationRepository(), connectivity = connectivity).create()
+
+        assertEquals(
+            listOf(TransportKind.BLUETOOTH, TransportKind.WIFI_AWARE),
+            store.state.transportsNeedingAttention,
+        )
+        val banner = stateToModel(store.state).connectivityBanner
+        assertNotNull(banner)
+        assertEquals(ConversationsComponent.ConnectivityBanner.Reason.PERMISSION, banner.reason)
     }
 
     @Test

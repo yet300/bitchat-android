@@ -54,8 +54,10 @@ import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
 import com.yet.bitmessage.feature.chats.conversations.conversationTimeLabel
 import com.yet.bitmessage.shared.resources.Res
 import com.yet.bitmessage.shared.resources.connectivity_banner_action
+import com.yet.bitmessage.shared.resources.connectivity_banner_action_enable
 import com.yet.bitmessage.shared.resources.connectivity_banner_dismiss
 import com.yet.bitmessage.shared.resources.connectivity_banner_title
+import com.yet.bitmessage.shared.resources.connectivity_banner_title_bluetooth_off
 import com.yet.bitmessage.shared.resources.connectivity_bluetooth
 import com.yet.bitmessage.shared.resources.connectivity_internet
 import com.yet.bitmessage.shared.resources.connectivity_title
@@ -183,9 +185,10 @@ private fun OverflowMenu(
 }
 
 /**
- * Dismissible prompt shown atop the list when one or more transports need a runtime permission.
- * Tapping the body or "Review" opens the connectivity sheet (the actual re-enable flow lives there);
- * the close button hides it for the session.
+ * Dismissible prompt shown atop the list when one or more transports need attention — a missing
+ * runtime permission, or an off Bluetooth adapter. Tapping the body or the action opens the
+ * connectivity sheet (the actual re-enable flow lives there); the close button hides it for the
+ * session.
  */
 @Composable
 private fun ConnectivityBanner(
@@ -193,6 +196,17 @@ private fun ConnectivityBanner(
     onReview: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val bluetoothOff = banner.reason == ConversationsComponent.ConnectivityBanner.Reason.BLUETOOTH_OFF
+    val title = if (bluetoothOff) {
+        stringResource(Res.string.connectivity_banner_title_bluetooth_off)
+    } else {
+        stringResource(Res.string.connectivity_banner_title)
+    }
+    val action = if (bluetoothOff) {
+        stringResource(Res.string.connectivity_banner_action_enable)
+    } else {
+        stringResource(Res.string.connectivity_banner_action)
+    }
     // stringResource cannot run inside a lambda, so resolve every kind's label up front, then join.
     val labels = mapOf(
         TransportKind.BLUETOOTH to stringResource(Res.string.connectivity_bluetooth),
@@ -214,7 +228,7 @@ private fun ConnectivityBanner(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = stringResource(Res.string.connectivity_banner_title),
+                    text = title,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                 )
@@ -225,7 +239,7 @@ private fun ConnectivityBanner(
                 )
             }
             TextButton(onClick = onReview) {
-                Text(text = stringResource(Res.string.connectivity_banner_action))
+                Text(text = action)
             }
             IconCircleButton(
                 icon = Close,
