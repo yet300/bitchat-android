@@ -5,7 +5,6 @@ package com.yet.bitmessage.feature.chats.conversations.channels.store
 import com.app.domain.model.BitMessage
 import com.app.domain.model.Channel
 import com.app.domain.model.ConversationId
-import com.app.domain.model.DeliveryStatus
 import com.app.domain.model.RetentionPolicy
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.JoinResult
@@ -64,7 +63,6 @@ class ChannelsStoreFactoryTest {
         override fun observeMessages(id: ConversationId): Flow<List<BitMessage>> = flowOf(emptyList())
         override suspend fun snapshot(id: ConversationId): List<BitMessage> = emptyList()
         override suspend fun append(id: ConversationId, message: BitMessage) = Unit
-        override suspend fun updateDeliveryStatus(messageId: String, status: DeliveryStatus) = Unit
         override suspend fun remove(messageId: String) = Unit
         override suspend fun clear(id: ConversationId) = Unit
         override suspend fun clearAll() = Unit

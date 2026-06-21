@@ -26,6 +26,9 @@ interface GeohashRepository {
 
     suspend fun setBlocked(pubkeyHex: String, blocked: Boolean)
 
+    /** Whether a geohash participant (by Nostr pubkey hex) is blocked — checked on incoming DMs. */
+    suspend fun isUserBlocked(pubkeyHex: String): Boolean
+
     suspend fun isTeleported(pubkeyHex: String): Boolean
 
     /** Resolve a participant's Nostr pubkey (hex) by display nickname. */

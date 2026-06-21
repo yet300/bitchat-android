@@ -33,6 +33,7 @@ import com.app.transport.nostr.NostrIdentityBridge
 import com.app.transport.nostr.NostrRelayManager
 import com.app.transport.nostr.PoWPreferenceManager
 import com.app.transport.nostr.RelayDirectory
+import com.app.data.nostr.NostrDirectMessageIngest
 import com.app.data.nostr.NostrMessageSender
 import com.yet.bitmessage.android.connectivity.RuntimePermissionRequester
 import com.yet.bitmessage.android.service.MeshServicePreferences
@@ -78,6 +79,7 @@ interface AppGraph : SharedAppGraph {
     val nostrRelayManager: NostrRelayManager
     val nostrIdentityBridge: NostrIdentityBridge
     val nostrMessageSender: NostrMessageSender
+    val nostrDirectMessageIngest: NostrDirectMessageIngest
     val artiTorManager: ArtiTorManager
     val httpClientProvider: HttpClientProvider
     val locationNotesManager: LocationNotesManager

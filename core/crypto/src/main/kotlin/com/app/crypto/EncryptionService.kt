@@ -316,7 +316,13 @@ open class EncryptionService(
     fun removeChannelPassword(channel: String) {
         noiseService.removeChannelPassword(channel)
     }
-    
+
+    /** SHA-256 commitment of the derived channel key (null if no key). Lets a join verify the password. */
+    fun channelKeyCommitment(channel: String): String? = noiseService.channelKeyCommitment(channel)
+
+    /** Whether an encryption key is currently held for [channel]. */
+    fun hasChannelKey(channel: String): Boolean = noiseService.hasChannelKey(channel)
+
     // MARK: - Session Management
     
     /**

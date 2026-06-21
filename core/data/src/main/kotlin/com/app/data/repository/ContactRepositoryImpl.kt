@@ -79,7 +79,14 @@ internal class ContactRepositoryImpl(
     override suspend fun toggleFavorite(peer: PeerId) {
         val fp = fingerprintFor(peer) ?: return
         val current = loadSet(KEY_FAVORITES)
-        saveSet(KEY_FAVORITES, if (fp in current) current - fp else current + fp)
+        val nowFavorite = fp !in current
+        saveSet(KEY_FAVORITES, if (nowFavorite) current + fp else current - fp)
+        // Persist the relationship into the favorites store too: observeContacts, the Nostr-pubkey
+        // resolution and mutual-favorite offline reachability all read from there, not the bare
+        // settings set. Re-homes the persistence half of the deleted ChatViewModel.toggleFavorite.
+        peerAddressResolver.resolveNoiseIdentity(peer.raw)?.let { (noiseKey, nickname) ->
+            favorites.updateFavoriteStatus(noiseKey, nickname, nowFavorite)
+        }
     }
 
     override suspend fun isFavorite(peer: PeerId): Boolean {

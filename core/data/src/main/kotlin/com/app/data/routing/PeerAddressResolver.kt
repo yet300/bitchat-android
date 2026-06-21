@@ -101,6 +101,23 @@ class PeerAddressResolver(
         }
     }
 
+    /**
+     * Resolve a peer to its `(noiseKey, nickname)` for favorite persistence: a live mesh peer's
+     * stored info first, else a stable 64-hex Noise key with a best-effort nickname from the
+     * favorites store. Mirrors the case split in the deleted ChatViewModel.toggleFavorite.
+     */
+    fun resolveNoiseIdentity(peerID: String): Pair<ByteArray, String>? {
+        mesh.getPeerInfo(peerID)?.let { info ->
+            info.noisePublicKey?.let { return it to info.nickname.ifBlank { peerID } }
+        }
+        if (PeerId(peerID).kind == PeerId.Kind.NOISE_STABLE) {
+            val noiseKey = peerID.dataFromHexString() ?: return null
+            val nickname = favorites.getFavoriteStatus(noiseKey)?.peerNickname ?: peerID
+            return noiseKey to nickname
+        }
+        return null
+    }
+
     private fun connectedMeshPeerFor(noiseKey: ByteArray, connectedPeers: List<String>): String? =
         connectedPeers.firstOrNull { pid ->
             mesh.getPeerInfo(pid)?.noisePublicKey?.contentEquals(noiseKey) == true

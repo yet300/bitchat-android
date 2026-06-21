@@ -17,6 +17,7 @@ import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlin.time.Clock
 
 /**
  * Process-wide in-memory state store that survives Activity recreation.
@@ -224,6 +225,14 @@ class AppStateStore(
         if (idx < 0) return null
         if (statusPriority(status) < statusPriority(this[idx].deliveryStatus)) return null
         return toMutableList().apply { this[idx] = this[idx].copy(deliveryStatus = status) }
+    }
+
+    override fun onDeliveryAck(messageId: String, peerId: String) {
+        updateMessageStatus(messageId, DeliveryStatus.Delivered(to = peerId, at = Clock.System.now()))
+    }
+
+    override fun onReadReceipt(messageId: String, peerId: String) {
+        updateMessageStatus(messageId, DeliveryStatus.Read(by = peerId, at = Clock.System.now()))
     }
 
     override fun addChannelMessage(channel: String, msg: BitchatMessage) {

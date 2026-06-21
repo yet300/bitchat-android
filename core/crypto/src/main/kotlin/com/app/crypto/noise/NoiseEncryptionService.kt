@@ -324,7 +324,13 @@ internal class NoiseEncryptionService(
     fun removeChannelPassword(channel: String) {
         channelEncryption.removeChannelPassword(channel)
     }
-    
+
+    /** SHA-256 commitment of the derived channel key (null if no key) — used to verify passwords. */
+    fun channelKeyCommitment(channel: String): String? = channelEncryption.calculateKeyCommitment(channel)
+
+    /** Whether an encryption key is currently held for [channel]. */
+    fun hasChannelKey(channel: String): Boolean = channelEncryption.hasChannelKey(channel)
+
     // MARK: - Session Maintenance
     
     /**

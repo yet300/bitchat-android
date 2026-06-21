@@ -6,6 +6,7 @@ import com.app.domain.model.PeerId
 import com.app.domain.model.TransportKind
 import com.app.domain.repository.ConnectivityRepository
 import com.app.domain.repository.ContactRepository
+import com.app.domain.repository.MessageTransport
 import com.app.domain.repository.PeerRepository
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.value.Value
@@ -57,6 +58,7 @@ internal class DefaultConnectivityComponentFactory(
     private val connectivityRepository: ConnectivityRepository,
     private val peerRepository: PeerRepository,
     private val contactRepository: ContactRepository,
+    private val messageTransport: MessageTransport,
 ) : ConnectivityComponent.Factory {
     override fun create(componentContext: ComponentContext): ConnectivityComponent =
         DefaultConnectivityComponent(
@@ -66,6 +68,7 @@ internal class DefaultConnectivityComponentFactory(
                 connectivityRepository,
                 peerRepository,
                 contactRepository,
+                messageTransport,
             ),
         )
 }

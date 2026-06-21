@@ -24,11 +24,11 @@ import java.util.concurrent.ConcurrentLinkedQueue
 @SingleIn(AppScope::class)
 @Inject
 class NostrMessageSender(
-    private val context: Context,
     private val relayManager: NostrRelayManager,
     private val favoritesService: FavoritesPersistenceService,
     private val nostrIdentityBridge: NostrIdentityBridge,
     private val peerIdSource: MeshPeerIdSource,
+    private val currentGeohashSource: CurrentGeohashSource,
 ) {
     // Live read (panic-safe): replaces the mutable var the UI had to assign before sends
     val senderPeerID: String get() = peerIdSource.current()
@@ -48,14 +48,7 @@ class NostrMessageSender(
     private var isSendingReadAcks = false
     private val transportScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    /** Set by the app to expose the selected Location channel's geohash (inverts the former direct
-     *  dependency on LocationChannelManager so this stays in the data layer). */
-    var currentGeohashSource: CurrentGeohashSource? = null
 
-    // MARK: - Transport Interface Methods
-    
-    val myPeerID: String get() = senderPeerID
-    
     fun sendPrivateMessage(
         content: String,
         to: String,
@@ -433,7 +426,7 @@ class NostrMessageSender(
     ) {
         // Use provided geohash or derive from the currently selected location channel (via the app).
         val geohash = sourceGeohash ?: run {
-            val gh = try { currentGeohashSource?.currentGeohash() } catch (_: Exception) { null }
+            val gh = try { currentGeohashSource.currentGeohash() } catch (_: Exception) { null }
             if (gh == null) {
                 Log.w(TAG, "NostrMessageSender: cannot send geohash PM - not in a location channel and no geohash provided")
                 return
