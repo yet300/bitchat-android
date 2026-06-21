@@ -40,29 +40,17 @@ class MeshForegroundService : Service() {
 
         fun start(context: Context) {
             val intent = Intent(context, MeshForegroundService::class.java).apply { action = ACTION_START }
-
-            // On API >= 26, avoid background-service start restrictions by using startForegroundService
-            // only when we can actually post a notification (Android 13+ requires runtime notif permission)
             val bgEnabled = context.appGraph.meshServicePreferences.isBackgroundEnabled(true)
-            val hasNotifPerm = hasNotificationPermissionStatic(context)
-
+            if (!bgEnabled) {
+                Log.i("MeshForegroundService", "Background disabled; not starting service")
+                return
+            }
+            // FGS notifications are system-managed and exempt from POST_NOTIFICATIONS on API 33+,
+            // so the mesh must not be gated on notification permission — only on bgEnabled.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if (bgEnabled && hasNotifPerm) {
-                    context.startForegroundService(intent)
-                } else {
-                    // Do not attempt to start a background service from headless context without notif permission
-                    // or when background is disabled, to avoid BackgroundServiceStartNotAllowedException.
-                    Log.i(
-                        "MeshForegroundService",
-                        "Not starting service on API>=26 (bgEnabled=$bgEnabled, hasNotifPerm=$hasNotifPerm)"
-                    )
-                }
+                context.startForegroundService(intent)
             } else {
-                if (bgEnabled) {
-                    context.startService(intent)
-                } else {
-                    Log.i("MeshForegroundService", "Background disabled; not starting service (pre-O)")
-                }
+                context.startService(intent)
             }
         }
 
