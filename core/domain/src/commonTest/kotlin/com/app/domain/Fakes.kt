@@ -5,7 +5,6 @@ import com.app.domain.model.BitMessage
 import com.app.domain.model.Channel
 import com.app.domain.model.Contact
 import com.app.domain.model.ConversationId
-import com.app.domain.model.DeliveryStatus
 import com.app.domain.model.Fingerprint
 import com.app.domain.model.GeoPerson
 import com.app.domain.model.GeohashChannel
@@ -90,7 +89,6 @@ class FakeMessageRepository : MessageRepository {
         appended += id to message
     }
 
-    override suspend fun updateDeliveryStatus(messageId: String, status: DeliveryStatus) {}
     override suspend fun remove(messageId: String) {
         removed += messageId
         store.values.forEach { list -> list.removeAll { it.id == messageId } }
@@ -170,6 +168,7 @@ class FakeGeohashRepository(
     override suspend fun setBlocked(pubkeyHex: String, blocked: Boolean) {
         if (blocked) this.blocked.add(pubkeyHex) else this.blocked.remove(pubkeyHex)
     }
+    override suspend fun isUserBlocked(pubkeyHex: String): Boolean = pubkeyHex in blocked
     override suspend fun isTeleported(pubkeyHex: String): Boolean = false
     override suspend fun pubkeyForNickname(nickname: String): String? = nicknameToPubkey[nickname]
     override suspend fun pubkeyForShortId(shortId: String): String? = shortIdToPubkey[shortId]

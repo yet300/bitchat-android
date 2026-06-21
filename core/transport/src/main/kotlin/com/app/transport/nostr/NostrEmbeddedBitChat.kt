@@ -3,6 +3,7 @@ package com.app.transport.nostr
 import android.util.Base64
 import com.app.common.utils.Log
 import com.app.transport.MeshConstants
+import com.app.transport.model.NoisePayload
 import com.app.transport.model.PrivateMessagePacket
 import com.app.transport.model.NoisePayloadType
 import com.app.transport.protocol.BitchatPacket
@@ -13,8 +14,71 @@ import com.app.transport.protocol.MessageType
  * Direct port from iOS implementation for 100% compatibility
  */
 object NostrEmbeddedBitChat {
-    
+
     private const val TAG = "NostrEmbeddedBitChat"
+
+    /**
+     * A decoded `bitchat1:` embedded packet recovered from an incoming Nostr rumor — the inverse of
+     * [encodePMForNostr]/[encodeAckForNostr]. [messageID]/[content] are populated for
+     * PRIVATE_MESSAGE; [messageID] alone for DELIVERED/READ_RECEIPT acks.
+     */
+    data class Embedded(
+        val senderPeerID: String,
+        val type: NoisePayloadType,
+        val payload: NoisePayload,
+        val messageID: String?,
+        val content: String?,
+    )
+
+    /**
+     * Decode a `bitchat1:` base64url string back into its embedded BitChat packet. Inverse of the
+     * `encode*` builders: unwrap base64url -> [BitchatPacket] -> [NoisePayload], then recover the
+     * private-message / ack fields. Returns null for anything that is not a NOISE_ENCRYPTED packet.
+     */
+    fun decode(bitchat1: String): Embedded? {
+        try {
+            if (!bitchat1.startsWith("bitchat1:")) return null
+            val packetData = base64URLDecode(bitchat1.removePrefix("bitchat1:")) ?: return null
+            val packet = BitchatPacket.fromBinaryData(packetData) ?: return null
+            if (packet.type != MessageType.NOISE_ENCRYPTED.value) return null
+            val payload = NoisePayload.decode(packet.payload) ?: return null
+            val senderPeerID = packet.senderID.joinToString("") { "%02x".format(it) }
+            val messageID: String?
+            val content: String?
+            when (payload.type) {
+                NoisePayloadType.PRIVATE_MESSAGE -> {
+                    val pm = PrivateMessagePacket.decode(payload.data)
+                    messageID = pm?.messageID
+                    content = pm?.content
+                }
+                NoisePayloadType.DELIVERED, NoisePayloadType.READ_RECEIPT -> {
+                    messageID = String(payload.data, Charsets.UTF_8)
+                    content = null
+                }
+                else -> {
+                    messageID = null
+                    content = null
+                }
+            }
+            return Embedded(senderPeerID, payload.type, payload, messageID, content)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to decode embedded BitChat packet: ${e.message}")
+            return null
+        }
+    }
+
+    private fun base64URLDecode(input: String): ByteArray? {
+        return try {
+            val padded = input.replace("-", "+").replace("_", "/").let { str ->
+                val padding = (4 - str.length % 4) % 4
+                str + "=".repeat(padding)
+            }
+            Base64.decode(padded, Base64.DEFAULT)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to decode base64url: ${e.message}")
+            null
+        }
+    }
     
     /**
      * Build a `bitchat1:` base64url-encoded BitChat packet carrying a private message for Nostr DMs.

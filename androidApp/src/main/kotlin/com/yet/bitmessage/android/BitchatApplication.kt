@@ -46,5 +46,11 @@ class BitchatApplication : Application(), MetroApplication {
             appGraph.nostrIdentityBridge.getCurrentNostrIdentity()
         } catch (_: Exception) { }
 
+        // Start the incoming Nostr DM ingest (account + per-geohash gift wraps). It also connects the
+        // default relays at startup so favorite DMs and receipts flow even with Tor off / no geo open.
+        try {
+            appGraph.nostrDirectMessageIngest.start()
+        } catch (_: Exception) { }
+
     }
 }

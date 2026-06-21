@@ -19,6 +19,9 @@ import com.app.data.repository.SearchRepositoryImpl
 import com.app.data.repository.SettingsRepositoryImpl
 import com.app.data.repository.SettingsStoreImpl
 import com.app.data.repository.ThemeRepositoryImpl
+import com.app.data.channel.ChannelCipher
+import com.app.data.channel.EncryptionServiceChannelCipher
+import com.app.data.nostr.CurrentGeohashSource
 import com.app.data.routing.MeshRouteStrategy
 import com.app.data.routing.NostrRouteStrategy
 import com.app.data.routing.RoutingCore
@@ -89,6 +92,9 @@ abstract class DataBindings {
     internal abstract val ChannelRepositoryImpl.bindChannel: ChannelRepository
 
     @Binds
+    internal abstract val EncryptionServiceChannelCipher.bindChannelCipher: ChannelCipher
+
+    @Binds
     internal abstract val MessageRepositoryImpl.bindMessages: MessageRepository
 
     @Binds
@@ -96,6 +102,10 @@ abstract class DataBindings {
 
     @Binds
     internal abstract val GeohashRepositoryImpl.bindGeohash: GeohashRepository
+
+    // Same singleton also answers "what geohash am I in?" for outgoing geohash DMs (NostrMessageSender).
+    @Binds
+    internal abstract val GeohashRepositoryImpl.bindCurrentGeohashSource: CurrentGeohashSource
 
     @Binds
     internal abstract val GeohashBookmarksRepositoryImpl.bindGeohashBookmarks: GeohashBookmarksRepository

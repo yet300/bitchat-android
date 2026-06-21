@@ -108,6 +108,8 @@ internal class GeohashRepositoryImpl(
         refreshDerived()
     }
 
+    override suspend fun isUserBlocked(pubkeyHex: String): Boolean = isBlocked(pubkeyHex)
+
     override suspend fun isTeleported(pubkeyHex: String): Boolean =
         synchronized(lock) { teleported.contains(pubkeyHex.lowercase()) }
 

@@ -3,10 +3,8 @@ package com.app.data.repository
 import com.app.data.AppStateStore
 import com.app.data.mapper.toDomain
 import com.app.data.mapper.toWire
-import com.app.data.mapper.toWireStatus
 import com.app.domain.model.BitMessage
 import com.app.domain.model.ConversationId
-import com.app.domain.model.DeliveryStatus
 import com.app.domain.repository.MessageRepository
 import com.app.transport.model.BitchatMessage
 import com.app.transport.routing.MeshPeerIdSource
@@ -57,10 +55,6 @@ internal class MessageRepositoryImpl(
             is ConversationId.Channel -> appStateStore.addChannelMessage(id.tag, wire)
             is ConversationId.Geohash -> appStateStore.addChannelMessage(id.geoTag(), wire)
         }
-    }
-
-    override suspend fun updateDeliveryStatus(messageId: String, status: DeliveryStatus) {
-        appStateStore.updateMessageStatus(messageId, status.toWireStatus())
     }
 
     override suspend fun remove(messageId: String) {

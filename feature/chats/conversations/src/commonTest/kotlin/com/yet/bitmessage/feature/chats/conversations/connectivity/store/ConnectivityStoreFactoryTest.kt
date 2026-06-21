@@ -8,8 +8,12 @@ import com.app.domain.model.PeerIdentity
 import com.app.domain.model.TransportKind
 import com.app.domain.model.TransportState
 import com.app.domain.model.TransportStatus
+import com.app.domain.model.Attachment
+import com.app.domain.model.ConversationId
+import com.app.domain.model.GeohashChannel
 import com.app.domain.repository.ConnectivityRepository
 import com.app.domain.repository.ContactRepository
+import com.app.domain.repository.MessageTransport
 import com.app.domain.repository.PeerRepository
 import com.arkivanov.mvikotlin.main.store.DefaultStoreFactory
 import kotlinx.coroutines.Dispatchers
@@ -68,11 +72,24 @@ class ConnectivityStoreFactoryTest {
         override suspend fun clearAll() = Unit
     }
 
+    private class FakeMessageTransport : MessageTransport {
+        val favoriteNotifications = mutableListOf<Pair<PeerId, Boolean>>()
+        override suspend fun sendPublic(content: String, mentions: List<String>, channel: String?) = Unit
+        override suspend fun sendPrivate(content: String, to: PeerId, recipientNickname: String?, messageId: String) = Unit
+        override suspend fun sendGeohash(content: String, channel: GeohashChannel, nickname: String?) = Unit
+        override suspend fun sendAttachment(attachment: Attachment, target: ConversationId, messageId: String) = Unit
+        override suspend fun cancelTransfer(messageId: String): Boolean = false
+        override suspend fun sendReadReceipt(messageId: String, to: PeerId) = Unit
+        override suspend fun sendFavoriteNotification(to: PeerId, isFavorite: Boolean) { favoriteNotifications += to to isFavorite }
+        override suspend fun announceSelf() = Unit
+    }
+
     private fun factory(
         connectivity: FakeConnectivityRepository = FakeConnectivityRepository(emptyList()),
         peers: List<Peer> = emptyList(),
         contacts: FakeContactRepository = FakeContactRepository(emptySet()),
-    ) = ConnectivityStoreFactory(DefaultStoreFactory(), connectivity, FakePeerRepository(peers), contacts)
+        transport: FakeMessageTransport = FakeMessageTransport(),
+    ) = ConnectivityStoreFactory(DefaultStoreFactory(), connectivity, FakePeerRepository(peers), contacts, transport)
 
     @Test
     fun loads_statuses_and_routes_enable_to_repository() = runTest {
@@ -95,12 +112,16 @@ class ConnectivityStoreFactoryTest {
     fun loads_peers_and_favorites_and_routes_toggle_favorite() = runTest {
         val peer = Peer(id = PeerId("1111111111111111"), nickname = "ann", isConnected = true, isDirect = true)
         val contacts = FakeContactRepository(setOf(Fingerprint("fp1")))
-        val store = factory(peers = listOf(peer), contacts = contacts).create()
+        val transport = FakeMessageTransport()
+        val store = factory(peers = listOf(peer), contacts = contacts, transport = transport).create()
 
         assertEquals(listOf("ann"), store.state.peers.map { it.nickname })
         assertTrue(Fingerprint("fp1") in store.state.favorites)
 
         store.accept(ConnectivityStore.Intent.ToggleFavorite(peer.id))
+        // The toggle flips the relationship AND notifies the peer (ToggleFavoriteUseCase), not a
+        // bare ContactRepository.toggleFavorite that would skip the notification.
         assertEquals(listOf(peer.id), contacts.favoriteToggles)
+        assertEquals(listOf(peer.id to false), transport.favoriteNotifications)
     }
 }

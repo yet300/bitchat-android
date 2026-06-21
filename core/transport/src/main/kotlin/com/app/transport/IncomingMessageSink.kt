@@ -14,4 +14,10 @@ interface IncomingMessageSink {
     fun addPublicMessage(message: BitchatMessage)
     fun addPrivateMessage(peerId: String, message: BitchatMessage)
     fun addChannelMessage(channel: String, message: BitchatMessage)
+
+    /** Advance the delivery ladder of [messageId] to Delivered (sent by [peerId]). */
+    fun onDeliveryAck(messageId: String, peerId: String)
+
+    /** Advance the delivery ladder of [messageId] to Read (read by [peerId]). */
+    fun onReadReceipt(messageId: String, peerId: String)
 }

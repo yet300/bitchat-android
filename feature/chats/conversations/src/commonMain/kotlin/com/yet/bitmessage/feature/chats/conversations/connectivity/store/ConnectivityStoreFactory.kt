@@ -2,7 +2,9 @@ package com.yet.bitmessage.feature.chats.conversations.connectivity.store
 
 import com.app.domain.repository.ConnectivityRepository
 import com.app.domain.repository.ContactRepository
+import com.app.domain.repository.MessageTransport
 import com.app.domain.repository.PeerRepository
+import com.app.domain.usecase.ToggleFavoriteUseCase
 import com.arkivanov.mvikotlin.core.store.Reducer
 import com.arkivanov.mvikotlin.core.store.SimpleBootstrapper
 import com.arkivanov.mvikotlin.core.store.Store
@@ -15,7 +17,12 @@ internal class ConnectivityStoreFactory(
     private val connectivityRepository: ConnectivityRepository,
     private val peerRepository: PeerRepository,
     private val contactRepository: ContactRepository,
+    private val messageTransport: MessageTransport,
 ) {
+    // Real favorite toggle: flips the relationship AND notifies the peer over mesh/Nostr (the bare
+    // ContactRepository.toggleFavorite only flips local state — the notification is the use-case's job).
+    private val toggleFavorite = ToggleFavoriteUseCase(contactRepository, messageTransport)
+
     fun create(): ConnectivityStore =
         object : ConnectivityStore,
             Store<ConnectivityStore.Intent, ConnectivityStore.State, ConnectivityStore.Label> by storeFactory.create(
@@ -59,7 +66,7 @@ internal class ConnectivityStoreFactory(
                 is ConnectivityStore.Intent.Enable ->
                     scope.launch { connectivityRepository.enable(intent.kind) }
                 is ConnectivityStore.Intent.ToggleFavorite ->
-                    scope.launch { contactRepository.toggleFavorite(intent.peerId) }
+                    scope.launch { toggleFavorite(intent.peerId) }
             }
         }
     }

@@ -2,7 +2,6 @@ package com.app.domain.repository
 
 import com.app.domain.model.BitMessage
 import com.app.domain.model.ConversationId
-import com.app.domain.model.DeliveryStatus
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -19,12 +18,6 @@ interface MessageRepository {
 
     /** Append a message (local echo or incoming). */
     suspend fun append(id: ConversationId, message: BitMessage)
-
-    /**
-     * Update delivery status by message id. Contract: status is never downgraded
-     * (see [DeliveryStatusPolicy][com.app.domain.model.DeliveryStatusPolicy]).
-     */
-    suspend fun updateDeliveryStatus(messageId: String, status: DeliveryStatus)
 
     /** Remove a message from everywhere. */
     suspend fun remove(messageId: String)

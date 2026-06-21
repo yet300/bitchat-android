@@ -5,7 +5,6 @@ package com.yet.bitmessage.feature.chats.conversations.settings.store
 import com.app.domain.model.BitMessage
 import com.app.domain.model.Contact
 import com.app.domain.model.ConversationId
-import com.app.domain.model.DeliveryStatus
 import com.app.domain.model.Fingerprint
 import com.app.domain.model.MyIdentity
 import com.app.domain.model.PeerId
@@ -76,7 +75,6 @@ class SettingsStoreFactoryTest {
         override fun observeMessages(id: ConversationId): Flow<List<BitMessage>> = flowOf(emptyList())
         override suspend fun snapshot(id: ConversationId): List<BitMessage> = emptyList()
         override suspend fun append(id: ConversationId, message: BitMessage) = Unit
-        override suspend fun updateDeliveryStatus(messageId: String, status: DeliveryStatus) = Unit
         override suspend fun remove(messageId: String) = Unit
         override suspend fun clear(id: ConversationId) = Unit
         override suspend fun clearAll() { cleared = true }

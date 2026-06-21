@@ -8,9 +8,10 @@ import kotlinx.coroutines.launch
 /**
  * Stable public facade over [RoutingCore] (implemented by [RouteSelector]).
  *
- * Keeps the existing call-site API ([sendPrivate], [sendReadReceipt], [sendDeliveryAck],
- * [sendFavoriteNotification], [onSessionEstablished], [onPeersUpdated]) so god-class
- * callers (ChatViewModel) need no changes until Phase C dissolves them.
+ * Exposes the send API actually used by the data layer ([sendPrivate], [sendReadReceipt],
+ * [sendFavoriteNotification]). Reachability-driven outbox flushing is owned by [RouteSelector]
+ * itself (via `Outbox.onFlushNeeded`), so the former lifecycle/flush passthroughs were dropped as
+ * dead code rather than left as never-called orphans.
  *
  * All routing logic has moved to [RouteSelector] + [MeshRouteStrategy]/[NostrRouteStrategy].
  * The former if/else branching (duplicated 4×) is gone — the Shotgun Surgery smell is fixed.
@@ -20,10 +21,6 @@ class MessageRouter internal constructor(
     private val scope: CoroutineScope,
 ) {
 
-    // -------------------------------------------------------------------------
-    // Send API — each method is now a single-line delegation to RouteSelector
-    // -------------------------------------------------------------------------
-
     fun sendPrivate(content: String, toPeerID: String, recipientNickname: String, messageID: String) {
         scope.launch { routingCore.route(OutgoingEnvelope.Private(toPeerID, content, recipientNickname, messageID)) }
     }
@@ -32,28 +29,7 @@ class MessageRouter internal constructor(
         scope.launch { routingCore.route(OutgoingEnvelope.Receipt(toPeerID, receipt.originalMessageID)) }
     }
 
-    fun sendDeliveryAck(messageID: String, toPeerID: String) {
-        scope.launch { routingCore.route(OutgoingEnvelope.Ack(toPeerID, messageID)) }
-    }
-
     fun sendFavoriteNotification(toPeerID: String, isFavorite: Boolean) {
         scope.launch { routingCore.route(OutgoingEnvelope.Favorite(toPeerID, isFavorite)) }
-    }
-
-    // -------------------------------------------------------------------------
-    // Lifecycle / flush callbacks — delegate to RouteSelector
-    // -------------------------------------------------------------------------
-
-    fun flushOutboxFor(peerID: String) {
-        scope.launch { routingCore.flushOutboxFor(peerID) }
-    }
-
-
-    fun onPeersUpdated(peers: List<String>) {
-        scope.launch { routingCore.onPeersUpdated(peers) }
-    }
-
-    fun onSessionEstablished(peerID: String) {
-        scope.launch { routingCore.onSessionEstablished(peerID) }
     }
 }

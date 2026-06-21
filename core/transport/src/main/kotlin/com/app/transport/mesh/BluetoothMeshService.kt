@@ -573,10 +573,15 @@ class BluetoothMeshService(
             }
             
             override fun onDeliveryAckReceived(messageID: String, peerID: String) {
+                // Advance the persistent status ladder. The top-level delegate is unset under the
+                // Decompose UI, so the sink (the process-wide store the UI hydrates from) is the
+                // live target — mirrors the deleted MeshDelegateHandler.didReceiveDeliveryAck.
+                try { incomingSink.onDeliveryAck(messageID, peerID) } catch (_: Exception) { }
                 delegate?.didReceiveDeliveryAck(messageID, peerID)
             }
-            
+
             override fun onReadReceiptReceived(messageID: String, peerID: String) {
+                try { incomingSink.onReadReceipt(messageID, peerID) } catch (_: Exception) { }
                 delegate?.didReceiveReadReceipt(messageID, peerID)
             }
 

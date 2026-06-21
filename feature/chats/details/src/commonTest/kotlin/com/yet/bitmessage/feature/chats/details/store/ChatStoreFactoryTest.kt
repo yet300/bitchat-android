@@ -7,7 +7,6 @@ import com.app.domain.model.AttachmentKind
 import com.app.domain.model.BitMessage
 import com.app.domain.model.Conversation
 import com.app.domain.model.ConversationId
-import com.app.domain.model.DeliveryStatus
 import com.app.domain.model.Fingerprint
 import com.app.domain.model.GeohashChannel
 import com.app.domain.model.GeohashLevel
@@ -76,7 +75,6 @@ class ChatStoreFactoryTest {
             appended += message
             flow.value = flow.value + message
         }
-        override suspend fun updateDeliveryStatus(messageId: String, status: DeliveryStatus) = Unit
         val removed = mutableListOf<String>()
         override suspend fun remove(messageId: String) { removed += messageId }
         override suspend fun clear(id: ConversationId) = Unit
@@ -187,6 +185,7 @@ class ChatStoreFactoryTest {
         override suspend fun startDirectMessage(pubkeyHex: String): ConversationId =
             ConversationId.Private(PeerId("nostr_$pubkeyHex"))
         override suspend fun setBlocked(pubkeyHex: String, blocked: Boolean) = Unit
+        override suspend fun isUserBlocked(pubkeyHex: String): Boolean = false
         override suspend fun isTeleported(pubkeyHex: String): Boolean = false
         override suspend fun pubkeyForNickname(nickname: String): String? = null
         override suspend fun pubkeyForShortId(shortId: String): String? = null
