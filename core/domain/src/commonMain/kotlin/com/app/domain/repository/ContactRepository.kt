@@ -30,7 +30,9 @@ interface ContactRepository {
 
     suspend fun setBlocked(peer: PeerId, blocked: Boolean)
 
-    suspend fun isBlocked(peer: PeerId): Boolean
+    /** Synchronous: block state is a local settings/fingerprint read, so the mesh sink can consult it
+     *  on the (non-suspend) incoming-message hot path to drop messages from blocked peers. */
+    fun isBlocked(peer: PeerId): Boolean
 
     /** Contact by stable identity (for routing/mutuality). */
     suspend fun contact(identity: PeerIdentity): Contact?

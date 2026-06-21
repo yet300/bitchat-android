@@ -4,6 +4,7 @@ package com.app.data.repository
 
 import com.app.crypto.EncryptionService
 import com.app.data.AppStateStore
+import com.app.data.FakeContactRepository
 import com.app.domain.model.ConversationId
 import com.app.domain.model.GeohashLevel
 import com.app.transport.SeenMessageStore
@@ -39,7 +40,7 @@ class ConversationRepositoryGeohashTest {
         whenever(encryptionService.getIdentityFingerprint()).thenReturn(MY_PEER_ID + "cccc")
         seenMessageStore = mock()
         whenever(seenMessageStore.hasRead(any())).thenReturn(false)
-        appStateStore = AppStateStore(encryptionService, seenMessageStore)
+        appStateStore = AppStateStore(encryptionService, seenMessageStore) { FakeContactRepository() }
 
         val mesh = mock<BluetoothMeshService>()
         whenever(mesh.myPeerID).thenReturn(MY_PEER_ID)

@@ -4,13 +4,13 @@ package com.app.data.repository
 
 import com.app.crypto.EncryptionService
 import com.app.data.AppStateStore
+import com.app.data.FakeContactRepository
 import com.app.domain.model.ConversationId
 import com.app.transport.SeenMessageStore
 import com.app.transport.model.BitchatMessage
 import com.app.transport.routing.MeshPeerIdSource
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -37,7 +37,7 @@ class MessageRepositoryImplTest {
         whenever(encryption.getIdentityFingerprint()).thenReturn("ffffffffffffffff")
         val seen = mock<SeenMessageStore>()
         whenever(seen.hasRead(any())).thenReturn(false)
-        appStateStore = AppStateStore(encryption, seen)
+        appStateStore = AppStateStore(encryption, seen) { FakeContactRepository() }
         repository = MessageRepositoryImpl(appStateStore, MeshPeerIdSource { peerId })
     }
 

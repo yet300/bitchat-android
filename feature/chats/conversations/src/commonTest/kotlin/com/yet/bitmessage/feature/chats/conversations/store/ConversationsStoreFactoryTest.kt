@@ -74,7 +74,7 @@ class ConversationsStoreFactoryTest {
         override suspend fun toggleFavorite(peer: PeerId) = Unit
         override suspend fun isFavorite(peer: PeerId): Boolean = false
         override suspend fun setBlocked(peer: PeerId, blocked: Boolean) = Unit
-        override suspend fun isBlocked(peer: PeerId): Boolean = false
+        override fun isBlocked(peer: PeerId): Boolean = false
         override suspend fun contact(identity: PeerIdentity): Contact? = null
         override suspend fun noiseKeyHexForNostrAlias(alias: PeerId): String? = null
         override suspend fun clearAll() = Unit

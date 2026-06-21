@@ -93,7 +93,7 @@ internal class ContactRepositoryImpl(
         saveSet(KEY_BLOCKED, if (blocked) current + fp else current - fp)
     }
 
-    override suspend fun isBlocked(peer: PeerId): Boolean {
+    override fun isBlocked(peer: PeerId): Boolean {
         val fp = fingerprintFor(peer) ?: return false
         return fp in loadSet(KEY_BLOCKED)
     }

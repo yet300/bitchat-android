@@ -24,7 +24,7 @@ class AppStateStoreStatusTest {
         whenever(encryption.getIdentityFingerprint()).thenReturn("ffffffffffffffff")
         val seen = mock<SeenMessageStore>()
         whenever(seen.hasRead(any())).thenReturn(false)
-        store = AppStateStore(encryption, seen)
+        store = AppStateStore(encryption, seen) { FakeContactRepository() }
     }
 
     private fun message(id: String) = BitchatMessage(
