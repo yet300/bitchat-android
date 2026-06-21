@@ -28,12 +28,17 @@ import com.app.transport.notification.ServiceNotifier
 import com.app.domain.repository.CameraPermissionRepository
 import com.app.domain.repository.ConnectivityRepository
 import com.app.domain.repository.IdentityRepository
+import com.app.domain.repository.MediaCleaner
+import com.app.domain.repository.MeshResetPort
 import com.app.domain.repository.NotificationPermissionRepository
 import com.app.domain.repository.PeerVerificationRepository
 import com.app.domain.repository.PlaceGeocoder
 import com.app.domain.repository.PowRepository
 import com.app.domain.repository.TorRepository
 import com.app.domain.repository.VerificationRepository
+import com.app.transport.features.file.FileUtils
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.yet.bitmessage.android.geohash.AndroidPlaceGeocoder
 import com.yet.bitmessage.android.connectivity.AndroidConnectivityRepository
 import com.yet.bitmessage.android.connectivity.RuntimePermissionRequester
@@ -160,6 +165,22 @@ object AndroidDataBindings {
     /** Narrow lifecycle contract for the foreground service (ISP); same underlying BMS. */
     @Provides
     fun provideMeshLifecycleController(mesh: BluetoothMeshService): MeshLifecycleController = mesh
+
+    /** Domain port for panic-wipe mesh identity rotation — delegates to BMS.reset(). */
+    @Provides
+    fun provideMeshResetPort(mesh: BluetoothMeshService): MeshResetPort =
+        object : MeshResetPort {
+            override suspend fun reset() = withContext(Dispatchers.IO) { mesh.reset() }
+        }
+
+    /** Domain port for panic-wipe media deletion — delegates to FileUtils.clearAllMedia(). */
+    @Provides
+    fun provideMediaCleaner(context: Context): MediaCleaner =
+        object : MediaCleaner {
+            override suspend fun wipeMedia() = withContext(Dispatchers.IO) {
+                FileUtils.clearAllMedia(context.applicationContext)
+            }
+        }
 
     /** Graph-owned holder the Activity attaches its ActivityResult permission launcher into. */
     @Provides

@@ -256,7 +256,7 @@ class BluetoothMeshService(
      * identity of this BMS object — and of [bleBearer] inside Set<MeshBearer> — never
      * changes, so no consumer is left holding a dead instance.
      */
-    fun reset() {
+    override fun reset() {
         synchronized(lifecycleLock) {
             Log.w(TAG, "🚨 Resetting mesh service in place — old peerID=$myPeerID")
             isActive = false

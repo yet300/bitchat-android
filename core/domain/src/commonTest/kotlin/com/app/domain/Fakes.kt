@@ -15,8 +15,10 @@ import com.app.domain.model.PeerIdentity
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.GeohashRepository
 import com.app.domain.repository.IdentityRepository
+import com.app.domain.repository.MediaCleaner
 import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.MessageTransport
+import com.app.domain.repository.MeshResetPort
 import com.app.domain.repository.PeerRepository
 import com.app.domain.repository.SearchRepository
 import kotlinx.coroutines.flow.Flow
@@ -172,6 +174,16 @@ class FakeGeohashRepository(
     override suspend fun isTeleported(pubkeyHex: String): Boolean = false
     override suspend fun pubkeyForNickname(nickname: String): String? = nicknameToPubkey[nickname]
     override suspend fun pubkeyForShortId(shortId: String): String? = shortIdToPubkey[shortId]
+}
+
+class FakeMeshResetPort : MeshResetPort {
+    var resetCount = 0
+    override suspend fun reset() { resetCount++ }
+}
+
+class FakeMediaCleaner : MediaCleaner {
+    var wiped = false
+    override suspend fun wipeMedia() { wiped = true }
 }
 
 /** Configurable search results. */
