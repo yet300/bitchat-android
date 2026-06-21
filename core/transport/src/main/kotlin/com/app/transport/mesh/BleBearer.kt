@@ -59,6 +59,10 @@ class BleBearer internal constructor(
     @Volatile
     private var nicknameResolver: ((String) -> String?)? = null
 
+    // Survives reset(): the new BLE stack's PowerManager must inherit the current state.
+    @Volatile
+    private var meshServiceActive: Boolean = false
+
     // -----------------------------------------------------------------
     // Underlying BLE stack
     // -----------------------------------------------------------------
@@ -207,6 +211,7 @@ class BleBearer internal constructor(
         connectionManager = connectionManagerFactory(myPeerID)
         wireConnectionManager()
         nicknameResolver?.let { connectionManager.setNicknameResolver(it) }
+        connectionManager.setMeshServiceActive(meshServiceActive)
     }
 
     // -----------------------------------------------------------------
@@ -229,6 +234,15 @@ class BleBearer internal constructor(
     fun setNicknameResolver(resolver: (String) -> String?) {
         nicknameResolver = resolver
         connectionManager.setNicknameResolver(resolver)
+    }
+
+    /**
+     * Signals that the mesh foreground service is active so the BLE power manager treats the
+     * process as foreground (keeps discovery on the BALANCED duty cycle when the screen is off).
+     */
+    fun setMeshServiceActive(active: Boolean) {
+        meshServiceActive = active
+        connectionManager.setMeshServiceActive(active)
     }
 
     // -----------------------------------------------------------------

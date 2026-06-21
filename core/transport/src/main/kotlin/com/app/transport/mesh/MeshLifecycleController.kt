@@ -12,4 +12,12 @@ interface MeshLifecycleController {
     fun reset()
     val isMeshActive: Boolean
     fun activePeerCount(): Int
+
+    /**
+     * Mark the mesh foreground service active/inactive. While active, BLE power management
+     * treats the process as foreground even though ProcessLifecycleOwner reports background
+     * (an FGS does not count as foreground), keeping peer discovery responsive with the
+     * screen off. The service sets it true after promoting to foreground, false on teardown.
+     */
+    fun setMeshServiceActive(active: Boolean)
 }
