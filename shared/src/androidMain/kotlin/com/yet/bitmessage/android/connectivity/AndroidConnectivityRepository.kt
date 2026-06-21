@@ -83,8 +83,7 @@ class AndroidConnectivityRepository(
         val status = WifiAwareSupport.evaluate(context)
         return when {
             !status.supported -> TransportState.UNAVAILABLE
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNearbyWifiPermission() ->
-                TransportState.PERMISSION_REQUIRED
+            !hasWifiAwarePermission() -> TransportState.PERMISSION_REQUIRED
             status.available -> TransportState.ON
             else -> TransportState.OFF
         }
@@ -112,8 +111,13 @@ class AndroidConnectivityRepository(
                 else startSystemIntent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
 
             TransportKind.WIFI_AWARE ->
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNearbyWifiPermission()) {
-                    requestOrSettings(listOf(Manifest.permission.NEARBY_WIFI_DEVICES))
+                if (!hasWifiAwarePermission()) {
+                    val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        Manifest.permission.NEARBY_WIFI_DEVICES
+                    } else {
+                        Manifest.permission.ACCESS_FINE_LOCATION
+                    }
+                    requestOrSettings(listOf(permission))
                 } else {
                     startSystemIntent(Settings.ACTION_WIFI_SETTINGS)
                 }
@@ -153,9 +157,12 @@ class AndroidConnectivityRepository(
                 isGranted(Manifest.permission.ACCESS_COARSE_LOCATION)
         }
 
-    private fun hasNearbyWifiPermission(): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+    private fun hasWifiAwarePermission(): Boolean =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             isGranted(Manifest.permission.NEARBY_WIFI_DEVICES)
+        } else {
+            isGranted(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
 
     private fun isGranted(permission: String): Boolean =
         ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED

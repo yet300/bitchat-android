@@ -24,11 +24,11 @@ object WifiAwareSupport {
     fun evaluate(context: Context): Status {
         val appContext = context.applicationContext
 
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             return Status(
                 supported = false,
                 available = false,
-                reason = "requires Android 10+"
+                reason = "requires Android 8+"
             )
         }
 
