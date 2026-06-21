@@ -144,6 +144,7 @@
     <string name="chat_input_hint">Message</string>
     <string name="chat_send">Send</string>
     <string name="chat_attach">Attach file</string>
+    <string name="chat_record">Record voice message</string>
     <string name="media_image">Image</string>
     <string name="media_audio">Voice message</string>
     <string name="media_file">File</string>

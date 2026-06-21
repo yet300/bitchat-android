@@ -55,6 +55,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.CompositionLocalProvider
 import com.arkivanov.decompose.router.slot.ChildSlot
 import coil3.compose.AsyncImage
+import com.app.domain.model.Attachment
+import com.app.domain.model.AttachmentKind
 import com.app.domain.model.BitMessage
 import com.app.domain.model.ConversationId
 import com.yet.bitmessage.ui.audio.LocalAudioPlayer
@@ -105,8 +107,10 @@ import com.yet.bitmessage.shared.resources.verify_peer_not_found
 import com.yet.bitmessage.shared.resources.verify_scan_prompt
 import com.yet.bitmessage.shared.resources.verify_scan_title
 import com.yet.bitmessage.shared.resources.verify_started
+import com.yet.bitmessage.ui.component.AudioRecorderController
 import com.yet.bitmessage.ui.component.CameraScanner
 import com.yet.bitmessage.ui.component.rememberAttachmentPicker
+import com.yet.bitmessage.ui.component.rememberAudioRecorderController
 import com.yet.bitmessage.ui.component.button.IconCircleButton
 import com.yet.bitmessage.ui.component.icon.AccountCircle
 import com.yet.bitmessage.ui.component.icon.Add
@@ -117,8 +121,10 @@ import com.yet.bitmessage.ui.component.icon.Done
 import com.yet.bitmessage.ui.component.icon.LocationOn
 import com.yet.bitmessage.ui.component.icon.DoneAll
 import com.yet.bitmessage.ui.component.icon.Lock
+import com.yet.bitmessage.ui.component.icon.Mic
 import com.yet.bitmessage.ui.component.icon.QrCodeScanner
 import com.yet.bitmessage.ui.component.icon.Send
+import com.yet.bitmessage.shared.resources.chat_record
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -126,11 +132,12 @@ fun ChatContent(component: ChatComponent, modifier: Modifier = Modifier) {
     val model by component.model.subscribeAsState()
     val sheet by component.sheetSlot.subscribeAsState()
     val launchAttachmentPicker = rememberAttachmentPicker(onPicked = component::onAttachmentPicked)
+    val audioRecorder = rememberAudioRecorderController()
     // Geo media has no Nostr file path yet (AttachmentSender drops it), so hide attach there.
     val canAttach = model.conversationId !is ConversationId.Geohash
 
     CompositionLocalProvider(LocalAudioPlayer provides rememberAudioPlayerController()) {
-        ChatScaffold(component, model, sheet, launchAttachmentPicker, canAttach, modifier)
+        ChatScaffold(component, model, sheet, launchAttachmentPicker, canAttach, audioRecorder, modifier)
     }
 }
 
@@ -142,6 +149,7 @@ private fun ChatScaffold(
     sheet: ChildSlot<*, ChatComponent.ChatSheetChild>,
     launchAttachmentPicker: () -> Unit,
     canAttach: Boolean,
+    audioRecorder: AudioRecorderController,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -209,6 +217,16 @@ private fun ChatScaffold(
                     onDraftChanged = component::onDraftChanged,
                     onSendClicked = component::onSendClicked,
                     onAttachClicked = launchAttachmentPicker,
+                    audioRecorder = audioRecorder,
+                    onVoiceRecorded = { path ->
+                        component.onAttachmentPicked(
+                            Attachment(
+                                kind = AttachmentKind.AUDIO,
+                                ref = path,
+                                mime = "audio/mp4",
+                            )
+                        )
+                    },
                 )
             }
         },
@@ -714,8 +732,11 @@ private fun MessageInput(
     onDraftChanged: (String) -> Unit,
     onSendClicked: () -> Unit,
     onAttachClicked: () -> Unit,
+    audioRecorder: AudioRecorderController,
+    onVoiceRecorded: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val isRecording by audioRecorder.isRecording
     Surface(tonalElevation = 2.dp) {
         Row(
             modifier = modifier
@@ -739,12 +760,27 @@ private fun MessageInput(
                 placeholder = { Text(text = stringResource(Res.string.chat_input_hint)) },
                 maxLines = 4,
             )
-            IconCircleButton(
-                icon = Send,
-                contentDescription = stringResource(Res.string.chat_send),
-                onClick = onSendClicked,
-                enabled = canSend,
-            )
+            if (!canSend) {
+                IconCircleButton(
+                    icon = Mic,
+                    contentDescription = stringResource(Res.string.chat_record),
+                    onClick = {
+                        if (isRecording) {
+                            audioRecorder.stop()?.let { onVoiceRecorded(it) }
+                        } else {
+                            audioRecorder.start()
+                        }
+                    },
+                    enabled = true,
+                )
+            } else {
+                IconCircleButton(
+                    icon = Send,
+                    contentDescription = stringResource(Res.string.chat_send),
+                    onClick = onSendClicked,
+                    enabled = canSend,
+                )
+            }
         }
     }
 }

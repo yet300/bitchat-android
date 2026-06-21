@@ -63,4 +63,21 @@ class SendAttachmentUseCaseTest {
         assertTrue(result is AttachmentSendResult.Sent)
         assertEquals(MessageType.AUDIO, repo.appended.single().second.type)
     }
+
+    @Test fun `voice note m4a produces AUDIO echo with correct mime`() = runTest {
+        val transport = FakeMessageTransport(); val repo = FakeMessageRepository()
+        val voiceNote = Attachment(
+            kind = AttachmentKind.AUDIO,
+            ref = "/data/user/0/com.app/files/voicenotes/outgoing/voice_1700000000000.m4a",
+            mime = "audio/mp4",
+            sizeBytes = null,
+        )
+        val result = useCase(transport, repo).invoke(target, voiceNote, sender)
+
+        assertTrue(result is AttachmentSendResult.Sent)
+        val echo = repo.appended.single().second
+        assertEquals(MessageType.AUDIO, echo.type)
+        assertEquals("audio/mp4", echo.attachment?.mime)
+        assertTrue(transport.attachments.isNotEmpty())
+    }
 }
