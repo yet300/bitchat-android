@@ -4,6 +4,8 @@ import com.app.common.decompose.asValue
 import com.app.domain.model.ThemeMode
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.IdentityRepository
+import com.app.domain.repository.MediaCleaner
+import com.app.domain.repository.MeshResetPort
 import com.app.domain.repository.MeshSettingsRepository
 import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.NotificationPermissionRepository
@@ -117,6 +119,8 @@ internal class DefaultSettingsComponentFactory(
     private val notificationSettingsRepository: NotificationSettingsRepository,
     private val notificationPermissionRepository: NotificationPermissionRepository,
     private val verificationRepository: VerificationRepository,
+    private val meshResetPort: MeshResetPort,
+    private val mediaCleaner: MediaCleaner,
 ) : SettingsComponent.Factory {
     override fun create(
         componentContext: ComponentContext,
@@ -136,7 +140,10 @@ internal class DefaultSettingsComponentFactory(
                 notificationSettingsRepository = notificationSettingsRepository,
                 notificationPermissionRepository = notificationPermissionRepository,
                 verificationRepository = verificationRepository,
-                panicWipe = PanicWipeUseCase(messageRepository, contactRepository, identityRepository),
+                panicWipe = PanicWipeUseCase(
+                    messageRepository, contactRepository, identityRepository,
+                    meshResetPort, mediaCleaner,
+                ),
             ),
             onClose = onClose,
             onOpenDebug = onOpenDebug,

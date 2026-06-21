@@ -22,6 +22,8 @@ import com.app.domain.repository.SettingsRepository
 import com.app.domain.repository.ThemeRepository
 import com.app.domain.repository.TorRepository
 import com.app.domain.repository.VerificationRepository
+import com.app.domain.repository.MediaCleaner
+import com.app.domain.repository.MeshResetPort
 import com.app.domain.usecase.PanicWipeUseCase
 import com.yet.bitmessage.feature.chats.conversations.settings.NotifPermissionStatus
 import com.arkivanov.mvikotlin.main.store.DefaultStoreFactory
@@ -172,7 +174,11 @@ class SettingsStoreFactoryTest {
         notificationSettingsRepository = notifSettings,
         notificationPermissionRepository = notifPermission,
         verificationRepository = verification,
-        panicWipe = PanicWipeUseCase(messages, contacts, identity),
+        panicWipe = PanicWipeUseCase(
+            messages, contacts, identity,
+            meshReset = object : MeshResetPort { override suspend fun reset() {} },
+            mediaCleaner = object : MediaCleaner { override suspend fun wipeMedia() {} },
+        ),
     )
 
     @Test

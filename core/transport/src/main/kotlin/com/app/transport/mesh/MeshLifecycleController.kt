@@ -8,6 +8,8 @@ package com.app.transport.mesh
 interface MeshLifecycleController {
     fun start()
     fun stop()
+    /** Rotate the in-memory mesh identity (new peerID + Noise keys) and restart advertising/scanning. */
+    fun reset()
     val isMeshActive: Boolean
     fun activePeerCount(): Int
 }
