@@ -44,7 +44,7 @@ class ContactsStoreFactoryTest {
         override suspend fun setBlocked(peer: PeerId, blocked: Boolean) {
             blockCalls += peer.raw to blocked
         }
-        override suspend fun isBlocked(peer: PeerId): Boolean = false
+        override fun isBlocked(peer: PeerId): Boolean = false
         override suspend fun contact(identity: PeerIdentity): Contact? = null
         override suspend fun noiseKeyHexForNostrAlias(alias: PeerId): String? = null
         override suspend fun clearAll() = Unit

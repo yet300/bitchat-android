@@ -126,7 +126,7 @@ class FakeContactRepository(
     override suspend fun setBlocked(peer: PeerId, blocked: Boolean) {
         if (blocked) this.blocked.add(peer) else this.blocked.remove(peer)
     }
-    override suspend fun isBlocked(peer: PeerId): Boolean = peer in blocked
+    override fun isBlocked(peer: PeerId): Boolean = peer in blocked
     override suspend fun contact(identity: PeerIdentity): Contact? =
         contactsByNoiseHex[identity.noiseKeyHex]
     override suspend fun noiseKeyHexForNostrAlias(alias: PeerId): String? = aliasToNoiseHex[alias.raw]

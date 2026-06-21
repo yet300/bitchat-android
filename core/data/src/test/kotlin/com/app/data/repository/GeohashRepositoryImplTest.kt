@@ -6,6 +6,7 @@ import com.app.common.settings.SettingsStore
 import com.app.crypto.EncryptionService
 import com.app.data.AppStateStore
 import com.app.domain.model.ConversationId
+import com.app.data.FakeContactRepository
 import com.app.domain.model.GeohashChannel
 import com.app.domain.model.GeohashLevel
 import com.app.transport.SeenMessageStore
@@ -74,7 +75,7 @@ class GeohashRepositoryImplTest {
         whenever(encryptionService.getIdentityFingerprint()).thenReturn("ffffffffffffffff")
         val seen = mock<SeenMessageStore>()
         whenever(seen.hasRead(any())).thenReturn(false)
-        appStateStore = AppStateStore(encryptionService, seen)
+        appStateStore = AppStateStore(encryptionService, seen) { FakeContactRepository() }
 
         relayManager = mock()
         val relayDirectory = mock<RelayDirectory>()

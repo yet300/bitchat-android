@@ -5,6 +5,8 @@ package com.app.data
 import kotlin.time.ExperimentalTime
 
 import com.app.crypto.EncryptionService
+import com.app.domain.model.PeerId
+import com.app.domain.repository.ContactRepository
 import com.app.transport.IncomingMessageSink
 import com.app.transport.SeenMessageStore
 import com.app.transport.model.BitchatMessage
@@ -30,6 +32,10 @@ class AppStateStore(
     private val encryptionService: EncryptionService,
     // Persisted read-state so unread counters survive process restart
     private val seenMessageStore: SeenMessageStore,
+    // Drops incoming messages from blocked peers (parity with legacy MeshDelegateHandler). Lazy: the
+    // ContactRepository's transitive deps (mesh) write back into this sink, so a deferred provider
+    // breaks that construction cycle.
+    private val contacts: () -> ContactRepository,
 ) : IncomingMessageSink {
 
     companion object {
@@ -130,7 +136,16 @@ class AppStateStore(
         _peers.value = ids
     }
 
+    /**
+     * Drop messages from a blocked peer (checked by the sender's peer id so my own local echoes —
+     * appended with my peer id — are never filtered). Mirrors the legacy block enforcement that was
+     * lost with MeshDelegateHandler.
+     */
+    private fun isFromBlocked(msg: BitchatMessage): Boolean =
+        msg.senderPeerID?.let { contacts().isBlocked(PeerId(it)) } == true
+
     override fun addPublicMessage(msg: BitchatMessage) {
+        if (isFromBlocked(msg)) return
         synchronized(this) {
             val publicKey = publicMessageKey(msg)
             if (seenPublicMessageKeys.contains(publicKey)) return
@@ -158,6 +173,7 @@ class AppStateStore(
     }
 
     override fun addPrivateMessage(peerID: String, msg: BitchatMessage) {
+        if (isFromBlocked(msg)) return
         synchronized(this) {
             if (!rememberSeen(msg.id)) return
             val map = _privateMessages.value.toMutableMap()
@@ -211,6 +227,7 @@ class AppStateStore(
     }
 
     override fun addChannelMessage(channel: String, msg: BitchatMessage) {
+        if (isFromBlocked(msg)) return
         synchronized(this) {
             if (!rememberSeen(msg.id)) return
             val map = _channelMessages.value.toMutableMap()

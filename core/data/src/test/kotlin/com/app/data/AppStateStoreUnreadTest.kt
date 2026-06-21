@@ -31,7 +31,7 @@ class AppStateStoreUnreadTest {
         whenever(encryptionService.getIdentityFingerprint()).thenReturn(MY_PEER_ID + "cccc")
         seenMessageStore = mock()
         whenever(seenMessageStore.hasRead(any())).thenReturn(false)
-        store = AppStateStore(encryptionService, seenMessageStore)
+        store = AppStateStore(encryptionService, seenMessageStore) { FakeContactRepository() }
     }
 
     private fun message(id: String, sender: String?) = BitchatMessage(
