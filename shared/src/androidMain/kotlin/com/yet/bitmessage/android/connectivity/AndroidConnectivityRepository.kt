@@ -16,6 +16,7 @@ import com.app.domain.model.TransportKind
 import com.app.domain.model.TransportState
 import com.app.domain.model.TransportStatus
 import com.app.domain.repository.ConnectivityRepository
+import com.app.transport.mesh.BluetoothPermissions
 import com.app.transport.mesh.MeshLifecycleController
 import com.app.transport.mesh.aware.WifiAwareSupport
 import com.app.transport.net.TorMode
@@ -139,20 +140,18 @@ class AndroidConnectivityRepository(
         }
     }
 
-    private fun bluetoothPermissions(): List<String> =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            listOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
-        } else {
-            emptyList()
-        }
+    private fun bluetoothPermissions(): List<String> = BluetoothPermissions.toRequest()
 
     private fun bluetoothAdapter(): BluetoothAdapter? =
         (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
 
-    private fun hasBluetoothRuntimePermission(): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
-        return isGranted(Manifest.permission.BLUETOOTH_CONNECT) && isGranted(Manifest.permission.BLUETOOTH_SCAN)
-    }
+    private fun hasBluetoothRuntimePermission(): Boolean =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            BluetoothPermissions.required().all { isGranted(it) }
+        } else {
+            isGranted(Manifest.permission.ACCESS_FINE_LOCATION) ||
+                isGranted(Manifest.permission.ACCESS_COARSE_LOCATION)
+        }
 
     private fun hasNearbyWifiPermission(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
