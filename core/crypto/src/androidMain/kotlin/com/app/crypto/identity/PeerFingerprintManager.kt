@@ -4,7 +4,7 @@ import com.app.common.utils.Log
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import java.security.MessageDigest
+import com.app.crypto.hash.Sha256
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -197,8 +197,7 @@ class PeerFingerprintManager {
      * @return The hex-encoded SHA-256 hash
      */
     private fun calculateFingerprint(publicKey: ByteArray): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        val hash = digest.digest(publicKey)
+        val hash = Sha256.digest(publicKey)
         return hash.joinToString("") { "%02x".format(it) }
     }
     
