@@ -27,9 +27,9 @@ import com.app.crypto.noise.southernstorm.protocol.Noise.createDH
 import com.app.crypto.noise.southernstorm.protocol.Noise.destroy
 import com.app.crypto.noise.southernstorm.protocol.Pattern.lookup
 import com.app.crypto.noise.southernstorm.protocol.Pattern.reverseFlags
-import java.security.NoSuchAlgorithmException
-import javax.crypto.BadPaddingException
-import javax.crypto.ShortBufferException
+import com.app.crypto.noise.southernstorm.crypto.NoSuchAlgorithmException
+import com.app.crypto.noise.southernstorm.crypto.BadPaddingException
+import com.app.crypto.noise.southernstorm.crypto.ShortBufferException
 
 /**
  * Interface to a Noise handshake.
@@ -500,7 +500,6 @@ internal class HandshakeState(protocolName: String, role: Int) : Destroyable {
      * 
      * @see .start
      */
-    @JvmOverloads
     @Throws(NoSuchAlgorithmException::class)
     fun fallback(patternName: String = "XXfallback") {
         // The original pattern must end in "K" for fallback to be possible.
@@ -1140,7 +1139,7 @@ internal class HandshakeState(protocolName: String, role: Int) : Destroyable {
         private fun bytesToHex(bytes: ByteArray): String {
             val sb = StringBuilder()
             for (b in bytes) {
-                sb.append("%02x".format(b))
+                sb.append((b.toInt() and 0xff).toString(16).padStart(2, '0'))
             }
             return sb.toString()
         }

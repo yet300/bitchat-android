@@ -25,11 +25,10 @@ import com.app.crypto.noise.southernstorm.crypto.Blake2bMessageDigest
 import com.app.crypto.noise.southernstorm.crypto.Blake2sMessageDigest
 import com.app.crypto.noise.southernstorm.crypto.SHA256MessageDigest
 import com.app.crypto.noise.southernstorm.crypto.SHA512MessageDigest
-import java.security.MessageDigest
-import java.security.NoSuchAlgorithmException
-import java.security.SecureRandom
-import javax.crypto.BadPaddingException
-
+import com.app.crypto.noise.southernstorm.crypto.MessageDigest
+import com.app.crypto.noise.southernstorm.crypto.NoSuchAlgorithmException
+import com.app.crypto.noise.southernstorm.crypto.BadPaddingException
+import dev.whyoleg.cryptography.random.CryptographyRandom
 /**
  * Utility functions for the Noise protocol library.
  */
@@ -39,32 +38,13 @@ internal object Noise {
      */
     const val MAX_PACKET_LEN: Int = 65535
 
-    private val random = SecureRandom()
-
-    private var forceFallbacks = false
-
     /**
-     * Generates random data using the system random number generator.
+     * Generates cryptographically secure random data.
      *
      * @param data The data buffer to fill with random data.
      */
-    @JvmStatic
     fun random(data: ByteArray) {
-        random.nextBytes(data)
-    }
-
-    /**
-     * Force the use of plain Java fallback crypto implementations.
-     * 
-     * @param force Set to true for force fallbacks, false to
-     * try to use the system implementation before falling back.
-     * 
-     * This function is intended for testing purposes to toggle between
-     * the system JCA/JCE implementations and the plain Java fallback
-     * reference implementations.
-     */
-    fun setForceFallbacks(force: Boolean) {
-        forceFallbacks = force
+        CryptographyRandom.nextBytes(data)
     }
 
     /**
@@ -78,7 +58,6 @@ internal object Noise {
      * valid Noise protocol name, or there is no cryptography provider
      * in the system that implements the algorithm.
      */
-    @JvmStatic
     @Throws(NoSuchAlgorithmException::class)
     fun createDH(name: String): DHState = when (name) {
         "25519" -> Curve25519DHState()
@@ -98,23 +77,11 @@ internal object Noise {
      * valid Noise protocol name, or there is no cryptography provider
      * in the system that implements the algorithm.
      */
-    @JvmStatic
     @Throws(NoSuchAlgorithmException::class)
     fun createCipher(name: String): CipherState = when (name) {
-        "AESGCM" -> {
-            if (forceFallbacks) {
-                AESGCMFallbackCipherState()
-            } else {
-                // "AES/GCM/NoPadding" exists in some recent JDK's but it is flaky
-                // to use and not easily back-portable to older Android versions.
-                // We instead emulate AESGCM on top of "AES/CTR/NoPadding".
-                try {
-                    AESGCMOnCtrCipherState()
-                } catch (_: NoSuchAlgorithmException) {
-                    AESGCMFallbackCipherState()
-                }
-            }
-        }
+        // Pure-Kotlin AES-GCM (Rijndael + GHASH); the JCA AES/CTR variant was JVM-only and is
+        // off the live ChaChaPoly path.
+        "AESGCM" -> AESGCMFallbackCipherState()
         "ChaChaPoly" -> ChaChaPolyCipherState()
         else -> throw NoSuchAlgorithmException("Unknown Noise cipher algorithm name: $name")
     }
@@ -130,26 +97,14 @@ internal object Noise {
      * valid Noise protocol name, or there is no cryptography provider
      * in the system that implements the algorithm.
      */
-    @JvmStatic
     @Throws(NoSuchAlgorithmException::class)
-    fun createHash(name: String): MessageDigest {
-        // Look for a JCA/JCE provider first and if that doesn't work,
-        // use the fallback implementations in this library instead.
-        // The only algorithm that is required to be implemented by a
-        // JDK is "SHA-256", although "SHA-512" is fairly common as well.
-        val (jcaName, fallback) = when (name) {
-            "SHA256" -> "SHA-256" to ::SHA256MessageDigest
-            "SHA512" -> "SHA-512" to ::SHA512MessageDigest
-            "BLAKE2b" -> "BLAKE2B-512" to ::Blake2bMessageDigest
-            "BLAKE2s" -> "BLAKE2S-256" to ::Blake2sMessageDigest
-            else -> throw NoSuchAlgorithmException("Unknown Noise hash algorithm name: $name")
-        }
-        if (forceFallbacks) return fallback()
-        return try {
-            MessageDigest.getInstance(jcaName)
-        } catch (_: NoSuchAlgorithmException) {
-            fallback()
-        }
+    fun createHash(name: String): MessageDigest = when (name) {
+        // Pure-Kotlin digests (no JCA provider on KMP); byte-identical to the standard algorithms.
+        "SHA256" -> SHA256MessageDigest()
+        "SHA512" -> SHA512MessageDigest()
+        "BLAKE2b" -> Blake2bMessageDigest()
+        "BLAKE2s" -> Blake2sMessageDigest()
+        else -> throw NoSuchAlgorithmException("Unknown Noise hash algorithm name: $name")
     }
 
     // The rest of this class consists of internal utility functions
@@ -159,7 +114,6 @@ internal object Noise {
      * 
      * @param array The array whose contents should be destroyed.
      */
-    @JvmStatic
     fun destroy(array: ByteArray) {
         array.fill(0)
     }
@@ -173,7 +127,6 @@ internal object Noise {
      * 
      * @return A new array with a copy of the sub-array.
      */
-    @JvmStatic
     fun copySubArray(data: ByteArray, offset: Int, length: Int): ByteArray =
         data.copyOfRange(offset, offset + length)
 
@@ -186,15 +139,8 @@ internal object Noise {
      * class, then this function will instead throw an instance of
      * the superclass BadPaddingException.
      */
-    @JvmStatic
     @Throws(BadPaddingException::class)
     fun throwBadTagException() {
-        val aead = try {
-            val c = Class.forName("javax.crypto.AEADBadTagException")
-            c.getDeclaredConstructor().newInstance() as BadPaddingException
-        } catch (_: ReflectiveOperationException) {
-            null
-        }
-        throw aead ?: BadPaddingException()
+        throw BadPaddingException()
     }
 }

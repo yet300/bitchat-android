@@ -270,7 +270,6 @@ internal object Pattern {
      * @param name The name of the pattern.
      * @return The pattern description or null.
      */
-    @JvmStatic
     fun lookup(name: String): ShortArray? = patterns[name]
 
     /**
@@ -279,7 +278,6 @@ internal object Pattern {
      * @param flags The flags, assuming that the initiator is "local".
      * @return The reversed flags, with the responder now being "local".
      */
-    @JvmStatic
     fun reverseFlags(flags: Short): Short {
         val v = flags.toInt() and 0xFFFF
         return (((v shr 8) and 0x00FF) or ((v shl 8) and 0xFF00)).toShort()

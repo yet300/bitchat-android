@@ -21,8 +21,8 @@
  */
 package com.app.crypto.noise.southernstorm.protocol
 
-import javax.crypto.BadPaddingException
-import javax.crypto.ShortBufferException
+import com.app.crypto.noise.southernstorm.crypto.BadPaddingException
+import com.app.crypto.noise.southernstorm.crypto.ShortBufferException
 
 /**
  * Interface to an authenticated cipher for use in the Noise protocol.

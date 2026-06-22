@@ -416,7 +416,6 @@ internal class Curve25519 {
          * @param publicKey The public key to use in the evaluation, or null
          * if the base point of the curve should be used.
          */
-        @JvmStatic
         fun eval(result: ByteArray, offset: Int, privateKey: ByteArray, publicKey: ByteArray?) {
             val state = Curve25519()
             try {

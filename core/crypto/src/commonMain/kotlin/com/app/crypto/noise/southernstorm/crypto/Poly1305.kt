@@ -96,7 +96,7 @@ internal class Poly1305 : Destroyable {
                 // Collect up partial bytes in the block buffer.
                 var temp = 16 - posn
                 if (temp > length) temp = length
-                System.arraycopy(data, offset, block, posn, temp)
+                data.copyInto(block, posn, offset, offset + temp)
                 offset += temp
                 length -= temp
                 posn += temp

@@ -1,8 +1,8 @@
 package com.app.crypto.noise
 
 import com.app.crypto.noise.southernstorm.protocol.HandshakeState
-import org.junit.Assert.assertEquals
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 /**
  * Wire-parity anchor for the Noise engine (iOS compatibility is sacred).

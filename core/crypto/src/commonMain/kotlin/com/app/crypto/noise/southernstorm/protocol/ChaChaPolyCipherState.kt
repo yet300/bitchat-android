@@ -27,8 +27,8 @@ import com.app.crypto.noise.southernstorm.crypto.ChaChaCore.initKey256
 import com.app.crypto.noise.southernstorm.crypto.Poly1305
 import com.app.crypto.noise.southernstorm.protocol.Noise.destroy
 import com.app.crypto.noise.southernstorm.protocol.Noise.throwBadTagException
-import javax.crypto.BadPaddingException
-import javax.crypto.ShortBufferException
+import com.app.crypto.noise.southernstorm.crypto.BadPaddingException
+import com.app.crypto.noise.southernstorm.crypto.ShortBufferException
 
 /**
  * Implements the ChaChaPoly cipher for Noise.
@@ -134,13 +134,8 @@ internal class ChaChaPolyCipherState : CipherState {
         if (!haskey) {
             // The key is not set yet - return the plaintext as-is.
             if (length > space) throw ShortBufferException()
-            if (plaintext !== ciphertext || plaintextOffset != ciphertextOffset) System.arraycopy(
-                plaintext,
-                plaintextOffset,
-                ciphertext,
-                ciphertextOffset,
-                length
-            )
+            if (plaintext !== ciphertext || plaintextOffset != ciphertextOffset)
+                plaintext.copyInto(ciphertext, ciphertextOffset, plaintextOffset, plaintextOffset + length)
             return length
         }
         if (space < 16 || length > (space - 16)) throw ShortBufferException()
@@ -148,7 +143,7 @@ internal class ChaChaPolyCipherState : CipherState {
         encrypt(plaintext, plaintextOffset, ciphertext, ciphertextOffset, length)
         poly.update(ciphertext, ciphertextOffset, length)
         finish(ad, length)
-        System.arraycopy(polyKey, 0, ciphertext, ciphertextOffset + length, 16)
+        polyKey.copyInto(ciphertext, ciphertextOffset + length, 0, 16)
         return length + 16
     }
 
@@ -169,13 +164,8 @@ internal class ChaChaPolyCipherState : CipherState {
         if (!haskey) {
             // The key is not set yet - return the ciphertext as-is.
             if (length > space) throw ShortBufferException()
-            if (plaintext !== ciphertext || plaintextOffset != ciphertextOffset) System.arraycopy(
-                ciphertext,
-                ciphertextOffset,
-                plaintext,
-                plaintextOffset,
-                length
-            )
+            if (plaintext !== ciphertext || plaintextOffset != ciphertextOffset)
+                ciphertext.copyInto(plaintext, plaintextOffset, ciphertextOffset, ciphertextOffset + length)
             return length
         }
         if (length < 16) throwBadTagException()
