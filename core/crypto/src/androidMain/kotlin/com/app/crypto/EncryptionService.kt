@@ -9,13 +9,7 @@ import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.secure.SecureKeyValueStore
 import com.app.crypto.secure.TinkSecureKeyValueStore
 import com.app.crypto.noise.NoiseEncryptionService
-import org.bouncycastle.crypto.AsymmetricCipherKeyPair
-import org.bouncycastle.crypto.generators.Ed25519KeyPairGenerator
-import org.bouncycastle.crypto.params.Ed25519KeyGenerationParameters
-import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
-import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
-import org.bouncycastle.crypto.signers.Ed25519Signer
-import java.security.SecureRandom
+import com.app.crypto.sign.Ed25519
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -43,8 +37,8 @@ open class EncryptionService(
     private val establishedSessions = ConcurrentHashMap<String, String>() // peerID -> fingerprint
     
     // Ed25519 signing keys (separate from Noise static keys)
-    private lateinit var ed25519PrivateKey: Ed25519PrivateKeyParameters
-    private lateinit var ed25519PublicKey: Ed25519PublicKeyParameters
+    private lateinit var ed25519PrivateKey: ByteArray
+    private lateinit var ed25519PublicKey: ByteArray
     
     // Callbacks for UI state updates
     var onSessionEstablished: ((String) -> Unit)? = null // peerID
@@ -66,9 +60,9 @@ open class EncryptionService(
     protected open fun initialize() {
         setUpSecureStore()
         // Initialize or load Ed25519 signing keys
-        val keyPair = loadOrCreateEd25519KeyPair()
-        ed25519PrivateKey = keyPair.private as Ed25519PrivateKeyParameters
-        ed25519PublicKey = keyPair.public as Ed25519PublicKeyParameters
+        val (priv, pub) = loadOrCreateEd25519KeyPair()
+        ed25519PrivateKey = priv
+        ed25519PublicKey = pub
         
         Log.d(TAG, "✅ Ed25519 signing keys initialized")
         
@@ -106,7 +100,7 @@ open class EncryptionService(
      * Get our signing public key for Ed25519 signatures (for identity announcements)
      */
     fun getSigningPublicKey(): ByteArray? {
-        return ed25519PublicKey.encoded
+        return ed25519PublicKey
     }
     
     /**
@@ -114,10 +108,7 @@ open class EncryptionService(
      */
     fun signData(data: ByteArray): ByteArray? {
         return try {
-            val signer = Ed25519Signer()
-            signer.init(true, ed25519PrivateKey)
-            signer.update(data, 0, data.size)
-            val signature = signer.generateSignature()
+            val signature = Ed25519.sign(ed25519PrivateKey, data)
             Log.d(TAG, "✅ Generated Ed25519 signature (${signature.size} bytes)")
             signature
         } catch (e: Exception) {
@@ -162,9 +153,9 @@ open class EncryptionService(
             Log.d(TAG, "🗑️ Cleared Ed25519 signing keys from preferences")
 
             // Generate new keys immediately
-            val keyPair = loadOrCreateEd25519KeyPair()
-            ed25519PrivateKey = keyPair.private as Ed25519PrivateKeyParameters
-            ed25519PublicKey = keyPair.public as Ed25519PublicKeyParameters
+            val (priv, pub) = loadOrCreateEd25519KeyPair()
+            ed25519PrivateKey = priv
+            ed25519PublicKey = pub
             Log.d(TAG, "✅ Rotated Ed25519 signing keys in memory")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to clear Ed25519 keys: ${e.message}")
@@ -392,11 +383,7 @@ open class EncryptionService(
      */
     open fun verifyEd25519Signature(signature: ByteArray, data: ByteArray, publicKeyBytes: ByteArray): Boolean {
         return try {
-            val publicKey = Ed25519PublicKeyParameters(publicKeyBytes, 0)
-            val verifier = Ed25519Signer()
-            verifier.init(false, publicKey)
-            verifier.update(data, 0, data.size)
-            val isValid = verifier.verifySignature(signature)
+            val isValid = Ed25519.verify(publicKeyBytes, data, signature)
             Log.d(TAG, "✅ Ed25519 signature verification: $isValid")
             isValid
         } catch (e: Exception) {
@@ -410,43 +397,36 @@ open class EncryptionService(
     /**
      * Load existing Ed25519 key pair from preferences or create a new one
      */
-    private fun loadOrCreateEd25519KeyPair(): AsymmetricCipherKeyPair {
+    private fun loadOrCreateEd25519KeyPair(): Pair<ByteArray, ByteArray> {
         try {
             val storedKey = store.getString(ED25519_PRIVATE_KEY_PREF)
 
             if (storedKey != null) {
-                // Load existing key
-                val privateKeyBytes = Base64.Default.decode(storedKey)
-                val privateKey = Ed25519PrivateKeyParameters(privateKeyBytes, 0)
-                val publicKey = privateKey.generatePublicKey()
+                // Load existing seed and re-derive the public key from it.
+                val privateKey = Base64.decode(storedKey)
+                val publicKey = Ed25519.publicKeyOf(privateKey)
                 Log.d(TAG, "✅ Loaded existing Ed25519 signing key pair")
-                return AsymmetricCipherKeyPair(publicKey, privateKey)
+                return privateKey to publicKey
             }
         } catch (e: Exception) {
             Log.w(TAG, "⚠️ Failed to load existing Ed25519 key, creating new one: ${e.message}")
         }
-        
+
         // Create new key pair
         return generateAndSaveEd25519KeyPair()
     }
 
-    fun generateAndSaveEd25519KeyPair(): AsymmetricCipherKeyPair {
-        val keyGen = Ed25519KeyPairGenerator()
-        keyGen.init(Ed25519KeyGenerationParameters(SecureRandom()))
-        val keyPair = keyGen.generateKeyPair()
+    fun generateAndSaveEd25519KeyPair(): Pair<ByteArray, ByteArray> {
+        val (privateKey, publicKey) = Ed25519.generateKeyPair()
 
-        // Store private key in preferences
+        // Store the private seed; the public key is re-derived on load.
         try {
-            val privateKey = keyPair.private as Ed25519PrivateKeyParameters
-            val privateKeyBytes = privateKey.encoded
-            val encodedKey = Base64.encode(privateKeyBytes)
-
-            store.putString(ED25519_PRIVATE_KEY_PREF, encodedKey)
+            store.putString(ED25519_PRIVATE_KEY_PREF, Base64.encode(privateKey))
             Log.d(TAG, "✅ Created and stored new Ed25519 signing key pair")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to store Ed25519 private key: ${e.message}")
         }
-        
-        return keyPair
+
+        return privateKey to publicKey
     }
 }
