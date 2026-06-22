@@ -25,8 +25,8 @@ import com.app.crypto.noise.southernstorm.crypto.GHASH
 import com.app.crypto.noise.southernstorm.crypto.RijndaelAES
 import com.app.crypto.noise.southernstorm.protocol.Noise.destroy
 import com.app.crypto.noise.southernstorm.protocol.Noise.throwBadTagException
-import javax.crypto.BadPaddingException
-import javax.crypto.ShortBufferException
+import com.app.crypto.noise.southernstorm.crypto.BadPaddingException
+import com.app.crypto.noise.southernstorm.crypto.ShortBufferException
 
 /**
  * Fallback implementation of "AESGCM" on platforms where
@@ -178,13 +178,8 @@ internal class AESGCMFallbackCipherState : CipherState {
         if (!haskey) {
             // The key is not set yet - return the plaintext as-is.
             if (length > space) throw ShortBufferException()
-            if (plaintext !== ciphertext || plaintextOffset != ciphertextOffset) System.arraycopy(
-                plaintext,
-                plaintextOffset,
-                ciphertext,
-                ciphertextOffset,
-                length
-            )
+            if (plaintext !== ciphertext || plaintextOffset != ciphertextOffset)
+                plaintext.copyInto(ciphertext, ciphertextOffset, plaintextOffset, plaintextOffset + length)
             return length
         }
         if (space < 16 || length > (space - 16)) throw ShortBufferException()
@@ -218,13 +213,8 @@ internal class AESGCMFallbackCipherState : CipherState {
         if (!haskey) {
             // The key is not set yet - return the ciphertext as-is.
             if (length > space) throw ShortBufferException()
-            if (plaintext !== ciphertext || plaintextOffset != ciphertextOffset) System.arraycopy(
-                ciphertext,
-                ciphertextOffset,
-                plaintext,
-                plaintextOffset,
-                length
-            )
+            if (plaintext !== ciphertext || plaintextOffset != ciphertextOffset)
+                ciphertext.copyInto(plaintext, plaintextOffset, ciphertextOffset, ciphertextOffset + length)
             return length
         }
         if (length < 16) throwBadTagException()

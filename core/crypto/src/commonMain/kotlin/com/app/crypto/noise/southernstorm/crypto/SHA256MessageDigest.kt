@@ -22,8 +22,6 @@
 package com.app.crypto.noise.southernstorm.crypto
 
 import com.app.crypto.noise.southernstorm.protocol.Destroyable
-import java.security.DigestException
-import java.security.MessageDigest
 
 
 /**
@@ -115,7 +113,7 @@ internal class SHA256MessageDigest : MessageDigest("SHA-256"), Destroyable {
             } else {
                 var temp = 64 - posn
                 if (temp > len) temp = len
-                System.arraycopy(input, offset, block, posn, temp)
+                input.copyInto(block, posn, offset, offset + temp)
                 posn += temp
                 length += (temp * 8).toLong()
                 if (posn >= 64) {

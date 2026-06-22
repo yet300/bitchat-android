@@ -7,7 +7,7 @@
  */
 package com.app.crypto.noise.southernstorm.crypto
 
-import java.security.SecureRandom
+import dev.whyoleg.cryptography.random.CryptographyRandom
 
 
 /**
@@ -169,7 +169,7 @@ internal open class NewHope {
     }
 
     protected open fun randombytes(buffer: ByteArray) {
-        SecureRandom().nextBytes(buffer)
+        CryptographyRandom.nextBytes(buffer)
     }
 
     // -------------- poly.c --------------

@@ -25,11 +25,10 @@ import com.app.common.utils.Log
 import com.app.crypto.noise.southernstorm.protocol.Noise.createCipher
 import com.app.crypto.noise.southernstorm.protocol.Noise.createHash
 import com.app.crypto.noise.southernstorm.protocol.Noise.destroy
-import java.io.UnsupportedEncodingException
-import java.security.DigestException
-import java.security.MessageDigest
-import javax.crypto.BadPaddingException
-import javax.crypto.ShortBufferException
+import com.app.crypto.noise.southernstorm.crypto.DigestException
+import com.app.crypto.noise.southernstorm.crypto.MessageDigest
+import com.app.crypto.noise.southernstorm.crypto.BadPaddingException
+import com.app.crypto.noise.southernstorm.crypto.ShortBufferException
 
 /**
  * Symmetric state for helping manage a Noise handshake.
@@ -78,12 +77,7 @@ internal class SymmetricState(protocolName: String, cipherName: String, hashName
         this.handshakeHash = initialHash
         prevH = ByteArray(hashLength)
 
-        val protocolNameBytes: ByteArray = try {
-            protocolName.toByteArray(charset("UTF-8"))
-        } catch (_: UnsupportedEncodingException) {
-            // If UTF-8 is not supported, then we are definitely in trouble!
-            throw UnsupportedOperationException("UTF-8 encoding is not supported")
-        }
+        val protocolNameBytes: ByteArray = protocolName.encodeToByteArray()
 
         if (protocolNameBytes.size <= hashLength) {
             protocolNameBytes.copyInto(initialHash, 0, 0, protocolNameBytes.size)
@@ -330,7 +324,6 @@ internal class SymmetricState(protocolName: String, cipherName: String, hashName
      *
      * @throws IllegalArgumentException The length is not 0 or 32.
      */
-    @JvmOverloads
     fun split(
         secondaryKey: ByteArray? = ByteArray(0),
         offset: Int = 0,
@@ -478,7 +471,7 @@ internal class SymmetricState(protocolName: String, cipherName: String, hashName
         val block = ByteArray(blockLength)
         try {
             if (keyLength <= blockLength) {
-                System.arraycopy(key, keyOffset, block, 0, keyLength)
+                key.copyInto(block, 0, keyOffset, keyOffset + keyLength)
                 block.fill(0, keyLength, blockLength)
             } else {
                 hash!!.reset()
@@ -538,10 +531,10 @@ internal class SymmetricState(protocolName: String, cipherName: String, hashName
             hmac(key, keyOffset, keyLength, data, dataOffset, dataLength, tempKey, 0, hashLength)
             tempHash[0] = 0x01.toByte()
             hmac(tempKey, 0, hashLength, tempHash, 0, 1, tempHash, 0, hashLength)
-            System.arraycopy(tempHash, 0, output1, output1Offset, output1Length)
+            tempHash.copyInto(output1, output1Offset, 0, output1Length)
             tempHash[hashLength] = 0x02.toByte()
             hmac(tempKey, 0, hashLength, tempHash, 0, hashLength + 1, tempHash, 0, hashLength)
-            System.arraycopy(tempHash, 0, output2, output2Offset, output2Length)
+            tempHash.copyInto(output2, output2Offset, 0, output2Length)
         } finally {
             destroy(tempKey)
             destroy(tempHash)
@@ -557,7 +550,7 @@ internal class SymmetricState(protocolName: String, cipherName: String, hashName
         private fun bytesToHex(bytes: ByteArray): String {
             val sb = StringBuilder()
             for (b in bytes) {
-                sb.append("%02x".format(b))
+                sb.append((b.toInt() and 0xff).toString(16).padStart(2, '0'))
             }
             return sb.toString()
         }

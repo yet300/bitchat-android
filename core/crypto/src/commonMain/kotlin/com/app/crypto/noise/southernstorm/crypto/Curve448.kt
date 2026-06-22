@@ -517,7 +517,6 @@ internal class Curve448 private constructor() {
          * @return Returns true if the curve evaluation was successful,
          * false if the publicKey value is out of range.
          */
-        @JvmStatic
         fun eval(
             result: ByteArray,
             offset: Int,

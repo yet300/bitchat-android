@@ -22,8 +22,6 @@
 package com.app.crypto.noise.southernstorm.crypto
 
 import com.app.crypto.noise.southernstorm.protocol.Destroyable
-import java.security.DigestException
-import java.security.MessageDigest
 
 
 /**
