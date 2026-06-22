@@ -1,7 +1,9 @@
+@file:OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
+
 package com.app.crypto
 
 import android.content.Context
-import android.util.Base64
+import kotlin.io.encoding.Base64
 import com.app.common.utils.Log
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.secure.SecureKeyValueStore
@@ -414,7 +416,7 @@ open class EncryptionService(
 
             if (storedKey != null) {
                 // Load existing key
-                val privateKeyBytes = Base64.decode(storedKey, Base64.DEFAULT)
+                val privateKeyBytes = Base64.Default.decode(storedKey)
                 val privateKey = Ed25519PrivateKeyParameters(privateKeyBytes, 0)
                 val publicKey = privateKey.generatePublicKey()
                 Log.d(TAG, "✅ Loaded existing Ed25519 signing key pair")
@@ -437,7 +439,7 @@ open class EncryptionService(
         try {
             val privateKey = keyPair.private as Ed25519PrivateKeyParameters
             val privateKeyBytes = privateKey.encoded
-            val encodedKey = Base64.encodeToString(privateKeyBytes, Base64.DEFAULT)
+            val encodedKey = Base64.encode(privateKeyBytes)
 
             store.putString(ED25519_PRIVATE_KEY_PREF, encodedKey)
             Log.d(TAG, "✅ Created and stored new Ed25519 signing key pair")
