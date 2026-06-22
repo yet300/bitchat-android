@@ -12,7 +12,6 @@ import org.bouncycastle.crypto.agreement.ECDHBasicAgreement
 import org.bouncycastle.crypto.digests.SHA256Digest
 import org.bouncycastle.crypto.macs.HMac
 import org.bouncycastle.crypto.params.KeyParameter
-import com.google.crypto.tink.subtle.XChaCha20Poly1305
 import java.security.SecureRandom
 import java.security.MessageDigest
 import java.math.BigInteger
@@ -250,7 +249,7 @@ internal object NostrCrypto {
             val sharedPoint = computeSharedPointWithParity(senderPrivateKeyHex, recipientPublicKeyHex, preferOddY = false)
             val secretMaterial = compressedPoint(sharedPoint)
             val encryptionKey = deriveNIP44Key(secretMaterial)
-            val aead = XChaCha20Poly1305(encryptionKey)
+            val aead = XChaCha20Poly1305Aead(encryptionKey)
             val combined = aead.encrypt(plaintext.toByteArray(Charsets.UTF_8), null) // nonce||ct||tag
             val b64 = base64UrlNoPad(combined)
             Log.d("NostrCrypto", "NIP44 v2 encrypt: len=${b64.length}")
@@ -280,7 +279,7 @@ internal object NostrCrypto {
                     val point = computeSharedPointWithParity(recipientPrivateKeyHex, senderPublicKeyHex, preferOddY = preferOdd)
                     val secretMaterial = compressedPoint(point)
                     val key = deriveNIP44Key(secretMaterial)
-                    val aead = XChaCha20Poly1305(key)
+                    val aead = XChaCha20Poly1305Aead(key)
                     val pt = aead.decrypt(encryptedData, null) // expects nonce||ct||tag
                     return String(pt, Charsets.UTF_8)
                 } catch (e: Exception) {
