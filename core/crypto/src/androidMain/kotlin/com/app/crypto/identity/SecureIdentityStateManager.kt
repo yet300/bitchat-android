@@ -5,7 +5,7 @@ package com.app.crypto.identity
 import android.content.Context
 import com.app.crypto.secure.SecureKeyValueStore
 import com.app.crypto.secure.TinkSecureKeyValueStore
-import java.security.MessageDigest
+import com.app.crypto.hash.Sha256
 import kotlin.io.encoding.Base64
 import com.app.common.utils.Log
 import com.app.common.encoding.hexEncodedString
@@ -155,8 +155,7 @@ class SecureIdentityStateManager(private val context: Context) {
      * Generate fingerprint from public key (SHA-256 hash)
      */
     fun generateFingerprint(publicKeyData: ByteArray): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        val hash = digest.digest(publicKeyData)
+        val hash = Sha256.digest(publicKeyData)
         return hash.hexEncodedString()
     }
     

@@ -4,7 +4,7 @@ import android.content.Context
 import com.app.common.utils.Log
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.crypto.identity.PeerFingerprintManager
-import java.security.MessageDigest
+import com.app.crypto.hash.Sha256
 import java.security.SecureRandom
 
 /**
@@ -136,8 +136,7 @@ internal class NoiseEncryptionService(
      * Get our identity fingerprint (SHA-256 hash of static public key)
      */
     fun getIdentityFingerprint(): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        val hash = digest.digest(staticIdentityPublicKey)
+        val hash = Sha256.digest(staticIdentityPublicKey)
         return hash.joinToString("") { "%02x".format(it) }
     }
     
@@ -400,8 +399,7 @@ internal class NoiseEncryptionService(
      * Calculate fingerprint from public key (SHA-256 hash)
      */
     private fun calculateFingerprint(publicKey: ByteArray): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        val hash = digest.digest(publicKey)
+        val hash = Sha256.digest(publicKey)
         return hash.joinToString("") { "%02x".format(it) }
     }
     

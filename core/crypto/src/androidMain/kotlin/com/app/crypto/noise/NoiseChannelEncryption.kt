@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
-import java.security.MessageDigest
+import com.app.crypto.hash.Sha256
 import java.util.concurrent.ConcurrentHashMap
 import javax.crypto.Cipher
 import javax.crypto.SecretKeyFactory
@@ -183,8 +183,7 @@ internal class NoiseChannelEncryption {
         val key = channelKeys[channel] ?: return null
         
         return try {
-            val digest = MessageDigest.getInstance("SHA-256")
-            val hash = digest.digest(key.encoded)
+            val hash = Sha256.digest(key.encoded)
             hash.joinToString("") { "%02x".format(it) }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to calculate key commitment: ${e.message}")
