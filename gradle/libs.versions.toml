@@ -25,8 +25,7 @@ mvi = "4.4.0"
 kermit = "2.1.0"
 
 # Cryptography
-bouncycastle = "1.70"
-tink-android = "1.22.0"
+tink-android = "1.22.0"   # Tink — only :core:crypto storage (TinkSecureKeyValueStore)
 
 # KMP cryptography — pinned via throwaway spike against Kotlin 2.4.0 (android + iosArm64/SimulatorArm64)
 cryptography-kotlin = "0.6.0"     # whyoleg/cryptography-kotlin (SHA/HMAC/HKDF/PBKDF2/AES-GCM/Ed25519/random)
@@ -97,7 +96,6 @@ androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-
 kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
 
 # Cryptography
-bouncycastle-bcprov = { module = "org.bouncycastle:bcprov-jdk15on", version.ref = "bouncycastle" }
 google-tink-android = { module = "com.google.crypto.tink:tink-android", version.ref = "tink-android" }
 
 # KMP cryptography (see migration: :core:crypto → KMP)
@@ -216,11 +214,6 @@ mvi = [
 lifecycle = [
     "androidx-lifecycle-runtime-ktx",
     "androidx-lifecycle-viewmodel-compose",
-]
-
-cryptography = [
-    "bouncycastle-bcprov",
-    "google-tink-android"
 ]
 
 multiplatform-settings = [
