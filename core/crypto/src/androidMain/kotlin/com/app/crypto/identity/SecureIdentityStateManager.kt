@@ -1,10 +1,12 @@
+@file:OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
+
 package com.app.crypto.identity
 
 import android.content.Context
 import com.app.crypto.secure.SecureKeyValueStore
 import com.app.crypto.secure.TinkSecureKeyValueStore
 import java.security.MessageDigest
-import android.util.Base64
+import kotlin.io.encoding.Base64
 import com.app.common.utils.Log
 import com.app.common.encoding.hexEncodedString
 
@@ -47,8 +49,8 @@ class SecureIdentityStateManager(private val context: Context) {
             val publicKeyString = store.getString(KEY_STATIC_PUBLIC_KEY)
             
             if (privateKeyString != null && publicKeyString != null) {
-                val privateKey = android.util.Base64.decode(privateKeyString, android.util.Base64.DEFAULT)
-                val publicKey = android.util.Base64.decode(publicKeyString, android.util.Base64.DEFAULT)
+                val privateKey = Base64.Default.decode(privateKeyString)
+                val publicKey = Base64.Default.decode(publicKeyString)
                 
                 // Validate key sizes
                 if (privateKey.size == 32 && publicKey.size == 32) {
@@ -78,8 +80,8 @@ class SecureIdentityStateManager(private val context: Context) {
                 throw IllegalArgumentException("Invalid key sizes: private=${privateKey.size}, public=${publicKey.size}")
             }
             
-            val privateKeyString = android.util.Base64.encodeToString(privateKey, android.util.Base64.DEFAULT)
-            val publicKeyString = android.util.Base64.encodeToString(publicKey, android.util.Base64.DEFAULT)
+            val privateKeyString = Base64.Default.encode(privateKey)
+            val publicKeyString = Base64.Default.encode(publicKey)
             
             store.putString(KEY_STATIC_PRIVATE_KEY, privateKeyString)
             store.putString(KEY_STATIC_PUBLIC_KEY, publicKeyString)
@@ -103,8 +105,8 @@ class SecureIdentityStateManager(private val context: Context) {
             val publicKeyString = store.getString(KEY_SIGNING_PUBLIC_KEY)
             
             if (privateKeyString != null && publicKeyString != null) {
-                val privateKey = android.util.Base64.decode(privateKeyString, android.util.Base64.DEFAULT)
-                val publicKey = android.util.Base64.decode(publicKeyString, android.util.Base64.DEFAULT)
+                val privateKey = Base64.Default.decode(privateKeyString)
+                val publicKey = Base64.Default.decode(publicKeyString)
                 
                 // Validate key sizes
                 if (privateKey.size == 32 && publicKey.size == 32) {
@@ -134,8 +136,8 @@ class SecureIdentityStateManager(private val context: Context) {
                 throw IllegalArgumentException("Invalid signing key sizes: private=${privateKey.size}, public=${publicKey.size}")
             }
             
-            val privateKeyString = android.util.Base64.encodeToString(privateKey, android.util.Base64.DEFAULT)
-            val publicKeyString = android.util.Base64.encodeToString(publicKey, android.util.Base64.DEFAULT)
+            val privateKeyString = Base64.Default.encode(privateKey)
+            val publicKeyString = Base64.Default.encode(publicKey)
             
             store.putString(KEY_SIGNING_PRIVATE_KEY, privateKeyString)
             store.putString(KEY_SIGNING_PUBLIC_KEY, publicKeyString)
@@ -255,7 +257,7 @@ class SecureIdentityStateManager(private val context: Context) {
         val entry = entries.firstOrNull { it.startsWith("$key=") } ?: return null
         val encoded = entry.substringAfter('=')
         return runCatching {
-            val bytes = Base64.decode(encoded, Base64.NO_WRAP)
+            val bytes = Base64.Default.decode(encoded)
             String(bytes, Charsets.UTF_8)
         }.getOrNull()
     }
@@ -263,7 +265,7 @@ class SecureIdentityStateManager(private val context: Context) {
     fun cacheFingerprintNickname(fingerprint: String, nickname: String) {
         if (!isValidFingerprint(fingerprint)) return
         val key = fingerprint.lowercase()
-        val encoded = Base64.encodeToString(nickname.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+        val encoded = Base64.Default.encode(nickname.toByteArray(Charsets.UTF_8))
         synchronized(lock) {
             val current = store.getStringSet(KEY_CACHED_FINGERPRINT_NICKNAMES)?.toMutableSet() ?: mutableSetOf()
             current.removeAll { it.startsWith("$key=") }

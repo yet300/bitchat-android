@@ -1,8 +1,10 @@
+@file:OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
+
 package com.app.crypto.secure
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Base64
+import kotlin.io.encoding.Base64
 import androidx.core.content.edit
 import com.app.common.serialization.JsonConfig
 import com.google.crypto.tink.Aead
@@ -70,12 +72,12 @@ internal class TinkSecureKeyValueStore(
     private fun encrypt(key: String, value: String): String {
         val aad = key.toByteArray(Charsets.UTF_8)
         val ciphertext = aead.encrypt(value.toByteArray(Charsets.UTF_8), aad)
-        return Base64.encodeToString(ciphertext, Base64.NO_WRAP)
+        return Base64.Default.encode(ciphertext)
     }
 
     private fun decrypt(key: String, encoded: String): String? = runCatching {
         val aad = key.toByteArray(Charsets.UTF_8)
-        val ciphertext = Base64.decode(encoded, Base64.NO_WRAP)
+        val ciphertext = Base64.Default.decode(encoded)
         String(aead.decrypt(ciphertext, aad), Charsets.UTF_8)
     }.getOrNull()
 }
