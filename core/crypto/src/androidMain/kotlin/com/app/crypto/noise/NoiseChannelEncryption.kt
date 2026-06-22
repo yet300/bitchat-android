@@ -9,11 +9,6 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import com.app.crypto.hash.Sha256
 import java.util.concurrent.ConcurrentHashMap
-import javax.crypto.Cipher
-import javax.crypto.SecretKeyFactory
-import javax.crypto.spec.GCMParameterSpec
-import javax.crypto.spec.PBEKeySpec
-import javax.crypto.spec.SecretKeySpec
 
 /**
  * Channel encryption for password-protected channels - 100% compatible with iOS implementation
@@ -25,14 +20,10 @@ internal class NoiseChannelEncryption {
     
     companion object {
         private const val TAG = "NoiseChannelEncryption"
-        
-        // PBKDF2 parameters (same as iOS)
-        private const val PBKDF2_ITERATIONS = 100000
-        private const val KEY_LENGTH = 256 // 256-bit AES key
     }
-    
-    // Channel keys storage (channelName -> AES key)
-    private val channelKeys = ConcurrentHashMap<String, SecretKeySpec>()
+
+    // Channel keys storage (channelName -> raw 256-bit AES key)
+    private val channelKeys = ConcurrentHashMap<String, ByteArray>()
     
     // Channel passwords (for rekey operations)
     private val channelPasswords = ConcurrentHashMap<String, String>()
@@ -50,7 +41,7 @@ internal class NoiseChannelEncryption {
             }
             
             // Derive key from password using PBKDF2 (same as iOS)
-            val key = deriveChannelKey(password, channel)
+            val key = ChannelCipher.deriveKey(password, channel)
             
             // Store key and password
             channelKeys[channel] = key
@@ -96,20 +87,10 @@ internal class NoiseChannelEncryption {
             ?: throw IllegalStateException("No key available for channel $channel")
         
         val messageBytes = message.toByteArray(Charsets.UTF_8)
-        
+
         return try {
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.ENCRYPT_MODE, key)
-            
-            val iv = cipher.iv
-            val encryptedData = cipher.doFinal(messageBytes)
-            
-            // Combine IV and encrypted data (same format as iOS)
-            val result = ByteArray(iv.size + encryptedData.size)
-            System.arraycopy(iv, 0, result, 0, iv.size)
-            System.arraycopy(encryptedData, 0, result, iv.size, encryptedData.size)
-            
-            result
+            // IV(12) || ciphertext || tag(16) — same wire format as iOS.
+            ChannelCipher.encrypt(key, messageBytes)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to encrypt channel message: ${e.message}")
             throw e
@@ -129,46 +110,9 @@ internal class NoiseChannelEncryption {
         }
         
         return try {
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            
-            // Extract IV (first 12 bytes for GCM) and ciphertext
-            val iv = encryptedData.sliceArray(0..11)
-            val ciphertext = encryptedData.sliceArray(12 until encryptedData.size)
-            
-            val gcmSpec = GCMParameterSpec(128, iv) // 128-bit authentication tag
-            cipher.init(Cipher.DECRYPT_MODE, key, gcmSpec)
-            
-            val decryptedBytes = cipher.doFinal(ciphertext)
-            String(decryptedBytes, Charsets.UTF_8)
+            String(ChannelCipher.decrypt(key, encryptedData), Charsets.UTF_8)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to decrypt channel message: ${e.message}")
-            throw e
-        }
-    }
-    
-    // MARK: - Key Derivation
-    
-    /**
-     * Derive AES key from password using PBKDF2 (same parameters as iOS)
-     */
-    private fun deriveChannelKey(password: String, channel: String): SecretKeySpec {
-        try {
-            val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-            
-            // Use channel name as salt (UTF-8 bytes)
-            val salt = channel.toByteArray(Charsets.UTF_8)
-            
-            val spec = PBEKeySpec(
-                password.toCharArray(),
-                salt,
-                PBKDF2_ITERATIONS,
-                KEY_LENGTH
-            )
-            
-            val secretKey = factory.generateSecret(spec)
-            return SecretKeySpec(secretKey.encoded, "AES")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to derive channel key: ${e.message}")
             throw e
         }
     }
@@ -183,7 +127,7 @@ internal class NoiseChannelEncryption {
         val key = channelKeys[channel] ?: return null
         
         return try {
-            val hash = Sha256.digest(key.encoded)
+            val hash = Sha256.digest(key)
             hash.joinToString("") { "%02x".format(it) }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to calculate key commitment: ${e.message}")
