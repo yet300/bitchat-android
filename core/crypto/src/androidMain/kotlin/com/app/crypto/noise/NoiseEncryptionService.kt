@@ -5,7 +5,7 @@ import com.app.common.utils.Log
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.hash.Sha256
-import java.security.SecureRandom
+import com.app.crypto.sign.Ed25519
 
 /**
  * Main Noise encryption service - 100% compatible with iOS implementation
@@ -408,8 +408,6 @@ internal class NoiseEncryptionService(
      */
     fun signData(data: ByteArray): ByteArray? {
         return try {
-            // For simplicity, we'll implement this using BouncyCastle which should be available
-            // In a production system, you might want to use the Android Keystore
             signWithEd25519(data, signingPrivateKey)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to sign data: ${e.message}")
@@ -433,54 +431,19 @@ internal class NoiseEncryptionService(
      * Generate a new Ed25519 key pair for signing using BouncyCastle
      * Returns (privateKey, publicKey) as 32-byte arrays
      */
-    private fun generateEd25519KeyPair(): Pair<ByteArray, ByteArray> {
-        try {
-            // Use BouncyCastle for proper Ed25519 key generation
-            val keyGen = org.bouncycastle.crypto.generators.Ed25519KeyPairGenerator()
-            keyGen.init(org.bouncycastle.crypto.params.Ed25519KeyGenerationParameters(SecureRandom()))
-            val keyPair = keyGen.generateKeyPair()
-            
-            val privateKey = (keyPair.private as org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters).encoded
-            val publicKey = (keyPair.public as org.bouncycastle.crypto.params.Ed25519PublicKeyParameters).encoded
-            
-            return Pair(privateKey, publicKey)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to generate Ed25519 key pair: ${e.message}")
-            throw e
-        }
-    }
+    private fun generateEd25519KeyPair(): Pair<ByteArray, ByteArray> = Ed25519.generateKeyPair()
 
     /**
      * Sign data with Ed25519 private key using BouncyCastle
      */
-    private fun signWithEd25519(data: ByteArray, privateKey: ByteArray): ByteArray {
-        try {
-            val privateKeyParams = org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters(privateKey, 0)
-            val signer = org.bouncycastle.crypto.signers.Ed25519Signer()
-            signer.init(true, privateKeyParams)
-            signer.update(data, 0, data.size)
-            return signer.generateSignature()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to sign data with Ed25519: ${e.message}")
-            throw e
-        }
-    }
+    private fun signWithEd25519(data: ByteArray, privateKey: ByteArray): ByteArray =
+        Ed25519.sign(privateKey, data)
 
     /**
      * Verify Ed25519 signature using BouncyCastle
      */
-    private fun verifyWithEd25519(signature: ByteArray, data: ByteArray, publicKey: ByteArray): Boolean {
-        try {
-            val publicKeyParams = org.bouncycastle.crypto.params.Ed25519PublicKeyParameters(publicKey, 0)
-            val verifier = org.bouncycastle.crypto.signers.Ed25519Signer()
-            verifier.init(false, publicKeyParams)
-            verifier.update(data, 0, data.size)
-            return verifier.verifySignature(signature)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to verify Ed25519 signature: ${e.message}")
-            return false
-        }
-    }
+    private fun verifyWithEd25519(signature: ByteArray, data: ByteArray, publicKey: ByteArray): Boolean =
+        Ed25519.verify(publicKey, data, signature)
 
     /**
      * Clean shutdown
