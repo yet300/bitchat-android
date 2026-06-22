@@ -4,10 +4,12 @@ package com.yet.bitmessage.feature.onboarding.store
 
 import com.app.domain.model.TransportKind
 import com.app.domain.model.TransportStatus
+import com.app.domain.repository.BatteryOptimizationRepository
 import com.app.domain.repository.ConnectivityRepository
 import com.app.domain.repository.NotificationPermissionRepository
 import com.app.domain.repository.OnboardingRepository
 import com.app.domain.repository.SettingsRepository
+import com.app.domain.usecase.RequestBatteryExemptionOnceUseCase
 import com.arkivanov.mvikotlin.extensions.coroutines.labels
 import com.arkivanov.mvikotlin.main.store.DefaultStoreFactory
 import com.yet.bitmessage.feature.onboarding.OnboardingStep
@@ -62,12 +64,29 @@ class OnboardingStoreFactoryTest {
         override suspend fun requestPermission() { requests++ }
     }
 
+    private class FakeBatteryOptimizationRepository : BatteryOptimizationRepository {
+        var asked = false
+        var requests = 0
+        override fun isExempt(): Boolean = false
+        override fun hasAsked(): Boolean = asked
+        override fun markAsked() { asked = true }
+        override suspend fun requestExemption() { requests++ }
+    }
+
     private fun store(
         settings: SettingsRepository = FakeSettingsRepository(),
         onboarding: OnboardingRepository = FakeOnboardingRepository(),
         connectivity: ConnectivityRepository = FakeConnectivityRepository(),
         notifications: NotificationPermissionRepository = FakeNotificationPermissionRepository(),
-    ) = OnboardingStoreFactory(DefaultStoreFactory(), settings, onboarding, connectivity, notifications).create()
+        battery: BatteryOptimizationRepository = FakeBatteryOptimizationRepository(),
+    ) = OnboardingStoreFactory(
+        DefaultStoreFactory(),
+        settings,
+        onboarding,
+        connectivity,
+        notifications,
+        RequestBatteryExemptionOnceUseCase(battery),
+    ).create()
 
     @Test
     fun loads_the_current_nickname() = runTest {
@@ -104,15 +123,18 @@ class OnboardingStoreFactoryTest {
     fun primer_steps_request_permission_then_advance_and_denial_does_not_block() = runTest {
         val connectivity = FakeConnectivityRepository()
         val notifications = FakeNotificationPermissionRepository()
-        val store = store(connectivity = connectivity, notifications = notifications)
+        val battery = FakeBatteryOptimizationRepository()
+        val store = store(connectivity = connectivity, notifications = notifications, battery = battery)
 
         store.accept(OnboardingStore.Intent.Primary) // WELCOME -> NICKNAME (no request)
         store.accept(OnboardingStore.Intent.Primary) // NICKNAME -> NEARBY (no request)
         assertEquals(OnboardingStep.NEARBY, store.state.step)
         assertTrue(connectivity.enabled.isEmpty())
+        assertEquals(0, battery.requests)
 
-        store.accept(OnboardingStore.Intent.Primary) // NEARBY: enable bluetooth, then advance
+        store.accept(OnboardingStore.Intent.Primary) // NEARBY: enable bluetooth + battery exemption, then advance
         assertEquals(listOf(TransportKind.BLUETOOTH), connectivity.enabled)
+        assertEquals(1, battery.requests)
         assertEquals(OnboardingStep.NOTIFICATIONS, store.state.step)
 
         store.accept(OnboardingStore.Intent.Primary) // NOTIFICATIONS: request, then advance

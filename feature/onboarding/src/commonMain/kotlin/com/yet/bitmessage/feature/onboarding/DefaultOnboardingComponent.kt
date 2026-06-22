@@ -2,10 +2,12 @@ package com.yet.bitmessage.feature.onboarding
 
 import com.app.common.decompose.asValue
 import com.app.common.decompose.coroutineScope
+import com.app.domain.repository.BatteryOptimizationRepository
 import com.app.domain.repository.ConnectivityRepository
 import com.app.domain.repository.NotificationPermissionRepository
 import com.app.domain.repository.OnboardingRepository
 import com.app.domain.repository.SettingsRepository
+import com.app.domain.usecase.RequestBatteryExemptionOnceUseCase
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.value.Value
 import com.arkivanov.decompose.value.operator.map
@@ -61,6 +63,7 @@ internal class DefaultOnboardingComponentFactory(
     private val onboardingRepository: OnboardingRepository,
     private val connectivityRepository: ConnectivityRepository,
     private val notificationPermissionRepository: NotificationPermissionRepository,
+    private val batteryOptimizationRepository: BatteryOptimizationRepository,
 ) : OnboardingComponent.Factory {
     override fun create(componentContext: ComponentContext, onFinished: () -> Unit): OnboardingComponent =
         DefaultOnboardingComponent(
@@ -71,6 +74,7 @@ internal class DefaultOnboardingComponentFactory(
                 onboardingRepository = onboardingRepository,
                 connectivityRepository = connectivityRepository,
                 notificationPermissionRepository = notificationPermissionRepository,
+                requestBatteryExemptionOnce = RequestBatteryExemptionOnceUseCase(batteryOptimizationRepository),
             ),
             onFinished = onFinished,
         )

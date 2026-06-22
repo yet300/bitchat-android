@@ -5,6 +5,7 @@ import com.app.domain.repository.ConnectivityRepository
 import com.app.domain.repository.NotificationPermissionRepository
 import com.app.domain.repository.OnboardingRepository
 import com.app.domain.repository.SettingsRepository
+import com.app.domain.usecase.RequestBatteryExemptionOnceUseCase
 import com.arkivanov.mvikotlin.core.store.Reducer
 import com.arkivanov.mvikotlin.core.store.SimpleBootstrapper
 import com.arkivanov.mvikotlin.core.store.Store
@@ -19,6 +20,7 @@ internal class OnboardingStoreFactory(
     private val onboardingRepository: OnboardingRepository,
     private val connectivityRepository: ConnectivityRepository,
     private val notificationPermissionRepository: NotificationPermissionRepository,
+    private val requestBatteryExemptionOnce: RequestBatteryExemptionOnceUseCase,
 ) {
     fun create(): OnboardingStore =
         object : OnboardingStore,
@@ -58,7 +60,11 @@ internal class OnboardingStoreFactory(
                 // dialog, settings fallback) and then advances — denial never blocks the flow.
                 OnboardingStore.Intent.Primary -> scope.launch {
                     when (state().step) {
-                        OnboardingStep.NEARBY -> connectivityRepository.enable(TransportKind.BLUETOOTH)
+                        OnboardingStep.NEARBY -> {
+                            connectivityRepository.enable(TransportKind.BLUETOOTH)
+                            // Optional, one-time: keep the background mesh alive under OEM standby.
+                            requestBatteryExemptionOnce()
+                        }
                         OnboardingStep.NOTIFICATIONS -> notificationPermissionRepository.requestPermission()
                         else -> Unit
                     }
