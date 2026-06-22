@@ -1,10 +1,8 @@
 import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryExtension
-import org.gradle.api.JavaVersion
 import org.gradle.api.Project
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
-import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 
-private const val JDK_VERSION = 11
+private const val JDK_VERSION = 17
 
 internal fun Project.configureKotlinMultiplatform(
     extension: KotlinMultiplatformExtension,
@@ -19,7 +17,11 @@ internal fun Project.configureKotlinMultiplatform(
         minSdk = libs.findVersion("minSdk").get().requiredVersion.toInt()
 
         // Run commonTest on the JVM host (fast) instead of only the iOS simulator.
-        withHostTest {}
+        // Include merged android resources + manifest so Robolectric host tests
+        // (e.g. :core:crypto EncryptionServiceTest) can run.
+        withHostTest {
+            isIncludeAndroidResources = true
+        }
     }
 
     iosArm64()

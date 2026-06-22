@@ -28,6 +28,11 @@ kermit = "2.1.0"
 bouncycastle = "1.70"
 tink-android = "1.22.0"
 
+# KMP cryptography — pinned via throwaway spike against Kotlin 2.4.0 (android + iosArm64/SimulatorArm64)
+cryptography-kotlin = "0.6.0"     # whyoleg/cryptography-kotlin (SHA/HMAC/HKDF/PBKDF2/AES-GCM/Ed25519/random)
+kotlincrypto-blake2 = "0.8.0"     # KotlinCrypto/hash blake2
+signum-supreme = "0.14.0"         # A-SIT Signum/Supreme (hardware-backed keys); pulls indispensable transitively
+
 multiplatformSettings = "1.3.0"
 
 
@@ -93,6 +98,13 @@ kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
 # Cryptography
 bouncycastle-bcprov = { module = "org.bouncycastle:bcprov-jdk15on", version.ref = "bouncycastle" }
 google-tink-android = { module = "com.google.crypto.tink:tink-android", version.ref = "tink-android" }
+
+# KMP cryptography (see migration: :core:crypto → KMP)
+cryptography-core = { module = "dev.whyoleg.cryptography:cryptography-core", version.ref = "cryptography-kotlin" }
+cryptography-provider-jdk = { module = "dev.whyoleg.cryptography:cryptography-provider-jdk", version.ref = "cryptography-kotlin" }
+cryptography-provider-apple = { module = "dev.whyoleg.cryptography:cryptography-provider-apple", version.ref = "cryptography-kotlin" }
+kotlincrypto-blake2 = { module = "org.kotlincrypto.hash:blake2", version.ref = "kotlincrypto-blake2" }
+signum-supreme = { module = "at.asitplus.signum:supreme", version.ref = "signum-supreme" }
 
 # JSON
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
