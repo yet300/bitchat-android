@@ -3,7 +3,6 @@ import org.gradle.api.JavaVersion
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.dependencies
 
-private const val JDK_VERSION = 11
 
 /**
  * Shared configuration for plain Android library modules (e.g. core:data, core:transport,
@@ -23,8 +22,8 @@ internal fun Project.configureAndroidLibrary(
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     // Local unit tests run on the JVM via Robolectric (Tink/Context need an Android runtime).
