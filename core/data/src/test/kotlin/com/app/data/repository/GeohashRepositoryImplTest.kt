@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class, ExperimentalCoroutinesApi::class)
 
 package com.app.data.repository
 
@@ -19,10 +19,13 @@ import com.app.transport.nostr.NostrKind
 import com.app.transport.nostr.NostrRelayManager
 import com.app.transport.nostr.PoWPreferenceManager
 import com.app.transport.nostr.RelayDirectory
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -93,7 +96,8 @@ class GeohashRepositoryImplTest {
             powPreferenceManager = pow,
             aliasRegistry = GeohashAliasRegistry(settings),
             conversationRegistry = GeohashConversationRegistry(settings),
-            settings = settings,
+            geohashDao = InMemoryDatabase().geohashDao,
+            scope = CoroutineScope(UnconfinedTestDispatcher()),
         )
     }
 
