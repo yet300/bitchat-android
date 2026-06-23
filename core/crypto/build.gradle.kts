@@ -12,10 +12,8 @@ kotlin {
             implementation(libs.stately.concurrency)
         }
         androidMain.dependencies {
-            // Tink only (Ed25519 moved off BouncyCastle to cryptography-kotlin in step 4);
-            // BouncyCastle stays in :core:transport for Nostr.
             implementation(libs.google.tink.android)
-            implementation(libs.cryptography.provider.jdk)
+            implementation(libs.cryptography.provider.jdk.bc)
             implementation(libs.androidx.core.ktx)
         }
         nativeMain.dependencies {

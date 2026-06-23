@@ -101,7 +101,7 @@ google-tink-android = { module = "com.google.crypto.tink:tink-android", version.
 
 # KMP cryptography (see migration: :core:crypto → KMP)
 cryptography-core = { module = "dev.whyoleg.cryptography:cryptography-core", version.ref = "cryptography-kotlin" }
-cryptography-provider-jdk = { module = "dev.whyoleg.cryptography:cryptography-provider-jdk", version.ref = "cryptography-kotlin" }
+cryptography-provider-jdk-bc = { module = "dev.whyoleg.cryptography:cryptography-provider-jdk-bc", version.ref = "cryptography-kotlin" }
 cryptography-provider-apple = { module = "dev.whyoleg.cryptography:cryptography-provider-apple", version.ref = "cryptography-kotlin" }
 kotlincrypto-blake2 = { module = "org.kotlincrypto.hash:blake2", version.ref = "kotlincrypto-blake2" }
 signum-supreme = { module = "at.asitplus.signum:supreme", version.ref = "signum-supreme" }

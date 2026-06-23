@@ -13,7 +13,7 @@ dependencies {
     implementation(libs.ktor.client.websockets)
 
     implementation(libs.cryptography.core)
-    implementation(libs.cryptography.provider.jdk)
+    implementation(libs.cryptography.provider.jdk.bc)
     implementation(libs.secp256k1.jni.android)
     testImplementation(libs.secp256k1.jni.jvm)
     implementation(libs.androidx.core.ktx)

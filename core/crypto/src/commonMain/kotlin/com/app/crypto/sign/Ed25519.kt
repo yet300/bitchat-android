@@ -10,7 +10,8 @@ import dev.whyoleg.cryptography.algorithms.EdDSA
  * are the standard 64-byte RFC 8032 form. Ed25519 is deterministic, so signatures are
  * byte-identical to the previous BouncyCastle implementation for the same key + message.
  *
- * Backed by the platform cryptography-kotlin provider (JDK on android, CryptoKit on apple).
+ * Backed by the platform cryptography-kotlin provider (BouncyCastle-backed JDK on Android,
+ * CryptoKit/CommonCrypto on Apple).
  */
 internal object Ed25519 {
 
