@@ -1,11 +1,15 @@
+@file:OptIn(ExperimentalCoroutinesApi::class)
+
 package com.app.data.repository
 
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.domain.model.PeerId
 import com.app.domain.repository.IdentityRepository
-import com.app.common.settings.SettingsStore
 import com.app.data.routing.PeerAddressResolver
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -32,11 +36,12 @@ class ContactRepositoryAliasTest {
         favorites = mock()
         resolver = mock()
         repository = ContactRepositoryImpl(
-            settings = mock<SettingsStore>(),
+            contactDao = InMemoryDatabase().contactDao,
             favorites = favorites,
             fingerprints = PeerFingerprintManager(),
             peerAddressResolver = resolver,
             identityRepository = mock<IdentityRepository>(),
+            scope = CoroutineScope(UnconfinedTestDispatcher()),
         )
     }
 
