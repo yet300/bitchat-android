@@ -1,5 +1,7 @@
 package com.app.data.di
 
+import com.app.data.DbMessagePersistence
+import com.app.data.MessagePersistence
 import com.app.data.repository.ChannelRepositoryImpl
 import com.app.data.repository.ContactRepositoryImpl
 import com.app.data.repository.ConversationPrefsRepositoryImpl
@@ -93,6 +95,9 @@ abstract class DataBindings {
 
     @Binds
     internal abstract val EncryptionServiceChannelCipher.bindChannelCipher: ChannelCipher
+
+    @Binds
+    internal abstract val DbMessagePersistence.bindMessagePersistence: MessagePersistence
 
     @Binds
     internal abstract val MessageRepositoryImpl.bindMessages: MessageRepository

@@ -14,9 +14,13 @@ import com.app.transport.model.DeliveryStatus
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlin.time.Clock
 
 /**
@@ -37,7 +41,36 @@ class AppStateStore(
     // ContactRepository's transitive deps (mesh) write back into this sink, so a deferred provider
     // breaks that construction cycle.
     private val contacts: () -> ContactRepository,
+    // Persists timelines into the encrypted DB and rehydrates them on startup. Defaults to a no-op so
+    // unit tests of the in-memory behaviour need not wire a database.
+    private val persistence: MessagePersistence = MessagePersistence.NoOp,
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) : IncomingMessageSink {
+
+    /**
+     * Rehydrate the timelines and de-dup state from the DB. Idempotent; runs once at startup (and is
+     * called directly by persistence tests). With the default [MessagePersistence.NoOp] it is a no-op.
+     */
+    suspend fun hydrate() {
+        val loaded = persistence.load(TIMELINE_CAP.toLong())
+        if (loaded.isEmpty()) return
+        synchronized(this) {
+            loaded.forEach { (key, messages) ->
+                messages.forEach { msg ->
+                    seenMessageIds.add(msg.id)
+                    if (key == publicConversationKey()) seenPublicMessageKeys.add(publicMessageKey(msg))
+                }
+                val capped = messages.takeLast(TIMELINE_CAP)
+                when {
+                    key == publicConversationKey() -> _publicMessages.value = capped
+                    key.startsWith("private:") ->
+                        _privateMessages.value = _privateMessages.value + (key.removePrefix("private:") to capped)
+                    key.startsWith("channel:") ->
+                        _channelMessages.value = _channelMessages.value + (key.removePrefix("channel:") to capped)
+                }
+            }
+        }
+    }
 
     companion object {
         private const val SEEN_IDS_CAP = 2048
@@ -159,6 +192,7 @@ class AppStateStore(
             }
             _publicMessages.value = (_publicMessages.value + msg).takeLast(TIMELINE_CAP)
             countUnread(publicConversationKey(), msg)
+            persistence.persist(publicConversationKey(), msg)
         }
     }
 
@@ -181,6 +215,7 @@ class AppStateStore(
             map[peerID] = ((map[peerID] ?: emptyList()) + msg).takeLast(TIMELINE_CAP)
             _privateMessages.value = map
             countUnread(privateConversationKey(peerID), msg)
+            persistence.persist(privateConversationKey(peerID), msg)
         }
     }
 
@@ -217,6 +252,7 @@ class AppStateStore(
                 if (changed) _channelMessages.value = map
             }
         }
+        persistence.updateStatus(messageID, status)
     }
 
     /** Returns a copy with [messageID]'s status updated, or null if absent / would downgrade. */
@@ -243,6 +279,7 @@ class AppStateStore(
             map[channel] = ((map[channel] ?: emptyList()) + msg).takeLast(TIMELINE_CAP)
             _channelMessages.value = map
             countUnread(channelConversationKey(channel), msg)
+            persistence.persist(channelConversationKey(channel), msg)
         }
     }
 
@@ -254,11 +291,13 @@ class AppStateStore(
             _privateMessages.value = _privateMessages.value.mapValues { (_, list) -> list.filterNot { it.id == messageId } }
             _channelMessages.value = _channelMessages.value.mapValues { (_, list) -> list.filterNot { it.id == messageId } }
         }
+        persistence.delete(messageId)
     }
 
     /** Clear the public mesh timeline. */
     fun clearPublic() {
         synchronized(this) { _publicMessages.value = emptyList() }
+        persistence.clear(publicConversationKey())
     }
 
     /** Clear a single private conversation's timeline. */
@@ -266,6 +305,7 @@ class AppStateStore(
         synchronized(this) {
             _privateMessages.value = _privateMessages.value.toMutableMap().apply { remove(peerID) }
         }
+        persistence.clear(privateConversationKey(peerID))
     }
 
     /** Clear a single channel's timeline. */
@@ -273,6 +313,7 @@ class AppStateStore(
         synchronized(this) {
             _channelMessages.value = _channelMessages.value.toMutableMap().apply { remove(channel) }
         }
+        persistence.clear(channelConversationKey(channel))
     }
 
     // Clear all in-memory state (used for full app shutdown)
@@ -286,5 +327,11 @@ class AppStateStore(
             _channelMessages.value = emptyMap()
             _unreadCounts.value = emptyMap()
         }
+        persistence.clear(null)
+    }
+
+    // Declared last so all timeline/de-dup fields above are initialized before hydration runs.
+    init {
+        scope.launch { hydrate() }
     }
 }

@@ -47,6 +47,7 @@ class DatabaseDaoTest {
             attachment_type = null,
             pow_difficulty = null,
             channel = null,
+            wire_json = null,
         )
 
     @Test

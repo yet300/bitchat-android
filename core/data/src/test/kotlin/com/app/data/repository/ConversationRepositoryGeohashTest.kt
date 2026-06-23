@@ -40,7 +40,7 @@ class ConversationRepositoryGeohashTest {
         whenever(encryptionService.getIdentityFingerprint()).thenReturn(MY_PEER_ID + "cccc")
         seenMessageStore = mock()
         whenever(seenMessageStore.hasRead(any())).thenReturn(false)
-        appStateStore = AppStateStore(encryptionService, seenMessageStore) { FakeContactRepository() }
+        appStateStore = AppStateStore(encryptionService, seenMessageStore, { FakeContactRepository() })
 
         val mesh = mock<BluetoothMeshService>()
         whenever(mesh.myPeerID).thenReturn(MY_PEER_ID)

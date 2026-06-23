@@ -33,7 +33,7 @@ class AppStateStoreBlockTest {
         whenever(seen.hasRead(any())).thenReturn(false)
         // Only BLOCKED_PEER_ID is blocked.
         val contacts = FakeContactRepository(blocked = setOf(PeerId(BLOCKED_PEER_ID)))
-        store = AppStateStore(encryption, seen) { contacts }
+        store = AppStateStore(encryption, seen, { contacts })
     }
 
     private fun message(id: String, sender: String?) = BitchatMessage(
