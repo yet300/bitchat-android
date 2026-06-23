@@ -16,7 +16,10 @@ CREATE TABLE message (
     attachment_path TEXT,
     attachment_type TEXT,
     pow_difficulty  INTEGER,
-    channel         TEXT
+    channel         TEXT,
+    -- Full serialized wire message (BitchatMessage JSON) — the lossless source for reconstruction.
+    -- The columns above are the searchable projection of it.
+    wire_json       TEXT
 );
 
 -- Indices the future indexed-search query (FIX_BACKLOG §C) will read. Search itself is NOT built here.
@@ -28,12 +31,21 @@ CREATE INDEX message_content      ON message(content);
 selectByConversation:
 SELECT * FROM message WHERE conversation_id = ? ORDER BY timestamp ASC;
 
+selectById:
+SELECT * FROM message WHERE id = ?;
+
+selectConversationIds:
+SELECT DISTINCT conversation_id FROM message;
+
+selectRecentByConversation:
+SELECT * FROM message WHERE conversation_id = ? ORDER BY timestamp DESC LIMIT ?;
+
 upsert:
 INSERT OR REPLACE INTO message(
     id, conversation_id, sender_peer_id, sender_name, content, timestamp, type,
     is_mine, is_relay, mentions, delivery_status, attachment_path, attachment_type,
-    pow_difficulty, channel
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    pow_difficulty, channel, wire_json
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 updateDeliveryStatus:
 UPDATE message SET delivery_status = ? WHERE id = ?;

@@ -37,7 +37,7 @@ class MessageRepositoryImplTest {
         whenever(encryption.getIdentityFingerprint()).thenReturn("ffffffffffffffff")
         val seen = mock<SeenMessageStore>()
         whenever(seen.hasRead(any())).thenReturn(false)
-        appStateStore = AppStateStore(encryption, seen) { FakeContactRepository() }
+        appStateStore = AppStateStore(encryption, seen, { FakeContactRepository() })
         repository = MessageRepositoryImpl(appStateStore, MeshPeerIdSource { peerId })
     }
 

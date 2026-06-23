@@ -37,12 +37,28 @@ class MessageDao(
             attachment_type = message.attachment_type,
             pow_difficulty = message.pow_difficulty,
             channel = message.channel,
+            wire_json = message.wire_json,
         )
     }
 
     suspend fun byConversation(conversationId: String): List<Message> =
         withContext(dispatchers.io) {
             databaseManager.getDb().messageQueries.selectByConversation(conversationId).executeAsList()
+        }
+
+    suspend fun byId(id: String): Message? = withContext(dispatchers.io) {
+        databaseManager.getDb().messageQueries.selectById(id).executeAsOneOrNull()
+    }
+
+    suspend fun conversationIds(): List<String> = withContext(dispatchers.io) {
+        databaseManager.getDb().messageQueries.selectConversationIds().executeAsList()
+    }
+
+    /** Most-recent [limit] rows for a conversation, returned oldest-first (ready to append). */
+    suspend fun recentByConversation(conversationId: String, limit: Long): List<Message> =
+        withContext(dispatchers.io) {
+            databaseManager.getDb().messageQueries
+                .selectRecentByConversation(conversationId, limit).executeAsList().asReversed()
         }
 
     fun observeByConversation(conversationId: String): Flow<List<Message>> = flow {

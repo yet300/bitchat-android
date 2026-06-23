@@ -78,7 +78,7 @@ class GeohashRepositoryImplTest {
         whenever(encryptionService.getIdentityFingerprint()).thenReturn("ffffffffffffffff")
         val seen = mock<SeenMessageStore>()
         whenever(seen.hasRead(any())).thenReturn(false)
-        appStateStore = AppStateStore(encryptionService, seen) { FakeContactRepository() }
+        appStateStore = AppStateStore(encryptionService, seen, { FakeContactRepository() })
 
         relayManager = mock()
         val relayDirectory = mock<RelayDirectory>()
