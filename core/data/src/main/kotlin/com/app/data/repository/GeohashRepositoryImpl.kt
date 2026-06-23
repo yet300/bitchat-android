@@ -3,7 +3,7 @@
 package com.app.data.repository
 
 import com.app.common.utils.Log
-import com.app.common.settings.SettingsStore
+import com.app.database.dao.GeohashDao
 import com.app.data.AppStateStore
 import com.app.data.nostr.CurrentGeohashSource
 import com.app.domain.model.ConversationId
@@ -24,9 +24,11 @@ import com.app.transport.nostr.RelayDirectory
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
@@ -50,10 +52,20 @@ internal class GeohashRepositoryImpl(
     private val powPreferenceManager: PoWPreferenceManager,
     private val aliasRegistry: GeohashAliasRegistry,
     private val conversationRegistry: GeohashConversationRegistry,
-    private val settings: SettingsStore,
+    private val geohashDao: GeohashDao,
+    private val scope: CoroutineScope,
 ) : GeohashRepository, CurrentGeohashSource {
 
     private val lock = Any()
+
+    // Synchronous mirror of the blocked-pubkeys set (the DB is the source of truth). ingest() runs on
+    // the non-suspend relay path and must consult block state without suspending; the mirror is
+    // hydrated from the DB on start and written through on every change.
+    private val blockedMirror = MutableStateFlow<Set<String>>(emptySet())
+
+    init {
+        scope.launch { geohashDao.observeBlocked().collect { blockedMirror.value = it.toSet() } }
+    }
 
     // geohash -> (pubkeyHex(lower) -> last seen)
     private val participants = mutableMapOf<String, MutableMap<String, Instant>>()
@@ -102,9 +114,9 @@ internal class GeohashRepositoryImpl(
 
     override suspend fun setBlocked(pubkeyHex: String, blocked: Boolean) {
         val key = pubkeyHex.lowercase()
-        val current = blockedSet()
-        val next = if (blocked) current + key else current - key
-        settings.putString(BLOCKED_KEY, next.joinToString(","))
+        if (blocked) geohashDao.insertBlocked(key) else geohashDao.deleteBlocked(key)
+        // Write through so the synchronous ingest path sees the change immediately.
+        blockedMirror.value = if (blocked) blockedMirror.value + key else blockedMirror.value - key
         refreshDerived()
     }
 
@@ -273,8 +285,7 @@ internal class GeohashRepositoryImpl(
 
     private fun isBlocked(pubkeyHex: String): Boolean = pubkeyHex.lowercase() in blockedSet()
 
-    private fun blockedSet(): Set<String> =
-        settings.getStringOrNull(BLOCKED_KEY)?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+    private fun blockedSet(): Set<String> = blockedMirror.value
 
     private fun aliasFor(pubkeyHex: String): String = "nostr_${pubkeyHex.take(16)}"
 
@@ -283,7 +294,6 @@ internal class GeohashRepositoryImpl(
     private companion object {
         const val TAG = "GeohashRepositoryImpl"
         const val ANON = "anon"
-        const val BLOCKED_KEY = "geohash_blocked_pubkeys"
         const val SEEN_CAP = 2000
         const val PRESENCE_TTL_MS = 5 * 60 * 1000L
         const val SUBSCRIBE_WINDOW_MS = 60 * 60 * 1000L

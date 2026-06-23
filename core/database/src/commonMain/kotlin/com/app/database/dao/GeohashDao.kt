@@ -49,6 +49,11 @@ class GeohashDao(
         databaseManager.getDb().geohashBlockedQueries.selectAll().executeAsList()
     }
 
+    fun observeBlocked(): Flow<List<String>> = flow {
+        val db = databaseManager.getDb()
+        emitAll(db.geohashBlockedQueries.selectAll().asFlow().mapToList(dispatchers.io))
+    }
+
     suspend fun insertBlocked(pubkeyHex: String) = withContext(dispatchers.io) {
         databaseManager.getDb().geohashBlockedQueries.insert(pubkeyHex)
     }
