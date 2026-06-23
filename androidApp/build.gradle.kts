@@ -90,6 +90,7 @@ dependencies {
     implementation(projects.core.crypto)
     implementation(projects.core.transport)
     implementation(projects.core.data)
+    implementation(projects.core.database)
 
     // Phase C CMP UI + feature modules (their Metro @ContributesTo bindings aggregate
     // into AndroidAppGraph so rootFactory resolves; RootComponent type for the activity).

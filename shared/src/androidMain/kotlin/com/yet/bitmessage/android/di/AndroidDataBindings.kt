@@ -27,6 +27,8 @@ import com.app.transport.nostr.PoWPreferenceManager
 import com.app.transport.notification.ServiceNotifier
 import com.app.domain.repository.CameraPermissionRepository
 import com.app.domain.repository.ConnectivityRepository
+import com.app.domain.repository.DatabaseKeyProvider
+import com.yet.bitmessage.android.database.AndroidDatabaseKeyProvider
 import com.app.common.settings.SettingsStore
 import com.app.domain.repository.BatteryOptimizationRepository
 import com.app.domain.repository.IdentityRepository
@@ -95,6 +97,12 @@ object AndroidDataBindings {
     @SingleIn(AppScope::class)
     fun provideSecureIdentityStateManager(context: Context): SecureIdentityStateManager =
         SecureIdentityStateManager(context)
+
+    /** Hardware-rooted SQLCipher passphrase (stored via the encrypted secret store, never plaintext). */
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideDatabaseKeyProvider(secureStore: SecureIdentityStateManager): DatabaseKeyProvider =
+        AndroidDatabaseKeyProvider(secureStore)
 
     /** Fragment reassembly state shared by the BLE stack and the BMS engine. */
     @Provides

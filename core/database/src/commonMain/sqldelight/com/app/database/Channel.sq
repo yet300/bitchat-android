@@ -1,0 +1,35 @@
+-- Channel membership + protection + key-commitment (moves out of plaintext multiplatform-settings:
+-- joined_channels, password_protected_channels, channel_key_commitment_* in ChannelRepositoryImpl).
+-- retention_policy is non-threat but colocated for cohesion.
+CREATE TABLE channel (
+    tag                  TEXT    NOT NULL PRIMARY KEY,
+    is_joined            INTEGER NOT NULL DEFAULT 0,
+    is_password_protected INTEGER NOT NULL DEFAULT 0,
+    key_commitment       TEXT,
+    retention_policy     TEXT    NOT NULL DEFAULT 'KEEP_ALL'
+);
+
+selectAll:
+SELECT * FROM channel;
+
+selectJoined:
+SELECT tag FROM channel WHERE is_joined = 1;
+
+selectByTag:
+SELECT * FROM channel WHERE tag = ?;
+
+upsert:
+INSERT OR REPLACE INTO channel(tag, is_joined, is_password_protected, key_commitment, retention_policy)
+VALUES (?, ?, ?, ?, ?);
+
+setJoined:
+UPDATE channel SET is_joined = ? WHERE tag = ?;
+
+setRetention:
+UPDATE channel SET retention_policy = ? WHERE tag = ?;
+
+deleteByTag:
+DELETE FROM channel WHERE tag = ?;
+
+deleteAll:
+DELETE FROM channel;

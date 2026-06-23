@@ -1,0 +1,48 @@
+-- Message timeline (source of truth for the UI; replaces the in-memory AppStateStore timelines).
+-- conversation_id uses the existing AppStateStore key scheme:
+--   "public" | "private:<peerId>" | "channel:<tag>" | "geo:<geohash>"
+CREATE TABLE message (
+    id              TEXT    NOT NULL PRIMARY KEY,
+    conversation_id TEXT    NOT NULL,
+    sender_peer_id  TEXT,
+    sender_name     TEXT    NOT NULL,
+    content         TEXT    NOT NULL,
+    timestamp       INTEGER NOT NULL,
+    type            TEXT    NOT NULL,
+    is_mine         INTEGER NOT NULL DEFAULT 0,
+    is_relay        INTEGER NOT NULL DEFAULT 0,
+    mentions        TEXT,
+    delivery_status TEXT,
+    attachment_path TEXT,
+    attachment_type TEXT,
+    pow_difficulty  INTEGER,
+    channel         TEXT
+);
+
+-- Indices the future indexed-search query (FIX_BACKLOG §C) will read. Search itself is NOT built here.
+CREATE INDEX message_conversation ON message(conversation_id, timestamp);
+CREATE INDEX message_sender       ON message(sender_peer_id);
+CREATE INDEX message_timestamp    ON message(timestamp);
+CREATE INDEX message_content      ON message(content);
+
+selectByConversation:
+SELECT * FROM message WHERE conversation_id = ? ORDER BY timestamp ASC;
+
+upsert:
+INSERT OR REPLACE INTO message(
+    id, conversation_id, sender_peer_id, sender_name, content, timestamp, type,
+    is_mine, is_relay, mentions, delivery_status, attachment_path, attachment_type,
+    pow_difficulty, channel
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+updateDeliveryStatus:
+UPDATE message SET delivery_status = ? WHERE id = ?;
+
+deleteById:
+DELETE FROM message WHERE id = ?;
+
+deleteByConversation:
+DELETE FROM message WHERE conversation_id = ?;
+
+deleteAll:
+DELETE FROM message;

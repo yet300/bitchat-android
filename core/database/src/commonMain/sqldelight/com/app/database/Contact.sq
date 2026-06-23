@@ -1,0 +1,40 @@
+-- Peer favorites / blocked / fingerprints (moves out of plaintext multiplatform-settings:
+-- the "favorites" and "blocked_users" sets in ContactRepositoryImpl).
+CREATE TABLE contact (
+    fingerprint        TEXT    NOT NULL PRIMARY KEY,
+    noise_key_hex      TEXT    NOT NULL,
+    nostr_pubkey       TEXT,
+    nickname           TEXT,
+    is_favorite        INTEGER NOT NULL DEFAULT 0,
+    they_favorited_us  INTEGER NOT NULL DEFAULT 0,
+    favorited_at       INTEGER NOT NULL DEFAULT 0,
+    last_updated       INTEGER NOT NULL DEFAULT 0,
+    is_blocked         INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX contact_favorite ON contact(is_favorite);
+CREATE INDEX contact_blocked  ON contact(is_blocked);
+
+selectFavorites:
+SELECT * FROM contact WHERE is_favorite = 1;
+
+selectBlocked:
+SELECT fingerprint FROM contact WHERE is_blocked = 1;
+
+selectByFingerprint:
+SELECT * FROM contact WHERE fingerprint = ?;
+
+upsert:
+INSERT OR REPLACE INTO contact(
+    fingerprint, noise_key_hex, nostr_pubkey, nickname,
+    is_favorite, they_favorited_us, favorited_at, last_updated, is_blocked
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+setFavorite:
+UPDATE contact SET is_favorite = ? WHERE fingerprint = ?;
+
+setBlocked:
+UPDATE contact SET is_blocked = ? WHERE fingerprint = ?;
+
+deleteAll:
+DELETE FROM contact;

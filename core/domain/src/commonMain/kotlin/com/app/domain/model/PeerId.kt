@@ -1,5 +1,7 @@
 package com.app.domain.model
 
+import kotlin.jvm.JvmInline
+
 /**
  * Address of a conversation peer. In bitchat the same "address string" can mean three
  * different things, and the routing/resolution business logic constantly distinguishes
