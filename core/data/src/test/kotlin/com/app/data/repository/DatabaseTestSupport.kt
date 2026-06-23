@@ -8,6 +8,7 @@ import com.app.database.BitMessageDatabase
 import com.app.database.dao.ChannelDao
 import com.app.database.dao.ContactDao
 import com.app.database.dao.ConversationDao
+import com.app.database.dao.ConversationPrefDao
 import com.app.database.dao.GeohashDao
 import com.app.database.dao.MessageDao
 import com.app.database.dao.SecureSettingDao
@@ -45,6 +46,7 @@ internal class InMemoryDatabase(dispatcher: CoroutineDispatcher = UnconfinedTest
     val channelDao = ChannelDao(manager, dispatchers)
     val geohashDao = GeohashDao(manager, dispatchers)
     val secureSettingDao = SecureSettingDao(manager, dispatchers)
+    val conversationPrefDao = ConversationPrefDao(manager, dispatchers)
 }
 
 /** Minimal in-memory [SettingsStore] for repo tests; records every key written so tests can assert

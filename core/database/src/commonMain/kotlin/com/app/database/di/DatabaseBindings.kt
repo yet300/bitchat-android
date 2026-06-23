@@ -4,6 +4,7 @@ import com.app.common.AppDispatchers
 import com.app.database.dao.ChannelDao
 import com.app.database.dao.ContactDao
 import com.app.database.dao.ConversationDao
+import com.app.database.dao.ConversationPrefDao
 import com.app.database.dao.GeohashDao
 import com.app.database.dao.MessageDao
 import com.app.database.dao.SecureSettingDao
@@ -55,6 +56,11 @@ object DatabaseBindings {
     @Provides
     fun provideGeohashDao(manager: DatabaseManager, dispatchers: AppDispatchers): GeohashDao =
         GeohashDao(manager, dispatchers)
+
+    @SingleIn(AppScope::class)
+    @Provides
+    fun provideConversationPrefDao(manager: DatabaseManager, dispatchers: AppDispatchers): ConversationPrefDao =
+        ConversationPrefDao(manager, dispatchers)
 
     @SingleIn(AppScope::class)
     @Provides

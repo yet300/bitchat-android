@@ -1,6 +1,6 @@
 package com.app.data.repository
 
-import com.app.common.settings.SettingsStore
+import com.app.database.dao.ConversationPrefDao
 import com.app.domain.model.ConversationId
 import com.app.domain.repository.ConversationPrefsRepository
 import dev.zacsweers.metro.AppScope
@@ -10,30 +10,30 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 /**
- * Pin/mute flags over the shared [SettingsStore]. Each set is a newline-joined list of stable
- * [ConversationId] keys (see [MutePrefsKeys]), read reactively via the store's flow. The same codec
- * is consumed by [NotificationMutePolicyImpl], so mute set here == mute honored by notifications.
+ * Pin/mute flags in the encrypted DB ([ConversationPrefDao]) — these reveal the contact graph, so they
+ * are sensitive metadata and no longer live in plaintext prefs. Keys use the stable [MutePrefsKeys]
+ * encoding, so the mute set written here is the mute set [NotificationMutePolicyImpl] honors.
  */
 @SingleIn(AppScope::class)
 @Inject
 internal class ConversationPrefsRepositoryImpl(
-    private val settings: SettingsStore,
+    private val prefs: ConversationPrefDao,
 ) : ConversationPrefsRepository {
 
-    override fun observePinned(): Flow<Set<ConversationId>> = observeSet(MutePrefsKeys.PINNED)
+    override fun observePinned(): Flow<Set<ConversationId>> = observeSet(pinned = true)
 
-    override fun observeMuted(): Flow<Set<ConversationId>> = observeSet(MutePrefsKeys.MUTED)
+    override fun observeMuted(): Flow<Set<ConversationId>> = observeSet(pinned = false)
 
-    override suspend fun setPinned(id: ConversationId, pinned: Boolean) = setFlag(MutePrefsKeys.PINNED, id, pinned)
+    override suspend fun setPinned(id: ConversationId, pinned: Boolean) {
+        prefs.setPinned(MutePrefsKeys.encode(id), pinned)
+    }
 
-    override suspend fun setMuted(id: ConversationId, muted: Boolean) = setFlag(MutePrefsKeys.MUTED, id, muted)
+    override suspend fun setMuted(id: ConversationId, muted: Boolean) {
+        prefs.setMuted(MutePrefsKeys.encode(id), muted)
+    }
 
-    private fun observeSet(key: String): Flow<Set<ConversationId>> =
-        settings.getStringFlow(key, "").map(MutePrefsKeys::decodeSet)
-
-    private fun setFlag(key: String, id: ConversationId, on: Boolean) {
-        val current = MutePrefsKeys.decodeSet(settings.getString(key, "")).toMutableSet()
-        if (on) current.add(id) else current.remove(id)
-        settings.putString(key, MutePrefsKeys.encodeSet(current))
+    private fun observeSet(pinned: Boolean): Flow<Set<ConversationId>> {
+        val flow = if (pinned) prefs.observePinned() else prefs.observeMuted()
+        return flow.map { tokens -> tokens.mapNotNull(MutePrefsKeys::decode).toSet() }
     }
 }
