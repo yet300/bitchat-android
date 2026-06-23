@@ -3,6 +3,9 @@ package com.app.crypto.noise
 import com.app.common.utils.Log
 import com.app.crypto.noise.southernstorm.protocol.CipherState
 import com.app.crypto.noise.southernstorm.protocol.HandshakeState
+import co.touchlab.stately.concurrency.Lock
+import co.touchlab.stately.concurrency.withLock
+import kotlin.time.Clock
 
 
 /**
@@ -151,7 +154,7 @@ class NoiseSession(
     
     // Session state
     private var state: NoiseSessionState = NoiseSessionState.Uninitialized
-    private val creationTime = System.currentTimeMillis()
+    private val creationTime = Clock.System.now().toEpochMilliseconds()
     private var handshakeStartMs: Long? = null
     private var lastHandshakeActivityMs: Long? = null
     private var handshakeMessage1: ByteArray? = null
@@ -168,7 +171,8 @@ class NoiseSession(
     // CRITICAL FIX: Enhanced thread safety for cipher operations
     // The noise-java CipherState objects are NOT thread-safe. Multiple concurrent
     // decrypt/encrypt operations can corrupt the internal nonce state.
-    private val cipherLock = Any() // Dedicated lock for cipher operations
+    private val cipherLock = Lock() // Dedicated lock for cipher operations
+    private val sessionLock = Lock() // Reentrant lock replacing @Synchronized on session methods
     
     // Remote peer information  
     private var remoteStaticPublicKey: ByteArray? = null
@@ -201,7 +205,7 @@ class NoiseSession(
     fun getHandshakeStartMs(): Long? = handshakeStartMs
     fun getLastHandshakeActivityMs(): Long? = lastHandshakeActivityMs
 
-    internal fun getHandshakeMessage1(): ByteArray? = handshakeMessage1?.clone()
+    internal fun getHandshakeMessage1(): ByteArray? = handshakeMessage1?.copyOf()
 
     internal fun setLastHandshakeActivityForTest(timestampMs: Long) {
         lastHandshakeActivityMs = timestampMs
@@ -285,8 +289,8 @@ class NoiseSession(
                     localKeyPair.getPrivateKey(verifyPrivate, 0)
                     localKeyPair.getPublicKey(verifyPublic, 0)
                     
-                    Log.d(TAG, "Persistent identity public key: ${localStaticPublicKey.joinToString("") { "%02x".format(it) }}")
-                    Log.d(TAG, "Set public key:               ${verifyPublic.joinToString("") { "%02x".format(it) }}")
+                    Log.d(TAG, "Persistent identity public key: ${localStaticPublicKey.joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }}")
+                    Log.d(TAG, "Set public key:               ${verifyPublic.joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }}")
 
                 } else {
                     throw IllegalStateException("HandshakeState returned null for local key pair")
@@ -312,8 +316,7 @@ class NoiseSession(
      * Start handshake as INITIATOR
      * Returns e, the first handshake message for XX pattern (32 bytes)
      */
-    @Synchronized
-    fun startHandshake(): ByteArray {
+    fun startHandshake(): ByteArray = sessionLock.withLock {
         Log.d(TAG, "Starting noise XX handshake with $peerID as INITIATOR")
 
         if (!isInitiator) {
@@ -329,9 +332,9 @@ class NoiseSession(
             initializeNoiseHandshake(HandshakeState.INITIATOR)
             state = NoiseSessionState.Handshaking
             if (handshakeStartMs == null) {
-                handshakeStartMs = System.currentTimeMillis()
+                handshakeStartMs = Clock.System.now().toEpochMilliseconds()
             }
-            lastHandshakeActivityMs = System.currentTimeMillis()
+            lastHandshakeActivityMs = Clock.System.now().toEpochMilliseconds()
             
             val messageBuffer = ByteArray(XX_MESSAGE_1_SIZE)
             val handshakeStateLocal = handshakeState ?: throw IllegalStateException("Handshake state is null")
@@ -358,8 +361,7 @@ class NoiseSession(
      * Process incoming handshake as RESPONDER
      * Returns e, ee
      */
-    @Synchronized
-    fun processHandshakeMessage(message: ByteArray): ByteArray? {
+    fun processHandshakeMessage(message: ByteArray): ByteArray? = sessionLock.withLock {
         Log.d(TAG, "Processing handshake message from $peerID (${message.size} bytes)")
         
         try {
@@ -368,7 +370,7 @@ class NoiseSession(
                 initializeNoiseHandshake(HandshakeState.RESPONDER)
                 state = NoiseSessionState.Handshaking
                 if (handshakeStartMs == null) {
-                    handshakeStartMs = System.currentTimeMillis()
+                    handshakeStartMs = Clock.System.now().toEpochMilliseconds()
                 }
                 Log.d(TAG, "Initialized as RESPONDER for XX handshake with $peerID")
             }
@@ -376,7 +378,7 @@ class NoiseSession(
             if (state != NoiseSessionState.Handshaking) {
                 throw IllegalStateException("Invalid state for handshake: $state")
             }
-            lastHandshakeActivityMs = System.currentTimeMillis()
+            lastHandshakeActivityMs = Clock.System.now().toEpochMilliseconds()
             
             val handshakeStateLocal = handshakeState ?: throw IllegalStateException("Handshake state is null")
             
@@ -438,8 +440,7 @@ class NoiseSession(
     /**
      * Complete handshake and derive transport keys
      */
-    @Synchronized
-    private fun completeHandshake() {
+    private fun completeHandshake() = sessionLock.withLock {
         if (currentPattern < NOISE_XX_PATTERN_LENGTH) {
             return
         }
@@ -459,7 +460,7 @@ class NoiseSession(
                 if (remoteDH != null) {
                     remoteStaticPublicKey = ByteArray(32)
                     remoteDH.getPublicKey(remoteStaticPublicKey!!, 0)
-                    Log.d(TAG, "Remote static public key: ${remoteStaticPublicKey!!.joinToString("") { "%02x".format(it) }}")
+                    Log.d(TAG, "Remote static public key: ${remoteStaticPublicKey!!.joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }}")
                 }
             }
             
@@ -501,7 +502,7 @@ class NoiseSession(
         }
         
         // Critical section: Use dedicated cipher lock to protect CipherState nonce corruption
-        synchronized(cipherLock) {
+        cipherLock.withLock {
             // Double-check state inside lock
             if (!isEstablished()) {
                 throw IllegalStateException("Session not established during cipher operation")
@@ -536,10 +537,10 @@ class NoiseSession(
                 val combinedPayload = ByteArray(NONCE_SIZE_BYTES + ciphertextLength)
                 
                 // Copy nonce (first 4 bytes)
-                System.arraycopy(nonceBytes, 0, combinedPayload, 0, NONCE_SIZE_BYTES)
+                nonceBytes.copyInto(combinedPayload, 0, 0, NONCE_SIZE_BYTES)
                 
                 // Copy ciphertext (remaining bytes)
-                System.arraycopy(ciphertext, 0, combinedPayload, NONCE_SIZE_BYTES, ciphertextLength)
+                ciphertext.copyInto(combinedPayload, NONCE_SIZE_BYTES, 0, ciphertextLength)
                 
                 // Log high nonce values that might indicate issues
                 if (currentNonce > HIGH_NONCE_WARNING_THRESHOLD) {
@@ -554,7 +555,7 @@ class NoiseSession(
                 
                 // ENHANCED: Log cipher state for debugging
                 if (sendCipher != null) {
-                    Log.e(TAG, "Send cipher state: ${sendCipher!!.javaClass.simpleName}")
+                    Log.e(TAG, "Send cipher state: ${sendCipher!!::class.simpleName}")
                 }
                 
                 throw SessionError.EncryptionFailed
@@ -573,7 +574,7 @@ class NoiseSession(
         }
         
         // Critical section: Use dedicated cipher lock to protect CipherState nonce corruption
-        synchronized(cipherLock) {
+        cipherLock.withLock {
             // Double-check state inside lock
             if (!isEstablished()) {
                 throw IllegalStateException("Session not established during cipher operation")
@@ -631,7 +632,7 @@ class NoiseSession(
                 
                 // ENHANCED: Log cipher state and session details for debugging
                 if (receiveCipher != null) {
-                    Log.e(TAG, "Receive cipher state: ${receiveCipher!!.javaClass.simpleName}")
+                    Log.e(TAG, "Receive cipher state: ${receiveCipher!!::class.simpleName}")
                 }
                 Log.e(TAG, "Session state: $state, highest received nonce: $highestReceivedNonce")
                 Log.e(TAG, "Input data size: ${combinedPayload.size} bytes")
@@ -647,14 +648,14 @@ class NoiseSession(
      * Get remote static public key (available after handshake completion)
      */
     fun getRemoteStaticPublicKey(): ByteArray? {
-        return remoteStaticPublicKey?.clone()
+        return remoteStaticPublicKey?.copyOf()
     }
     
     /**
      * Get handshake hash for channel binding
      */
     fun getHandshakeHash(): ByteArray? {
-        return handshakeHash?.clone()
+        return handshakeHash?.copyOf()
     }
     
     /**
@@ -663,7 +664,7 @@ class NoiseSession(
     fun needsRekey(): Boolean {
         if (!isEstablished()) return false
         
-        val timeLimit = System.currentTimeMillis() - creationTime > REKEY_TIME_LIMIT
+        val timeLimit = Clock.System.now().toEpochMilliseconds() - creationTime > REKEY_TIME_LIMIT
         val messageLimit = (messagesSent + messagesReceived) > REKEY_MESSAGE_LIMIT
         
         return timeLimit || messageLimit
@@ -678,7 +679,7 @@ class NoiseSession(
         appendLine("  Role: ${if (isInitiator) "initiator" else "responder"}")
         appendLine("  Messages sent: $messagesSent")
         appendLine("  Messages received: $messagesReceived")
-        appendLine("  Session age: ${(System.currentTimeMillis() - creationTime) / 1000}s")
+        appendLine("  Session age: ${(Clock.System.now().toEpochMilliseconds() - creationTime) / 1000}s")
         appendLine("  Needs rekey: ${needsRekey()}")
         appendLine("  Has remote key: ${remoteStaticPublicKey != null}")
         appendLine("  Has send cipher: ${sendCipher != null}")
@@ -688,8 +689,7 @@ class NoiseSession(
     /**
      * Reset session state
      */
-    @Synchronized
-    fun reset() {
+    fun reset() = sessionLock.withLock {
         try {
             // Destroy existing state
             destroy()
@@ -714,8 +714,7 @@ class NoiseSession(
     /**
      * Clean up session resources securely
      */
-    @Synchronized
-    fun destroy() {
+    fun destroy() = sessionLock.withLock {
         try {
             // Destroy Noise objects
             sendCipher?.destroy()

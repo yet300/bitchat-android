@@ -1,7 +1,8 @@
 package com.app.crypto.noise
 
 import com.app.common.utils.Log
-import java.util.concurrent.ConcurrentHashMap
+import co.touchlab.stately.collections.ConcurrentMutableMap
+import kotlin.time.Clock
 
 /**
  * SIMPLIFIED Noise session manager - focuses on core functionality only
@@ -18,7 +19,7 @@ internal class NoiseSessionManager(
         private const val HANDSHAKE_MESSAGE_1_SIZE = 32
     }
     
-    private val sessions = ConcurrentHashMap<String, NoiseSession>()
+    private val sessions = ConcurrentMutableMap<String, NoiseSession>()
     
     // Callbacks
     var onSessionEstablished: ((String, ByteArray) -> Unit)? = null
@@ -57,7 +58,7 @@ internal class NoiseSessionManager(
     fun initiateHandshake(peerID: String): ByteArray? {
         Log.d(TAG, "initiateHandshake($peerID)")
 
-        val now = System.currentTimeMillis()
+        val now = Clock.System.now().toEpochMilliseconds()
         val existing = getSession(peerID)
         if (existing != null) {
             when {

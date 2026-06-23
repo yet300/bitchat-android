@@ -8,7 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import com.app.crypto.hash.Sha256
-import java.util.concurrent.ConcurrentHashMap
+import co.touchlab.stately.collections.ConcurrentMutableMap
+import kotlin.time.Clock
 
 /**
  * Channel encryption for password-protected channels - 100% compatible with iOS implementation
@@ -23,10 +24,10 @@ internal class NoiseChannelEncryption {
     }
 
     // Channel keys storage (channelName -> raw 256-bit AES key)
-    private val channelKeys = ConcurrentHashMap<String, ByteArray>()
-    
+    private val channelKeys = ConcurrentMutableMap<String, ByteArray>()
+
     // Channel passwords (for rekey operations)
-    private val channelPasswords = ConcurrentHashMap<String, String>()
+    private val channelPasswords = ConcurrentMutableMap<String, String>()
     
     // MARK: - Channel Password Management
     
@@ -86,7 +87,7 @@ internal class NoiseChannelEncryption {
         val key = channelKeys[channel]
             ?: throw IllegalStateException("No key available for channel $channel")
         
-        val messageBytes = message.toByteArray(Charsets.UTF_8)
+        val messageBytes = message.encodeToByteArray()
 
         return try {
             // IV(12) || ciphertext || tag(16) — same wire format as iOS.
@@ -110,7 +111,7 @@ internal class NoiseChannelEncryption {
         }
         
         return try {
-            String(ChannelCipher.decrypt(key, encryptedData), Charsets.UTF_8)
+            ChannelCipher.decrypt(key, encryptedData).decodeToString()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to decrypt channel message: ${e.message}")
             throw e
@@ -128,7 +129,7 @@ internal class NoiseChannelEncryption {
         
         return try {
             val hash = Sha256.digest(key)
-            hash.joinToString("") { "%02x".format(it) }
+            hash.joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to calculate key commitment: ${e.message}")
             null
@@ -140,7 +141,7 @@ internal class NoiseChannelEncryption {
      */
     fun verifyKeyCommitment(channel: String, commitment: String): Boolean {
         val ourCommitment = calculateKeyCommitment(channel)
-        return ourCommitment?.lowercase() == commitment.lowercase()
+        return ourCommitment.equals(commitment, ignoreCase = true)
     }
     
     // MARK: - Channel Key Sharing
@@ -155,12 +156,12 @@ internal class NoiseChannelEncryption {
             val packet = buildJsonObject {
                 put("channel", JsonPrimitive(channel))
                 put("password", JsonPrimitive(password))
-                put("timestamp", JsonPrimitive(System.currentTimeMillis()))
+                put("timestamp", JsonPrimitive(Clock.System.now().toEpochMilliseconds()))
             }
 
             // Simple JSON encoding for now (could be replaced with more efficient format)
             val json = JsonConfig.json.encodeToString(JsonObject.serializer(), packet)
-            json.toByteArray(Charsets.UTF_8)
+            json.encodeToByteArray()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to create channel key packet: ${e.message}")
             null
@@ -173,7 +174,7 @@ internal class NoiseChannelEncryption {
      */
     fun processChannelKeyPacket(data: ByteArray): Pair<String, String>? {
         return try {
-            val json = String(data, Charsets.UTF_8)
+            val json = data.decodeToString()
             val packet = JsonConfig.json.parseToJsonElement(json) as JsonObject
 
             val channel = packet["channel"]?.jsonPrimitive?.contentOrNull
