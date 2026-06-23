@@ -5,7 +5,7 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import com.app.crypto.hash.Sha256
-import java.util.concurrent.ConcurrentHashMap
+import co.touchlab.stately.collections.ConcurrentMutableMap
 
 /**
  * Centralized peer fingerprint management singleton
@@ -31,8 +31,8 @@ class PeerFingerprintManager {
     }
     
     // Bidirectional mapping for efficient lookups
-    private val peerIDToFingerprint = ConcurrentHashMap<String, String>() // peerID -> fingerprint
-    private val fingerprintToPeerID = ConcurrentHashMap<String, String>() // fingerprint -> current peerID
+    private val peerIDToFingerprint = ConcurrentMutableMap<String, String>() // peerID -> fingerprint
+    private val fingerprintToPeerID = ConcurrentMutableMap<String, String>() // fingerprint -> current peerID
     
     // MARK: - Fingerprint Storage (Only called after successful Noise handshake)
     
@@ -198,7 +198,7 @@ class PeerFingerprintManager {
      */
     private fun calculateFingerprint(publicKey: ByteArray): String {
         val hash = Sha256.digest(publicKey)
-        return hash.joinToString("") { "%02x".format(it) }
+        return hash.joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
     }
     
     /**

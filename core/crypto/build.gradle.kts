@@ -8,6 +8,8 @@ kotlin {
         commonMain.dependencies {
             implementation(projects.core.common)
             implementation(libs.cryptography.core)
+            implementation(libs.stately.concurrent.collections)
+            implementation(libs.stately.concurrency)
         }
         androidMain.dependencies {
             // Tink only (Ed25519 moved off BouncyCastle to cryptography-kotlin in step 4);

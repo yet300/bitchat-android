@@ -32,6 +32,7 @@ cryptography-kotlin = "0.6.0"     # whyoleg/cryptography-kotlin (SHA/HMAC/HKDF/P
 kotlincrypto-blake2 = "0.8.0"     # KotlinCrypto/hash blake2
 signum-supreme = "0.14.0"         # A-SIT Signum/Supreme (hardware-backed keys); pulls indispensable transitively
 secp256k1 = "0.23.0"              # ACINQ secp256k1-kmp (Nostr secp256k1 + BIP-340 Schnorr + ECDH)
+stately = "2.1.0"                 # Touchlab Stately — KMP concurrent collections + locks
 
 multiplatformSettings = "1.3.0"
 
@@ -108,6 +109,10 @@ signum-supreme = { module = "at.asitplus.signum:supreme", version.ref = "signum-
 # ACINQ secp256k1 (Nostr, :core:transport)
 secp256k1-jni-android = { module = "fr.acinq.secp256k1:secp256k1-kmp-jni-android", version.ref = "secp256k1" }
 secp256k1-jni-jvm = { module = "fr.acinq.secp256k1:secp256k1-kmp-jni-jvm", version.ref = "secp256k1" }
+
+# Touchlab Stately (KMP concurrent map + lock) — :core:crypto commonMain services
+stately-concurrent-collections = { module = "co.touchlab:stately-concurrent-collections", version.ref = "stately" }
+stately-concurrency = { module = "co.touchlab:stately-concurrency", version.ref = "stately" }
 
 # JSON
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
