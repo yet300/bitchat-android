@@ -1,27 +1,30 @@
 package com.app.data.repository
 
+import com.app.database.dao.SecureSettingDao
 import com.app.domain.repository.SettingsRepository
 import com.app.common.settings.SettingsStore
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 /**
- * Ordinary (non-secret) settings over the shared [SettingsStore]. Keys match the legacy
- * `DataManager` so both read the same store during the Strangler-Fig transition.
+ * Ordinary settings. The nickname is a pseudonym but treated as sensitive metadata, so it lives in the
+ * encrypted DB ([SecureSettingDao]); the non-threat location toggle stays in plaintext prefs.
  */
 @SingleIn(AppScope::class)
 @Inject
 internal class SettingsRepositoryImpl(
+    private val secureSettings: SecureSettingDao,
     private val settings: SettingsStore,
 ) : SettingsRepository {
 
     override fun observeNickname(): Flow<String> =
-        settings.getStringFlow(KEY_NICKNAME, "")
+        secureSettings.observe(KEY_NICKNAME).map { it ?: "" }
 
     override suspend fun setNickname(value: String) {
-        settings.putString(KEY_NICKNAME, value)
+        secureSettings.put(KEY_NICKNAME, value)
     }
 
     override var locationServicesEnabled: Boolean

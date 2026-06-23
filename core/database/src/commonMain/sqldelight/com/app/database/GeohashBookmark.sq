@@ -1,12 +1,15 @@
--- Geohash bookmarks (moves out of plaintext multiplatform-settings: geohash_bookmarks in
--- GeohashBookmarksRepositoryImpl). `position` preserves the newest-first ordering (lower = newer).
+-- Geohash bookmarks (sensitive metadata, kept in the encrypted DB). `position` strictly increases per
+-- insert, so `ORDER BY position DESC` yields newest-first deterministically.
 CREATE TABLE geohash_bookmark (
     geohash  TEXT    NOT NULL PRIMARY KEY,
     position INTEGER NOT NULL
 );
 
 selectAll:
-SELECT geohash FROM geohash_bookmark ORDER BY position ASC;
+SELECT geohash FROM geohash_bookmark ORDER BY position DESC;
+
+nextPosition:
+SELECT COALESCE(MAX(position), 0) + 1 FROM geohash_bookmark;
 
 upsert:
 INSERT OR REPLACE INTO geohash_bookmark(geohash, position) VALUES (?, ?);
