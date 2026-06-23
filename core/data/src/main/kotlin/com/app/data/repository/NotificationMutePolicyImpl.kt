@@ -1,6 +1,7 @@
 package com.app.data.repository
 
 import com.app.common.settings.SettingsStore
+import com.app.database.dao.ConversationPrefDao
 import com.app.domain.model.ConversationId
 import com.app.domain.model.PeerId
 import com.app.domain.repository.NotificationMutePolicy
@@ -9,16 +10,22 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.Provider
 import dev.zacsweers.metro.SingleIn
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 
 /**
- * Reads the same persisted mute state the UI writes ([MutePrefsKeys]) — synchronously, on demand —
- * so the notifier and the conversation-list mute can never drift.
+ * Decides notification suppression synchronously, on demand — so the notifier and the
+ * conversation-list mute can never drift. The global-mute toggle is a non-threat boolean kept in
+ * plaintext prefs; the per-conversation muted set is sensitive metadata kept in the encrypted DB
+ * ([ConversationPrefDao]). Since the notify path is non-suspend, an in-memory mirror of the muted set
+ * is kept, hydrated from the DB by a scoped collector (it is read-only here; writes go through
+ * [ConversationPrefsRepositoryImpl]).
  *
- * The live notify path carries the ephemeral mesh senderPeerID, but pin/mute is stored under the
- * stable Noise key (see I12-2). [isPrivateMuted] therefore canonicalizes the sender mesh peerID to
- * its Noise key the same way the peer repository does ([BluetoothMeshService.getPeerInfo] →
- * noisePublicKey hex) before testing the muted set — and also checks the raw id, so a legacy
- * mesh-keyed entry from this session still matches. This keeps suppression cross-session stable.
+ * The live notify path carries the ephemeral mesh senderPeerID, but mute is stored under the stable
+ * Noise key (see I12-2). [isPrivateMuted] therefore canonicalizes the sender mesh peerID to its Noise
+ * key ([BluetoothMeshService.getPeerInfo] → noisePublicKey hex) before testing the muted set — and also
+ * checks the raw id, so a mesh-keyed entry from this session still matches.
  *
  * The mesh is injected as a [Provider] to break the construction cycle (BMS → ServiceNotifier →
  * NotificationMutePolicy); it is only resolved lazily on the on-demand suppression check.
@@ -28,7 +35,17 @@ import dev.zacsweers.metro.SingleIn
 internal class NotificationMutePolicyImpl(
     private val settings: SettingsStore,
     private val mesh: Provider<BluetoothMeshService>,
+    private val prefs: ConversationPrefDao,
+    private val scope: CoroutineScope,
 ) : NotificationMutePolicy {
+
+    private val mutedMirror = MutableStateFlow<Set<ConversationId>>(emptySet())
+
+    init {
+        scope.launch {
+            prefs.observeMuted().collect { tokens -> mutedMirror.value = tokens.mapNotNull(MutePrefsKeys::decode).toSet() }
+        }
+    }
 
     override fun isAllMuted(): Boolean = settings.getBoolean(MutePrefsKeys.GLOBAL_MUTE, false)
 
@@ -52,6 +69,5 @@ internal class NotificationMutePolicyImpl(
     override fun isGeohashMuted(geohash: String): Boolean =
         mutedSet().any { it is ConversationId.Geohash && it.channel.geohash == geohash }
 
-    private fun mutedSet(): Set<ConversationId> =
-        MutePrefsKeys.decodeSet(settings.getString(MutePrefsKeys.MUTED, ""))
+    private fun mutedSet(): Set<ConversationId> = mutedMirror.value
 }

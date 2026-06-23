@@ -1,0 +1,25 @@
+-- Per-conversation pin/mute flags (sensitive metadata: which conversations the user pins/mutes
+-- reveals the contact graph). conversation_id is the stable MutePrefsKeys encoding.
+CREATE TABLE conversation_pref (
+    conversation_id TEXT    NOT NULL PRIMARY KEY,
+    is_pinned       INTEGER NOT NULL DEFAULT 0,
+    is_muted        INTEGER NOT NULL DEFAULT 0
+);
+
+selectPinned:
+SELECT conversation_id FROM conversation_pref WHERE is_pinned = 1;
+
+selectMuted:
+SELECT conversation_id FROM conversation_pref WHERE is_muted = 1;
+
+-- INSERT OR REPLACE + COALESCE preserves the *other* flag (SQLite 3.18 has no UPSERT).
+setPinned:
+INSERT OR REPLACE INTO conversation_pref(conversation_id, is_pinned, is_muted)
+VALUES (:id, :pinned, COALESCE((SELECT is_muted FROM conversation_pref WHERE conversation_id = :id), 0));
+
+setMuted:
+INSERT OR REPLACE INTO conversation_pref(conversation_id, is_pinned, is_muted)
+VALUES (:id, COALESCE((SELECT is_pinned FROM conversation_pref WHERE conversation_id = :id), 0), :muted);
+
+deleteAll:
+DELETE FROM conversation_pref;
