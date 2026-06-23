@@ -1,6 +1,7 @@
 package com.app.domain.usecase
 
 import com.app.domain.FakeContactRepository
+import com.app.domain.FakeDatabasePanicWiper
 import com.app.domain.FakeIdentityRepository
 import com.app.domain.FakeMediaCleaner
 import com.app.domain.FakeMessageRepository
@@ -18,7 +19,8 @@ class PanicWipeUseCaseTest {
         identity: FakeIdentityRepository = FakeIdentityRepository(),
         meshReset: FakeMeshResetPort = FakeMeshResetPort(),
         mediaCleaner: FakeMediaCleaner = FakeMediaCleaner(),
-    ) = PanicWipeUseCase(messages, contacts, identity, meshReset, mediaCleaner)
+        databaseWiper: FakeDatabasePanicWiper = FakeDatabasePanicWiper(),
+    ) = PanicWipeUseCase(messages, contacts, identity, meshReset, mediaCleaner, databaseWiper)
 
     @Test fun `clears messages contacts and identity`() = runTest {
         val messages = FakeMessageRepository()
@@ -42,5 +44,11 @@ class PanicWipeUseCaseTest {
         val mediaCleaner = FakeMediaCleaner()
         useCase(mediaCleaner = mediaCleaner).invoke()
         assertTrue(mediaCleaner.wiped, "media files must be deleted during panic wipe")
+    }
+
+    @Test fun `crypto-erases the database`() = runTest {
+        val databaseWiper = FakeDatabasePanicWiper()
+        useCase(databaseWiper = databaseWiper).invoke()
+        assertTrue(databaseWiper.wiped, "the encrypted database must be crypto-erased during panic wipe")
     }
 }

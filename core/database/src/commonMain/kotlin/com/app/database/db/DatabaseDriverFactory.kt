@@ -14,5 +14,5 @@ interface DatabaseDriverFactory {
     suspend fun create(): SqlDriver
 }
 
-/** On-disk database file name (shared by every platform driver). */
-internal const val DB_FILE_NAME = "bitmessage.db"
+/** On-disk database file name (shared by every platform driver; also used by the panic wiper). */
+const val DB_FILE_NAME = "bitmessage.db"

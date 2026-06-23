@@ -15,6 +15,7 @@ import com.app.domain.model.PeerIdentity
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.GeohashRepository
 import com.app.domain.repository.IdentityRepository
+import com.app.domain.repository.DatabasePanicWiper
 import com.app.domain.repository.MediaCleaner
 import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.MessageTransport
@@ -184,6 +185,11 @@ class FakeMeshResetPort : MeshResetPort {
 class FakeMediaCleaner : MediaCleaner {
     var wiped = false
     override suspend fun wipeMedia() { wiped = true }
+}
+
+class FakeDatabasePanicWiper : DatabasePanicWiper {
+    var wiped = false
+    override suspend fun wipe() { wiped = true }
 }
 
 /** Configurable search results. */
