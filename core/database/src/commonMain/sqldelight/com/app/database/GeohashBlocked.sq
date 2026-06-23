@@ -1,0 +1,17 @@
+-- Blocked geohash-chat participants (moves out of plaintext multiplatform-settings:
+-- geohash_blocked_pubkeys in GeohashRepositoryImpl). pubkey_hex stored lowercase.
+CREATE TABLE geohash_blocked (
+    pubkey_hex TEXT NOT NULL PRIMARY KEY
+);
+
+selectAll:
+SELECT pubkey_hex FROM geohash_blocked;
+
+insert:
+INSERT OR IGNORE INTO geohash_blocked(pubkey_hex) VALUES (?);
+
+deleteByPubkey:
+DELETE FROM geohash_blocked WHERE pubkey_hex = ?;
+
+deleteAll:
+DELETE FROM geohash_blocked;

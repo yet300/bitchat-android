@@ -52,6 +52,7 @@ kotlin {
             implementation(projects.core.crypto)
             implementation(projects.core.transport)
             implementation(projects.core.data)
+            implementation(projects.core.database)
 
             implementation(projects.feature.root)
             implementation(projects.feature.onboarding)

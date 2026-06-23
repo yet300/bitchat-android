@@ -1,0 +1,18 @@
+-- Small sensitive scalars that belong off plaintext prefs (currently: the nickname from
+-- SettingsRepositoryImpl). Generic key/value so future sensitive scalars can join without a migration.
+CREATE TABLE secure_setting (
+    key   TEXT NOT NULL PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+selectByKey:
+SELECT value FROM secure_setting WHERE key = ?;
+
+upsert:
+INSERT OR REPLACE INTO secure_setting(key, value) VALUES (?, ?);
+
+deleteByKey:
+DELETE FROM secure_setting WHERE key = ?;
+
+deleteAll:
+DELETE FROM secure_setting;

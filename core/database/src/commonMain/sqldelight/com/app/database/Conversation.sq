@@ -1,0 +1,23 @@
+-- Chat-list aggregate metadata (unread / last activity / title). Timelines live in `message`.
+CREATE TABLE conversation (
+    id            TEXT    NOT NULL PRIMARY KEY,
+    title         TEXT    NOT NULL,
+    last_activity INTEGER,
+    unread_count  INTEGER NOT NULL DEFAULT 0
+);
+
+selectAll:
+SELECT * FROM conversation ORDER BY last_activity DESC;
+
+upsert:
+INSERT OR REPLACE INTO conversation(id, title, last_activity, unread_count)
+VALUES (?, ?, ?, ?);
+
+setUnread:
+UPDATE conversation SET unread_count = ? WHERE id = ?;
+
+deleteById:
+DELETE FROM conversation WHERE id = ?;
+
+deleteAll:
+DELETE FROM conversation;
