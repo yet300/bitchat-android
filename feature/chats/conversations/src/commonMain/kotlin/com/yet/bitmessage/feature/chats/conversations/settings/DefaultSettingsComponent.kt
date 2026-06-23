@@ -3,6 +3,7 @@ package com.yet.bitmessage.feature.chats.conversations.settings
 import com.app.common.decompose.asValue
 import com.app.domain.model.ThemeMode
 import com.app.domain.repository.ContactRepository
+import com.app.domain.repository.DatabasePanicWiper
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.MediaCleaner
 import com.app.domain.repository.MeshResetPort
@@ -121,6 +122,7 @@ internal class DefaultSettingsComponentFactory(
     private val verificationRepository: VerificationRepository,
     private val meshResetPort: MeshResetPort,
     private val mediaCleaner: MediaCleaner,
+    private val databasePanicWiper: DatabasePanicWiper,
 ) : SettingsComponent.Factory {
     override fun create(
         componentContext: ComponentContext,
@@ -142,7 +144,7 @@ internal class DefaultSettingsComponentFactory(
                 verificationRepository = verificationRepository,
                 panicWipe = PanicWipeUseCase(
                     messageRepository, contactRepository, identityRepository,
-                    meshResetPort, mediaCleaner,
+                    meshResetPort, mediaCleaner, databasePanicWiper,
                 ),
             ),
             onClose = onClose,

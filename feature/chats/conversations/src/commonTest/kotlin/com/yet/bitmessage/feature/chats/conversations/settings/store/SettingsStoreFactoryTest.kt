@@ -22,6 +22,7 @@ import com.app.domain.repository.SettingsRepository
 import com.app.domain.repository.ThemeRepository
 import com.app.domain.repository.TorRepository
 import com.app.domain.repository.VerificationRepository
+import com.app.domain.repository.DatabasePanicWiper
 import com.app.domain.repository.MediaCleaner
 import com.app.domain.repository.MeshResetPort
 import com.app.domain.usecase.PanicWipeUseCase
@@ -178,6 +179,7 @@ class SettingsStoreFactoryTest {
             messages, contacts, identity,
             meshReset = object : MeshResetPort { override suspend fun reset() {} },
             mediaCleaner = object : MediaCleaner { override suspend fun wipeMedia() {} },
+            databaseWiper = object : DatabasePanicWiper { override suspend fun wipe() {} },
         ),
     )
 

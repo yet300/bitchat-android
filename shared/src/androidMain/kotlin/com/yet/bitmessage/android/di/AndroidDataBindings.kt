@@ -28,6 +28,9 @@ import com.app.transport.notification.ServiceNotifier
 import com.app.domain.repository.CameraPermissionRepository
 import com.app.domain.repository.ConnectivityRepository
 import com.app.domain.repository.DatabaseKeyProvider
+import com.app.domain.repository.DatabasePanicWiper
+import com.app.database.db.DatabaseManager
+import com.app.database.db.DB_FILE_NAME
 import com.yet.bitmessage.android.database.AndroidDatabaseKeyProvider
 import com.app.common.settings.SettingsStore
 import com.app.domain.repository.BatteryOptimizationRepository
@@ -190,6 +193,26 @@ object AndroidDataBindings {
         object : MediaCleaner {
             override suspend fun wipeMedia() = withContext(Dispatchers.IO) {
                 FileUtils.clearAllMedia(context.applicationContext)
+            }
+        }
+
+    /**
+     * Panic crypto-erase of the encrypted DB: close the handle, destroy the passphrase (its only copy
+     * lives behind the hardware-rooted secret store), then drop the file. Destroying the key makes the
+     * database permanently undecryptable even if the file survives.
+     */
+    @Provides
+    fun provideDatabasePanicWiper(
+        context: Context,
+        databaseManager: DatabaseManager,
+        keyProvider: DatabaseKeyProvider,
+    ): DatabasePanicWiper =
+        object : DatabasePanicWiper {
+            override suspend fun wipe() = withContext(Dispatchers.IO) {
+                databaseManager.close()
+                keyProvider.destroyKey()
+                context.applicationContext.deleteDatabase(DB_FILE_NAME)
+                Unit
             }
         }
 
