@@ -26,6 +26,11 @@ class GeohashDao(
         emitAll(db.geohashBookmarkQueries.selectAll().asFlow().mapToList(dispatchers.io))
     }
 
+    /** The next strictly-increasing position (so a new bookmark sorts newest-first). */
+    suspend fun nextBookmarkPosition(): Long = withContext(dispatchers.io) {
+        databaseManager.getDb().geohashBookmarkQueries.nextPosition().executeAsOne()
+    }
+
     suspend fun upsertBookmark(geohash: String, position: Long) = withContext(dispatchers.io) {
         databaseManager.getDb().geohashBookmarkQueries.upsert(geohash, position)
     }
