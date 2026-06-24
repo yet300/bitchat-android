@@ -123,14 +123,14 @@ internal class NoiseEncryptionService(
      * Get our static public key data for sharing (32 bytes)
      */
     fun getStaticPublicKeyData(): ByteArray {
-        return staticIdentityPublicKey.clone()
+        return staticIdentityPublicKey.copyOf()
     }
 
     /**
      * Get our signing public key data for sharing (32 bytes)
      */
     fun getSigningPublicKeyData(): ByteArray {
-        return signingPublicKey.clone()
+        return signingPublicKey.copyOf()
     }
     
     /**

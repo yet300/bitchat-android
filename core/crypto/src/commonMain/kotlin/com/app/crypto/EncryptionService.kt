@@ -128,7 +128,7 @@ open class EncryptionService(
      */
     fun getPeerIdentityKey(peerID: String): ByteArray? {
         val fingerprint = getPeerFingerprint(peerID) ?: return null
-        return fingerprint.toByteArray()
+        return fingerprint.encodeToByteArray()
     }
     
     /**
