@@ -47,8 +47,8 @@ class SecureIdentityStateManager(private val store: SecureKeyValueStore) {
             val publicKeyString = store.getString(KEY_STATIC_PUBLIC_KEY)
             
             if (privateKeyString != null && publicKeyString != null) {
-                val privateKey = Base64.Default.decode(privateKeyString)
-                val publicKey = Base64.Default.decode(publicKeyString)
+                val privateKey = Base64.decode(privateKeyString)
+                val publicKey = Base64.decode(publicKeyString)
                 
                 // Validate key sizes
                 if (privateKey.size == 32 && publicKey.size == 32) {
@@ -78,8 +78,8 @@ class SecureIdentityStateManager(private val store: SecureKeyValueStore) {
                 throw IllegalArgumentException("Invalid key sizes: private=${privateKey.size}, public=${publicKey.size}")
             }
             
-            val privateKeyString = Base64.Default.encode(privateKey)
-            val publicKeyString = Base64.Default.encode(publicKey)
+            val privateKeyString = Base64.encode(privateKey)
+            val publicKeyString = Base64.encode(publicKey)
             
             store.putString(KEY_STATIC_PRIVATE_KEY, privateKeyString)
             store.putString(KEY_STATIC_PUBLIC_KEY, publicKeyString)
@@ -103,8 +103,8 @@ class SecureIdentityStateManager(private val store: SecureKeyValueStore) {
             val publicKeyString = store.getString(KEY_SIGNING_PUBLIC_KEY)
             
             if (privateKeyString != null && publicKeyString != null) {
-                val privateKey = Base64.Default.decode(privateKeyString)
-                val publicKey = Base64.Default.decode(publicKeyString)
+                val privateKey = Base64.decode(privateKeyString)
+                val publicKey = Base64.decode(publicKeyString)
                 
                 // Validate key sizes
                 if (privateKey.size == 32 && publicKey.size == 32) {
@@ -134,8 +134,8 @@ class SecureIdentityStateManager(private val store: SecureKeyValueStore) {
                 throw IllegalArgumentException("Invalid signing key sizes: private=${privateKey.size}, public=${publicKey.size}")
             }
             
-            val privateKeyString = Base64.Default.encode(privateKey)
-            val publicKeyString = Base64.Default.encode(publicKey)
+            val privateKeyString = Base64.encode(privateKey)
+            val publicKeyString = Base64.encode(publicKey)
             
             store.putString(KEY_SIGNING_PRIVATE_KEY, privateKeyString)
             store.putString(KEY_SIGNING_PUBLIC_KEY, publicKeyString)
@@ -254,15 +254,15 @@ class SecureIdentityStateManager(private val store: SecureKeyValueStore) {
         val entry = entries.firstOrNull { it.startsWith("$key=") } ?: return null
         val encoded = entry.substringAfter('=')
         return runCatching {
-            val bytes = Base64.Default.decode(encoded)
-            String(bytes, Charsets.UTF_8)
+            val bytes = Base64.decode(encoded)
+            bytes.decodeToString()
         }.getOrNull()
     }
 
     fun cacheFingerprintNickname(fingerprint: String, nickname: String) {
         if (!isValidFingerprint(fingerprint)) return
         val key = fingerprint.lowercase()
-        val encoded = Base64.Default.encode(nickname.toByteArray(Charsets.UTF_8))
+        val encoded = Base64.encode(nickname.encodeToByteArray())
         lock.withLock {
             val current = store.getStringSet(KEY_CACHED_FINGERPRINT_NICKNAMES)?.toMutableSet() ?: mutableSetOf()
             current.removeAll { it.startsWith("$key=") }
@@ -306,7 +306,7 @@ class SecureIdentityStateManager(private val store: SecureKeyValueStore) {
         if (privateKey.all { it == 0.toByte() }) return false
         
         // Check that clamping bits are correct for Curve25519
-        val clampedKey = privateKey.clone()
+        val clampedKey = privateKey.copyOf()
         clampedKey[0] = (clampedKey[0].toInt() and 248).toByte()
         clampedKey[31] = (clampedKey[31].toInt() and 127).toByte()
         clampedKey[31] = (clampedKey[31].toInt() or 64).toByte()
