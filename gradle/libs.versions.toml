@@ -29,8 +29,6 @@ tink-android = "1.22.0"   # Tink — only :core:crypto storage (TinkSecureKeyVal
 
 # KMP cryptography — pinned via throwaway spike against Kotlin 2.4.0 (android + iosArm64/SimulatorArm64)
 cryptography-kotlin = "0.6.0"     # whyoleg/cryptography-kotlin (SHA/HMAC/HKDF/PBKDF2/AES-GCM/Ed25519/random)
-kotlincrypto-blake2 = "0.8.0"     # KotlinCrypto/hash blake2
-signum-supreme = "0.14.0"         # A-SIT Signum/Supreme (hardware-backed keys); pulls indispensable transitively
 secp256k1 = "0.23.0"              # ACINQ secp256k1-kmp (Nostr secp256k1 + BIP-340 Schnorr + ECDH)
 stately = "2.1.0"                 # Touchlab Stately — KMP concurrent collections + locks
 
@@ -109,8 +107,6 @@ google-tink-android = { module = "com.google.crypto.tink:tink-android", version.
 cryptography-core = { module = "dev.whyoleg.cryptography:cryptography-core", version.ref = "cryptography-kotlin" }
 cryptography-provider-jdk-bc = { module = "dev.whyoleg.cryptography:cryptography-provider-jdk-bc", version.ref = "cryptography-kotlin" }
 cryptography-provider-apple = { module = "dev.whyoleg.cryptography:cryptography-provider-apple", version.ref = "cryptography-kotlin" }
-kotlincrypto-blake2 = { module = "org.kotlincrypto.hash:blake2", version.ref = "kotlincrypto-blake2" }
-signum-supreme = { module = "at.asitplus.signum:supreme", version.ref = "signum-supreme" }
 
 # ACINQ secp256k1 (Nostr, :core:transport)
 secp256k1-jni-android = { module = "fr.acinq.secp256k1:secp256k1-kmp-jni-android", version.ref = "secp256k1" }
