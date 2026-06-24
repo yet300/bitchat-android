@@ -2,10 +2,10 @@
 
 package com.app.crypto.identity
 
-import android.content.Context
 import com.app.crypto.secure.SecureKeyValueStore
-import com.app.crypto.secure.SecureStores
 import com.app.crypto.hash.Sha256
+import co.touchlab.stately.concurrency.Lock
+import co.touchlab.stately.concurrency.withLock
 import kotlin.io.encoding.Base64
 import com.app.common.utils.Log
 import com.app.common.encoding.hexEncodedString
@@ -15,10 +15,10 @@ import com.app.common.encoding.hexEncodedString
  *
  * Handles:
  * - Static identity key persistence across app sessions
- * - Secure storage backed by Google Tink ([SecureKeyValueStore])
+ * - Secure storage backed by an injected [SecureKeyValueStore] (KSafe-encrypted on Android)
  * - Fingerprint calculation and identity validation
  */
-class SecureIdentityStateManager(private val context: Context) {
+class SecureIdentityStateManager(private val store: SecureKeyValueStore) {
     
     companion object {
         private const val TAG = "SecureIdentityStateManager"
@@ -33,8 +33,7 @@ class SecureIdentityStateManager(private val context: Context) {
         private const val KEY_CACHED_FINGERPRINT_NICKNAMES = "cached_fingerprint_nicknames"
     }
     
-    private val store: SecureKeyValueStore = SecureStores.secure(context)
-    private val lock = Any()
+    private val lock = Lock()
     
     // MARK: - Static Key Management
     
@@ -178,7 +177,7 @@ class SecureIdentityStateManager(private val context: Context) {
 
     fun setVerifiedFingerprint(fingerprint: String, verified: Boolean) {
         if (!isValidFingerprint(fingerprint)) return
-        synchronized(lock) {
+        lock.withLock {
             val current = store.getStringSet(KEY_VERIFIED_FINGERPRINTS)?.toMutableSet() ?: mutableSetOf()
             if (verified) {
                 current.add(fingerprint)
@@ -203,7 +202,7 @@ class SecureIdentityStateManager(private val context: Context) {
     fun cachePeerFingerprint(peerID: String, fingerprint: String) {
         if (!isValidFingerprint(fingerprint)) return
         val pid = peerID.lowercase()
-        synchronized(lock) {
+        lock.withLock {
             val current = store.getStringSet(KEY_CACHED_PEER_FINGERPRINTS)?.toMutableSet() ?: mutableSetOf()
             current.removeAll { it.startsWith("$pid:") }
             current.add("$pid:$fingerprint")
@@ -221,7 +220,7 @@ class SecureIdentityStateManager(private val context: Context) {
     fun cachePeerNoiseKey(peerID: String, noiseKeyHex: String) {
         if (!noiseKeyHex.matches(Regex("^[a-fA-F0-9]{64}$"))) return
         val pid = peerID.lowercase()
-        synchronized(lock) {
+        lock.withLock {
             val current = store.getStringSet(KEY_CACHED_PEER_NOISE_KEYS)?.toMutableSet() ?: mutableSetOf()
             current.removeAll { it.startsWith("$pid=") }
             current.add("$pid=${noiseKeyHex.lowercase()}")
@@ -240,7 +239,7 @@ class SecureIdentityStateManager(private val context: Context) {
         if (!isValidFingerprint(fingerprint)) return
         if (!noiseKeyHex.matches(Regex("^[a-fA-F0-9]{64}$"))) return
         val key = noiseKeyHex.lowercase()
-        synchronized(lock) {
+        lock.withLock {
             val current = store.getStringSet(KEY_CACHED_NOISE_FINGERPRINTS)?.toMutableSet() ?: mutableSetOf()
             current.removeAll { it.startsWith("$key=") }
             current.add("$key=$fingerprint")
@@ -264,7 +263,7 @@ class SecureIdentityStateManager(private val context: Context) {
         if (!isValidFingerprint(fingerprint)) return
         val key = fingerprint.lowercase()
         val encoded = Base64.Default.encode(nickname.toByteArray(Charsets.UTF_8))
-        synchronized(lock) {
+        lock.withLock {
             val current = store.getStringSet(KEY_CACHED_FINGERPRINT_NICKNAMES)?.toMutableSet() ?: mutableSetOf()
             current.removeAll { it.startsWith("$key=") }
             current.add("$key=$encoded")

@@ -14,7 +14,7 @@ import kotlinx.serialization.builtins.serializer
  * writes), preserving the synchronous contract the callers rely on. String sets are JSON-encoded
  * through the string path, exactly as the previous Tink store did, so on-disk shape is unchanged.
  */
-internal class KSafeSecureKeyValueStore(private val ksafe: KSafe) : SecureKeyValueStore {
+class KSafeSecureKeyValueStore(private val ksafe: KSafe) : SecureKeyValueStore {
 
     override fun getString(key: String): String? =
         if (ksafe.getKeyInfo(key) == null) null else ksafe.getDirect(key, "")

@@ -6,10 +6,10 @@ import kotlinx.serialization.builtins.serializer
 
 /**
  * In-memory [SecureKeyValueStore] for host (Robolectric) tests. KSafe's encrypted mode needs a real
- * Android Keystore and fails closed without one, so host tests install this through
- * [SecureStores.factory] instead. Mirrors the production storage shape (sets JSON-encoded through the
- * string path) and shares one instance across all callers in a test, matching the single-file
- * semantics of the real store.
+ * Android Keystore and fails closed without one, so host tests construct the crypto classes with this
+ * store injected directly. Mirrors the production storage shape (sets JSON-encoded through the string
+ * path) and shares one instance across all callers in a test, matching the single-file semantics of
+ * the real store.
  */
 internal class InMemorySecureKeyValueStore : SecureKeyValueStore {
 

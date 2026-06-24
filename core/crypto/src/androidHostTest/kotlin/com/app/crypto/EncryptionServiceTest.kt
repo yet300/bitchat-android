@@ -1,11 +1,7 @@
 package com.app.crypto
 
-import android.content.Context
-import androidx.test.core.app.ApplicationProvider
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.secure.InMemorySecureKeyValueStore
-import com.app.crypto.secure.SecureStores
-import org.junit.After
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Before
@@ -17,22 +13,13 @@ import java.util.Arrays
 @RunWith(RobolectricTestRunner::class)
 class EncryptionServiceTest {
 
-    private lateinit var context: Context
     private lateinit var encryptionService: EncryptionService
 
     @Before
     fun setup() {
-        context = ApplicationProvider.getApplicationContext()
-        // Robolectric has no Android Keystore, so the KSafe-backed secure store fails closed. Install
-        // a single in-memory store shared across every component the service constructs.
-        val store = InMemorySecureKeyValueStore()
-        SecureStores.factory = { store }
-        encryptionService = EncryptionService(context, PeerFingerprintManager())
-    }
-
-    @After
-    fun tearDown() {
-        SecureStores.resetFactory()
+        // KSafe-encrypted storage fails closed under Robolectric (no Android Keystore), so the service
+        // is constructed with an in-memory secure store injected directly.
+        encryptionService = EncryptionService(InMemorySecureKeyValueStore(), PeerFingerprintManager())
     }
 
     @Test

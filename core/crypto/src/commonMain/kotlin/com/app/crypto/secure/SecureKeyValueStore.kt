@@ -5,10 +5,10 @@ package com.app.crypto.secure
  * signing keys). Values are encrypted before they ever touch disk.
  *
  * The Android implementation is backed by KSafe (AES-256-GCM, AES key in the Android
- * Keystore/TEE); the interface itself carries no Android types so it can move to
- * `commonMain` unchanged when the project goes KMP.
+ * Keystore/TEE); the interface itself carries no platform types and lives in `commonMain`,
+ * so each platform's DI graph provides its own backing store.
  */
-internal interface SecureKeyValueStore {
+interface SecureKeyValueStore {
 
     fun getString(key: String): String?
 

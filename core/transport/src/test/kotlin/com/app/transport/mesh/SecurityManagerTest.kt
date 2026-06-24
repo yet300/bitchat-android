@@ -3,6 +3,7 @@ package com.app.transport.mesh
 import android.os.Build
 import com.app.crypto.EncryptionService
 import com.app.crypto.identity.PeerFingerprintManager
+import com.app.crypto.secure.SecureKeyValueStore
 import com.app.transport.model.IdentityAnnouncement
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
@@ -14,7 +15,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.*
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
@@ -37,8 +37,19 @@ class SecurityManagerTest {
     private val otherSigningKey = ByteArray(32) { 0xA }
     private val otherNoiseKey = ByteArray(32) { 0xB }
 
+    /** No-op secure store: the fake overrides [initialize] so storage is never touched. */
+    object NoopSecureKeyValueStore : SecureKeyValueStore {
+        override fun getString(key: String): String? = null
+        override fun putString(key: String, value: String) {}
+        override fun getStringSet(key: String): Set<String>? = null
+        override fun putStringSet(key: String, values: Set<String>) {}
+        override fun contains(key: String): Boolean = false
+        override fun remove(vararg keys: String) {}
+        override suspend fun clear() {}
+    }
+
     // Fake implementation to bypass initialization issues in tests
-    open class FakeEncryptionService : EncryptionService(RuntimeEnvironment.getApplication(), PeerFingerprintManager()) {
+    open class FakeEncryptionService : EncryptionService(NoopSecureKeyValueStore, PeerFingerprintManager()) {
         var shouldVerify: Boolean = true
         var lastVerifySignature: ByteArray? = null
         var lastVerifyKey: ByteArray? = null
