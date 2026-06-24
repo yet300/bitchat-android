@@ -1,6 +1,5 @@
 package com.app.transport.nostr
 
-import android.content.Context
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -99,7 +98,7 @@ data class NostrIdentity(
  */
 @SingleIn(AppScope::class)
 @Inject
-class NostrIdentityBridge(private val context: Context) {
+class NostrIdentityBridge(private val stateManager: SecureIdentityStateManager) {
 
     private companion object {
         const val TAG = "NostrIdentityBridge"
@@ -115,7 +114,6 @@ class NostrIdentityBridge(private val context: Context) {
      * Get or create the current Nostr identity
      */
     fun getCurrentNostrIdentity(): NostrIdentity? {
-        val stateManager = SecureIdentityStateManager(context)
         
         // Try to load existing Nostr private key
         val existingKey = loadNostrPrivateKey(stateManager)
@@ -151,7 +149,6 @@ class NostrIdentityBridge(private val context: Context) {
             return cachedIdentity
         }
         
-        val stateManager = SecureIdentityStateManager(context)
         val seed = getOrCreateDeviceSeed(stateManager)
         
         val geohashBytes = forGeohash.toByteArray(Charsets.UTF_8)
@@ -198,7 +195,6 @@ class NostrIdentityBridge(private val context: Context) {
      * Associate a Nostr identity with a Noise public key (for favorites)
      */
     fun associateNostrIdentity(nostrPubkey: String, noisePublicKey: ByteArray) {
-        val stateManager = SecureIdentityStateManager(context)
         
         // We'll use the existing signing key storage mechanism for associations
         // For now, we'll store this as a preference since it's just for favorites mapping
@@ -220,7 +216,6 @@ class NostrIdentityBridge(private val context: Context) {
      * Clear all Nostr identity data
      */
     fun clearAllAssociations() {
-        val stateManager = SecureIdentityStateManager(context)
         
         // Clear cache first
         geohashIdentityCache.clear()

@@ -1,9 +1,10 @@
 package com.app.crypto.noise
 
-import android.content.Context
 import com.app.common.utils.Log
+import com.app.common.encoding.hexEncodedString
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.crypto.identity.PeerFingerprintManager
+import com.app.crypto.secure.SecureKeyValueStore
 import com.app.crypto.hash.Sha256
 import com.app.crypto.sign.Ed25519
 
@@ -17,7 +18,7 @@ import com.app.crypto.sign.Ed25519
  * - Peer fingerprint mapping and identity persistence
  */
 internal class NoiseEncryptionService(
-    private val context: Context,
+    store: SecureKeyValueStore,
     private val fingerprintManager: PeerFingerprintManager,
 ) {
     
@@ -52,7 +53,7 @@ internal class NoiseEncryptionService(
     
     init {
         // Initialize identity state manager for persistent storage
-        identityStateManager = SecureIdentityStateManager(context)
+        identityStateManager = SecureIdentityStateManager(store)
         
         // Load or create keys - temporary placeholders
         staticIdentityPrivateKey = ByteArray(32)
@@ -137,7 +138,7 @@ internal class NoiseEncryptionService(
      */
     fun getIdentityFingerprint(): String {
         val hash = Sha256.digest(staticIdentityPublicKey)
-        return hash.joinToString("") { "%02x".format(it) }
+        return hash.hexEncodedString()
     }
     
     /**
@@ -400,7 +401,7 @@ internal class NoiseEncryptionService(
      */
     private fun calculateFingerprint(publicKey: ByteArray): String {
         val hash = Sha256.digest(publicKey)
-        return hash.joinToString("") { "%02x".format(it) }
+        return hash.hexEncodedString()
     }
     
     /**

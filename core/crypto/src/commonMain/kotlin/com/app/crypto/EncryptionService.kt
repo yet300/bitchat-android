@@ -2,15 +2,13 @@
 
 package com.app.crypto
 
-import android.content.Context
 import kotlin.io.encoding.Base64
+import co.touchlab.stately.collections.ConcurrentMutableMap
 import com.app.common.utils.Log
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.secure.SecureKeyValueStore
-import com.app.crypto.secure.SecureStores
 import com.app.crypto.noise.NoiseEncryptionService
 import com.app.crypto.sign.Ed25519
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Encryption service that now uses NoiseEncryptionService internally
@@ -20,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap
  * It now uses the Noise protocol for secure transport encryption with proper session management.
  */
 open class EncryptionService(
-    private val context: Context,
+    private val store: SecureKeyValueStore,
     private val peerFingerprintManager: PeerFingerprintManager,
 ) {
     
@@ -30,10 +28,10 @@ open class EncryptionService(
     }
     
     // Core Noise encryption service
-    private val noiseService: NoiseEncryptionService by lazy { NoiseEncryptionService(context, peerFingerprintManager) }
-    
+    private val noiseService: NoiseEncryptionService by lazy { NoiseEncryptionService(store, peerFingerprintManager) }
+
     // Session tracking for established connections
-    private val establishedSessions = ConcurrentHashMap<String, String>() // peerID -> fingerprint
+    private val establishedSessions = ConcurrentMutableMap<String, String>() // peerID -> fingerprint
     
     // Ed25519 signing keys (separate from Noise static keys)
     private lateinit var ed25519PrivateKey: ByteArray
@@ -43,21 +41,15 @@ open class EncryptionService(
     var onSessionEstablished: ((String) -> Unit)? = null // peerID
     var onSessionLost: ((String) -> Unit)? = null // peerID
     var onHandshakeRequired: ((String) -> Unit)? = null // peerID
-    private lateinit var store: SecureKeyValueStore
 
     init {
         initialize()
-    }
-
-    private fun setUpSecureStore() {
-        store = SecureStores.secure(context)
     }
 
     /**
      * Initialization logic moved to method to allow overriding in tests
      */
     protected open fun initialize() {
-        setUpSecureStore()
         // Initialize or load Ed25519 signing keys
         val (priv, pub) = loadOrCreateEd25519KeyPair()
         ed25519PrivateKey = priv

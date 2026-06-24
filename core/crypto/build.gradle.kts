@@ -14,7 +14,6 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.cryptography.provider.jdk.bc)
-            implementation(libs.androidx.core.ktx)
         }
         nativeMain.dependencies {
             implementation(libs.cryptography.provider.apple)

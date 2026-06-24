@@ -2,7 +2,6 @@
 
 package com.app.data.favorites
 
-import android.content.Context
 import com.app.common.utils.Log
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.common.serialization.JsonConfig
@@ -69,7 +68,7 @@ interface FavoritesChangeListener {
  */
 @SingleIn(AppScope::class)
 @Inject
-class FavoritesPersistenceService(private val context: Context) {
+class FavoritesPersistenceService(private val stateManager: SecureIdentityStateManager) {
 
     companion object {
         private const val TAG = "FavoritesPersistenceService"
@@ -77,7 +76,6 @@ class FavoritesPersistenceService(private val context: Context) {
         private const val PEERID_INDEX_KEY = "favorite_peerid_index"    // peerID(16-hex) -> npub
     }
 
-    private val stateManager = SecureIdentityStateManager(context)
     private val favorites = mutableMapOf<String, FavoriteRelationship>() // noiseHex -> relationship
     // NEW: Index by current mesh peerID (16-hex) for direct lookup when sending Nostr DMs from mesh context
     private val peerIdIndex = mutableMapOf<String, String>() // peerID (lowercase 16-hex) -> npub

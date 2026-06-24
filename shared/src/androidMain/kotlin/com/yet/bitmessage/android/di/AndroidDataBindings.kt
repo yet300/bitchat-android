@@ -57,7 +57,8 @@ import com.yet.bitmessage.android.verification.AndroidCameraPermissionRepository
 import com.yet.bitmessage.android.verification.VerificationCoordinator
 import com.yet.bitmessage.android.verification.VerificationRepositoryImpl
 import com.app.transport.VerificationService
-import com.app.crypto.secure.KSafeStores
+import com.app.crypto.secure.KSafeSecureKeyValueStore
+import com.app.crypto.secure.SecureKeyValueStore
 import eu.anifantakis.lib.ksafe.KSafe
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.BindingContainer
@@ -78,6 +79,12 @@ import dev.zacsweers.metro.SingleIn
 @BindingContainer
 object AndroidDataBindings {
 
+    // KSafe is single-process and must be one instance per fileName (two live instances on one file
+    // diverge). The @SingleIn(AppScope) scope guarantees that here; the file names are unchanged from
+    // the previous crypto-layer holder so the on-disk vault/prefs stores keep their identity.
+    private const val VAULT_FILE = "bitchat_vault"
+    private const val PREFS_FILE = "bitchat_prefs"
+
     @Provides
     @SingleIn(AppScope::class)
     fun provideApplication(context: Context): Application = context.applicationContext as Application
@@ -85,21 +92,34 @@ object AndroidDataBindings {
     /**
      * Single app-wide KSafe **plain** store for all non-secret preferences (theme, toggles,
      * onboarding flags, mesh settings). [SettingsStoreImpl] writes everything here with
-     * `KSafeWriteMode.Plain`. Secrets stay in the KSafe encrypted vault (the crypto layer's
-     * [com.app.crypto.secure.SecureKeyValueStore]), not here.
+     * `KSafeWriteMode.Plain`. Secrets stay in the encrypted vault ([SecureKeyValueStore]), not here.
      */
     @Provides
     @SingleIn(AppScope::class)
-    fun provideKSafePrefs(context: Context): KSafe = KSafeStores.prefs(context)
+    fun provideKSafePrefs(context: Context): KSafe =
+        KSafe(context.applicationContext, fileName = PREFS_FILE)
+
+    /**
+     * Encrypted secret store (KSafe AES-256-GCM, AES key in the Android Keystore/TEE) for all secrets
+     * at rest — identity/signing/Nostr keys, the SQLCipher passphrase, favorites. The Context-bound
+     * KSafe construction lives here at the DI edge so the crypto layer stays commonMain-only.
+     */
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideSecureKeyValueStore(context: Context): SecureKeyValueStore =
+        KSafeSecureKeyValueStore(KSafe(context.applicationContext, fileName = VAULT_FILE))
 
     @Provides
     @SingleIn(AppScope::class)
-    fun provideEncryptionService(context: Context, peerFingerprintManager: PeerFingerprintManager): EncryptionService = EncryptionService(context, peerFingerprintManager)
+    fun provideEncryptionService(
+        store: SecureKeyValueStore,
+        peerFingerprintManager: PeerFingerprintManager,
+    ): EncryptionService = EncryptionService(store, peerFingerprintManager)
 
     @Provides
     @SingleIn(AppScope::class)
-    fun provideSecureIdentityStateManager(context: Context): SecureIdentityStateManager =
-        SecureIdentityStateManager(context)
+    fun provideSecureIdentityStateManager(store: SecureKeyValueStore): SecureIdentityStateManager =
+        SecureIdentityStateManager(store)
 
     /** Hardware-rooted SQLCipher passphrase (stored via the encrypted secret store, never plaintext). */
     @Provides
