@@ -2,9 +2,9 @@ package com.app.domain.repository
 
 /**
  * Root of trust for the encrypted messenger database (SQLCipher). The passphrase is persisted only
- * through the app's hardware-rooted encrypted secret store (Android: Tink AEAD + an Android Keystore
- * master key — the same store that guards the Noise identity). It is NEVER stored in plaintext and
- * never in the unencrypted multiplatform-settings.
+ * through the app's hardware-rooted encrypted secret store (Android: KSafe vault — AES-256-GCM with
+ * the AES key in the Android Keystore/TEE — the same store that guards the Noise identity). It is
+ * NEVER stored in plaintext and never in the plain KSafe prefs.
  *
  * Implemented per platform alongside the other `Android*` providers (in :shared androidMain), so the
  * :core:database driver factory stays free of any key-management dependency. The iOS provider

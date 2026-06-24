@@ -6,7 +6,7 @@ import org.gradle.kotlin.dsl.dependencies
 
 /**
  * Shared configuration for plain Android library modules (e.g. core:data, core:transport,
- * core:crypto) that depend on Android APIs (BLE, Tor, Tink, Context) and therefore are not
+ * core:crypto) that depend on Android APIs (BLE, Tor, KSafe, Context) and therefore are not
  * pure KMP commonMain code.
  */
 internal fun Project.configureAndroidLibrary(
@@ -26,7 +26,7 @@ internal fun Project.configureAndroidLibrary(
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    // Local unit tests run on the JVM via Robolectric (Tink/Context need an Android runtime).
+    // Local unit tests run on the JVM via Robolectric (KSafe/Context need an Android runtime).
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
