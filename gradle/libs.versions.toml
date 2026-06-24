@@ -24,9 +24,6 @@ mvi = "4.4.0"
 
 kermit = "2.1.0"
 
-# Cryptography
-tink-android = "1.22.0"   # Tink — only :core:crypto storage (TinkSecureKeyValueStore)
-
 # KMP cryptography — pinned via throwaway spike against Kotlin 2.4.0 (android + iosArm64/SimulatorArm64)
 cryptography-kotlin = "0.6.0"     # whyoleg/cryptography-kotlin (SHA/HMAC/HKDF/PBKDF2/AES-GCM/Ed25519/random)
 secp256k1 = "0.23.0"              # ACINQ secp256k1-kmp (Nostr secp256k1 + BIP-340 Schnorr + ECDH)
@@ -101,9 +98,6 @@ compose-uiToolingPreview = { module = "org.jetbrains.compose.ui:ui-tooling-previ
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle-runtime" } # delete when migrate to mvi-kotlin
 
 kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
-
-# Cryptography
-google-tink-android = { module = "com.google.crypto.tink:tink-android", version.ref = "tink-android" }
 
 # KMP cryptography (see migration: :core:crypto → KMP)
 cryptography-core = { module = "dev.whyoleg.cryptography:cryptography-core", version.ref = "cryptography-kotlin" }

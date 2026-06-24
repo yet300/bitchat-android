@@ -4,10 +4,9 @@ package com.app.crypto.secure
  * Encrypted key-value storage for secrets at rest (identity keys, fingerprints,
  * signing keys). Values are encrypted before they ever touch disk.
  *
- * Replaces the deprecated `androidx.security:security-crypto`
- * (`EncryptedSharedPreferences`). The Android implementation is backed by Google
- * Tink (see [TinkSecureKeyValueStore]); the interface itself carries no Android
- * types so it can move to `commonMain` unchanged when the project goes KMP.
+ * The Android implementation is backed by KSafe (AES-256-GCM, AES key in the Android
+ * Keystore/TEE); the interface itself carries no Android types so it can move to
+ * `commonMain` unchanged when the project goes KMP.
  */
 internal interface SecureKeyValueStore {
 
@@ -23,5 +22,5 @@ internal interface SecureKeyValueStore {
 
     fun remove(vararg keys: String)
 
-    fun clear()
+    suspend fun clear()
 }

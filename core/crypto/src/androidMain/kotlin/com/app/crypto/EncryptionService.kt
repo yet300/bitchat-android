@@ -7,7 +7,7 @@ import kotlin.io.encoding.Base64
 import com.app.common.utils.Log
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.secure.SecureKeyValueStore
-import com.app.crypto.secure.TinkSecureKeyValueStore
+import com.app.crypto.secure.SecureStores
 import com.app.crypto.noise.NoiseEncryptionService
 import com.app.crypto.sign.Ed25519
 import java.util.concurrent.ConcurrentHashMap
@@ -27,7 +27,6 @@ open class EncryptionService(
     companion object {
         private const val TAG = "EncryptionService"
         private const val ED25519_PRIVATE_KEY_PREF = "ed25519_signing_private_key"
-        private const val SECURE_PREFS_NAME = "bitchat_crypto_secure"
     }
     
     // Core Noise encryption service
@@ -51,7 +50,7 @@ open class EncryptionService(
     }
 
     private fun setUpSecureStore() {
-        store = TinkSecureKeyValueStore(context, SECURE_PREFS_NAME)
+        store = SecureStores.secure(context)
     }
 
     /**

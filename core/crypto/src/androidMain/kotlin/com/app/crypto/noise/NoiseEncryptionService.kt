@@ -154,8 +154,8 @@ internal class NoiseEncryptionService(
         Log.w(TAG, "🚨 Panic Mode: Clearing persistent identity and rotating in-memory keys")
         
         // 1. Clear storage
-        identityStateManager.clearIdentityData()
-        
+        identityStateManager.clearIdentityKeysImmediate()
+
         // 2. Clear all sessions immediately
         if (::sessionManager.isInitialized) {
             sessionManager.shutdown()
