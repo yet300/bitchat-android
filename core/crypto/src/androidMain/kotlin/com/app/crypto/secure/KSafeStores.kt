@@ -7,7 +7,7 @@ import eu.anifantakis.lib.ksafe.KSafe
  * Process-wide [KSafe] singletons. DataStore is single-process and KSafe must be a singleton per
  * `fileName` (two live instances on one file diverge on web and waste backends elsewhere), so every
  * caller — graph-provided or directly constructed — fetches the shared instance from here. Mirrors
- * the existing process-global [TinkAead] holder it replaces.
+ * the process-global Tink AEAD holder it replaces.
  *
  * Two buckets:
  * - [vault]  — encrypted (AES-256-GCM, key in the Android Keystore/TEE). All secrets at rest.

@@ -13,7 +13,6 @@ kotlin {
             implementation(libs.ksafe)
         }
         androidMain.dependencies {
-            implementation(libs.google.tink.android)
             implementation(libs.cryptography.provider.jdk.bc)
             implementation(libs.androidx.core.ktx)
         }

@@ -4,7 +4,7 @@ package com.app.crypto.identity
 
 import android.content.Context
 import com.app.crypto.secure.SecureKeyValueStore
-import com.app.crypto.secure.TinkSecureKeyValueStore
+import com.app.crypto.secure.SecureStores
 import com.app.crypto.hash.Sha256
 import kotlin.io.encoding.Base64
 import com.app.common.utils.Log
@@ -22,7 +22,6 @@ class SecureIdentityStateManager(private val context: Context) {
     
     companion object {
         private const val TAG = "SecureIdentityStateManager"
-        private const val PREFS_NAME = "bitchat_identity"
         private const val KEY_STATIC_PRIVATE_KEY = "static_private_key"
         private const val KEY_STATIC_PUBLIC_KEY = "static_public_key"
         private const val KEY_SIGNING_PRIVATE_KEY = "signing_private_key"
@@ -34,7 +33,7 @@ class SecureIdentityStateManager(private val context: Context) {
         private const val KEY_CACHED_FINGERPRINT_NICKNAMES = "cached_fingerprint_nicknames"
     }
     
-    private val store: SecureKeyValueStore = TinkSecureKeyValueStore(context, PREFS_NAME)
+    private val store: SecureKeyValueStore = SecureStores.secure(context)
     private val lock = Any()
     
     // MARK: - Static Key Management
@@ -345,15 +344,35 @@ class SecureIdentityStateManager(private val context: Context) {
     // MARK: - Emergency Clear
     
     /**
-     * Clear all identity data (for panic mode)
+     * Clear all identity data (for panic mode). Suspends — wipes the whole encrypted store.
      */
-    fun clearIdentityData() {
+    suspend fun clearIdentityData() {
         try {
             store.clear()
             Log.w(TAG, "All identity data cleared")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to clear identity data: ${e.message}")
         }
+    }
+
+    /**
+     * Synchronously remove this manager's own identity keys (Noise static, Ed25519 signing, verified
+     * and cached fingerprint sets). Non-blocking — used where a full async store wipe cannot suspend
+     * and only the identity keys must be dropped before in-memory regeneration.
+     */
+    fun clearIdentityKeysImmediate() {
+        store.remove(
+            KEY_STATIC_PRIVATE_KEY,
+            KEY_STATIC_PUBLIC_KEY,
+            KEY_SIGNING_PRIVATE_KEY,
+            KEY_SIGNING_PUBLIC_KEY,
+            KEY_VERIFIED_FINGERPRINTS,
+            KEY_CACHED_PEER_FINGERPRINTS,
+            KEY_CACHED_PEER_NOISE_KEYS,
+            KEY_CACHED_NOISE_FINGERPRINTS,
+            KEY_CACHED_FINGERPRINT_NICKNAMES,
+        )
+        Log.w(TAG, "Identity keys cleared (immediate)")
     }
     
     /**
