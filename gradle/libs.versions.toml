@@ -34,6 +34,8 @@ stately = "2.1.0"                 # Touchlab Stately — KMP concurrent collecti
 
 multiplatformSettings = "1.3.0"
 
+ksafe = "2.1.3"
+
 # Persistence (encrypted messenger DB) — pinned via throwaway spike against Kotlin 2.4.0 / AGP 9.2.1
 sqldelight = "2.3.2"              # app.cash.sqldelight (KMP DB; android-driver now, native later)
 sqlcipher = "4.16.0"             # net.zetetic:sqlcipher-android (at-rest encryption)
@@ -115,6 +117,9 @@ secp256k1-jni-jvm = { module = "fr.acinq.secp256k1:secp256k1-kmp-jni-jvm", versi
 # Touchlab Stately (KMP concurrent map + lock) — :core:crypto commonMain services
 stately-concurrent-collections = { module = "co.touchlab:stately-concurrent-collections", version.ref = "stately" }
 stately-concurrency = { module = "co.touchlab:stately-concurrency", version.ref = "stately" }
+
+# KSafe — encrypted KV store (single artifact, multiplatform)
+ksafe = { module = "eu.anifantakis:ksafe", version.ref = "ksafe" }
 
 # JSON
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
