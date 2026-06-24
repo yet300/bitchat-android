@@ -4,7 +4,7 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Low-level key/value settings port for non-secret preferences. Abstracts the concrete settings
- * backend (multiplatform-settings) away from the layers that read/write arbitrary keys, so neither
+ * backend (KSafe in plain mode) away from the layers that read/write arbitrary keys, so neither
  * the domain nor the lower modules depend on the settings infrastructure library — only on this
  * interface. The implementation lives in :core:data.
  *

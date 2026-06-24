@@ -10,9 +10,9 @@ import java.security.SecureRandom
 
 /**
  * Hardware-rooted SQLCipher passphrase. The passphrase is a 32-byte CSPRNG value, persisted through
- * the app's existing encrypted secret store ([SecureIdentityStateManager] → Tink AEAD + an Android
- * Keystore master key — the same store that guards the Noise identity). It is therefore never written
- * in plaintext and never lands in the unencrypted multiplatform-settings.
+ * the app's encrypted secret store ([SecureIdentityStateManager] → KSafe vault: AES-256-GCM with the
+ * AES key in the Android Keystore/TEE — the same store that guards the Noise identity). It is
+ * therefore never written in plaintext and never lands in the plain KSafe prefs.
  *
  * First run generates and stores it; subsequent runs read it back. Crypto-erase ([destroyKey]) drops
  * the only stored copy, after which the encrypted database can no longer be opened.
