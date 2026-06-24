@@ -12,7 +12,7 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
-import com.russhwolf.settings.ObservableSettings
+import com.app.common.settings.SettingsStore
 import dev.zacsweers.metro.SingleIn
 
 /**
@@ -38,7 +38,7 @@ object AndroidAppBindings {
 
     @Provides
     @SingleIn(AppScope::class)
-    fun provideNicknameSource(settings: ObservableSettings): NicknameSource {
+    fun provideNicknameSource(settings: SettingsStore): NicknameSource {
         val dataManager = DataManager(settings)
         return NicknameSource { fallback ->
             try {

@@ -1,6 +1,6 @@
 package com.yet.bitmessage.android.service
 
-import com.russhwolf.settings.ObservableSettings
+import com.app.common.settings.SettingsStore
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -11,7 +11,7 @@ import dev.zacsweers.metro.SingleIn
  */
 @SingleIn(AppScope::class)
 @Inject
-class MeshServicePreferences(private val settings: ObservableSettings) {
+class MeshServicePreferences(private val settings: SettingsStore) {
 
     private companion object {
         const val KEY_AUTO_START = "auto_start_on_boot"

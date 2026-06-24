@@ -2,7 +2,7 @@ package com.yet.bitmessage.android.data
 
 import com.app.common.utils.Log
 import com.app.common.serialization.JsonConfig
-import com.russhwolf.settings.Settings
+import com.app.common.settings.SettingsStore
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.SetSerializer
 import kotlinx.serialization.builtins.serializer
@@ -11,11 +11,11 @@ import kotlin.random.Random
 /**
  * Handles data persistence operations for the chat system.
  *
- * String sets are stored as JSON strings since multiplatform-settings has no
+ * String sets are stored as JSON strings since the key/value [SettingsStore] has no
  * native set type; the [JsonConfig] codec keeps that encoding consistent with
  * the rest of the app.
  */
-class DataManager(private val settings: Settings) {
+class DataManager(private val settings: SettingsStore) {
 
     companion object {
         private const val TAG = "DataManager"
@@ -276,6 +276,12 @@ class DataManager(private val settings: Settings) {
         _blockedUsers.clear()
         _geohashBlockedUsers.clear()
         _channelMembers.clear()
-        settings.clear()
+        // SettingsStore has no blanket clear (it shares one KSafe instance with other consumers);
+        // remove only the keys this manager owns.
+        listOf(
+            "nickname", "last_geohash_channel", "location_services_enabled",
+            "joined_channels", "password_protected_channels", "channel_creators",
+            "favorites", "blocked_users", "geohash_blocked_users",
+        ).forEach(settings::remove)
     }
 }
