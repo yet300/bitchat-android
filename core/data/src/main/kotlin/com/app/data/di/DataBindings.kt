@@ -61,7 +61,7 @@ import dev.zacsweers.metro.ContributesTo
 /**
  * Binds the data-layer repository implementations to their domain ports. Contributed to [AppScope];
  * the application graph (Phase B4) aggregates this together with the platform providers that supply
- * `ObservableSettings`, `FavoritesPersistenceService` and `PeerFingerprintManager`.
+ * the KSafe plain prefs instance, `FavoritesPersistenceService` and `PeerFingerprintManager`.
  */
 @ContributesTo(AppScope::class)
 @BindingContainer

@@ -37,7 +37,6 @@ import com.app.data.nostr.NostrDirectMessageIngest
 import com.app.data.nostr.NostrMessageSender
 import com.yet.bitmessage.android.connectivity.RuntimePermissionRequester
 import com.yet.bitmessage.android.service.MeshServicePreferences
-import com.russhwolf.settings.ObservableSettings
 import com.yet.bitmessage.di.AppGraph as SharedAppGraph
 
 /**
@@ -91,7 +90,6 @@ interface AppGraph : SharedAppGraph {
 
     // Settings-backed preference managers (formerly `object`s over the global appSettings()).
     // Transitional accessors for framework entry points; dissolve into feature stores in Phase C.
-    val observableSettings: ObservableSettings
     val meshServicePreferences: MeshServicePreferences
     val verificationService: VerificationService
     val notificationMutePolicy: NotificationMutePolicy

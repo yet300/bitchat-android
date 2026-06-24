@@ -10,7 +10,7 @@ dependencies {
     implementation(projects.core.transport)
     implementation(projects.core.database)
 
-    implementation(libs.bundles.multiplatform.settings)
+    implementation(libs.ksafe)
 
     // secp256k1-kmp JVM native lib for unit tests that exercise transport's Nostr crypto
     // (the android JNI variant ships only android .so; host JVM tests need the jvm variant).
@@ -18,4 +18,8 @@ dependencies {
 
     // In-memory JDBC SQLite driver for repository tests that round-trip through the DB DAOs.
     testImplementation(libs.sqldelight.sqlite.driver)
+
+    // Robolectric + KSafe round-trip for SettingsStoreImpl (KSafe needs a Context; plain mode works
+    // on the host JVM without a Keystore).
+    testImplementation(libs.bundles.android.testing)
 }

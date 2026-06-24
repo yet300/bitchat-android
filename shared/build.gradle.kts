@@ -79,8 +79,7 @@ kotlin {
             implementation(libs.decompose.compose)
             implementation(libs.decompose.compose.experimental)
 
-            implementation(libs.bundles.multiplatform.settings)
-
+            implementation(libs.ksafe)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

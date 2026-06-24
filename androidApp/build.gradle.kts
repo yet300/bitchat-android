@@ -116,9 +116,6 @@ dependencies {
     implementation(libs.bundles.lifecycle)
     implementation(libs.androidx.lifecycle.process)
 
-    // ObservableSettings type referenced by AndroidAppBindings.provideNicknameSource.
-    implementation(libs.bundles.multiplatform.settings)
-
     // JSON / serialization (Decompose Config) + coroutines
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.datetime)

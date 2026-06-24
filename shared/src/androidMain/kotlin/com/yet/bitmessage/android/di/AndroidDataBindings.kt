@@ -57,8 +57,8 @@ import com.yet.bitmessage.android.verification.AndroidCameraPermissionRepository
 import com.yet.bitmessage.android.verification.VerificationCoordinator
 import com.yet.bitmessage.android.verification.VerificationRepositoryImpl
 import com.app.transport.VerificationService
-import com.russhwolf.settings.ObservableSettings
-import com.russhwolf.settings.SharedPreferencesSettings
+import com.app.crypto.secure.KSafeStores
+import eu.anifantakis.lib.ksafe.KSafe
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
@@ -83,14 +83,14 @@ object AndroidDataBindings {
     fun provideApplication(context: Context): Application = context.applicationContext as Application
 
     /**
-     * Single app-wide [ObservableSettings] for all non-secret preferences (one store,
-     * namespaced keys, never enumerate keys). Secrets stay in the Tink-backed
-     * [com.app.crypto.secure.SecureKeyValueStore], not here.
+     * Single app-wide KSafe **plain** store for all non-secret preferences (theme, toggles,
+     * onboarding flags, mesh settings). [SettingsStoreImpl] writes everything here with
+     * `KSafeWriteMode.Plain`. Secrets stay in the KSafe encrypted vault (the crypto layer's
+     * [com.app.crypto.secure.SecureKeyValueStore]), not here.
      */
     @Provides
     @SingleIn(AppScope::class)
-    fun provideObservableSettings(context: Context): ObservableSettings =
-        SharedPreferencesSettings(context.getSharedPreferences("bitchat", Context.MODE_PRIVATE))
+    fun provideKSafePrefs(context: Context): KSafe = KSafeStores.prefs(context)
 
     @Provides
     @SingleIn(AppScope::class)

@@ -29,8 +29,6 @@ cryptography-kotlin = "0.6.0"     # whyoleg/cryptography-kotlin (SHA/HMAC/HKDF/P
 secp256k1 = "0.23.0"              # ACINQ secp256k1-kmp (Nostr secp256k1 + BIP-340 Schnorr + ECDH)
 stately = "2.1.0"                 # Touchlab Stately — KMP concurrent collections + locks
 
-multiplatformSettings = "1.3.0"
-
 ksafe = "2.1.3"
 
 # Persistence (encrypted messenger DB) — pinned via throwaway spike against Kotlin 2.4.0 / AGP 9.2.1
@@ -147,13 +145,6 @@ androidx-camera-compose = { module = "androidx.camera:camera-compose", version.r
 mlkit-barcode-scanning = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkit-barcode" }
 
 
-#settings
-multiplatform-settings = { module = "com.russhwolf:multiplatform-settings", version.ref = "multiplatformSettings" }
-multiplatform-settings-test = { module = "com.russhwolf:multiplatform-settings-test", version.ref = "multiplatformSettings" }
-multiplatform-settings-no-arg = { module = "com.russhwolf:multiplatform-settings-no-arg", version.ref = "multiplatformSettings" }
-multiplatform-settings-coroutines = { module = "com.russhwolf:multiplatform-settings-coroutines", version.ref = "multiplatformSettings" }
-multiplatform-settings-observable = { module = "com.russhwolf:multiplatform-settings-make-observable", version.ref = "multiplatformSettings" }
-
 metrox-android = { module = "dev.zacsweers.metro:metrox-android", version.ref = "metro" }
 
 # Persistence (encrypted messenger DB)
@@ -231,13 +222,6 @@ mvi = [
 lifecycle = [
     "androidx-lifecycle-runtime-ktx",
     "androidx-lifecycle-viewmodel-compose",
-]
-
-multiplatform-settings = [
-    "multiplatform-settings",
-    "multiplatform-settings-no-arg",
-    "multiplatform-settings-coroutines",
-    "multiplatform-settings-observable"
 ]
 
 testing = [
