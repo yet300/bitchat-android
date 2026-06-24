@@ -10,6 +10,7 @@ kotlin {
             implementation(libs.cryptography.core)
             implementation(libs.stately.concurrent.collections)
             implementation(libs.stately.concurrency)
+            implementation(libs.ksafe)
         }
         androidMain.dependencies {
             implementation(libs.google.tink.android)
