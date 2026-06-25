@@ -1,5 +1,8 @@
 package com.app.transport.mesh
 
+import co.touchlab.stately.collections.ConcurrentMutableSet
+import co.touchlab.stately.concurrency.Lock
+import co.touchlab.stately.concurrency.withLock
 import com.app.common.utils.Log
 import com.app.transport.MeshConstants
 import com.app.transport.model.RoutedPacket
@@ -12,7 +15,6 @@ import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.merge
-import java.util.concurrent.ConcurrentHashMap
 
 /** Outcome of [MeshNetwork.sendToPeer] — honest about what actually happened. */
 enum class SendPath {
@@ -57,9 +59,9 @@ class MeshNetwork(
     // arriving over two bearers (or echoed back by a neighbor) is dropped here;
     // SecurityManager.validatePacket remains the authoritative duplicate/replay check.
     private val seenIds = LinkedHashSet<String>()
-    private val seenLock = Any()
+    private val seenLock = Lock()
 
-    private fun firstSeen(id: String): Boolean = synchronized(seenLock) {
+    private fun firstSeen(id: String): Boolean = seenLock.withLock {
         if (!seenIds.add(id)) {
             // Refresh recency so a busy duplicate keeps getting suppressed
             seenIds.remove(id)
@@ -101,7 +103,7 @@ class MeshNetwork(
 
     // Bearers whose start() succeeded — outgoing traffic and the NoRoute verdict only
     // consider these (a registered-but-unstarted stub must not fake a Flooded outcome).
-    private val started = ConcurrentHashMap.newKeySet<BearerId>()
+    private val started = ConcurrentMutableSet<BearerId>()
 
     /** Start all registered bearers. Returns true if at least one bearer started. */
     fun startAll(): Boolean {

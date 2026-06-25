@@ -1,5 +1,7 @@
 package com.app.transport.mesh
 
+import kotlin.jvm.JvmInline
+
 /**
  * Stable identity token for a [MeshBearer] instance.
  *

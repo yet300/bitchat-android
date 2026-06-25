@@ -5,9 +5,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Link-level event on a bearer medium. Addresses are bearer-specific link addresses
- * (BLE MAC, Wi-Fi Aware peer handle …) — peerID binding happens separately via
- * [MeshBearer.bindPeer] once the engine identifies the peer behind a link.
+ * Link-level event on a bearer medium. [linkAddress] is an OPAQUE, bearer-private token — never
+ * parse it. It may be an Android BLE MAC, a Wi-Fi Aware peer handle, or an iOS CoreBluetooth
+ * NSUUID that rotates between devices and is not stable across centrals. The logical identity is
+ * the peerID, bound separately via [MeshBearer.bindPeer] once the engine identifies the peer
+ * behind a link.
  */
 sealed interface BearerEvent {
     data class LinkConnected(val linkAddress: String) : BearerEvent
