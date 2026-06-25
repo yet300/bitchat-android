@@ -5,23 +5,24 @@ import com.app.common.settings.SettingsStore
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import co.touchlab.stately.collections.ConcurrentMutableMap
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
-import java.util.concurrent.ConcurrentHashMap
 
 /**
- * GeohashAliasRegistry
- * - Global, thread-safe registry for alias->Nostr pubkey mappings (e.g., nostr_<pub16> -> pubkeyHex)
+ * GeohashConversationRegistry
+ * - Global, thread-safe registry of conversationKey (e.g., "nostr_<pub16>") -> source geohash
+ * - Enables routing geohash DMs from anywhere by providing the correct geohash identity
  * - Persisted as a single JSON map under [KEY] through the [SettingsStore] port.
  *
  * App-scoped singleton: the in-memory map is loaded once on construction and persisted on writes.
  */
 @SingleIn(AppScope::class)
 @Inject
-class GeohashAliasRegistry(
+class GeohashConversationRegistry(
     private val settings: SettingsStore,
 ) {
-    private val map: MutableMap<String, String> = ConcurrentHashMap()
+    private val map = ConcurrentMutableMap<String, String>()
     private val serializer = MapSerializer(String.serializer(), String.serializer())
 
     init {
@@ -38,16 +39,16 @@ class GeohashAliasRegistry(
         settings.putString(KEY, JsonConfig.json.encodeToString(serializer, HashMap(map)))
     }
 
-    fun put(alias: String, pubkeyHex: String) {
-        map[alias] = pubkeyHex
-        persist()
+    fun set(convKey: String, geohash: String) {
+        if (geohash.isNotEmpty()) {
+            map[convKey] = geohash
+            persist()
+        }
     }
 
-    fun get(alias: String): String? = map[alias]
+    fun get(convKey: String): String? = map[convKey]
 
-    fun contains(alias: String): Boolean = map.containsKey(alias)
-
-    fun snapshot(): Map<String, String> = HashMap(map)
+    fun snapshot(): Map<String, String> = map.toMap()
 
     fun clear() {
         map.clear()
@@ -55,6 +56,6 @@ class GeohashAliasRegistry(
     }
 
     private companion object {
-        const val KEY = "geohash_alias_registry"
+        const val KEY = "geohash_conversation_registry"
     }
 }

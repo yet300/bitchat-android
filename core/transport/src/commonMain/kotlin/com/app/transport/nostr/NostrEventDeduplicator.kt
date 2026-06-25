@@ -1,11 +1,15 @@
 package com.app.transport.nostr
 
+import co.touchlab.stately.collections.ConcurrentMutableMap
+import co.touchlab.stately.concurrency.Lock
+import co.touchlab.stately.concurrency.withLock
 import com.app.common.utils.Log
 import com.app.transport.NostrConstants
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import java.util.concurrent.ConcurrentHashMap
+import kotlin.concurrent.Volatile
+import kotlin.math.round
 
 /**
  * Efficient LRU-based Nostr event deduplication system
@@ -41,14 +45,14 @@ internal class NostrEventDeduplicator(
     )
     
     // Hash map for O(1) lookup - maps event ID to node
-    private val nodeMap = ConcurrentHashMap<String, LRUNode>()
+    private val nodeMap = ConcurrentMutableMap<String, LRUNode>()
     
     // Doubly-linked list for LRU ordering
     private val head = LRUNode("HEAD") // Dummy head node
     private val tail = LRUNode("TAIL") // Dummy tail node
     
     // Lock for thread-safe LRU operations
-    private val lruLock = Any()
+    private val lruLock = Lock()
     
     // Statistics
     @Volatile
@@ -75,7 +79,7 @@ internal class NostrEventDeduplicator(
     fun isDuplicate(eventId: String): Boolean {
         totalChecks++
         
-        synchronized(lruLock) {
+        lruLock.withLock {
             val existingNode = nodeMap[eventId]
             
             if (existingNode != null) {
@@ -122,7 +126,7 @@ internal class NostrEventDeduplicator(
      * Get current statistics about the deduplicator
      */
     fun getStats(): DeduplicationStats {
-        synchronized(lruLock) {
+        lruLock.withLock {
             return DeduplicationStats(
                 capacity = maxCapacity,
                 currentSize = nodeMap.size,
@@ -138,7 +142,7 @@ internal class NostrEventDeduplicator(
      * Clear all cached event IDs (useful for testing or resetting state)
      */
     fun clear() {
-        synchronized(lruLock) {
+        lruLock.withLock {
             nodeMap.clear()
             head.next = tail
             tail.prev = head
@@ -249,6 +253,6 @@ internal data class DeduplicationStats(
     override fun toString(): String {
         return "DeduplicationStats(capacity=$capacity, size=$currentSize, " +
                "checks=$totalChecks, duplicates=$duplicateCount, evictions=$evictionCount, " +
-               "hitRate=${"%.2f".format(hitRate * 100)}%)"
+               "hitRate=${round(hitRate * 10000) / 100.0}%)"
     }
 }

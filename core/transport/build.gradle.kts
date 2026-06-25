@@ -15,6 +15,7 @@ kotlin {
             implementation(libs.cryptography.core)
             implementation(libs.secp256k1.kmp)
             implementation(libs.stately.concurrent.collections)
+            implementation(libs.stately.concurrency)
         }
         androidMain.dependencies {
 
