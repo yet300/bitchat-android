@@ -10,6 +10,7 @@ kotlin {
             implementation(projects.core.crypto)
 
             implementation(libs.kotlinx.io.core)
+            implementation(libs.kompress.core)
         }
         androidMain.dependencies {
 

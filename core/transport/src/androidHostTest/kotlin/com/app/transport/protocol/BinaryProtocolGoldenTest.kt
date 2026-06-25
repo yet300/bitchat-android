@@ -86,9 +86,12 @@ class BinaryProtocolGoldenTest {
         )
         val encoded = BinaryProtocol.encode(packet)
         assertNotNull(encoded)
+        // Compressed bytes re-captured for the Kompress (pure-Kotlin KMP) DEFLATE codec; the
+        // stream is one byte shorter than the old JDK encoder but inflates identically (see
+        // CompressionInteropTest). Plain/uncompressed golden vectors are unaffected.
         assertEquals(
-            "0102070000018bcfe5680004000a0102030405060708019073741c0583090000" +
-                "e0".repeat(224),
+            "0102070000018bcfe5680004000901020304050607080190731c05830a0000" +
+                "e1".repeat(225),
             encoded!!.hex(),
         )
     }
@@ -102,10 +105,11 @@ class BinaryProtocolGoldenTest {
         )
         val encoded = BinaryProtocol.encode(packet)
         assertNotNull(encoded)
+        // Re-captured for the Kompress DEFLATE codec (see the v1 note / CompressionInteropTest).
         assertEquals(
-            "0202070000018bcfe56800050000000c0102030405060708112233445566778800000190" +
-                "73741c0583090000" +
-                "d4".repeat(212),
+            "0202070000018bcfe56800050000000b0102030405060708112233445566778800000190" +
+                "731c05830a0000" +
+                "d5".repeat(213),
             encoded!!.hex(),
         )
     }
