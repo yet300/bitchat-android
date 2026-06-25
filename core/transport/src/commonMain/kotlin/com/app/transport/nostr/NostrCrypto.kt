@@ -1,9 +1,14 @@
+@file:OptIn(ExperimentalTime::class, ExperimentalEncodingApi::class)
+
 package com.app.transport.nostr
 
+import com.app.transport.crypto.HmacSha256
+import dev.whyoleg.cryptography.random.CryptographyRandom
 import fr.acinq.secp256k1.Secp256k1
-import java.security.SecureRandom
-import javax.crypto.Mac
-import javax.crypto.spec.SecretKeySpec
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Cryptographic utilities for the Nostr protocol: secp256k1 key handling, BIP-340 Schnorr (NIP-01)
@@ -13,7 +18,7 @@ import javax.crypto.spec.SecretKeySpec
  */
 internal object NostrCrypto {
 
-    private val secureRandom = SecureRandom()
+    private val secureRandom = CryptographyRandom.Default
 
     /** Generate a secp256k1 key pair as (privateKeyHex, x-only publicKeyHex). */
     fun generateKeyPair(): Pair<String, String> {
@@ -56,7 +61,7 @@ internal object NostrCrypto {
         // iOS derives the HKDF input from the compressed shared point (33 bytes), even-Y lift.
         val secretMaterial = sharedPointCompressed(senderPrivateKeyHex, recipientPublicKeyHex, oddY = false)
         val key = deriveNIP44Key(secretMaterial)
-        val combined = XChaCha20Poly1305Aead(key).encrypt(plaintext.toByteArray(Charsets.UTF_8), null)
+        val combined = XChaCha20Poly1305Aead(key).encrypt(plaintext.encodeToByteArray(), null)
         return "v2:" + base64UrlNoPad(combined)
     }
 
@@ -70,7 +75,7 @@ internal object NostrCrypto {
             try {
                 val secretMaterial = sharedPointCompressed(recipientPrivateKeyHex, senderPublicKeyHex, oddY)
                 val key = deriveNIP44Key(secretMaterial)
-                return String(XChaCha20Poly1305Aead(key).decrypt(data, null), Charsets.UTF_8)
+                return XChaCha20Poly1305Aead(key).decrypt(data, null).decodeToString()
             } catch (e: Exception) {
                 lastError = e
             }
@@ -97,15 +102,9 @@ internal object NostrCrypto {
     /** NIP-44 v2 key derivation: HKDF-SHA256(salt = empty, info = "nip44-v2", length = 32). */
     private fun deriveNIP44Key(sharedSecret: ByteArray): ByteArray {
         // HKDF-extract with an empty salt == HMAC with a zero key (both pad to a 64-byte zero block).
-        val prk = hmacSha256(ByteArray(32), sharedSecret)
+        val prk = HmacSha256.mac(ByteArray(32), sharedSecret)
         // HKDF-expand, single block (T(1) = HMAC(prk, info || 0x01)).
-        return hmacSha256(prk, "nip44-v2".toByteArray(Charsets.UTF_8) + byteArrayOf(0x01)).copyOf(32)
-    }
-
-    private fun hmacSha256(key: ByteArray, data: ByteArray): ByteArray {
-        val mac = Mac.getInstance("HmacSHA256")
-        mac.init(SecretKeySpec(key, "HmacSHA256"))
-        return mac.doFinal(data)
+        return HmacSha256.mac(prk, "nip44-v2".encodeToByteArray() + byteArrayOf(0x01)).copyOf(32)
     }
 
     // ------------------------------------------------------------------------------------------
@@ -136,14 +135,14 @@ internal object NostrCrypto {
     // ------------------------------------------------------------------------------------------
 
     /** Random timestamp offset for privacy (±15 minutes). */
-    fun randomizeTimestamp(baseTimestamp: Long = System.currentTimeMillis() / 1000): Int {
+    fun randomizeTimestamp(baseTimestamp: Long = Clock.System.now().epochSeconds): Int {
         val offset = secureRandom.nextInt(1800) - 900
         return (baseTimestamp + offset).toInt()
     }
 
     /** Random timestamp up to maxPastSeconds in the past (default 2 days). */
     fun randomizeTimestampUpToPast(maxPastSeconds: Int = 172800): Int {
-        val now = (System.currentTimeMillis() / 1000).toInt()
+        val now = Clock.System.now().epochSeconds.toInt()
         val offset = if (maxPastSeconds > 0) secureRandom.nextInt(maxPastSeconds + 1) else 0
         return now - offset
     }
@@ -153,7 +152,7 @@ internal object NostrCrypto {
     // ------------------------------------------------------------------------------------------
 
     private fun base64UrlNoPad(data: ByteArray): String {
-        val b64 = android.util.Base64.encodeToString(data, android.util.Base64.NO_WRAP)
+        val b64 = Base64.encode(data) // standard alphabet with padding
         return b64.replace('+', '-').replace('/', '_').replace("=", "")
     }
 
@@ -162,7 +161,7 @@ internal object NostrCrypto {
         val pad = (4 - (str.length % 4)) % 4
         if (pad > 0) str += "=".repeat(pad)
         return try {
-            android.util.Base64.decode(str, android.util.Base64.NO_WRAP)
+            Base64.decode(str)
         } catch (_: IllegalArgumentException) {
             null
         }

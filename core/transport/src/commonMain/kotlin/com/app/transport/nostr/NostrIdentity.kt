@@ -1,13 +1,21 @@
+@file:OptIn(ExperimentalTime::class, ExperimentalEncodingApi::class)
+
 package com.app.transport.nostr
 
+import co.touchlab.stately.collections.ConcurrentMutableMap
+import com.app.common.encoding.hexEncodedString
+import com.app.common.utils.Log
+import com.app.crypto.identity.SecureIdentityStateManager
+import com.app.transport.crypto.HmacSha256
+import com.app.transport.crypto.Sha256
+import dev.whyoleg.cryptography.random.CryptographyRandom
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import com.app.common.utils.Log
-import com.app.crypto.identity.SecureIdentityStateManager
-import java.security.MessageDigest
-import java.security.SecureRandom
-import java.util.concurrent.ConcurrentHashMap
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Manages Nostr identity (secp256k1 keypair) for NIP-17 private messaging
@@ -36,7 +44,7 @@ data class NostrIdentity(
                 privateKeyHex = privateKeyHex,
                 publicKeyHex = publicKeyHex,
                 npub = npub,
-                createdAt = System.currentTimeMillis()
+                createdAt = Clock.System.now().toEpochMilliseconds()
             )
         }
         
@@ -55,7 +63,7 @@ data class NostrIdentity(
                 privateKeyHex = privateKeyHex,
                 publicKeyHex = publicKeyHex,
                 npub = npub,
-                createdAt = System.currentTimeMillis()
+                createdAt = Clock.System.now().toEpochMilliseconds()
             )
         }
         
@@ -64,10 +72,9 @@ data class NostrIdentity(
          */
         fun fromSeed(seed: String): NostrIdentity {
             // Hash the seed to create a private key
-            val digest = MessageDigest.getInstance("SHA-256")
-            val seedBytes = seed.toByteArray(Charsets.UTF_8)
-            val privateKeyBytes = digest.digest(seedBytes)
-            val privateKeyHex = privateKeyBytes.joinToString("") { "%02x".format(it) }
+            val seedBytes = seed.encodeToByteArray()
+            val privateKeyBytes = Sha256.digest(seedBytes)
+            val privateKeyHex = privateKeyBytes.hexEncodedString()
             
             return fromPrivateKey(privateKeyHex)
         }
@@ -108,7 +115,7 @@ class NostrIdentityBridge(private val stateManager: SecureIdentityStateManager) 
 
     // Cache for derived geohash identities to avoid repeated crypto operations
     // (concurrent: derivation happens from UI, transport and data coroutines)
-    private val geohashIdentityCache = ConcurrentHashMap<String, NostrIdentity>()
+    private val geohashIdentityCache = ConcurrentMutableMap<String, NostrIdentity>()
     
     /**
      * Get or create the current Nostr identity
@@ -151,7 +158,7 @@ class NostrIdentityBridge(private val stateManager: SecureIdentityStateManager) 
         
         val seed = getOrCreateDeviceSeed(stateManager)
         
-        val geohashBytes = forGeohash.toByteArray(Charsets.UTF_8)
+        val geohashBytes = forGeohash.encodeToByteArray()
         
         // Try a few iterations to ensure a valid key can be formed (exactly like iOS)
         for (i in 0 until 10) {
@@ -171,8 +178,7 @@ class NostrIdentityBridge(private val stateManager: SecureIdentityStateManager) 
         
         // As a final fallback, hash the seed+msg and try again (exactly like iOS)
         val combined = seed + geohashBytes
-        val digest = MessageDigest.getInstance("SHA-256")
-        val fallbackKey = digest.digest(combined)
+        val fallbackKey = Sha256.digest(combined)
         
         val fallbackIdentity = NostrIdentity.fromPrivateKey(fallbackKey.toHexStringLocal())
         
@@ -188,7 +194,7 @@ class NostrIdentityBridge(private val stateManager: SecureIdentityStateManager) 
      */
     private fun candidateKey(seed: ByteArray, message: ByteArray, iteration: UInt): ByteArray {
         val input = message + iteration.toLittleEndianBytes()
-        return hmacSha256(seed, input)
+        return HmacSha256.mac(seed, input)
     }
     
     /**
@@ -259,14 +265,14 @@ class NostrIdentityBridge(private val stateManager: SecureIdentityStateManager) 
             // Use public methods instead of reflection to access the encrypted preferences
             val existingSeed = stateManager.getSecureValue(DEVICE_SEED_KEY)
             if (existingSeed != null) {
-                return android.util.Base64.decode(existingSeed, android.util.Base64.DEFAULT)
+                return Base64.decode(existingSeed)
             }
-            
+
             // Generate new seed
             val seed = ByteArray(32)
-            SecureRandom().nextBytes(seed)
-            
-            val seedBase64 = android.util.Base64.encodeToString(seed, android.util.Base64.DEFAULT)
+            CryptographyRandom.Default.nextBytes(seed)
+
+            val seedBase64 = Base64.encode(seed)
             stateManager.storeSecureValue(DEVICE_SEED_KEY, seedBase64)
                 
             Log.d(TAG, "Generated new device seed for geohash identity derivation")
@@ -277,12 +283,6 @@ class NostrIdentityBridge(private val stateManager: SecureIdentityStateManager) 
         }
     }
     
-    private fun hmacSha256(key: ByteArray, message: ByteArray): ByteArray {
-        val mac = javax.crypto.Mac.getInstance("HmacSHA256")
-        val secretKeySpec = javax.crypto.spec.SecretKeySpec(key, "HmacSHA256")
-        mac.init(secretKeySpec)
-        return mac.doFinal(message)
-    }
 }
 
 // Extension functions for data conversion
@@ -290,9 +290,7 @@ private fun String.hexToByteArrayLocal(): ByteArray {
     return chunked(2).map { it.toInt(16).toByte() }.toByteArray()
 }
 
-private fun ByteArray.toHexStringLocal(): String {
-    return joinToString("") { "%02x".format(it) }
-}
+private fun ByteArray.toHexStringLocal(): String = hexEncodedString()
 
 private fun UInt.toLittleEndianBytes(): ByteArray {
     val bytes = ByteArray(4)
