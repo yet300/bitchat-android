@@ -1,5 +1,7 @@
 package com.app.transport.model
 
+import com.app.common.encoding.hexEncodedString
+
 /**
  * FragmentPayload - 100% iOS-compatible fragment payload structure
  * 
@@ -84,7 +86,7 @@ internal data class FragmentPayload(
         val payload = ByteArray(HEADER_SIZE + data.size)
         
         // Fragment ID (8 bytes)
-        System.arraycopy(fragmentID, 0, payload, 0, FRAGMENT_ID_SIZE)
+        fragmentID.copyInto(payload, destinationOffset = 0, startIndex = 0, endIndex = FRAGMENT_ID_SIZE)
         
         // Index (2 bytes, big-endian) - matching iOS withUnsafeBytes(of: UInt16(index).bigEndian)
         payload[8] = ((index shr 8) and 0xFF).toByte()
@@ -99,7 +101,7 @@ internal data class FragmentPayload(
         
         // Fragment data
         if (data.isNotEmpty()) {
-            System.arraycopy(data, 0, payload, HEADER_SIZE, data.size)
+            data.copyInto(payload, destinationOffset = HEADER_SIZE, startIndex = 0, endIndex = data.size)
         }
         
         return payload
@@ -109,7 +111,7 @@ internal data class FragmentPayload(
      * Get fragment ID as hex string for logging/debugging
      */
     fun getFragmentIDString(): String {
-        return fragmentID.joinToString("") { "%02x".format(it) }
+        return fragmentID.hexEncodedString()
     }
     
     /**
@@ -125,8 +127,8 @@ internal data class FragmentPayload(
     
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-        
+        if (other == null || this::class != other::class) return false
+
         other as FragmentPayload
         
         if (!fragmentID.contentEquals(other.fragmentID)) return false

@@ -1,16 +1,17 @@
 @file:UseSerializers(DateSerializer::class)
-@file:OptIn(ExperimentalTime::class)
+@file:OptIn(ExperimentalTime::class, ExperimentalUuidApi::class)
 
 package com.app.transport.model
 
 import com.app.transport.serialization.DateSerializer
+import kotlinx.io.Buffer
+import kotlinx.io.readByteArray
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import java.util.UUID
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 @Serializable
 enum class BitchatMessageType {
@@ -60,7 +61,7 @@ sealed class DeliveryStatus {
  */
 @Serializable
 data class BitchatMessage(
-    val id: String = UUID.randomUUID().toString().uppercase(),
+    val id: String = Uuid.random().toString().uppercase(),
     val sender: String,
     val content: String,
     val type: BitchatMessageType = BitchatMessageType.Message,
@@ -83,7 +84,8 @@ data class BitchatMessage(
      */
     fun toBinaryPayload(): ByteArray? {
         try {
-            val buffer = ByteBuffer.allocate(4096).apply { order(ByteOrder.BIG_ENDIAN) }
+            // kotlinx-io Buffer writes big-endian by default, matching the iOS wire (BIG_ENDIAN).
+            val buffer = Buffer()
 
             // Message format:
             // - Flags: 1 byte (bit flags for optional fields)
@@ -103,74 +105,71 @@ data class BitchatMessage(
             if (channel != null) flags = flags or 0x40u
             if (isEncrypted) flags = flags or 0x80u
 
-            buffer.put(flags.toByte())
+            buffer.writeByte(flags.toByte())
 
             // Timestamp (in milliseconds, 8 bytes big-endian)
             val timestampMillis = timestamp.toEpochMilliseconds()
-            buffer.putLong(timestampMillis)
+            buffer.writeLong(timestampMillis)
 
             // ID
-            val idBytes = id.toByteArray(Charsets.UTF_8)
-            buffer.put(minOf(idBytes.size, 255).toByte())
-            buffer.put(idBytes.take(255).toByteArray())
+            val idBytes = id.encodeToByteArray()
+            buffer.writeByte(minOf(idBytes.size, 255).toByte())
+            buffer.write(idBytes.take(255).toByteArray())
 
             // Sender
-            val senderBytes = sender.toByteArray(Charsets.UTF_8)
-            buffer.put(minOf(senderBytes.size, 255).toByte())
-            buffer.put(senderBytes.take(255).toByteArray())
+            val senderBytes = sender.encodeToByteArray()
+            buffer.writeByte(minOf(senderBytes.size, 255).toByte())
+            buffer.write(senderBytes.take(255).toByteArray())
 
             // Content or encrypted content
             if (isEncrypted && encryptedContent != null) {
                 val length = minOf(encryptedContent.size, 65535)
-                buffer.putShort(length.toShort())
-                buffer.put(encryptedContent.take(length).toByteArray())
+                buffer.writeShort(length.toShort())
+                buffer.write(encryptedContent.take(length).toByteArray())
             } else {
-                val contentBytes = content.toByteArray(Charsets.UTF_8)
+                val contentBytes = content.encodeToByteArray()
                 val length = minOf(contentBytes.size, 65535)
-                buffer.putShort(length.toShort())
-                buffer.put(contentBytes.take(length).toByteArray())
+                buffer.writeShort(length.toShort())
+                buffer.write(contentBytes.take(length).toByteArray())
             }
 
             // Optional fields
             originalSender?.let { origSender ->
-                val origBytes = origSender.toByteArray(Charsets.UTF_8)
-                buffer.put(minOf(origBytes.size, 255).toByte())
-                buffer.put(origBytes.take(255).toByteArray())
+                val origBytes = origSender.encodeToByteArray()
+                buffer.writeByte(minOf(origBytes.size, 255).toByte())
+                buffer.write(origBytes.take(255).toByteArray())
             }
 
             recipientNickname?.let { recipient ->
-                val recipBytes = recipient.toByteArray(Charsets.UTF_8)
-                buffer.put(minOf(recipBytes.size, 255).toByte())
-                buffer.put(recipBytes.take(255).toByteArray())
+                val recipBytes = recipient.encodeToByteArray()
+                buffer.writeByte(minOf(recipBytes.size, 255).toByte())
+                buffer.write(recipBytes.take(255).toByteArray())
             }
 
             senderPeerID?.let { peerID ->
-                val peerBytes = peerID.toByteArray(Charsets.UTF_8)
-                buffer.put(minOf(peerBytes.size, 255).toByte())
-                buffer.put(peerBytes.take(255).toByteArray())
+                val peerBytes = peerID.encodeToByteArray()
+                buffer.writeByte(minOf(peerBytes.size, 255).toByte())
+                buffer.write(peerBytes.take(255).toByteArray())
             }
 
             // Mentions array
             mentions?.let { mentionList ->
-                buffer.put(minOf(mentionList.size, 255).toByte())
+                buffer.writeByte(minOf(mentionList.size, 255).toByte())
                 mentionList.take(255).forEach { mention ->
-                    val mentionBytes = mention.toByteArray(Charsets.UTF_8)
-                    buffer.put(minOf(mentionBytes.size, 255).toByte())
-                    buffer.put(mentionBytes.take(255).toByteArray())
+                    val mentionBytes = mention.encodeToByteArray()
+                    buffer.writeByte(minOf(mentionBytes.size, 255).toByte())
+                    buffer.write(mentionBytes.take(255).toByteArray())
                 }
             }
 
             // Channel hashtag
             channel?.let { channelName ->
-                val channelBytes = channelName.toByteArray(Charsets.UTF_8)
-                buffer.put(minOf(channelBytes.size, 255).toByte())
-                buffer.put(channelBytes.take(255).toByteArray())
+                val channelBytes = channelName.encodeToByteArray()
+                buffer.writeByte(minOf(channelBytes.size, 255).toByte())
+                buffer.write(channelBytes.take(255).toByteArray())
             }
 
-            val result = ByteArray(buffer.position())
-            buffer.rewind()
-            buffer.get(result)
-            return result
+            return buffer.readByteArray()
 
         } catch (e: Exception) {
             return null
@@ -185,10 +184,10 @@ data class BitchatMessage(
             try {
                 if (data.size < 13) return null
 
-                val buffer = ByteBuffer.wrap(data).apply { order(ByteOrder.BIG_ENDIAN) }
+                val buffer = Buffer().apply { write(data) }
 
                 // Flags
-                val flags = buffer.get().toUByte()
+                val flags = buffer.readByte().toUByte()
                 val isRelay = (flags and 0x01u) != 0u.toUByte()
                 val isPrivate = (flags and 0x02u) != 0u.toUByte()
                 val hasOriginalSender = (flags and 0x04u) != 0u.toUByte()
@@ -199,81 +198,59 @@ data class BitchatMessage(
                 val isEncrypted = (flags and 0x80u) != 0u.toUByte()
 
                 // Timestamp
-                val timestampMillis = buffer.getLong()
+                val timestampMillis = buffer.readLong()
                 val timestamp = Instant.fromEpochMilliseconds(timestampMillis)
 
                 // ID
-                val idLength = buffer.get().toInt() and 0xFF
-                if (buffer.remaining() < idLength) return null
-                val idBytes = ByteArray(idLength)
-                buffer.get(idBytes)
-                val id = String(idBytes, Charsets.UTF_8)
+                val idLength = buffer.readByte().toInt() and 0xFF
+                if (buffer.size < idLength) return null
+                val id = buffer.readByteArray(idLength).decodeToString()
 
                 // Sender
-                val senderLength = buffer.get().toInt() and 0xFF
-                if (buffer.remaining() < senderLength) return null
-                val senderBytes = ByteArray(senderLength)
-                buffer.get(senderBytes)
-                val sender = String(senderBytes, Charsets.UTF_8)
+                val senderLength = buffer.readByte().toInt() and 0xFF
+                if (buffer.size < senderLength) return null
+                val sender = buffer.readByteArray(senderLength).decodeToString()
 
                 // Content
-                val contentLength = buffer.getShort().toInt() and 0xFFFF
-                if (buffer.remaining() < contentLength) return null
+                val contentLength = buffer.readShort().toInt() and 0xFFFF
+                if (buffer.size < contentLength) return null
 
                 val content: String
                 val encryptedContent: ByteArray?
 
                 if (isEncrypted) {
-                    val encryptedBytes = ByteArray(contentLength)
-                    buffer.get(encryptedBytes)
-                    encryptedContent = encryptedBytes
+                    encryptedContent = buffer.readByteArray(contentLength)
                     content = "" // Empty placeholder
                 } else {
-                    val contentBytes = ByteArray(contentLength)
-                    buffer.get(contentBytes)
-                    content = String(contentBytes, Charsets.UTF_8)
+                    content = buffer.readByteArray(contentLength).decodeToString()
                     encryptedContent = null
                 }
 
                 // Optional fields
-                val originalSender = if (hasOriginalSender && buffer.hasRemaining()) {
-                    val length = buffer.get().toInt() and 0xFF
-                    if (buffer.remaining() >= length) {
-                        val bytes = ByteArray(length)
-                        buffer.get(bytes)
-                        String(bytes, Charsets.UTF_8)
-                    } else null
+                val originalSender = if (hasOriginalSender && !buffer.exhausted()) {
+                    val length = buffer.readByte().toInt() and 0xFF
+                    if (buffer.size >= length) buffer.readByteArray(length).decodeToString() else null
                 } else null
 
-                val recipientNickname = if (hasRecipientNickname && buffer.hasRemaining()) {
-                    val length = buffer.get().toInt() and 0xFF
-                    if (buffer.remaining() >= length) {
-                        val bytes = ByteArray(length)
-                        buffer.get(bytes)
-                        String(bytes, Charsets.UTF_8)
-                    } else null
+                val recipientNickname = if (hasRecipientNickname && !buffer.exhausted()) {
+                    val length = buffer.readByte().toInt() and 0xFF
+                    if (buffer.size >= length) buffer.readByteArray(length).decodeToString() else null
                 } else null
 
-                val senderPeerID = if (hasSenderPeerID && buffer.hasRemaining()) {
-                    val length = buffer.get().toInt() and 0xFF
-                    if (buffer.remaining() >= length) {
-                        val bytes = ByteArray(length)
-                        buffer.get(bytes)
-                        String(bytes, Charsets.UTF_8)
-                    } else null
+                val senderPeerID = if (hasSenderPeerID && !buffer.exhausted()) {
+                    val length = buffer.readByte().toInt() and 0xFF
+                    if (buffer.size >= length) buffer.readByteArray(length).decodeToString() else null
                 } else null
 
                 // Mentions array
-                val mentions = if (hasMentions && buffer.hasRemaining()) {
-                    val mentionCount = buffer.get().toInt() and 0xFF
+                val mentions = if (hasMentions && !buffer.exhausted()) {
+                    val mentionCount = buffer.readByte().toInt() and 0xFF
                     val mentionList = mutableListOf<String>()
                     repeat(mentionCount) {
-                        if (buffer.hasRemaining()) {
-                            val length = buffer.get().toInt() and 0xFF
-                            if (buffer.remaining() >= length) {
-                                val bytes = ByteArray(length)
-                                buffer.get(bytes)
-                                mentionList.add(String(bytes, Charsets.UTF_8))
+                        if (!buffer.exhausted()) {
+                            val length = buffer.readByte().toInt() and 0xFF
+                            if (buffer.size >= length) {
+                                mentionList.add(buffer.readByteArray(length).decodeToString())
                             }
                         }
                     }
@@ -281,13 +258,9 @@ data class BitchatMessage(
                 } else null
 
                 // Channel
-                val channel = if (hasChannel && buffer.hasRemaining()) {
-                    val length = buffer.get().toInt() and 0xFF
-                    if (buffer.remaining() >= length) {
-                        val bytes = ByteArray(length)
-                        buffer.get(bytes)
-                        String(bytes, Charsets.UTF_8)
-                    } else null
+                val channel = if (hasChannel && !buffer.exhausted()) {
+                    val length = buffer.readByte().toInt() and 0xFF
+                    if (buffer.size >= length) buffer.readByteArray(length).decodeToString() else null
                 } else null
 
                 return BitchatMessage(
@@ -315,7 +288,7 @@ data class BitchatMessage(
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (javaClass != other?.javaClass) return false
+        if (other == null || this::class != other::class) return false
 
         other as BitchatMessage
 
@@ -360,5 +333,3 @@ data class BitchatMessage(
         return result
     }
 }
-
-

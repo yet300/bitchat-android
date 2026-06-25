@@ -5,12 +5,13 @@ plugins {
 
 kotlin {
     sourceSets {
-        // Phase 0 of the KMP migration: every source still lives in androidMain. commonMain stays
-        // empty until protocol/model/Nostr code is moved over phase by phase. iOS targets compile
-        // (the convention adds iosArm64 + iosSimulatorArm64) but have no transport sources yet.
-        androidMain.dependencies {
+        commonMain.dependencies {
             implementation(projects.core.common)
             implementation(projects.core.crypto)
+
+            implementation(libs.kotlinx.io.core)
+        }
+        androidMain.dependencies {
 
             // ktor HttpClient is part of this module's public surface (HttpClientProvider), so expose it.
             api(libs.ktor.client.core)

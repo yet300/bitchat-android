@@ -1,8 +1,8 @@
 package com.app.transport.model
 
 import com.app.common.utils.Log
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
+import kotlinx.io.Buffer
+import kotlinx.io.readByteArray
 
 /**
  * BitchatFilePacket: TLV-encoded file transfer payload for BLE mesh.
@@ -27,16 +27,16 @@ data class BitchatFilePacket(
 ) {
     private enum class TLVType(val v: UByte) {
         FILE_NAME(0x01u), FILE_SIZE(0x02u), MIME_TYPE(0x03u), CONTENT(0x04u);
-        companion object { fun from(value: UByte) = values().find { it.v == value } }
+        companion object { fun from(value: UByte) = entries.find { it.v == value } }
     }
 
     fun encode(): ByteArray? {
         try {
             Log.d("BitchatFilePacket", "🔄 Encoding: name=$fileName, size=$fileSize, mime=$mimeType")
-        val nameBytes = fileName.toByteArray(Charsets.UTF_8)
-        val mimeBytes = mimeType.toByteArray(Charsets.UTF_8)
-        // Validate bounds for 2-byte TLV lengths (per-TLV). CONTENT may exceed 65535 and will be chunked.
-        if (nameBytes.size > 0xFFFF || mimeBytes.size > 0xFFFF) {
+            val nameBytes = fileName.encodeToByteArray()
+            val mimeBytes = mimeType.encodeToByteArray()
+            // Validate bounds for 2-byte TLV lengths (per-TLV). CONTENT may exceed 65535 and will be chunked.
+            if (nameBytes.size > 0xFFFF || mimeBytes.size > 0xFFFF) {
                 Log.e("BitchatFilePacket", "❌ TLV field too large: name=${nameBytes.size}, mime=${mimeBytes.size} (max: 65535)")
                 return null
             }
@@ -45,35 +45,31 @@ data class BitchatFilePacket(
             } else {
                 Log.d("BitchatFilePacket", "📏 TLV sizes OK: name=${nameBytes.size}, mime=${mimeBytes.size}, content=${content.size}")
             }
-        val sizeFieldLen = 4 // UInt32 for FILE_SIZE (changed from 8 bytes)
-        val contentLenFieldLen = 4 // UInt32 for CONTENT TLV as requested
 
-        // Compute capacity: header TLVs + single CONTENT TLV with 4-byte length
-        val contentTLVBytes = 1 + contentLenFieldLen + content.size
-        val capacity = (1 + 2 + nameBytes.size) + (1 + 2 + sizeFieldLen) + (1 + 2 + mimeBytes.size) + contentTLVBytes
-        val buf = ByteBuffer.allocate(capacity).order(ByteOrder.BIG_ENDIAN)
+            // kotlinx-io Buffer writes big-endian by default, matching the iOS wire (BIG_ENDIAN).
+            val buf = Buffer()
 
-        // FILE_NAME
-        buf.put(TLVType.FILE_NAME.v.toByte())
-        buf.putShort(nameBytes.size.toShort())
-        buf.put(nameBytes)
+            // FILE_NAME
+            buf.writeByte(TLVType.FILE_NAME.v.toByte())
+            buf.writeShort(nameBytes.size.toShort())
+            buf.write(nameBytes)
 
-        // FILE_SIZE (4 bytes)
-        buf.put(TLVType.FILE_SIZE.v.toByte())
-        buf.putShort(sizeFieldLen.toShort())
-        buf.putInt(fileSize.toInt())
+            // FILE_SIZE (4 bytes)
+            buf.writeByte(TLVType.FILE_SIZE.v.toByte())
+            buf.writeShort(4.toShort()) // UInt32 for FILE_SIZE
+            buf.writeInt(fileSize.toInt())
 
-        // MIME_TYPE
-        buf.put(TLVType.MIME_TYPE.v.toByte())
-        buf.putShort(mimeBytes.size.toShort())
-        buf.put(mimeBytes)
+            // MIME_TYPE
+            buf.writeByte(TLVType.MIME_TYPE.v.toByte())
+            buf.writeShort(mimeBytes.size.toShort())
+            buf.write(mimeBytes)
 
-        // CONTENT (single TLV with 4-byte length)
-        buf.put(TLVType.CONTENT.v.toByte())
-        buf.putInt(content.size)
-        buf.put(content)
+            // CONTENT (single TLV with 4-byte length)
+            buf.writeByte(TLVType.CONTENT.v.toByte())
+            buf.writeInt(content.size)
+            buf.write(content)
 
-        val result = buf.array()
+            val result = buf.readByteArray()
             Log.d("BitchatFilePacket", "✅ Encoded successfully: ${result.size} bytes total")
             return result
         } catch (e: Exception) {
@@ -109,13 +105,17 @@ data class BitchatFilePacket(
                     val value = data.copyOfRange(off, off + len)
                     off += len
                     when (t) {
-                        TLVType.FILE_NAME -> name = String(value, Charsets.UTF_8)
+                        TLVType.FILE_NAME -> name = value.decodeToString()
                         TLVType.FILE_SIZE -> {
                             if (len != 4) return null
-                            val bb = ByteBuffer.wrap(value).order(ByteOrder.BIG_ENDIAN)
-                            size = bb.int.toLong()
+                            // Signed big-endian int -> Long (sign-extended), identical to ByteBuffer.int.toLong().
+                            val iv = ((value[0].toInt() and 0xFF) shl 24) or
+                                ((value[1].toInt() and 0xFF) shl 16) or
+                                ((value[2].toInt() and 0xFF) shl 8) or
+                                (value[3].toInt() and 0xFF)
+                            size = iv.toLong()
                         }
-                        TLVType.MIME_TYPE -> mime = String(value, Charsets.UTF_8)
+                        TLVType.MIME_TYPE -> mime = value.decodeToString()
                         TLVType.CONTENT -> {
                             // Expect a single CONTENT TLV
                             if (contentBytes == null) contentBytes = value else {
@@ -139,4 +139,3 @@ data class BitchatFilePacket(
         }
     }
 }
-

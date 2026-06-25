@@ -41,7 +41,7 @@ internal object MessagePadding {
         val result = ByteArray(targetSize)
         
         // Copy original data
-        System.arraycopy(data, 0, result, 0, data.size)
+        data.copyInto(result, destinationOffset = 0, startIndex = 0, endIndex = data.size)
         
         // PKCS#7: All pad bytes are equal to the pad length (iOS fix)
         for (i in data.size until targetSize) {

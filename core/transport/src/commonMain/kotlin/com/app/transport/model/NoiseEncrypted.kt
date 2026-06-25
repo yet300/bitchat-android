@@ -79,8 +79,8 @@ data class NoisePayload(
     // Override equals and hashCode since we use ByteArray
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-        
+        if (other == null || this::class != other::class) return false
+
         other as NoisePayload
         
         if (type != other.type) return false
@@ -124,8 +124,8 @@ data class PrivateMessagePacket(
      * Format: [type][length][value] for each field
      */
     fun encode(): ByteArray? {
-        val messageIDData = messageID.toByteArray(Charsets.UTF_8)
-        val contentData = content.toByteArray(Charsets.UTF_8)
+        val messageIDData = messageID.encodeToByteArray()
+        val contentData = content.encodeToByteArray()
         
         // Check size limits (TLV length field is 1 byte = max 255)
         if (messageIDData.size > 255 || contentData.size > 255) {
@@ -175,10 +175,10 @@ data class PrivateMessagePacket(
                 
                 when (type) {
                     TLVType.MESSAGE_ID -> {
-                        messageID = String(value, Charsets.UTF_8)
+                        messageID = value.decodeToString()
                     }
                     TLVType.CONTENT -> {
-                        content = String(value, Charsets.UTF_8)
+                        content = value.decodeToString()
                     }
                 }
             }
