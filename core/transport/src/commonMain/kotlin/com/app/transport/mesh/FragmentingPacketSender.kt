@@ -1,6 +1,9 @@
 package com.app.transport.mesh
 
+import co.touchlab.stately.collections.ConcurrentMutableMap
+import com.app.common.encoding.hexEncodedString
 import com.app.common.utils.Log
+import com.app.transport.crypto.Sha256
 import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
@@ -10,8 +13,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.security.MessageDigest
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Shared transport send wrapper that applies bitchat packet fragmentation and
@@ -27,7 +28,7 @@ internal class FragmentingPacketSender(
     private val logTag: String,
     private val interFragmentDelayMs: Long = 20L
 ) {
-    private val transferJobs = ConcurrentHashMap<String, Job>()
+    private val transferJobs = ConcurrentMutableMap<String, Job>()
 
     fun send(
         routed: RoutedPacket,
@@ -90,7 +91,7 @@ internal class FragmentingPacketSender(
 
         if (transferId != null) {
             transferJobs[transferId] = job
-            job.invokeOnCompletion { transferJobs.remove(transferId, job) }
+            job.invokeOnCompletion { if (transferJobs[transferId] === job) transferJobs.remove(transferId) }
         }
         job.start()
         return true
@@ -133,9 +134,7 @@ internal class FragmentingPacketSender(
     }
 
     private fun sha256Hex(bytes: ByteArray): String = try {
-        val md = MessageDigest.getInstance("SHA-256")
-        md.update(bytes)
-        md.digest().joinToString("") { "%02x".format(it) }
+        Sha256.digest(bytes).hexEncodedString()
     } catch (_: Exception) {
         bytes.size.toString(16)
     }

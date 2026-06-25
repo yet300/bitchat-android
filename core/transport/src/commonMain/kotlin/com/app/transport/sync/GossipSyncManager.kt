@@ -62,7 +62,7 @@ internal class GossipSyncManager(
     private var cleanupJob: Job? = null
     fun start() {
         periodicJob?.cancel()
-        periodicJob = scope.launch(Dispatchers.Default) {
+        periodicJob = scope.launch(Dispatchers.IO) {
             while (isActive) {
                 try {
                     delay(30_000)
@@ -74,7 +74,7 @@ internal class GossipSyncManager(
 
         // Start periodic cleanup of stale announcements and messages
         cleanupJob?.cancel()
-        cleanupJob = scope.launch(Dispatchers.Default) {
+        cleanupJob = scope.launch(Dispatchers.IO) {
             while (isActive) {
                 try {
                     delay(SyncDefaults.CLEANUP_INTERVAL_MS)
@@ -91,14 +91,14 @@ internal class GossipSyncManager(
     }
 
     fun scheduleInitialSync(delayMs: Long = 5_000L) {
-        scope.launch(Dispatchers.Default) {
+        scope.launch(Dispatchers.IO) {
             delay(delayMs)
             sendRequestSync()
         }
     }
 
     fun scheduleInitialSyncToPeer(peerID: String, delayMs: Long = 5_000L) {
-        scope.launch(Dispatchers.Default) {
+        scope.launch(Dispatchers.IO) {
             delay(delayMs)
             sendRequestSyncToPeer(peerID)
         }
