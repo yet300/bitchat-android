@@ -1,12 +1,19 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.app.transport.sync
 
+import co.touchlab.stately.collections.ConcurrentMutableMap
+import co.touchlab.stately.concurrency.Lock
+import co.touchlab.stately.concurrency.withLock
+import com.app.common.encoding.hexEncodedString
 import com.app.common.utils.Log
 import com.app.transport.model.RequestSyncPacket
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
 import com.app.transport.protocol.SpecialRecipients
 import kotlinx.coroutines.*
-import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Gossip-based synchronization manager using on-demand GCS filters.
@@ -47,14 +54,15 @@ internal class GossipSyncManager(
     // Stored packets for sync:
     // - broadcast messages: keep up to seenCapacity() most recent, keyed by packetId
     private val messages = LinkedHashMap<String, BitchatPacket>()
+    private val messagesLock = Lock()
     // - announcements: only keep latest per sender peerID
-    private val latestAnnouncementByPeer = ConcurrentHashMap<String, Pair<String, BitchatPacket>>()
+    private val latestAnnouncementByPeer = ConcurrentMutableMap<String, Pair<String, BitchatPacket>>()
 
     private var periodicJob: Job? = null
     private var cleanupJob: Job? = null
     fun start() {
         periodicJob?.cancel()
-        periodicJob = scope.launch(Dispatchers.IO) {
+        periodicJob = scope.launch(Dispatchers.Default) {
             while (isActive) {
                 try {
                     delay(30_000)
@@ -66,7 +74,7 @@ internal class GossipSyncManager(
 
         // Start periodic cleanup of stale announcements and messages
         cleanupJob?.cancel()
-        cleanupJob = scope.launch(Dispatchers.IO) {
+        cleanupJob = scope.launch(Dispatchers.Default) {
             while (isActive) {
                 try {
                     delay(SyncDefaults.CLEANUP_INTERVAL_MS)
@@ -83,14 +91,14 @@ internal class GossipSyncManager(
     }
 
     fun scheduleInitialSync(delayMs: Long = 5_000L) {
-        scope.launch(Dispatchers.IO) {
+        scope.launch(Dispatchers.Default) {
             delay(delayMs)
             sendRequestSync()
         }
     }
 
     fun scheduleInitialSyncToPeer(peerID: String, delayMs: Long = 5_000L) {
-        scope.launch(Dispatchers.IO) {
+        scope.launch(Dispatchers.Default) {
             delay(delayMs)
             sendRequestSyncToPeer(peerID)
         }
@@ -104,10 +112,10 @@ internal class GossipSyncManager(
         if (!isBroadcastMessage && !isAnnouncement) return
 
         val idBytes = PacketIdUtil.computeIdBytes(packet)
-        val id = idBytes.joinToString("") { b -> "%02x".format(b) }
+        val id = idBytes.hexEncodedString()
 
         if (isBroadcastMessage) {
-            synchronized(messages) {
+            messagesLock.withLock {
                 messages[id] = packet
                 // Enforce capacity (remove oldest when exceeded)
                 val cap = configProvider.seenCapacity().coerceAtLeast(1)
@@ -118,14 +126,14 @@ internal class GossipSyncManager(
             }
         } else if (isAnnouncement) {
             // Ignore stale announcements older than STALE_PEER_TIMEOUT
-            val now = System.currentTimeMillis()
+            val now = Clock.System.now().toEpochMilliseconds()
             val age = now - packet.timestamp.toLong()
             if (age > STALE_ANNOUNCE_MAX_AGE_MS) {
                 Log.d(TAG, "Ignoring stale ANNOUNCE (age=${age}ms > ${STALE_ANNOUNCE_MAX_AGE_MS}ms)")
                 return
             }
             // senderID is fixed-size 8 bytes; map to hex string for key
-            val sender = packet.senderID.joinToString("") { b -> "%02x".format(b) }
+            val sender = packet.senderID.hexEncodedString()
             latestAnnouncementByPeer[sender] = id to packet
             // Enforce capacity (remove oldest when exceeded)
             val cap = configProvider.seenCapacity().coerceAtLeast(1)
@@ -142,7 +150,7 @@ internal class GossipSyncManager(
         val packet = BitchatPacket(
             type = MessageType.REQUEST_SYNC.value,
             senderID = hexStringToByteArray(myPeerID),
-            timestamp = System.currentTimeMillis().toULong(),
+            timestamp = Clock.System.now().toEpochMilliseconds().toULong(),
             payload = payload,
             ttl = SyncDefaults.SYNC_TTL_HOPS // neighbors only
         )
@@ -158,7 +166,7 @@ internal class GossipSyncManager(
             type = MessageType.REQUEST_SYNC.value,
             senderID = hexStringToByteArray(myPeerID),
             recipientID = hexStringToByteArray(peerID),
-            timestamp = System.currentTimeMillis().toULong(),
+            timestamp = Clock.System.now().toEpochMilliseconds().toULong(),
             payload = payload,
             ttl = SyncDefaults.SYNC_TTL_HOPS // neighbor only
         )
@@ -185,18 +193,18 @@ internal class GossipSyncManager(
                 // Send original packet unchanged to requester only (keep local TTL)
                 val toSend = pkt.copy(ttl = SyncDefaults.SYNC_TTL_HOPS)
                 delegate?.sendPacketToPeer(fromPeerID, toSend)
-                Log.d(TAG, "Sent sync announce: Type ${toSend.type} from ${toSend.senderID.toHexString()} to $fromPeerID packet id ${idBytes.toHexString()}")
+                Log.d(TAG, "Sent sync announce: Type ${toSend.type} from ${toSend.senderID.hexEncodedString()} to $fromPeerID packet id ${idBytes.hexEncodedString()}")
             }
         }
 
         // 2) Broadcast messages: send all they lack
-        val toSendMsgs = synchronized(messages) { messages.values.toList() }
+        val toSendMsgs = messagesLock.withLock { messages.values.toList() }
         for (pkt in toSendMsgs) {
             val idBytes = PacketIdUtil.computeIdBytes(pkt)
             if (!mightContain(idBytes)) {
                 val toSend = pkt.copy(ttl = SyncDefaults.SYNC_TTL_HOPS)
                 delegate?.sendPacketToPeer(fromPeerID, toSend)
-                Log.d(TAG, "Sent sync message: Type ${toSend.type} to $fromPeerID packet id ${idBytes.toHexString()}")
+                Log.d(TAG, "Sent sync message: Type ${toSend.type} to $fromPeerID packet id ${idBytes.hexEncodedString()}")
             }
         }
     }
@@ -234,7 +242,7 @@ internal class GossipSyncManager(
             list.add(pair.second)
         }
         // messages
-        synchronized(messages) {
+        messagesLock.withLock {
             list.addAll(messages.values)
         }
         // sort by timestamp desc, then take up to min(seenCapacity, fit capacity)
@@ -258,7 +266,7 @@ internal class GossipSyncManager(
 
     // Periodically remove stale announcements and all their messages
     private fun pruneStaleAnnouncements() {
-        val now = System.currentTimeMillis()
+        val now = Clock.System.now().toEpochMilliseconds()
         val stalePeers = mutableListOf<String>()
 
         // Identify stale announcements by age
@@ -277,9 +285,9 @@ internal class GossipSyncManager(
         for (peerID in stalePeers) {
             // Count messages to be pruned for logging
             val toRemove = mutableListOf<String>()
-            synchronized(messages) {
+            messagesLock.withLock {
                 for ((id, message) in messages) {
-                    val sender = message.senderID.joinToString("") { b -> "%02x".format(b) }
+                    val sender = message.senderID.hexEncodedString()
                     if (sender == peerID) toRemove.add(id)
                 }
             }
@@ -301,9 +309,9 @@ internal class GossipSyncManager(
 
         // Collect IDs to remove first to avoid modifying collection while iterating
         val idsToRemove = mutableListOf<String>()
-        synchronized(messages) {
+        messagesLock.withLock {
             for ((id, message) in messages) {
-                val sender = message.senderID.joinToString("") { b -> "%02x".format(b) }
+                val sender = message.senderID.hexEncodedString()
                 if (sender == key) {
                     idsToRemove.add(id)
                 }
@@ -311,7 +319,7 @@ internal class GossipSyncManager(
         }
         
         // Now remove the collected IDs
-        synchronized(messages) {
+        messagesLock.withLock {
             for (id in idsToRemove) {
                 messages.remove(id)
             }

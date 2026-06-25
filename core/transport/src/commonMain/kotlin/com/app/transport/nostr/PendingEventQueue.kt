@@ -1,5 +1,8 @@
 package com.app.transport.nostr
 
+import co.touchlab.stately.concurrency.Lock
+import co.touchlab.stately.concurrency.withLock
+
 /**
  * Queue policy for events that could not be delivered immediately: each entry tracks the
  * relay URLs that still need to receive the event. Connected relays are never enqueued —
@@ -21,7 +24,7 @@ internal class PendingEventQueue<E>(private val maxEntries: Int = DEFAULT_MAX_EN
     /** [sendNow] — relays with a live connection; [dropped] — oldest events evicted by the cap. */
     data class SubmitResult<E>(val sendNow: List<String>, val dropped: List<E>)
 
-    private val lock = Any()
+    private val lock = Lock()
     private val entries = mutableListOf<Pair<E, MutableList<String>>>()
 
     /**
@@ -30,7 +33,7 @@ internal class PendingEventQueue<E>(private val maxEntries: Int = DEFAULT_MAX_EN
      * queued until their relay reconnects.
      */
     fun submit(event: E, targetRelays: List<String>, isConnected: (String) -> Boolean): SubmitResult<E> {
-        synchronized(lock) {
+        lock.withLock {
             val (connected, pending) = targetRelays.partition(isConnected)
             val dropped = mutableListOf<E>()
             if (pending.isNotEmpty()) {
@@ -48,7 +51,7 @@ internal class PendingEventQueue<E>(private val maxEntries: Int = DEFAULT_MAX_EN
      * waiting for it (in submission order). Entries with no remaining relays are removed.
      */
     fun drainFor(relayUrl: String): List<E> {
-        synchronized(lock) {
+        lock.withLock {
             val toSend = mutableListOf<E>()
             val iterator = entries.iterator()
             while (iterator.hasNext()) {
@@ -64,12 +67,12 @@ internal class PendingEventQueue<E>(private val maxEntries: Int = DEFAULT_MAX_EN
         }
     }
 
-    fun clear() = synchronized(lock) { entries.clear() }
+    fun clear() = lock.withLock { entries.clear() }
 
-    fun size(): Int = synchronized(lock) { entries.size }
+    fun size(): Int = lock.withLock { entries.size }
 
     /** Pending relay URLs of the entry holding [event], or null if not queued. Test hook. */
-    fun pendingRelaysOf(event: E): List<String>? = synchronized(lock) {
+    fun pendingRelaysOf(event: E): List<String>? = lock.withLock {
         entries.firstOrNull { it.first == event }?.second?.toList()
     }
 }

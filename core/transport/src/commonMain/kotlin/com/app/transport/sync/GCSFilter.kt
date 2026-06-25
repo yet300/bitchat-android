@@ -1,6 +1,6 @@
 package com.app.transport.sync
 
-import java.security.MessageDigest
+import com.app.transport.crypto.Sha256
 import kotlin.math.ceil
 import kotlin.math.ln
 
@@ -105,9 +105,7 @@ object GCSFilter {
     }
 
     internal fun h64(id16: ByteArray): Long {
-        val md = MessageDigest.getInstance("SHA-256")
-        md.update(id16)
-        val d = md.digest()
+        val d = Sha256.digest(id16)
         var x = 0L
         for (i in 0 until 8) {
             x = (x shl 8) or ((d[i].toLong() and 0xFF))

@@ -1,5 +1,7 @@
 package com.app.transport
 
+import co.touchlab.stately.concurrency.Lock
+import co.touchlab.stately.concurrency.withLock
 import com.app.common.utils.Log
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.common.serialization.JsonConfig
@@ -21,15 +23,16 @@ class SeenMessageStore(private val secure: SecureIdentityStateManager) {
         private const val MAX_IDS = 10_000
     }
 
+    private val lock = Lock()
     private val delivered = LinkedHashSet<String>(MAX_IDS)
     private val read = LinkedHashSet<String>(MAX_IDS)
 
     init { load() }
 
-    @Synchronized fun hasDelivered(id: String) = delivered.contains(id)
-    @Synchronized fun hasRead(id: String) = read.contains(id)
+    fun hasDelivered(id: String) = lock.withLock { delivered.contains(id) }
+    fun hasRead(id: String) = lock.withLock { read.contains(id) }
 
-    @Synchronized fun markDelivered(id: String) {
+    fun markDelivered(id: String) = lock.withLock {
         if (delivered.remove(id)) delivered.add(id) else {
             delivered.add(id)
             trim(delivered)
@@ -37,7 +40,7 @@ class SeenMessageStore(private val secure: SecureIdentityStateManager) {
         persist()
     }
 
-    @Synchronized fun markRead(id: String) {
+    fun markRead(id: String) = lock.withLock {
         if (read.remove(id)) read.add(id) else {
             read.add(id)
             trim(read)
@@ -46,8 +49,8 @@ class SeenMessageStore(private val secure: SecureIdentityStateManager) {
     }
 
     /** Marks many ids read with a single persist (conversation-level mark-read). */
-    @Synchronized fun markReadAll(ids: Collection<String>) {
-        if (ids.isEmpty()) return
+    fun markReadAll(ids: Collection<String>) = lock.withLock {
+        if (ids.isEmpty()) return@withLock
         ids.forEach { id ->
             if (read.remove(id)) read.add(id) else read.add(id)
         }
@@ -55,7 +58,7 @@ class SeenMessageStore(private val secure: SecureIdentityStateManager) {
         persist()
     }
 
-    @Synchronized fun clear() {
+    fun clear() = lock.withLock {
         delivered.clear()
         read.clear()
         persist()
@@ -69,9 +72,9 @@ class SeenMessageStore(private val secure: SecureIdentityStateManager) {
         }
     }
 
-    @Synchronized private fun load() {
+    private fun load() = lock.withLock {
         try {
-            val json = secure.getSecureValue(STORAGE_KEY) ?: return
+            val json = secure.getSecureValue(STORAGE_KEY) ?: return@withLock
             val data = JsonConfig.json.decodeFromString(StorePayload.serializer(), json)
             delivered.clear(); read.clear()
             data.delivered.takeLast(MAX_IDS).forEach { delivered.add(it) }
@@ -82,7 +85,7 @@ class SeenMessageStore(private val secure: SecureIdentityStateManager) {
         }
     }
 
-    @Synchronized private fun persist() {
+    private fun persist() {
         try {
             val payload = StorePayload(delivered.toList(), read.toList())
             val json = JsonConfig.json.encodeToString(StorePayload.serializer(), payload)

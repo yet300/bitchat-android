@@ -1,12 +1,14 @@
 package com.app.transport.meshgraph
 
+import co.touchlab.stately.collections.ConcurrentMutableMap
+import co.touchlab.stately.concurrency.Lock
+import co.touchlab.stately.concurrency.withLock
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Maintains an internal graph of the mesh based on gossip.
@@ -19,12 +21,14 @@ class MeshGraphService {
     data class GraphEdge(val a: String, val b: String, val isConfirmed: Boolean, val confirmedBy: String? = null)
     data class GraphSnapshot(val nodes: List<GraphNode>, val edges: List<GraphEdge>)
 
+    // Reentrant lock replacing lock.withLock for commonMain.
+    private val lock = Lock()
     // Map peerID -> nickname (may be null if unknown)
-    private val nicknames = ConcurrentHashMap<String, String?>()
+    private val nicknames = ConcurrentMutableMap<String, String?>()
     // Announcements: peerID -> set of neighbor peerIDs that *this* peer claims to see
-    private val announcements = ConcurrentHashMap<String, Set<String>>()
+    private val announcements = ConcurrentMutableMap<String, Set<String>>()
     // Latest announcement timestamp per peer (ULong from packet)
-    private val lastUpdate = ConcurrentHashMap<String, ULong>()
+    private val lastUpdate = ConcurrentMutableMap<String, ULong>()
 
     private val _graphState = MutableStateFlow(GraphSnapshot(emptyList(), emptyList()))
     val graphState: StateFlow<GraphSnapshot> = _graphState.asStateFlow()
@@ -34,7 +38,7 @@ class MeshGraphService {
      * Replaces previous neighbors for origin if this is newer (by timestamp).
      */
     fun updateFromAnnouncement(originPeerID: String, originNickname: String?, neighborsOrNull: List<String>?, timestamp: ULong) {
-        synchronized(this) {
+        lock.withLock {
             // Always update nickname if provided
             if (originNickname != null) nicknames[originPeerID] = originNickname
 
@@ -68,7 +72,7 @@ class MeshGraphService {
      * Remove a peer from the graph completely (e.g. when stale/offline).
      */
     fun removePeer(peerID: String) {
-        synchronized(this) {
+        lock.withLock {
             nicknames.remove(peerID)
             announcements.remove(peerID)
             lastUpdate.remove(peerID)
