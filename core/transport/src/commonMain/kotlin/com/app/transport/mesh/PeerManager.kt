@@ -1,11 +1,15 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.app.transport.mesh
 
+import co.touchlab.stately.collections.ConcurrentMutableList
+import co.touchlab.stately.collections.ConcurrentMutableMap
 import com.app.common.utils.Log
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.transport.MeshConstants
 import kotlinx.coroutines.*
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Peer information structure with verification status
@@ -23,8 +27,8 @@ data class PeerInfo(
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-        
+        if (other == null || this::class != other::class) return false
+
         other as PeerInfo
         
         if (id != other.id) return false
@@ -77,10 +81,10 @@ internal class PeerManager(
     private val stalePeerTimeoutMs: Long = MeshConstants.Mesh.STALE_PEER_TIMEOUT_MS
 
     // Peer tracking data - enhanced with verification status
-    private val peers = ConcurrentHashMap<String, PeerInfo>() // peerID -> PeerInfo
-    private val peerRSSI = ConcurrentHashMap<String, Int>()
-    private val announcedPeers = CopyOnWriteArrayList<String>()
-    private val announcedToPeers = CopyOnWriteArrayList<String>()
+    private val peers = ConcurrentMutableMap<String, PeerInfo>() // peerID -> PeerInfo
+    private val peerRSSI = ConcurrentMutableMap<String, Int>()
+    private val announcedPeers = ConcurrentMutableList<String>()
+    private val announcedToPeers = ConcurrentMutableList<String>()
     
     // Delegate for callbacks
     var delegate: PeerManagerDelegate? = null
@@ -110,7 +114,7 @@ internal class PeerManager(
     ): Boolean {
         if (peerID == "unknown") return false
         
-        val now = System.currentTimeMillis()
+        val now = Clock.System.now().toEpochMilliseconds()
         val existingPeer = peers[peerID]
         val isNewPeer = existingPeer == null
         
@@ -194,7 +198,7 @@ internal class PeerManager(
     fun updatePeerLastSeen(peerID: String) {
         if (peerID != "unknown") {
             peers[peerID]?.let { info ->
-                peers[peerID] = info.copy(lastSeen = System.currentTimeMillis())
+                peers[peerID] = info.copy(lastSeen = Clock.System.now().toEpochMilliseconds())
             }
         }
     }
@@ -207,7 +211,7 @@ internal class PeerManager(
         if (peerID == "unknown") return false
         
         // Clean up stale peer IDs with the same nickname (exact same logic as iOS)
-        val now = System.currentTimeMillis()
+        val now = Clock.System.now().toEpochMilliseconds()
         val stalePeerIDs = mutableListOf<String>()
         peers.forEach { (existingPeerID, info) ->
             if (info.nickname == nickname && existingPeerID != peerID) {
@@ -362,7 +366,7 @@ internal class PeerManager(
      * Get debug information
      */
     fun getDebugInfo(addressPeerMap: Map<String, String>? = null): String {
-        val now = System.currentTimeMillis()
+        val now = Clock.System.now().toEpochMilliseconds()
         val activeIds = getActivePeerIDs().toSet()
         return buildString {
             appendLine("=== Peer Manager Debug Info ===")
@@ -430,7 +434,7 @@ internal class PeerManager(
      * Clean up stale peers (same 3-minute threshold as iOS)
      */
     private fun cleanupStalePeers() {
-        val now = System.currentTimeMillis()
+        val now = Clock.System.now().toEpochMilliseconds()
         
         val peersToRemove = peers.filterValues { (now - it.lastSeen) > stalePeerTimeoutMs }
             .keys

@@ -1,13 +1,18 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.app.transport.mesh
 
+import co.touchlab.stately.collections.ConcurrentMutableList
+import co.touchlab.stately.collections.ConcurrentMutableMap
+import co.touchlab.stately.collections.ConcurrentMutableSet
 import com.app.common.utils.Log
 import com.app.transport.MeshConstants
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
 import com.app.transport.protocol.SpecialRecipients
 import kotlinx.coroutines.*
-import java.util.*
-import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Manages store-and-forward messaging for offline peers
@@ -34,15 +39,15 @@ internal class StoreForwardManager {
     )
     
     // Message storage
-    private val messageCache = Collections.synchronizedList(mutableListOf<StoredMessage>())
-    private val favoriteMessageQueue = ConcurrentHashMap<String, MutableList<StoredMessage>>()
-    private val deliveredMessages = Collections.synchronizedSet(mutableSetOf<String>())
-    private val cachedMessagesSentToPeer = Collections.synchronizedSet(mutableSetOf<String>())
-    
+    private val messageCache = ConcurrentMutableList<StoredMessage>()
+    private val favoriteMessageQueue = ConcurrentMutableMap<String, MutableList<StoredMessage>>()
+    private val deliveredMessages = ConcurrentMutableSet<String>()
+    private val cachedMessagesSentToPeer = ConcurrentMutableSet<String>()
+
     // Delegate for callbacks
     var delegate: StoreForwardManagerDelegate? = null
-    
-    // Coroutines
+
+
     private val managerScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
     init {
@@ -70,7 +75,7 @@ internal class StoreForwardManager {
         
         // Determine if this is for a favorite peer
         val recipientPeerID = packet.recipientID?.let { recipientID ->
-            String(recipientID).replace("\u0000", "")
+            recipientID.decodeToString().replace("\u0000", "")
         }
         
         if (recipientPeerID.isNullOrEmpty()) {
@@ -82,7 +87,7 @@ internal class StoreForwardManager {
         
         val storedMessage = StoredMessage(
             packet = packet,
-            timestamp = System.currentTimeMillis(),
+            timestamp = Clock.System.now().toEpochMilliseconds(),
             messageID = messageID,
             isForFavorite = isForFavorite
         )
@@ -144,7 +149,7 @@ internal class StoreForwardManager {
             val recipientMessages = messageCache.filter { storedMessage ->
                 !deliveredMessages.contains(storedMessage.messageID) &&
                 storedMessage.packet.recipientID?.let { recipientID ->
-                    String(recipientID).replace("\u0000", "") == peerID
+                    recipientID.decodeToString().replace("\u0000", "") == peerID
                 } == true
             }
             messagesToSend.addAll(recipientMessages)
@@ -204,7 +209,7 @@ internal class StoreForwardManager {
         val favoriteCount = favoriteMessageQueue[peerID]?.size ?: 0
         val regularCount = messageCache.count { storedMessage ->
             storedMessage.packet.recipientID?.let { recipientID ->
-                String(recipientID).replace("\u0000", "") == peerID
+                recipientID.decodeToString().replace("\u0000", "") == peerID
             } == true
         }
         return favoriteCount + regularCount
@@ -227,7 +232,7 @@ internal class StoreForwardManager {
             appendLine("Peers Sent Cache: ${cachedMessagesSentToPeer.size}")
             
             // Cache age analysis
-            val now = System.currentTimeMillis()
+            val now = Clock.System.now().toEpochMilliseconds()
             val regularCacheAges = messageCache.map { (now - it.timestamp) / 1000 }
             if (regularCacheAges.isNotEmpty()) {
                 val avgAge = regularCacheAges.average().toInt()
@@ -254,7 +259,7 @@ internal class StoreForwardManager {
      * Clean up old cached messages (not for favorites)
      */
     private fun cleanupMessageCache() {
-        val cutoffTime = System.currentTimeMillis() - MESSAGE_CACHE_TIMEOUT
+        val cutoffTime = Clock.System.now().toEpochMilliseconds() - MESSAGE_CACHE_TIMEOUT
         val sizeBefore = messageCache.size
         val removed = messageCache.removeAll { !it.isForFavorite && it.timestamp < cutoffTime }
         

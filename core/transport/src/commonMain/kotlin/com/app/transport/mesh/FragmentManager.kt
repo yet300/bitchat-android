@@ -1,5 +1,10 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.app.transport.mesh
 
+import co.touchlab.stately.collections.ConcurrentMutableMap
+import co.touchlab.stately.concurrency.Lock
+import co.touchlab.stately.concurrency.withLock
 import com.app.common.utils.Log
 import com.app.transport.MeshConstants
 import com.app.transport.protocol.BitchatPacket
@@ -7,7 +12,8 @@ import com.app.transport.protocol.MessageType
 import com.app.transport.protocol.MessagePadding
 import com.app.transport.model.FragmentPayload
 import kotlinx.coroutines.*
-import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Manages message fragmentation and reassembly - 100% iOS Compatible
@@ -30,12 +36,12 @@ class FragmentManager {
     }
     
     // Fragment storage - iOS equivalent: incomingFragments: [String: [Int: Data]]
-    private val incomingFragments = ConcurrentHashMap<String, MutableMap<Int, ByteArray>>()
+    private val incomingFragments = ConcurrentMutableMap<String, MutableMap<Int, ByteArray>>()
     // iOS equivalent: fragmentMetadata: [String: (type: UInt8, total: Int, timestamp: Date)]
-    private val fragmentMetadata = ConcurrentHashMap<String, Triple<UByte, Int, Long>>() // originalType, totalFragments, timestamp
-    private val fragmentCumulativeSize = ConcurrentHashMap<String, Int>()
+    private val fragmentMetadata = ConcurrentMutableMap<String, Triple<UByte, Int, Long>>() // originalType, totalFragments, timestamp
+    private val fragmentCumulativeSize = ConcurrentMutableMap<String, Int>()
 
-    private val fragmentStateLock = Any()
+    private val fragmentStateLock = Lock()
     private var globalBufferedBytes: Long = 0L
 
     // Delegate for callbacks
@@ -184,7 +190,7 @@ class FragmentManager {
                 return null
             }
 
-            synchronized(fragmentStateLock) {
+            fragmentStateLock.withLock {
                 fragmentMetadata[fragmentIDString]?.let { (expectedType, expectedTotal, _) ->
                     if (expectedTotal != fragmentPayload.total || expectedType != fragmentPayload.originalType) {
                         Log.w(
@@ -209,7 +215,7 @@ class FragmentManager {
                     fragmentMetadata[fragmentIDString] = Triple(
                         fragmentPayload.originalType,
                         fragmentPayload.total,
-                        System.currentTimeMillis()
+                        Clock.System.now().toEpochMilliseconds()
                     )
                     fragmentCumulativeSize[fragmentIDString] = 0
                 }
@@ -318,8 +324,8 @@ class FragmentManager {
      * Clean old fragments (> 30 seconds old)
      */
     private fun cleanupOldFragments() {
-        synchronized(fragmentStateLock) {
-            val now = System.currentTimeMillis()
+        fragmentStateLock.withLock {
+            val now = Clock.System.now().toEpochMilliseconds()
             val cutoff = now - FRAGMENT_TIMEOUT
 
             // iOS: let oldFragments = fragmentMetadata.filter { $0.value.timestamp < cutoff }.map { $0.key }
@@ -339,7 +345,7 @@ class FragmentManager {
      * Get debug information - matches iOS debugging
      */
     fun getDebugInfo(): String {
-        synchronized(fragmentStateLock) {
+        fragmentStateLock.withLock {
             return buildString {
                 appendLine("=== Fragment Manager Debug Info (iOS Compatible) ===")
                 appendLine("Active Fragment Sets: ${incomingFragments.size}")
@@ -350,7 +356,7 @@ class FragmentManager {
                 fragmentMetadata.forEach { (fragmentID, metadata) ->
                     val (originalType, totalFragments, timestamp) = metadata
                     val received = incomingFragments[fragmentID]?.size ?: 0
-                    val ageSeconds = (System.currentTimeMillis() - timestamp) / 1000
+                    val ageSeconds = (Clock.System.now().toEpochMilliseconds() - timestamp) / 1000
                     val bytes = fragmentCumulativeSize[fragmentID] ?: 0
                     appendLine("  - $fragmentID: $received/$totalFragments fragments, bytes=$bytes, type: $originalType, age: ${ageSeconds}s")
                 }
@@ -374,7 +380,7 @@ class FragmentManager {
      * Clear all fragments
      */
     fun clearAllFragments() {
-        synchronized(fragmentStateLock) {
+        fragmentStateLock.withLock {
             incomingFragments.clear()
             fragmentMetadata.clear()
             fragmentCumulativeSize.clear()
