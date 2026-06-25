@@ -11,6 +11,10 @@ kotlin {
 
             implementation(libs.kotlinx.io.core)
             implementation(libs.kompress.core)
+
+            implementation(libs.cryptography.core)
+            implementation(libs.secp256k1.kmp)
+            implementation(libs.stately.concurrent.collections)
         }
         androidMain.dependencies {
 
@@ -19,12 +23,14 @@ kotlin {
             implementation(libs.ktor.client.okhttp)
             implementation(libs.ktor.client.websockets)
 
-            implementation(libs.cryptography.core)
             implementation(libs.cryptography.provider.jdk.bc)
             implementation(libs.secp256k1.jni.android)
             implementation(libs.androidx.core.ktx)
             implementation(libs.androidx.lifecycle.process)
             implementation(libs.androidx.lifecycle.runtime.ktx)
+        }
+        nativeMain.dependencies {
+            implementation(libs.cryptography.provider.apple)
         }
         androidHostTest.dependencies {
             implementation(libs.secp256k1.jni.jvm)

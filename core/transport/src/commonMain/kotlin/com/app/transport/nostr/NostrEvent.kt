@@ -1,6 +1,10 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.app.transport.nostr
 
+import com.app.common.encoding.hexEncodedString
 import com.app.common.serialization.JsonConfig
+import com.app.transport.crypto.Sha256
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -17,7 +21,8 @@ import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.jsonPrimitive
-import java.security.MessageDigest
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Nostr Event structure following NIP-01
@@ -74,7 +79,7 @@ data class NostrEvent(
             publicKeyHex: String,
             privateKeyHex: String,
             tags: List<List<String>> = emptyList(),
-            createdAt: Int = (System.currentTimeMillis() / 1000).toInt()
+            createdAt: Int = Clock.System.now().epochSeconds.toInt()
         ): NostrEvent {
             val event = NostrEvent(
                 pubkey = publicKeyHex,
@@ -93,7 +98,7 @@ data class NostrEvent(
             metadata: String,
             publicKeyHex: String,
             privateKeyHex: String,
-            createdAt: Int = (System.currentTimeMillis() / 1000).toInt()
+            createdAt: Int = Clock.System.now().epochSeconds.toInt()
         ): NostrEvent {
             val event = NostrEvent(
                 pubkey = publicKeyHex,
@@ -158,12 +163,11 @@ data class NostrEvent(
         val jsonString = JsonConfig.json.encodeToString(JsonArray.serializer(), jsonArray)
 
         // SHA256 hash of the JSON string
-        val digest = MessageDigest.getInstance("SHA-256")
-        val jsonBytes = jsonString.toByteArray(Charsets.UTF_8)
-        val hash = digest.digest(jsonBytes)
+        val jsonBytes = jsonString.encodeToByteArray()
+        val hash = Sha256.digest(jsonBytes)
 
         // Convert to hex
-        val hexId = hash.joinToString("") { "%02x".format(it) }
+        val hexId = hash.hexEncodedString()
 
         return Pair(hexId, hash)
     }
@@ -250,7 +254,7 @@ fun String.hexToByteArray(): ByteArray {
         .toByteArray()
 }
 
-fun ByteArray.toHexString(): String = joinToString("") { "%02x".format(it) }
+fun ByteArray.toHexString(): String = hexEncodedString()
 
 /**
  * Serializes Nostr tags as a JSON array of string arrays — `[["p","abc"],["g","u4"]]`.

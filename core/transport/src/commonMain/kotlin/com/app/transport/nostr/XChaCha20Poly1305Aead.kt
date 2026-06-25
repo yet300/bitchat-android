@@ -4,7 +4,7 @@ package com.app.transport.nostr
 
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.ChaCha20Poly1305
-import java.security.SecureRandom
+import dev.whyoleg.cryptography.random.CryptographyRandom
 
 /**
  * XChaCha20-Poly1305 (NIP-44 v2) — wire-compatible replacement for Tink's XChaCha20Poly1305.
@@ -46,7 +46,7 @@ internal class XChaCha20Poly1305Aead(private val key: ByteArray) {
     private fun chachaNonce(nonce24: ByteArray): ByteArray = ByteArray(4) + nonce24.copyOfRange(16, 24)
 
     private companion object {
-        private val random = SecureRandom()
+        private val random = CryptographyRandom.Default
         private val EMPTY = ByteArray(0)
 
         // HChaCha20 of a 32-byte key and 16-byte nonce -> 32-byte subkey.
