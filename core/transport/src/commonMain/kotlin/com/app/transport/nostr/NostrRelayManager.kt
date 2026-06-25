@@ -1,9 +1,13 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.app.transport.nostr
 
+import co.touchlab.stately.collections.ConcurrentMutableMap
+import co.touchlab.stately.collections.ConcurrentMutableSet
 import com.app.common.utils.Log
 import com.app.common.serialization.JsonConfig
 import com.app.transport.NostrConstants
-import com.app.transport.net.HttpClientProvider
+import com.app.transport.net.WebSocketClientProvider
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -19,9 +23,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.JsonArray
 import kotlinx.coroutines.*
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.min
 import kotlin.math.pow
+import kotlin.random.Random
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Manages WebSocket connections to Nostr relays
@@ -31,7 +37,7 @@ import kotlin.math.pow
 @Inject
 class NostrRelayManager internal constructor(
     private val eventDeduplicator: NostrEventDeduplicator,
-    private val httpClientProvider: HttpClientProvider,
+    private val webSocketClientProvider: WebSocketClientProvider,
 ) {
 
     companion object {
@@ -52,7 +58,7 @@ class NostrRelayManager internal constructor(
         private const val MAX_RECONNECT_ATTEMPTS = NostrConstants.MAX_RECONNECT_ATTEMPTS
         
         // Track gift-wraps we initiated for logging
-        private val pendingGiftWrapIDs = ConcurrentHashMap.newKeySet<String>()
+        private val pendingGiftWrapIDs = ConcurrentMutableSet<String>()
         
         fun registerPendingGiftWrap(id: String) {
             pendingGiftWrapIDs.add(id)
@@ -85,12 +91,12 @@ class NostrRelayManager internal constructor(
     
     // Internal state
     private val relaysList = mutableListOf<Relay>()
-    private val connections = ConcurrentHashMap<String, DefaultClientWebSocketSession>()
-    private val subscriptions = ConcurrentHashMap<String, Set<String>>() // relay URL -> subscription IDs
-    private val messageHandlers = ConcurrentHashMap<String, (NostrEvent) -> Unit>()
+    private val connections = ConcurrentMutableMap<String, DefaultClientWebSocketSession>()
+    private val subscriptions = ConcurrentMutableMap<String, Set<String>>() // relay URL -> subscription IDs
+    private val messageHandlers = ConcurrentMutableMap<String, (NostrEvent) -> Unit>()
     
     // Persistent subscription tracking for robust reconnection
-    private val activeSubscriptions = ConcurrentHashMap<String, SubscriptionInfo>() // subscription ID -> info
+    private val activeSubscriptions = ConcurrentMutableMap<String, SubscriptionInfo>() // subscription ID -> info
     
     /**
      * Information about an active subscription that needs to be maintained across reconnections
@@ -100,7 +106,7 @@ class NostrRelayManager internal constructor(
         val filter: NostrFilter,
         val handler: (NostrEvent) -> Unit,
         val targetRelayUrls: Set<String>? = null, // null means all relays
-        val createdAt: Long = System.currentTimeMillis(),
+        val createdAt: Long = Clock.System.now().toEpochMilliseconds(),
         val originGeohash: String? = null // used for logging and grouping
     )
     
@@ -116,11 +122,11 @@ class NostrRelayManager internal constructor(
     
     // ktor client for WebSocket connections (via provider to honor Tor)
     private val httpClient: HttpClient
-        get() = httpClientProvider.webSocketClient()
+        get() = webSocketClientProvider.webSocketClient()
     
     
     // Per-geohash relay selection
-    private val geohashToRelays = ConcurrentHashMap<String, Set<String>>() // geohash -> relay URLs
+    private val geohashToRelays = ConcurrentMutableMap<String, Set<String>>() // geohash -> relay URLs
 
     // --- Public API for geohash-specific operation ---
 
@@ -129,7 +135,7 @@ class NostrRelayManager internal constructor(
      */
     fun ensureGeohashRelaysConnected(
         geohash: String,
-        relayDirectory: RelayDirectory,
+        relayDirectory: GeohashRelaySource,
         nRelays: Int = 5,
         includeDefaults: Boolean = false
     ) {
@@ -163,7 +169,7 @@ class NostrRelayManager internal constructor(
     fun subscribeForGeohash(
         geohash: String,
         filter: NostrFilter,
-        relayDirectory: RelayDirectory,
+        relayDirectory: GeohashRelaySource,
         id: String = generateSubscriptionId(),
         handler: (NostrEvent) -> Unit,
         includeDefaults: Boolean = false,
@@ -191,7 +197,7 @@ class NostrRelayManager internal constructor(
     fun sendEventToGeohash(
         event: NostrEvent,
         geohash: String,
-        relayDirectory: RelayDirectory,
+        relayDirectory: GeohashRelaySource,
         includeDefaults: Boolean = false,
         nRelays: Int = 5
     ) {
@@ -792,7 +798,7 @@ class NostrRelayManager internal constructor(
             MAX_BACKOFF_INTERVAL.toDouble()
         ).toLong()
         
-        relay.nextReconnectTime = System.currentTimeMillis() + backoffInterval
+        relay.nextReconnectTime = Clock.System.now().toEpochMilliseconds() + backoffInterval
         
         Log.d(TAG, "Scheduling reconnection to $relayUrl in ${backoffInterval / 1000}s (attempt ${relay.reconnectAttempts})")
         
@@ -810,11 +816,11 @@ class NostrRelayManager internal constructor(
         relay.lastError = error
         
         if (isConnected) {
-            relay.lastConnectedAt = System.currentTimeMillis()
+            relay.lastConnectedAt = Clock.System.now().toEpochMilliseconds()
             relay.reconnectAttempts = 0
             relay.nextReconnectTime = null
         } else {
-            relay.lastDisconnectedAt = System.currentTimeMillis()
+            relay.lastDisconnectedAt = Clock.System.now().toEpochMilliseconds()
         }
         
         updateRelaysList()
@@ -831,7 +837,7 @@ class NostrRelayManager internal constructor(
     }
     
     private fun generateSubscriptionId(): String {
-        return "sub-${System.currentTimeMillis()}-${(Math.random() * 1000).toInt()}"
+        return "sub-${Clock.System.now().toEpochMilliseconds()}-${Random.nextInt(1000)}"
     }
     
     /**

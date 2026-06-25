@@ -38,7 +38,7 @@ import kotlinx.coroutines.withContext
 class RelayDirectory(
     private val settings: SettingsStore,
     private val httpClientProvider: com.app.transport.net.HttpClientProvider,
-) {
+) : GeohashRelaySource {
 
     private val TAG = "RelayDirectory"
     private val ASSET_FILE_URL = "https://raw.githubusercontent.com/permissionlesstech/georelays/refs/heads/main/nostr_relays.csv"
@@ -99,7 +99,7 @@ class RelayDirectory(
     /**
      * Return up to nRelays closest relay URLs to the geohash center.
      */
-    fun closestRelaysForGeohash(geohash: String, nRelays: Int): List<String> {
+    override fun closestRelaysForGeohash(geohash: String, nRelays: Int): List<String> {
         val snapshot = synchronized(relaysLock) { relays.toList() }
         if (snapshot.isEmpty()) return emptyList()
         val center = try {

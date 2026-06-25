@@ -33,7 +33,7 @@ fun interface SocksAddressSource {
  */
 @SingleIn(AppScope::class)
 @Inject
-class HttpClientProvider(private val socksAddressSource: SocksAddressSource) {
+class HttpClientProvider(private val socksAddressSource: SocksAddressSource) : WebSocketClientProvider {
     private val httpClientRef = AtomicReference<HttpClient?>(null)
     private val wsClientRef = AtomicReference<HttpClient?>(null)
 
@@ -58,7 +58,7 @@ class HttpClientProvider(private val socksAddressSource: SocksAddressSource) {
         return cacheOrClose(httpClientRef, created)
     }
 
-    fun webSocketClient(): HttpClient {
+    override fun webSocketClient(): HttpClient {
         wsClientRef.get()?.let { return it }
         val created = HttpClient(OkHttp) {
             expectSuccess = false
