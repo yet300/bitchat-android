@@ -10,7 +10,7 @@ import kotlinx.coroutines.launch
  */
 class NostrSubscriptionManager(
     private val scope: CoroutineScope,
-    private val relayDirectory: RelayDirectory,
+    private val relayDirectory: GeohashRelaySource,
     private val relayManager: NostrRelayManager,
 ) {
     companion object { private const val TAG = "NostrSubscriptionManager" }

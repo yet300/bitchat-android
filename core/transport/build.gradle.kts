@@ -16,13 +16,13 @@ kotlin {
             implementation(libs.secp256k1.kmp)
             implementation(libs.stately.concurrent.collections)
             implementation(libs.stately.concurrency)
+
+            api(libs.ktor.client.core)
+            implementation(libs.ktor.client.websockets)
         }
         androidMain.dependencies {
 
-            // ktor HttpClient is part of this module's public surface (HttpClientProvider), so expose it.
-            api(libs.ktor.client.core)
             implementation(libs.ktor.client.okhttp)
-            implementation(libs.ktor.client.websockets)
 
             implementation(libs.cryptography.provider.jdk.bc)
             implementation(libs.secp256k1.jni.android)

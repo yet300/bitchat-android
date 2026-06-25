@@ -9,7 +9,9 @@ import com.app.transport.GeohashReadReceiptRouter
 import com.app.transport.IncomingMessageSink
 import com.app.transport.model.ReadReceipt
 import com.app.transport.net.ArtiTorManager
+import com.app.transport.net.HttpClientProvider
 import com.app.transport.net.SocksAddressSource
+import com.app.transport.net.WebSocketClientProvider
 import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.nostr.NostrIdentityBridge
 import com.app.transport.routing.MeshPeerIdSource
@@ -76,6 +78,10 @@ object AndroidTransportBindings {
     @Provides
     fun provideSocksAddressSource(arti: Lazy<ArtiTorManager>): SocksAddressSource =
         SocksAddressSource { arti.value.currentSocksAddress() }
+
+    /** Binds the commonMain WebSocket seam to the androidMain OkHttp/Tor HttpClientProvider. */
+    @Provides
+    fun provideWebSocketClientProvider(impl: HttpClientProvider): WebSocketClientProvider = impl
 
     /**
      * Our own mesh peer id, read live from the Noise identity fingerprint — the same
