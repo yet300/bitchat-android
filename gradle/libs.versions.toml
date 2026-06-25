@@ -43,6 +43,7 @@ kotlinx-serialization = "1.11.0"
 # Coroutines
 kotlinx-coroutines = "1.11.0"
 kotlinxDatetime = "0.8.0"
+kotlinxIo = "0.9.0"
 
 # Ktor (HTTP + WebSocket client; OkHttp engine honors the Arti SOCKS proxy)
 ktor = "3.5.0"
@@ -116,6 +117,7 @@ ksafe = { module = "eu.anifantakis:ksafe", version.ref = "ksafe" }
 # JSON
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
+kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinxIo" }
 
 # Coroutines
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }

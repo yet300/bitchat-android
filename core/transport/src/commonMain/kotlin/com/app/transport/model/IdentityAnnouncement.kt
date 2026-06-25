@@ -1,5 +1,6 @@
 package com.app.transport.model
 
+import com.app.common.encoding.hexEncodedString
 import kotlinx.serialization.Serializable
 
 /**
@@ -32,7 +33,7 @@ internal data class IdentityAnnouncement(
      * Encode to TLV binary data matching iOS implementation
      */
     fun encode(): ByteArray? {
-        val nicknameData = nickname.toByteArray(Charsets.UTF_8)
+        val nicknameData = nickname.encodeToByteArray()
         
         // Check size limits
         if (nicknameData.size > 255 || noisePublicKey.size > 255 || signingPublicKey.size > 255) {
@@ -92,7 +93,7 @@ internal data class IdentityAnnouncement(
                 // Process known TLV types, skip unknown ones for forward compatibility
                 when (type) {
                     TLVType.NICKNAME -> {
-                        nickname = String(value, Charsets.UTF_8)
+                        nickname = value.decodeToString()
                     }
                     TLVType.NOISE_PUBLIC_KEY -> {
                         noisePublicKey = value
@@ -119,8 +120,8 @@ internal data class IdentityAnnouncement(
     // Override equals and hashCode since we use ByteArray
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-        
+        if (other == null || this::class != other::class) return false
+
         other as IdentityAnnouncement
         
         if (nickname != other.nickname) return false
@@ -138,6 +139,6 @@ internal data class IdentityAnnouncement(
     }
     
     override fun toString(): String {
-        return "IdentityAnnouncement(nickname='$nickname', noisePublicKey=${noisePublicKey.joinToString("") { "%02x".format(it) }.take(16)}..., signingPublicKey=${signingPublicKey.joinToString("") { "%02x".format(it) }.take(16)}...)"
+        return "IdentityAnnouncement(nickname='$nickname', noisePublicKey=${noisePublicKey.hexEncodedString().take(16)}..., signingPublicKey=${signingPublicKey.hexEncodedString().take(16)}...)"
     }
 }
