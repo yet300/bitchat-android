@@ -1,17 +1,27 @@
+@file:OptIn(ExperimentalCompressionApi::class)
+
 package com.app.transport.protocol
 
 import com.app.common.utils.Log
-import java.io.ByteArrayOutputStream
-import java.util.zip.Deflater
-import java.util.zip.Inflater
+import dev.karmakrafts.kompress.ExperimentalCompressionApi
+import dev.karmakrafts.kompress.deflate.Deflater
+import dev.karmakrafts.kompress.deflate.Inflater
 
 /**
- * Compression utilities - 100% iOS-compatible zlib implementation
- * Uses the same zlib algorithm as iOS CompressionUtil.swift
+ * Compression utilities - iOS-compatible raw DEFLATE (RFC 1951, no zlib/gzip header).
+ *
+ * Backed by the pure-Kotlin multiplatform Kompress codec (commonMain), replacing the
+ * java.util.zip Deflater/Inflater. The emitted bytes differ from the old JDK encoder
+ * (Kompress is a different, deterministic DEFLATE implementation) but remain valid
+ * RFC 1951 streams: the iOS COMPRESSION_ZLIB peer decodes them and Kompress decodes the
+ * peer's streams. The wire contract is mutual inflate-compatibility, not byte-identical
+ * compress — proven both directions against java.util.zip in CompressionInteropTest.
  */
 internal object CompressionUtil {
     private const val COMPRESSION_THRESHOLD = 100  // bytes - same as iOS
-    
+    private const val DEFLATE_LEVEL = 6            // zlib default level; deterministic output
+    private const val DEFLATE_BUFFER = 1024
+
     /**
      * Helper to check if compression is worth it - exact same logic as iOS
      */
@@ -33,90 +43,36 @@ internal object CompressionUtil {
     }
     
     /**
-     * Compress data using deflate algorithm - exact same as iOS
-     * iOS COMPRESSION_ZLIB actually produces raw deflate data (no zlib headers)
+     * Compress data using raw DEFLATE - iOS COMPRESSION_ZLIB produces raw deflate (no headers).
      */
     fun compress(data: ByteArray): ByteArray? {
         // Skip compression for small data
         if (data.size < COMPRESSION_THRESHOLD) return null
-        
-        try {
-            // Use raw deflate format (no headers) to match iOS COMPRESSION_ZLIB behavior
-            val deflater = Deflater(Deflater.DEFAULT_COMPRESSION, true) // true = raw deflate, no headers
-            deflater.setInput(data)
-            deflater.finish()
-            
-            val outputStream = ByteArrayOutputStream(data.size)
-            val buffer = ByteArray(1024)
-            
-            while (!deflater.finished()) {
-                val count = deflater.deflate(buffer)
-                outputStream.write(buffer, 0, count)
-            }
-            deflater.end()
-            
-            val compressedData = outputStream.toByteArray()
-            
+
+        return try {
+            val compressedData = Deflater.compress(data, level = DEFLATE_LEVEL, bufferSize = DEFLATE_BUFFER)
             // Only return if compression was beneficial (same logic as iOS)
-            return if (compressedData.size > 0 && compressedData.size < data.size) {
-                compressedData
-            } else {
-                null
-            }
+            if (compressedData.isNotEmpty() && compressedData.size < data.size) compressedData else null
         } catch (e: Exception) {
-            return null
+            null
         }
     }
-    
+
     /**
-     * Decompress deflate compressed data - exact same as iOS
-     * iOS COMPRESSION_ZLIB produces raw deflate data (no headers)
+     * Decompress raw DEFLATE compressed data - iOS COMPRESSION_ZLIB produces raw deflate (no headers).
      */
     fun decompress(compressedData: ByteArray, originalSize: Int): ByteArray? {
-        // iOS COMPRESSION_ZLIB produces raw deflate format (no headers)
-        try {
-            val inflater = Inflater(true) // true = raw deflate, no headers
-            inflater.setInput(compressedData)
-            
-            val decompressedBuffer = ByteArray(originalSize)
-            val actualSize = inflater.inflate(decompressedBuffer)
-            inflater.end()
-            
-            // Verify decompressed size matches expected (same validation as iOS)
-            return if (actualSize == originalSize) {
-                decompressedBuffer
-            } else if (actualSize > 0) {
-                // Handle case where actual size is different
-                decompressedBuffer.copyOfRange(0, actualSize)
-            } else {
-                null
-            }
+        return try {
+            // Kompress inflates the full raw stream; the caller already bounds the input size
+            // and applies a compression-bomb ratio check before calling this.
+            val decompressed = Inflater.decompress(compressedData, bufferSize = DEFLATE_BUFFER)
+            if (decompressed.isEmpty() && originalSize > 0) null else decompressed
         } catch (e: Exception) {
-            Log.d("CompressionUtil", "Raw deflate decompression failed: ${e.message}, trying with zlib headers...")
-            
-            // Fallback: try with zlib headers in case of mixed usage
-            try {
-                val inflater = Inflater(false) // false = expect zlib headers
-                inflater.setInput(compressedData)
-                
-                val decompressedBuffer = ByteArray(originalSize)
-                val actualSize = inflater.inflate(decompressedBuffer)
-                inflater.end()
-                
-                return if (actualSize == originalSize) {
-                    decompressedBuffer
-                } else if (actualSize > 0) {
-                    decompressedBuffer.copyOfRange(0, actualSize)
-                } else {
-                    null
-                }
-            } catch (fallbackException: Exception) {
-                Log.e("CompressionUtil", "Both raw deflate and zlib decompression failed: ${fallbackException.message}")
-                return null
-            }
+            Log.d("CompressionUtil", "Raw deflate decompression failed: ${e.message}")
+            null
         }
     }
-    
+
     /**
      * Test function to verify deflate compression works correctly
      * This can be called during app initialization to ensure compatibility
@@ -125,47 +81,47 @@ internal object CompressionUtil {
         try {
             // Create test data that should compress well (repeating pattern like iOS would use)
             val testMessage = "This is a test message that should compress well. ".repeat(10)
-            val originalData = testMessage.toByteArray()
-            
+            val originalData = testMessage.encodeToByteArray()
+
             Log.d("CompressionUtil", "Testing deflate compression with ${originalData.size} bytes")
-            
+
             // Test shouldCompress
             val shouldCompress = shouldCompress(originalData)
             Log.d("CompressionUtil", "shouldCompress() returned: $shouldCompress")
-            
+
             if (!shouldCompress) {
                 Log.e("CompressionUtil", "shouldCompress failed for test data")
                 return false
             }
-            
+
             // Test compression
             val compressed = compress(originalData)
             if (compressed == null) {
                 Log.e("CompressionUtil", "Compression failed")
                 return false
             }
-            
+
             Log.d("CompressionUtil", "Compressed ${originalData.size} bytes to ${compressed.size} bytes (${(compressed.size.toDouble() / originalData.size * 100).toInt()}%)")
-            
+
             // Test decompression
             val decompressed = decompress(compressed, originalData.size)
             if (decompressed == null) {
                 Log.e("CompressionUtil", "Decompression failed")
                 return false
             }
-            
+
             // Verify data integrity
             val isIdentical = originalData.contentEquals(decompressed)
             Log.d("CompressionUtil", "Data integrity check: $isIdentical")
-            
+
             if (!isIdentical) {
                 Log.e("CompressionUtil", "Decompressed data doesn't match original")
                 return false
             }
-            
+
             Log.i("CompressionUtil", "✅ deflate compression test PASSED - ready for iOS compatibility")
             return true
-            
+
         } catch (e: Exception) {
             Log.e("CompressionUtil", "deflate compression test failed: ${e.message}")
             return false
