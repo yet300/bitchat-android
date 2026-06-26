@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
@@ -191,7 +192,15 @@ internal class GeohashRepositoryImpl(
             val lastSeen = Instant.fromEpochMilliseconds(event.createdAt * 1000L)
             val isTeleport = event.tags.any { it.size >= 2 && it[0] == "t" && it[1] == "teleport" }
             synchronized(lock) {
-                participants.getOrPut(geohash) { mutableMapOf() }[event.pubkey.lowercase()] = lastSeen
+                // Cap to now (clock skew / malicious created_at) and keep the max lastSeen:
+                // relays deliver newest-first, so a later, older event must not overwrite a
+                // fresher timestamp and silently drop the user from the live count. (upstream #672)
+                val now = Clock.System.now()
+                val effective = if (lastSeen > now) now else lastSeen
+                val pk = event.pubkey.lowercase()
+                val ps = participants.getOrPut(geohash) { mutableMapOf() }
+                val existing = ps[pk]
+                if (existing == null || effective > existing) ps[pk] = effective
                 event.tags.firstOrNull { it.size >= 2 && it[0] == "n" }
                     ?.let { nicknames[event.pubkey.lowercase()] = it[1] }
                 if (isTeleport) teleported.add(event.pubkey.lowercase())
