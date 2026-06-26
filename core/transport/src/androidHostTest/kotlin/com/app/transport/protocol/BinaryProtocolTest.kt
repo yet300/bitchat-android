@@ -1,6 +1,8 @@
 package com.app.transport.protocol
 
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -1111,6 +1113,62 @@ class BinaryProtocolTest {
             result[i] = hex.substring(i * 2, i * 2 + 2).toInt(16).toByte()
         }
         return result
+    }
+
+    @Test
+    fun `encoding with padding false returns exact unpadded frame`() {
+        val payload = "ios-compatible-unpadded".toByteArray()
+        val packet = makePacket(payload = payload)
+
+        val unpadded = BinaryProtocol.encode(packet, padding = false)!!
+        val padded = BinaryProtocol.encode(packet, padding = true)!!
+
+        assertEquals(
+            "v1 unpadded frame size must be header + sender + payload",
+            14 + 8 + payload.size,
+            unpadded.size
+        )
+        assertEquals("small padded frame should pad to 256 bytes", 256, padded.size)
+        assertFalse(
+            "padding=false must not append PKCS#7 bytes",
+            hasPkcs7PaddingTail(unpadded)
+        )
+        assertArrayEquals(
+            "padded frame must unpad to the exact raw frame",
+            unpadded,
+            MessagePadding.unpad(padded)
+        )
+        assertPacketEquals(packet, BinaryProtocol.decode(unpadded)!!)
+        assertPacketEquals(packet, BinaryProtocol.decode(padded)!!)
+    }
+
+    @Test
+    fun `toBinaryData propagates padding flag`() {
+        val packet = makePacket(payload = "packet-helper-padding-flag".toByteArray())
+
+        val defaultEncoded = packet.toBinaryData()!!
+        val explicitlyPadded = packet.toBinaryData(padding = true)!!
+        val unpadded = packet.toBinaryData(padding = false)!!
+
+        assertArrayEquals(
+            "default helper must remain padded for backward compatibility",
+            explicitlyPadded,
+            defaultEncoded
+        )
+        assertTrue("default helper should produce a padded frame", defaultEncoded.size > unpadded.size)
+        assertArrayEquals(
+            "helper padding=false must match BinaryProtocol padding=false",
+            BinaryProtocol.encode(packet, padding = false)!!,
+            unpadded
+        )
+    }
+
+    private fun hasPkcs7PaddingTail(data: ByteArray): Boolean {
+        if (data.isEmpty()) return false
+        val paddingLength = data.last().toInt() and 0xFF
+        if (paddingLength <= 0 || paddingLength > data.size) return false
+        val start = data.size - paddingLength
+        return data.copyOfRange(start, data.size).all { (it.toInt() and 0xFF) == paddingLength }
     }
 
     private fun makePacket(
