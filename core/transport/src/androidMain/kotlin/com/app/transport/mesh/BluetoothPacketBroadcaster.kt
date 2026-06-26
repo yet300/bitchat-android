@@ -248,7 +248,8 @@ internal class BluetoothPacketBroadcaster(
         characteristic: BluetoothGattCharacteristic?
     ): Boolean {
         val packet = routed.packet
-        val data = packet.toBinaryData() ?: return false
+        // iOS-compatible: only Noise frames are padded over BLE (BLEPacketPaddingPolicy).
+        val data = packet.toBinaryData(padding = BLEPacketPaddingPolicy.shouldPadForBLE(packet.type)) ?: return false
         val typeName = MessageType.fromValue(packet.type)?.name ?: packet.type.toString()
         val senderPeerID = routed.peerID ?: packet.senderID.toHexString()
         val incomingAddr = routed.relayAddress
@@ -286,7 +287,8 @@ internal class BluetoothPacketBroadcaster(
         characteristic: BluetoothGattCharacteristic?
     ) {
         val packet = routed.packet
-        val data = packet.toBinaryData() ?: return
+        // iOS-compatible: only Noise frames are padded over BLE (BLEPacketPaddingPolicy).
+        val data = packet.toBinaryData(padding = BLEPacketPaddingPolicy.shouldPadForBLE(packet.type)) ?: return
         val typeName = MessageType.fromValue(packet.type)?.name ?: packet.type.toString()
         val senderPeerID = routed.peerID ?: packet.senderID.toHexString()
         val incomingAddr = routed.relayAddress

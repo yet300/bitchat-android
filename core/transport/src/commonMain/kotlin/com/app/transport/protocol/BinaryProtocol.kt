@@ -82,8 +82,8 @@ data class BitchatPacket(
         ttl = ttl
     )
 
-    fun toBinaryData(): ByteArray? {
-        return BinaryProtocol.encode(this)
+    fun toBinaryData(padding: Boolean = true): ByteArray? {
+        return BinaryProtocol.encode(this, padding = padding)
     }
 
     /**
@@ -202,7 +202,7 @@ internal object BinaryProtocol {
         }
     }
     
-    fun encode(packet: BitchatPacket): ByteArray? {
+    fun encode(packet: BitchatPacket, padding: Boolean = true): ByteArray? {
         try {
             // Fail loudly on inputs the wire format cannot represent — a silently
             // truncated frame would be misparsed by the decoder on the other side.
@@ -326,12 +326,15 @@ internal object BinaryProtocol {
 
             val result = buffer.readByteArray()
             
-            // Apply padding to standard block sizes for traffic analysis resistance
-            val optimalSize = MessagePadding.optimalBlockSize(result.size)
-            val paddedData = MessagePadding.pad(result, optimalSize)
-            
-            return paddedData
-            
+            // Apply padding only when requested. iOS pads just Noise frames over BLE
+            // (see BLEPacketPaddingPolicy); public frames go out unpadded for wire parity.
+            if (padding) {
+                val optimalSize = MessagePadding.optimalBlockSize(result.size)
+                return MessagePadding.pad(result, optimalSize)
+            }
+
+            return result
+
         } catch (e: Exception) {
             Log.e("BinaryProtocol", "Error encoding packet type ${packet.type}: ${e.message}")
             return null
