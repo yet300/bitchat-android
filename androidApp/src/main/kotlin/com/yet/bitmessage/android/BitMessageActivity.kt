@@ -1,6 +1,7 @@
 package com.yet.bitmessage.android
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import com.app.common.utils.Log
 import androidx.activity.ComponentActivity
@@ -69,6 +70,11 @@ class BitMessageActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
+        // Hide app content from the system recents screenshot (upstream #608, privacy).
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            setRecentsScreenshotEnabled(false)
+        }
 
         appGraph.runtimePermissionRequester.attach(permissionHost)
 
