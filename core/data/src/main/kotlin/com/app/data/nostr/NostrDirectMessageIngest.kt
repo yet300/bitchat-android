@@ -144,8 +144,11 @@ class NostrDirectMessageIngest(
                 val age = System.currentTimeMillis() / 1000 - giftWrap.createdAt
                 if (age > MAX_AGE_SECONDS) return@launch
 
-                val (content, senderPubkey, _) = NostrProtocol.decryptPrivateMessage(giftWrap, identity)
+                val (content, rawSenderPubkey, _) = NostrProtocol.decryptPrivateMessage(giftWrap, identity)
                     ?: run { Log.w(TAG, "Failed to decrypt Nostr DM"); return@launch }
+                // Normalize to lowercase so conversation/alias keys stay consistent with the
+                // geohash side regardless of the hex casing. (upstream #645)
+                val senderPubkey = rawSenderPubkey.lowercase()
 
                 // Drop events from blocked geohash users (applies to account DMs too — parity with the
                 // deleted handler's dataManager.isGeohashUserBlocked check).

@@ -187,7 +187,10 @@ internal class GeohashRepositoryImpl(
                 }
             }
 
-            if (isBlocked(event.pubkey)) return
+            // Normalize the pubkey to lowercase so block/participant/nickname/alias keys stay
+            // consistent regardless of the hex casing a relay delivers. (upstream #645)
+            val pubkey = event.pubkey.lowercase()
+            if (isBlocked(pubkey)) return
 
             val lastSeen = Instant.fromEpochMilliseconds(event.createdAt * 1000L)
             val isTeleport = event.tags.any { it.size >= 2 && it[0] == "t" && it[1] == "teleport" }
@@ -197,15 +200,14 @@ internal class GeohashRepositoryImpl(
                 // fresher timestamp and silently drop the user from the live count. (upstream #672)
                 val now = Clock.System.now()
                 val effective = if (lastSeen > now) now else lastSeen
-                val pk = event.pubkey.lowercase()
                 val ps = participants.getOrPut(geohash) { mutableMapOf() }
-                val existing = ps[pk]
-                if (existing == null || effective > existing) ps[pk] = effective
+                val existing = ps[pubkey]
+                if (existing == null || effective > existing) ps[pubkey] = effective
                 event.tags.firstOrNull { it.size >= 2 && it[0] == "n" }
-                    ?.let { nicknames[event.pubkey.lowercase()] = it[1] }
-                if (isTeleport) teleported.add(event.pubkey.lowercase())
+                    ?.let { nicknames[pubkey] = it[1] }
+                if (isTeleport) teleported.add(pubkey)
             }
-            runCatching { aliasRegistry.put(aliasFor(event.pubkey), event.pubkey) }
+            runCatching { aliasRegistry.put(aliasFor(pubkey), pubkey) }
             refreshDerived()
 
             // Presence heartbeats only update participants; they carry no chat content.
@@ -213,17 +215,17 @@ internal class GeohashRepositoryImpl(
 
             // Skip our own posts (they appear via local echo) and empty teleport presence beacons.
             val myHex = runCatching { nostrIdentityBridge.deriveIdentity(geohash).publicKeyHex }.getOrNull()
-            if (myHex != null && myHex.equals(event.pubkey, ignoreCase = true)) return
+            if (myHex != null && myHex.equals(pubkey, ignoreCase = true)) return
             if (isTeleport && event.content.trim().isEmpty()) return
 
             val message = BitchatMessage(
                 id = event.id,
-                sender = displayName(event.pubkey, geohash, disambiguate = true),
+                sender = displayName(pubkey, geohash, disambiguate = true),
                 content = event.content,
                 timestamp = lastSeen,
                 isRelay = false,
-                originalSender = displayName(event.pubkey, geohash, disambiguate = false) + "#" + event.pubkey.takeLast(4),
-                senderPeerID = "nostr:${event.pubkey.take(8)}",
+                originalSender = displayName(pubkey, geohash, disambiguate = false) + "#" + pubkey.takeLast(4),
+                senderPeerID = "nostr:${pubkey.take(8)}",
                 mentions = null,
                 channel = "#$geohash",
                 powDifficulty = powDifficultyOf(event),
