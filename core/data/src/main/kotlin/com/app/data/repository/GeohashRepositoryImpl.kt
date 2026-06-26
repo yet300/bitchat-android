@@ -6,6 +6,7 @@ import com.app.common.utils.Log
 import com.app.database.dao.GeohashDao
 import com.app.data.AppStateStore
 import com.app.data.nostr.CurrentGeohashSource
+import com.app.domain.app.AppForegroundState
 import com.app.domain.model.ConversationId
 import com.app.domain.model.GeoPerson
 import com.app.domain.model.PeerId
@@ -54,6 +55,7 @@ internal class GeohashRepositoryImpl(
     private val aliasRegistry: GeohashAliasRegistry,
     private val conversationRegistry: GeohashConversationRegistry,
     private val geohashDao: GeohashDao,
+    private val appForegroundState: AppForegroundState,
     private val scope: CoroutineScope,
 ) : GeohashRepository, CurrentGeohashSource {
 
@@ -66,6 +68,15 @@ internal class GeohashRepositoryImpl(
 
     init {
         scope.launch { geohashDao.observeBlocked().collect { blockedMirror.value = it.toSet() } }
+        // Pause the high-volume presence firehose (kind 20001) while backgrounded; chat messages
+        // (kind 20000) stay subscribed so the timeline and participant count keep updating. (#706)
+        scope.launch {
+            appForegroundState.isForeground.collect { foreground ->
+                val geo = synchronized(lock) { activeGeohash } ?: return@collect
+                if (foreground) subscribePresence(geo)
+                else relayManager.unsubscribe(presenceSubId(geo))
+            }
+        }
     }
 
     // geohash -> (pubkeyHex(lower) -> last seen)
@@ -140,31 +151,56 @@ internal class GeohashRepositoryImpl(
     // --- subscription lifecycle ---
 
     private fun subscribe(geohash: String) {
+        val previous: String?
         synchronized(lock) {
             if (activeGeohash == geohash) return
-            activeGeohash?.let { relayManager.unsubscribe(subscriptionId(it)) }
+            previous = activeGeohash
             activeGeohash = geohash
         }
-        val filter = NostrFilter.geohashEphemeral(
-            geohash = geohash,
-            since = System.currentTimeMillis() - SUBSCRIBE_WINDOW_MS,
-            limit = SUBSCRIBE_LIMIT,
-        )
+        previous?.let {
+            relayManager.unsubscribe(messagesSubId(it))
+            relayManager.unsubscribe(presenceSubId(it))
+        }
+        // Low-volume chat messages (kind 20000): always subscribed, kept alive in the background.
         runCatching {
             relayManager.subscribeForGeohash(
                 geohash = geohash,
-                filter = filter,
+                filter = NostrFilter.geohashMessages(
+                    geohash, System.currentTimeMillis() - SUBSCRIBE_WINDOW_MS, SUBSCRIBE_LIMIT,
+                ),
                 relayDirectory = relayDirectory,
-                id = subscriptionId(geohash),
+                id = messagesSubId(geohash),
                 handler = { event -> ingest(event, geohash) },
             )
-        }.onFailure { Log.e(TAG, "subscribe($geohash) failed: ${it.message}") }
+        }.onFailure { Log.e(TAG, "subscribe messages($geohash) failed: ${it.message}") }
+        // High-volume presence firehose (kind 20001): only while foreground (#706).
+        if (appForegroundState.isForeground.value) subscribePresence(geohash)
+    }
+
+    /** Subscribe to the geohash presence firehose (kind 20001) — paused while backgrounded. */
+    private fun subscribePresence(geohash: String) {
+        runCatching {
+            relayManager.subscribeForGeohash(
+                geohash = geohash,
+                filter = NostrFilter.geohashPresence(
+                    geohash, System.currentTimeMillis() - SUBSCRIBE_WINDOW_MS, SUBSCRIBE_LIMIT,
+                ),
+                relayDirectory = relayDirectory,
+                id = presenceSubId(geohash),
+                handler = { event -> ingest(event, geohash) },
+            )
+        }.onFailure { Log.e(TAG, "subscribe presence($geohash) failed: ${it.message}") }
     }
 
     private fun unsubscribe() {
+        val current: String?
         synchronized(lock) {
-            activeGeohash?.let { relayManager.unsubscribe(subscriptionId(it)) }
+            current = activeGeohash
             activeGeohash = null
+        }
+        current?.let {
+            relayManager.unsubscribe(messagesSubId(it))
+            relayManager.unsubscribe(presenceSubId(it))
         }
     }
 
@@ -300,7 +336,8 @@ internal class GeohashRepositoryImpl(
 
     private fun aliasFor(pubkeyHex: String): String = "nostr_${pubkeyHex.take(16)}"
 
-    private fun subscriptionId(geohash: String): String = "geohash-$geohash"
+    private fun messagesSubId(geohash: String): String = "geohash-msg-$geohash"
+    private fun presenceSubId(geohash: String): String = "geohash-presence-$geohash"
 
     private companion object {
         const val TAG = "GeohashRepositoryImpl"

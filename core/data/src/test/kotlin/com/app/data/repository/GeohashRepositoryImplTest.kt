@@ -5,6 +5,7 @@ package com.app.data.repository
 import com.app.common.settings.SettingsStore
 import com.app.crypto.EncryptionService
 import com.app.data.AppStateStore
+import com.app.domain.app.AppForegroundState
 import com.app.domain.model.ConversationId
 import com.app.data.FakeContactRepository
 import com.app.domain.model.GeohashChannel
@@ -97,6 +98,9 @@ class GeohashRepositoryImplTest {
             aliasRegistry = GeohashAliasRegistry(settings),
             conversationRegistry = GeohashConversationRegistry(settings),
             geohashDao = InMemoryDatabase().geohashDao,
+            appForegroundState = object : AppForegroundState {
+                override val isForeground = MutableStateFlow(true)
+            },
             scope = CoroutineScope(UnconfinedTestDispatcher()),
         )
     }

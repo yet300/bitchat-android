@@ -45,6 +45,8 @@ kotlin {
             implementation(libs.mlkit.barcode.scanning)
             // Attachment picker (P10): system GetContent launcher.
             implementation(libs.androidx.activity.compose)
+            // Process foreground/background signal for AppForegroundState (#706).
+            implementation(libs.androidx.lifecycle.process)
         }
         commonMain.dependencies {
             implementation(projects.core.domain)

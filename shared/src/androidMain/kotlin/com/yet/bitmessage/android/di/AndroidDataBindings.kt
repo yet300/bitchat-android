@@ -44,6 +44,8 @@ import com.app.domain.repository.PowRepository
 import com.app.domain.repository.TorRepository
 import com.app.domain.repository.VerificationRepository
 import com.app.transport.features.file.FileUtils
+import com.app.domain.app.AppForegroundState
+import com.yet.bitmessage.android.app.AndroidAppForegroundState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.yet.bitmessage.android.geohash.AndroidPlaceGeocoder
@@ -240,6 +242,11 @@ object AndroidDataBindings {
     @Provides
     @SingleIn(AppScope::class)
     fun provideRuntimePermissionRequester(): RuntimePermissionRequester = RuntimePermissionRequester()
+
+    /** Process foreground/background signal (ProcessLifecycleOwner) for data-saving throttling. */
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideAppForegroundState(): AppForegroundState = AndroidAppForegroundState()
 
     /** Transport-backed settings ports (Tor, PoW) over the existing managers (DIP for the feature). */
     @Provides
