@@ -16,6 +16,7 @@ import com.app.transport.meshgraph.MeshGraphService
 import com.app.transport.debug.DebugPreferenceManager
 import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.mesh.BleBearer
+import com.app.transport.mesh.createAndroidBleBearer
 import com.app.transport.mesh.FragmentManager
 import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.mesh.MeshBearer
@@ -146,12 +147,12 @@ object AndroidDataBindings {
         debugSettingsManager: DebugSettingsManager,
         fragmentManager: FragmentManager,
         transferProgressManager: TransferProgressManager,
-    ): BleBearer = BleBearer(
-        context.applicationContext,
-        encryptionService.getIdentityFingerprint().take(16),
-        debugSettingsManager,
-        fragmentManager,
-        transferProgressManager,
+    ): BleBearer = createAndroidBleBearer(
+        context = context.applicationContext,
+        myPeerID = encryptionService.getIdentityFingerprint().take(16),
+        debugSettingsManager = debugSettingsManager,
+        fragmentManager = fragmentManager,
+        transferProgressManager = transferProgressManager,
     )
 
     @Provides
