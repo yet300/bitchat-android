@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.Uri
 import com.app.common.utils.Log
 import com.app.transport.model.BitchatFilePacket
-import com.app.transport.model.BitchatMessageType
 import java.io.File
 import java.io.FileOutputStream
 
@@ -256,18 +255,6 @@ object FileUtils {
                 tmp.writeBytes(file.content)
                 tmp.absolutePath
             }
-        }
-    }
-
-    /**
-     * Classify BitchatMessageType from MIME string used in file messages.
-     */
-    fun messageTypeForMime(mime: String): BitchatMessageType {
-        val lower = mime.lowercase()
-        return when {
-            lower.startsWith("image/") -> BitchatMessageType.Image
-            lower.startsWith("audio/") -> BitchatMessageType.Audio
-            else -> BitchatMessageType.File
         }
     }
 

@@ -25,6 +25,7 @@ import com.app.transport.IncomingMessageSink
 import com.app.transport.FavoriteNostrLink
 import com.app.transport.GeohashReadReceiptRouter
 import com.app.transport.SeenMessageStore
+import com.app.transport.features.file.AndroidIncomingFileStore
 import com.app.transport.meshgraph.MeshGraphService
 import com.app.transport.meshgraph.RoutePlanner
 import com.app.transport.verification.VerifyEventListener
@@ -93,7 +94,7 @@ class BluetoothMeshService(
     private var peerManager = PeerManager(peerFingerprintManager)
     private var securityManager = SecurityManager(encryptionService, myPeerID)
     private var storeForwardManager = StoreForwardManager()
-    private var messageHandler = MessageHandler(myPeerID, context.applicationContext, meshGraphService)
+    private var messageHandler = MessageHandler(myPeerID, AndroidIncomingFileStore(context.applicationContext), meshGraphService, dispatchers)
 
     /**
      * Narrow BLE debug surface for [com.bitchat.android.ui.debug.DebugSettingsSheet]
@@ -243,7 +244,7 @@ class BluetoothMeshService(
         fragmentManager.clearAllFragments()
         securityManager = SecurityManager(encryptionService, myPeerID)
         storeForwardManager = StoreForwardManager()
-        messageHandler = MessageHandler(myPeerID, context.applicationContext, meshGraphService)
+        messageHandler = MessageHandler(myPeerID, AndroidIncomingFileStore(context.applicationContext), meshGraphService, dispatchers)
         packetProcessor = PacketProcessor(myPeerID, debugSettingsManager)
         bleBearer.reset(myPeerID)
         wireComponents()

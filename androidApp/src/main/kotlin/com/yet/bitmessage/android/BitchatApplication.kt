@@ -39,7 +39,7 @@ class BitchatApplication : Application(), MetroApplication {
         appGraph.relayDirectory.initialize(this)
 
         // Initialize LocationNotesManager dependencies early so sheet subscriptions can start immediately
-        try { LocationNotesInitializer.initialize(this, appGraph.relayDirectory, appGraph.nostrRelayManager, appGraph.locationNotesManager, appGraph.nostrIdentityBridge) } catch (_: Exception) { }
+        try { LocationNotesInitializer.initialize(appGraph.relayDirectory, appGraph.nostrRelayManager, appGraph.locationNotesManager, appGraph.nostrIdentityBridge) } catch (_: Exception) { }
 
         // Warm up Nostr identity to ensure npub is available for favorite notifications
         try {

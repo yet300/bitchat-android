@@ -1,6 +1,5 @@
 package com.app.transport.nostr
 
-import android.content.Context
 import com.app.common.utils.Log
 
 /**
@@ -8,16 +7,15 @@ import com.app.common.utils.Log
  * Extracts initialization logic from MainActivity for better separation of concerns
  */
 object LocationNotesInitializer {
-    
+
     private const val TAG = "LocationNotesInitializer"
-    
+
     /**
      * Initialize LocationNotesManager with all required dependencies
-     * 
-     * @param context Application context
+     *
      * @return true if initialization succeeded, false otherwise
      */
-    fun initialize(context: Context, relayDirectory: RelayDirectory, relayManager: NostrRelayManager, locationNotesManager: LocationNotesManager, nostrIdentityBridge: NostrIdentityBridge): Boolean {
+    fun initialize(relayDirectory: GeohashRelaySource, relayManager: NostrRelayManager, locationNotesManager: LocationNotesManager, nostrIdentityBridge: NostrIdentityBridge): Boolean {
         return try {
             locationNotesManager.initialize(
                 relayManager = { relayManager },

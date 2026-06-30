@@ -1,7 +1,7 @@
 package com.app.transport.nostr
 
+import com.app.common.AppDispatchers
 import com.app.common.utils.Log
-import androidx.annotation.MainThread
 import com.app.common.geohash.Geohash
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
@@ -13,12 +13,13 @@ import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Manages location notes (kind=1 text notes with geohash tags)
- * iOS-compatible implementation with StateFlow for Android UI binding
+ * iOS-compatible implementation with StateFlow for UI binding
  */
-@MainThread
 @SingleIn(AppScope::class)
 @Inject
-class LocationNotesManager {
+class LocationNotesManager(
+    private val dispatchers: AppDispatchers = AppDispatchers(),
+) {
 
     companion object {
         private const val TAG = "LocationNotesManager"
@@ -90,7 +91,7 @@ class LocationNotesManager {
     private var deriveIdentityFunc: ((String) -> NostrIdentity)? = null
     
     // Coroutine scope for background operations
-    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private val scope = CoroutineScope(dispatchers.main + SupervisorJob())
     
     /**
      * Initialize dependencies
@@ -189,7 +190,7 @@ class LocationNotesManager {
     /**
      * Send a new location note
      */
-    fun send(content: String, nickname: String?, relayDirectory: RelayDirectory) {
+    fun send(content: String, nickname: String?, relayDirectory: GeohashRelaySource) {
         val currentGeohash = _geohash.value
         if (currentGeohash == null) {
             Log.w(TAG, "Cannot send note - no geohash set")
@@ -230,11 +231,11 @@ class LocationNotesManager {
         
         scope.launch {
             try {
-                val identity = withContext(Dispatchers.IO) {
+                val identity = withContext(dispatchers.io) {
                     deriveIdentity(currentGeohash)
                 }
                 
-                val event = withContext(Dispatchers.IO) {
+                val event = withContext(dispatchers.io) {
                     NostrProtocol.createGeohashTextNote(
                         content = trimmed,
                         geohash = currentGeohash,
@@ -265,7 +266,7 @@ class LocationNotesManager {
                 
                 // CRITICAL FIX: Send to geo-specific relays (matching iOS pattern)
                 // iOS: dependencies.sendEvent(event, relays)
-                withContext(Dispatchers.IO) {
+                withContext(dispatchers.io) {
                     sendEventFunc?.invoke(event, relays)
                 }
                 

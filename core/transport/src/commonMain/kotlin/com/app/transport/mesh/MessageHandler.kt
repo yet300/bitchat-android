@@ -1,10 +1,10 @@
-@file:OptIn(ExperimentalTime::class)
+@file:OptIn(ExperimentalTime::class, ExperimentalUuidApi::class)
 
 package com.app.transport.mesh
 
-import android.content.Context
+import com.app.common.AppDispatchers
 import com.app.common.utils.Log
-import com.app.transport.features.file.FileUtils
+import com.app.transport.features.file.IncomingFileStore
 import com.app.transport.model.BitchatFilePacket
 import com.app.transport.model.BitchatMessage
 import com.app.transport.model.IdentityAnnouncement
@@ -12,6 +12,7 @@ import com.app.transport.model.NoisePayload
 import com.app.transport.model.NoisePayloadType
 import com.app.transport.model.PrivateMessagePacket
 import com.app.transport.model.RoutedPacket
+import com.app.transport.model.messageTypeForMime
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
 import com.app.transport.sync.PacketIdUtil
@@ -21,13 +22,14 @@ import com.app.transport.FavoriteNostrLink
 import com.app.transport.meshgraph.GossipTLV
 import com.app.transport.meshgraph.MeshGraphService
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /**
  * Handles processing of different message types
@@ -35,8 +37,9 @@ import kotlin.time.Instant
  */
 internal class MessageHandler(
     private val myPeerID: String,
-    private val appContext: Context,
+    private val incomingFileStore: IncomingFileStore,
     private val meshGraphService: MeshGraphService,
+    dispatchers: AppDispatchers = AppDispatchers(),
 ) {
     
     companion object {
@@ -53,7 +56,7 @@ internal class MessageHandler(
     var favoriteNostrLink: FavoriteNostrLink? = null
     
     // Coroutines
-    private val handlerScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val handlerScope = CoroutineScope(dispatchers.io + SupervisorJob())
     
     /**
      * Handle Noise encrypted transport message - SIMPLIFIED iOS-compatible version
@@ -140,13 +143,13 @@ internal class MessageHandler(
                     val file = BitchatFilePacket.decode(noisePayload.data)
                     if (file != null) {
                         Log.d(TAG, "🔓 Decrypted encrypted file from $peerID: name='${file.fileName}', size=${file.fileSize}, mime='${file.mimeType}'")
-                        val uniqueMsgId = java.util.UUID.randomUUID().toString().uppercase()
-                        val savedPath = FileUtils.saveIncomingFile(appContext, file)
+                        val uniqueMsgId = Uuid.random().toString().uppercase()
+                        val savedPath = incomingFileStore.saveIncomingFile(file)
                         val message = BitchatMessage(
                             id = uniqueMsgId,
                             sender = delegate?.getPeerNickname(peerID) ?: "Unknown",
                             content = savedPath,
-                            type = FileUtils.messageTypeForMime(file.mimeType),
+                            type = messageTypeForMime(file.mimeType),
                             timestamp = Instant.fromEpochMilliseconds(packet.timestamp.toLong()),
                             isRelay = false,
                             isPrivate = true,
@@ -166,7 +169,7 @@ internal class MessageHandler(
                 
                 NoisePayloadType.DELIVERED -> {
                     // Handle delivery ACK exactly like iOS
-                    val messageID = String(noisePayload.data, Charsets.UTF_8)
+                    val messageID = noisePayload.data.decodeToString()
                     Log.d(TAG, "📬 Delivery ACK received from $peerID for message $messageID")
                     
                     // Simplified: Call delegate with messageID and peerID directly
@@ -175,7 +178,7 @@ internal class MessageHandler(
                 
                 NoisePayloadType.READ_RECEIPT -> {
                     // Handle read receipt exactly like iOS
-                    val messageID = String(noisePayload.data, Charsets.UTF_8)
+                    val messageID = noisePayload.data.decodeToString()
                     Log.d(TAG, "👁️ Read receipt received from $peerID for message $messageID")
                     
                     // Simplified: Call delegate with messageID and peerID directly
@@ -204,7 +207,7 @@ internal class MessageHandler(
             // Create ACK payload: [type byte] + [message ID] - exactly like iOS
             val ackPayload = NoisePayload(
                 type = NoisePayloadType.DELIVERED,
-                data = messageID.toByteArray(Charsets.UTF_8)
+                data = messageID.encodeToByteArray()
             )
             
             // Encrypt the payload
@@ -220,7 +223,7 @@ internal class MessageHandler(
                     type = MessageType.NOISE_ENCRYPTED.value,
                     senderID = hexStringToByteArray(myPeerID),
                     recipientID = hexStringToByteArray(senderPeerID),
-                    timestamp = System.currentTimeMillis().toULong(),
+                    timestamp = Clock.System.now().toEpochMilliseconds().toULong(),
                     payload = encryptedPayload,
                     signature = null,
                     ttl = MeshConstants.MESSAGE_TTL_HOPS // Same TTL as iOS messageTTL
@@ -244,7 +247,7 @@ internal class MessageHandler(
         if (peerID == myPeerID) return false
 
         // Ignore stale announcements older than STALE_PEER_TIMEOUT
-        val now = System.currentTimeMillis()
+        val now = Clock.System.now().toEpochMilliseconds()
         val age = now - packet.timestamp.toLong()
         if (age > MeshConstants.Mesh.STALE_PEER_TIMEOUT_MS) {
             Log.w(TAG, "Ignoring stale ANNOUNCE from ${peerID.take(8)} (age=${age}ms > ${MeshConstants.Mesh.STALE_PEER_TIMEOUT_MS}ms)")
@@ -285,8 +288,8 @@ internal class MessageHandler(
         
         // Successfully decoded TLV format exactly like iOS
         Log.d(TAG, "✅ Verified announce from $peerID: nickname=${announcement.nickname}, " +
-                "noisePublicKey=${announcement.noisePublicKey.joinToString("") { "%02x".format(it) }.take(16)}..., " +
-                "signingPublicKey=${announcement.signingPublicKey.joinToString("") { "%02x".format(it) }.take(16)}...")
+                "noisePublicKey=${announcement.noisePublicKey.toHexString().take(16)}..., " +
+                "signingPublicKey=${announcement.signingPublicKey.toHexString().take(16)}...")
         
         // Extract nickname and public keys from TLV data
         val nickname = announcement.nickname
@@ -353,7 +356,7 @@ internal class MessageHandler(
                     type = MessageType.NOISE_HANDSHAKE.value,
                     senderID = hexStringToByteArray(myPeerID),
                     recipientID = hexStringToByteArray(peerID),
-                    timestamp = System.currentTimeMillis().toULong(),
+                    timestamp = Clock.System.now().toEpochMilliseconds().toULong(),
                     payload = response,
                     signature = null,
                     ttl = MeshConstants.MESSAGE_TTL_HOPS // Same TTL as iOS
@@ -421,14 +424,14 @@ internal class MessageHandler(
                 if (isFileTransfer) {
                     Log.d(TAG, "📥 FILE_TRANSFER decode success (broadcast): name='${file.fileName}', size=${file.fileSize}, mime='${file.mimeType}', from=${peerID.take(8)}")
                 }
-                val savedPath = FileUtils.saveIncomingFile(appContext, file)
+                val savedPath = incomingFileStore.saveIncomingFile(file)
                 val message = BitchatMessage(
                     // Stable content-derived id: request-sync replays of the same packet
                     // must collapse to one message (upstream #707)
                     id = PacketIdUtil.computeIdHex(packet).uppercase(),
                     sender = delegate?.getPeerNickname(peerID) ?: "unknown",
                     content = savedPath,
-                    type = FileUtils.messageTypeForMime(file.mimeType),
+                    type = messageTypeForMime(file.mimeType),
                     senderPeerID = peerID,
                     timestamp = Instant.fromEpochMilliseconds(packet.timestamp.toLong())
                 )
@@ -443,7 +446,7 @@ internal class MessageHandler(
             val message = BitchatMessage(
                 id = PacketIdUtil.computeIdHex(packet).uppercase(),
                 sender = delegate?.getPeerNickname(peerID) ?: "unknown",
-                content = String(packet.payload, Charsets.UTF_8),
+                content = packet.payload.decodeToString(),
                 senderPeerID = peerID,
                 timestamp = Instant.fromEpochMilliseconds(packet.timestamp.toLong())
             )
@@ -471,12 +474,12 @@ internal class MessageHandler(
                 if (isFileTransfer) {
                     Log.d(TAG, "📥 FILE_TRANSFER decode success (private): name='${file.fileName}', size=${file.fileSize}, mime='${file.mimeType}', from=${peerID.take(8)}")
                 }
-                val savedPath = FileUtils.saveIncomingFile(appContext, file)
+                val savedPath = incomingFileStore.saveIncomingFile(file)
                 val message = BitchatMessage(
-                    id = java.util.UUID.randomUUID().toString().uppercase(),
+                    id = Uuid.random().toString().uppercase(),
                     sender = delegate?.getPeerNickname(peerID) ?: "unknown",
                     content = savedPath,
-                    type = FileUtils.messageTypeForMime(file.mimeType),
+                    type = messageTypeForMime(file.mimeType),
                     senderPeerID = peerID,
                     timestamp = Instant.fromEpochMilliseconds(packet.timestamp.toLong()),
                     isPrivate = true,
@@ -492,7 +495,7 @@ internal class MessageHandler(
             // Fallback: plain text
             val message = BitchatMessage(
                 sender = delegate?.getPeerNickname(peerID) ?: "unknown",
-                content = String(packet.payload, Charsets.UTF_8),
+                content = packet.payload.decodeToString(),
                 senderPeerID = peerID,
                 timestamp = Instant.fromEpochMilliseconds(packet.timestamp.toLong())
             )
@@ -511,7 +514,7 @@ internal class MessageHandler(
     suspend fun handleLeave(routed: RoutedPacket) {
         val packet = routed.packet
         val peerID = routed.peerID ?: "unknown"
-        val content = String(packet.payload, Charsets.UTF_8)
+        val content = packet.payload.decodeToString()
         
         if (content.startsWith("#")) {
             // Channel leave
