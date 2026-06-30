@@ -1,12 +1,19 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package com.app.transport
+
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /**
  * Mesh-domain configuration constants (commonMain).
  *
  * Extracted from the monolith's god-config (`com.bitchat.android.util.AppConstants`) into the
  * transport module ahead of the `mesh/` extraction. Values are copied verbatim — this move is
- * behavior-neutral. iOS byte-compatibility: the packet TTL must stay identical. The BLE GATT
- * UUIDs (java.util.UUID, Android-only) live in androidMain's MeshGattConstants.
+ * behavior-neutral. iOS byte-compatibility: the packet TTL and the GATT UUIDs must stay identical.
+ * The BLE GATT UUIDs ([Mesh.Gatt]) are typed kotlin.uuid.Uuid (the project-wide idiom); platform
+ * code adapts each to its native UUID type at the call site (java.util.UUID on Android via
+ * Uuid.toJavaUuid(); CBUUID on native via CBUUID.UUIDWithString(uuid.toString())).
  */
 object MeshConstants {
 
@@ -27,6 +34,12 @@ object MeshConstants {
 
         // GATT client RSSI updates
         const val RSSI_UPDATE_INTERVAL_MS: Long = 5_000L
+
+        object Gatt {
+            val SERVICE_UUID: Uuid = Uuid.parse("F47B5E2D-4A9E-4C5A-9B3F-8E1D2C3A4B5C")
+            val CHARACTERISTIC_UUID: Uuid = Uuid.parse("A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D")
+            val DESCRIPTOR_UUID: Uuid = Uuid.parse("00002902-0000-1000-8000-00805f9b34fb")
+        }
     }
 
     object Fragmentation {
