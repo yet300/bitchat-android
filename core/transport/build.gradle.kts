@@ -34,6 +34,7 @@ kotlin {
         }
         nativeMain.dependencies {
             implementation(libs.cryptography.provider.apple)
+            implementation(libs.ktor.client.darwin)
         }
         androidHostTest.dependencies {
             implementation(libs.secp256k1.jni.jvm)
