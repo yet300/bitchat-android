@@ -1,6 +1,8 @@
+@file:OptIn(ExperimentalTime::class, ExperimentalEncodingApi::class)
+
 package com.app.transport.nostr
 
-import android.util.Base64
+import com.app.common.encoding.hexEncodedString
 import com.app.common.utils.Log
 import com.app.transport.MeshConstants
 import com.app.transport.model.NoisePayload
@@ -8,6 +10,10 @@ import com.app.transport.model.PrivateMessagePacket
 import com.app.transport.model.NoisePayloadType
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * BitChat-over-Nostr Adapter
@@ -42,7 +48,7 @@ object NostrEmbeddedBitChat {
             val packet = BitchatPacket.fromBinaryData(packetData) ?: return null
             if (packet.type != MessageType.NOISE_ENCRYPTED.value) return null
             val payload = NoisePayload.decode(packet.payload) ?: return null
-            val senderPeerID = packet.senderID.joinToString("") { "%02x".format(it) }
+            val senderPeerID = packet.senderID.hexEncodedString()
             val messageID: String?
             val content: String?
             when (payload.type) {
@@ -52,7 +58,7 @@ object NostrEmbeddedBitChat {
                     content = pm?.content
                 }
                 NoisePayloadType.DELIVERED, NoisePayloadType.READ_RECEIPT -> {
-                    messageID = String(payload.data, Charsets.UTF_8)
+                    messageID = payload.data.decodeToString()
                     content = null
                 }
                 else -> {
@@ -73,7 +79,7 @@ object NostrEmbeddedBitChat {
                 val padding = (4 - str.length % 4) % 4
                 str + "=".repeat(padding)
             }
-            Base64.decode(padded, Base64.DEFAULT)
+            Base64.decode(padded)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to decode base64url: ${e.message}")
             null
@@ -97,7 +103,7 @@ object NostrEmbeddedBitChat {
             // Prefix with NoisePayloadType
             val payload = ByteArray(1 + tlv.size)
             payload[0] = NoisePayloadType.PRIVATE_MESSAGE.value.toByte()
-            System.arraycopy(tlv, 0, payload, 1, tlv.size)
+            tlv.copyInto(payload, destinationOffset = 1)
             
             // Determine 8-byte recipient ID to embed
             val recipientIDHex = normalizeRecipientPeerID(recipientPeerID)
@@ -107,7 +113,7 @@ object NostrEmbeddedBitChat {
                 type = MessageType.NOISE_ENCRYPTED.value,
                 senderID = hexStringToByteArray(senderPeerID),
                 recipientID = hexStringToByteArray(recipientIDHex),
-                timestamp = System.currentTimeMillis().toULong(),
+                timestamp = Clock.System.now().toEpochMilliseconds().toULong(),
                 payload = payload,
                 signature = null,
                 ttl = MeshConstants.MESSAGE_TTL_HOPS
@@ -135,10 +141,10 @@ object NostrEmbeddedBitChat {
         }
         
         try {
-            val payload = ByteArray(1 + messageID.toByteArray(Charsets.UTF_8).size)
+            val messageIDBytes = messageID.encodeToByteArray()
+            val payload = ByteArray(1 + messageIDBytes.size)
             payload[0] = type.value.toByte()
-            val messageIDBytes = messageID.toByteArray(Charsets.UTF_8)
-            System.arraycopy(messageIDBytes, 0, payload, 1, messageIDBytes.size)
+            messageIDBytes.copyInto(payload, destinationOffset = 1)
             
             val recipientIDHex = normalizeRecipientPeerID(recipientPeerID)
             
@@ -147,7 +153,7 @@ object NostrEmbeddedBitChat {
                 type = MessageType.NOISE_ENCRYPTED.value,
                 senderID = hexStringToByteArray(senderPeerID),
                 recipientID = hexStringToByteArray(recipientIDHex),
-                timestamp = System.currentTimeMillis().toULong(),
+                timestamp = Clock.System.now().toEpochMilliseconds().toULong(),
                 payload = payload,
                 signature = null,
                 ttl = MeshConstants.MESSAGE_TTL_HOPS
@@ -174,17 +180,17 @@ object NostrEmbeddedBitChat {
         }
         
         try {
-            val payload = ByteArray(1 + messageID.toByteArray(Charsets.UTF_8).size)
+            val messageIDBytes = messageID.encodeToByteArray()
+            val payload = ByteArray(1 + messageIDBytes.size)
             payload[0] = type.value.toByte()
-            val messageIDBytes = messageID.toByteArray(Charsets.UTF_8)
-            System.arraycopy(messageIDBytes, 0, payload, 1, messageIDBytes.size)
+            messageIDBytes.copyInto(payload, destinationOffset = 1)
             
             val packet = BitchatPacket(
                 version = 1u,
                 type = MessageType.NOISE_ENCRYPTED.value,
                 senderID = hexStringToByteArray(senderPeerID),
                 recipientID = null, // No recipient for geohash DMs
-                timestamp = System.currentTimeMillis().toULong(),
+                timestamp = Clock.System.now().toEpochMilliseconds().toULong(),
                 payload = payload,
                 signature = null,
                 ttl = MeshConstants.MESSAGE_TTL_HOPS
@@ -212,14 +218,14 @@ object NostrEmbeddedBitChat {
             
             val payload = ByteArray(1 + tlv.size)
             payload[0] = NoisePayloadType.PRIVATE_MESSAGE.value.toByte()
-            System.arraycopy(tlv, 0, payload, 1, tlv.size)
+            tlv.copyInto(payload, destinationOffset = 1)
             
             val packet = BitchatPacket(
                 version = 1u,
                 type = MessageType.NOISE_ENCRYPTED.value,
                 senderID = hexStringToByteArray(senderPeerID),
                 recipientID = null, // No recipient for geohash DMs
-                timestamp = System.currentTimeMillis().toULong(),
+                timestamp = Clock.System.now().toEpochMilliseconds().toULong(),
                 payload = payload,
                 signature = null,
                 ttl = MeshConstants.MESSAGE_TTL_HOPS
@@ -243,7 +249,7 @@ object NostrEmbeddedBitChat {
                 32 -> {
                     // Treat as Noise static public key; derive peerID from fingerprint
                     // For now, return first 8 bytes as hex (simplified)
-                    maybeData.take(8).joinToString("") { "%02x".format(it) }
+                    maybeData.take(8).toByteArray().hexEncodedString()
                 }
                 8 -> {
                     // Already an 8-byte peer ID
@@ -264,7 +270,7 @@ object NostrEmbeddedBitChat {
      * Base64url encode without padding (matches iOS implementation)
      */
     private fun base64URLEncode(data: ByteArray): String {
-        val b64 = Base64.encodeToString(data, Base64.NO_WRAP)
+        val b64 = Base64.encode(data)
         return b64
             .replace("+", "-")
             .replace("/", "_")

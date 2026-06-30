@@ -1,5 +1,8 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.app.transport.mesh
 
+import com.app.common.AppDispatchers
 import com.app.common.utils.Log
 import com.app.crypto.EncryptionService
 import com.app.transport.model.IdentityAnnouncement
@@ -8,16 +11,22 @@ import com.app.transport.protocol.MessageType
 import com.app.transport.model.RoutedPacket
 import com.app.common.encoding.toHexString
 import com.app.transport.MeshConstants
+import co.touchlab.stately.collections.ConcurrentMutableMap
+import co.touchlab.stately.collections.ConcurrentMutableSet
 import kotlinx.coroutines.*
-import java.util.*
-import kotlin.collections.mutableSetOf
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Manages security aspects of the mesh network including duplicate detection,
  * replay attack protection, and key exchange handling
  * Extracted from BluetoothMeshService for better separation of concerns
  */
-internal class SecurityManager(private val encryptionService: EncryptionService, private val myPeerID: String) {
+internal class SecurityManager(
+    private val encryptionService: EncryptionService,
+    private val myPeerID: String,
+    dispatchers: AppDispatchers = AppDispatchers(),
+) {
     
     companion object {
         private const val TAG = "SecurityManager"
@@ -28,15 +37,15 @@ internal class SecurityManager(private val encryptionService: EncryptionService,
     }
     
     // Security tracking
-    private val processedMessages = Collections.synchronizedSet(mutableSetOf<String>())
-    private val processedKeyExchanges = Collections.synchronizedSet(mutableSetOf<String>())
-    private val messageTimestamps = Collections.synchronizedMap(mutableMapOf<String, Long>())
-    
+    private val processedMessages = ConcurrentMutableSet<String>()
+    private val processedKeyExchanges = ConcurrentMutableSet<String>()
+    private val messageTimestamps = ConcurrentMutableMap<String, Long>()
+
     // Delegate for callbacks
     var delegate: SecurityManagerDelegate? = null
-    
+
     // Coroutines
-    private val managerScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val managerScope = CoroutineScope(dispatchers.io + SupervisorJob())
     
     init {
         startPeriodicCleanup()
@@ -53,7 +62,7 @@ internal class SecurityManager(private val encryptionService: EncryptionService,
         }
         
         // Replay attack protection (same 5-minute window as iOS)
-        val currentTime = System.currentTimeMillis()
+        val currentTime = Clock.System.now().toEpochMilliseconds()
         val messageType = MessageType.fromValue(packet.type)
 
         // Duplicate detection
@@ -351,7 +360,7 @@ internal class SecurityManager(private val encryptionService: EncryptionService,
      * Clean up old processed messages and timestamps
      */
     private fun cleanupOldData() {
-        val cutoffTime = System.currentTimeMillis() - MESSAGE_TIMEOUT
+        val cutoffTime = Clock.System.now().toEpochMilliseconds() - MESSAGE_TIMEOUT
         var removedCount = 0
         
         // Clean up old message timestamps and corresponding processed messages

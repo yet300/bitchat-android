@@ -1,5 +1,7 @@
 package com.app.transport.mesh
 
+import com.app.common.AppDispatchers
+import com.app.common.encoding.hexEncodedString
 import com.app.common.utils.Log
 import com.app.transport.MeshTelemetry
 import com.app.transport.protocol.BitchatPacket
@@ -7,18 +9,19 @@ import com.app.transport.protocol.MessageType
 import com.app.transport.model.RoutedPacket
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.actor
+import kotlinx.coroutines.channels.SendChannel
 
 /**
  * Processes incoming packets and routes them to appropriate handlers
- * 
- * Per-peer packet serialization using Kotlin coroutine actors
- * Prevents race condition where multiple threads process packets
+ *
+ * Per-peer packet serialization using a dedicated channel + consumer coroutine
+ * per peer. Prevents the race condition where multiple threads process packets
  * from the same peer simultaneously, causing session management conflicts.
  */
 internal class PacketProcessor(
     private val myPeerID: String,
     private val debugSettingsManager: MeshTelemetry,
+    dispatchers: AppDispatchers = AppDispatchers(),
 ) {
     private val debugManager = debugSettingsManager
     
@@ -36,34 +39,34 @@ internal class PacketProcessor(
     }
     
     // Packet relay manager for centralized relay decisions
-    private val packetRelayManager = PacketRelayManager(myPeerID, debugSettingsManager)
-    
+    private val packetRelayManager = PacketRelayManager(myPeerID, debugSettingsManager, dispatchers)
+
     // Coroutines
-    private val processorScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    
-    // Per-peer actors to serialize packet processing
-    // Each peer gets its own actor that processes packets sequentially
-    // This prevents race conditions in session management
-    private val peerActors = mutableMapOf<String, CompletableDeferred<Unit>>()
-    
-    @OptIn(ObsoleteCoroutinesApi::class)
-    private fun getOrCreateActorForPeer(peerID: String) = processorScope.actor<RoutedPacket>(
-        capacity = Channel.UNLIMITED
-    ) {
-        Log.d(TAG, "🎭 Created packet actor for peer: ${formatPeerForLog(peerID)}")
-        try {
-            for (packet in channel) {
-                Log.d(TAG, "📦 Processing packet type ${packet.packet.type} from ${formatPeerForLog(peerID)} (serialized)")
-                handleReceivedPacket(packet)
-                Log.d(TAG, "Completed packet type ${packet.packet.type} from ${formatPeerForLog(peerID)}")
+    private val processorScope = CoroutineScope(dispatchers.io + SupervisorJob())
+
+    // Per-peer serialization: each peer gets its own unbounded channel drained by a
+    // dedicated consumer coroutine, so packets from one peer are processed sequentially.
+    // This prevents race conditions in session management. (Replaces the obsolete
+    // coroutine `actor` builder, which is JVM-only, so this can live in commonMain.)
+    private fun getOrCreateActorForPeer(peerID: String): SendChannel<RoutedPacket> {
+        val channel = Channel<RoutedPacket>(Channel.UNLIMITED)
+        processorScope.launch {
+            Log.d(TAG, "🎭 Created packet actor for peer: ${formatPeerForLog(peerID)}")
+            try {
+                for (packet in channel) {
+                    Log.d(TAG, "📦 Processing packet type ${packet.packet.type} from ${formatPeerForLog(peerID)} (serialized)")
+                    handleReceivedPacket(packet)
+                    Log.d(TAG, "Completed packet type ${packet.packet.type} from ${formatPeerForLog(peerID)}")
+                }
+            } finally {
+                Log.d(TAG, "🎭 Packet actor for ${formatPeerForLog(peerID)} terminated")
             }
-        } finally {
-            Log.d(TAG, "🎭 Packet actor for ${formatPeerForLog(peerID)} terminated")
         }
+        return channel
     }
-    
+
     // Cache actors to reuse them
-    private val actors = mutableMapOf<String, kotlinx.coroutines.channels.SendChannel<RoutedPacket>>()
+    private val actors = mutableMapOf<String, SendChannel<RoutedPacket>>()
     
     init {
         // Set up the packet relay manager delegate immediately
@@ -166,7 +169,7 @@ internal class PacketProcessor(
                         }
                     }
                 } else {
-                    Log.d(TAG, "Private packet type ${messageType} not addressed to us (from: ${formatPeerForLog(peerID)} to ${packet.recipientID?.let { it.joinToString("") { b -> "%02x".format(b) } }}), skipping")
+                    Log.d(TAG, "Private packet type ${messageType} not addressed to us (from: ${formatPeerForLog(peerID)} to ${packet.recipientID?.hexEncodedString()}), skipping")
                 }
             }
         }
