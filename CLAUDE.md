@@ -17,6 +17,7 @@
 - Max 800 lines per file. If a file outgrows that, refactor meaningfully (SOLID, DRY, KISS) — no mechanical splits.
 - Refer to classes by simple names with imports; never fully-qualified names inline in code.
 - Write code comments only for constraints the code can't express.
+- Coroutine dispatchers: never use `Dispatchers.IO` directly (absent on native — breaks commonMain/iOS) and avoid hardcoding `Dispatchers.Default/Main`. Inject `com.app.common.AppDispatchers` (ctor param, defaults to `AppDispatchers()`) and use `dispatchers.io` / `.default` / `.main` / `.unconfined`. commonMain code with no DI seam may reference the `ioDispatcher` expect val. Migrate existing direct `Dispatchers.*` call sites to `AppDispatchers` opportunistically when touching a file.
 
 ## Hard invariants (do not break)
 - iOS wire compatibility: `BinaryProtocol` BLE bytes, Nostr NIP-01/17 JSON, Noise XX. `BinaryProtocolTest` + `BinaryProtocolGoldenTest` must stay green.
