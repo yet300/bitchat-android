@@ -20,8 +20,8 @@ internal class BluetoothConnectionManager(
     private val debugSettingsManager: MeshTelemetry,
     private val fragmentManager: FragmentManager? = null,
     private val transferProgressManager: TransferProgressManager,
-) : PowerManagerDelegate {
-    
+) : PowerManagerDelegate, BearerTransport {
+
     companion object {
         private const val TAG = "BluetoothConnectionManager"
     }
@@ -56,17 +56,17 @@ internal class BluetoothConnectionManager(
 
             if (peerID == myPeerID) return // Ignore messages from self
 
-            delegate?.onPacketReceived(packet, peerID, device)
+            delegate?.onPacketReceived(packet, peerID, device?.address)
         }
-        
+
         override fun onDeviceConnected(device: BluetoothDevice) {
             // Trigger limit enforcement immediately upon any new connection
             enforceStrictLimits()
-            delegate?.onDeviceConnected(device)
+            delegate?.onDeviceConnected(device.address)
         }
 
         override fun onDeviceDisconnected(device: BluetoothDevice) {
-            delegate?.onDeviceDisconnected(device)
+            delegate?.onDeviceDisconnected(device.address)
         }
         
         override fun onRSSIUpdated(deviceAddress: String, rssi: Int) {
@@ -84,11 +84,11 @@ internal class BluetoothConnectionManager(
     // Service state
     private var isActive = false
     
-    // Delegate for callbacks
-    var delegate: BluetoothConnectionManagerDelegate? = null
-    
+    // External delegate (the shared BleBearer) — platform-free, address-based.
+    override var delegate: BearerTransportDelegate? = null
+
     // Public property for address-peer mapping
-    val addressPeerMap get() = connectionTracker.addressPeerMap
+    override val addressPeerMap get() = connectionTracker.addressPeerMap
 
     init {
         powerManager.delegate = this
@@ -163,7 +163,7 @@ internal class BluetoothConnectionManager(
     /**
      * Start all Bluetooth services with power optimization
      */
-    fun startServices(): Boolean {
+    override fun startServices(): Boolean {
         Log.i(TAG, "Starting power-optimized Bluetooth services...")
         
         if (!permissionManager.hasBluetoothPermissions()) {
@@ -240,7 +240,7 @@ internal class BluetoothConnectionManager(
     /**
      * Stop all Bluetooth services with proper cleanup
      */
-    fun stopServices() {
+    override fun stopServices() {
         Log.i(TAG, "Stopping power-optimized Bluetooth services")
         
         isActive = false
@@ -280,7 +280,7 @@ internal class BluetoothConnectionManager(
      * Broadcast packet to connected devices with connection limit enforcement
      * Automatically fragments large packets to fit within BLE MTU limits
      */
-    fun broadcastPacket(routed: RoutedPacket) {
+    override fun broadcastPacket(routed: RoutedPacket) {
         if (!isActive) return
         
         packetBroadcaster.broadcastPacket(
@@ -290,7 +290,7 @@ internal class BluetoothConnectionManager(
         )
     }
 
-    fun sendToPeer(peerID: String, routed: RoutedPacket): Boolean {
+    override fun sendToPeer(peerID: String, routed: RoutedPacket): Boolean {
         if (!isActive) return false
         return packetBroadcaster.sendToPeer(
             peerID,
@@ -300,26 +300,26 @@ internal class BluetoothConnectionManager(
         )
     }
 
-    fun cancelTransfer(transferId: String): Boolean {
+    override fun cancelTransfer(transferId: String): Boolean {
         return packetBroadcaster.cancelTransfer(transferId)
     }
 
     
 
     // Expose role controls for debug UI
-    fun startServer() { connectionScope.launch { serverManager.start() } }
-    fun stopServer() { connectionScope.launch { serverManager.stop() } }
-    fun startClient() { connectionScope.launch { clientManager.start() } }
-    fun stopClient() { connectionScope.launch { clientManager.stop() } }
+    override fun startServer() { connectionScope.launch { serverManager.start() } }
+    override fun stopServer() { connectionScope.launch { serverManager.stop() } }
+    override fun startClient() { connectionScope.launch { clientManager.start() } }
+    override fun stopClient() { connectionScope.launch { clientManager.stop() } }
 
     // Inject nickname resolver for broadcaster logs
-    fun setNicknameResolver(resolver: (String) -> String?) { packetBroadcaster.setNicknameResolver(resolver) }
+    override fun setNicknameResolver(resolver: (String) -> String?) { packetBroadcaster.setNicknameResolver(resolver) }
 
     /** Forward the mesh-foreground-service signal to the power manager (see [PowerManager.setMeshServiceActive]). */
-    fun setMeshServiceActive(active: Boolean) { powerManager.setMeshServiceActive(active) }
+    override fun setMeshServiceActive(active: Boolean) { powerManager.setMeshServiceActive(active) }
 
     // Debug snapshots for connected devices
-    fun getConnectedDeviceEntries(): List<Triple<String, Boolean, Int?>> {
+    override fun getConnectedDeviceEntries(): List<Triple<String, Boolean, Int?>> {
         return try {
             connectionTracker.getConnectedDevices().values.map { dc ->
                 val rssi = if (dc.rssi != Int.MIN_VALUE) dc.rssi else null
@@ -331,17 +331,17 @@ internal class BluetoothConnectionManager(
     }
 
     // Expose local adapter address for debug UI
-    fun getLocalAdapterAddress(): String? = try { bluetoothAdapter?.address } catch (e: Exception) { null }
+    override fun getLocalAdapterAddress(): String? = try { bluetoothAdapter?.address } catch (e: Exception) { null }
 
-    fun isClientConnection(address: String): Boolean? {
+    override fun isClientConnection(address: String): Boolean? {
         return try { connectionTracker.getConnectedDevices()[address]?.isClient } catch (e: Exception) { null }
     }
 
     /**
      * Public: connect/disconnect helpers for debug UI
      */
-    fun connectToAddress(address: String): Boolean = clientManager.connectToAddress(address)
-    fun disconnectAddress(address: String) { connectionTracker.disconnectDevice(address) }
+    override fun connectToAddress(address: String): Boolean = clientManager.connectToAddress(address)
+    override fun disconnectAddress(address: String) { connectionTracker.disconnectDevice(address) }
 
 
     // Optionally disconnect all connections (server and client)
@@ -368,7 +368,7 @@ internal class BluetoothConnectionManager(
     /**
      * Get debug information including power management
      */
-    fun getDebugInfo(): String {
+    override fun getDebugInfo(): String {
         return buildString {
             appendLine("=== Bluetooth Connection Manager ===")
             appendLine("Bluetooth MAC Address: ${bluetoothAdapter?.address}")

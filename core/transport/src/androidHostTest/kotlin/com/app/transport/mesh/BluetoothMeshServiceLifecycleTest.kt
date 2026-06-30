@@ -120,7 +120,7 @@ class BluetoothMeshServiceLifecycleTest {
         }
 
         val managers = mutableListOf<BluetoothConnectionManager>()
-        val delegates = ConcurrentHashMap<BluetoothConnectionManager, BluetoothConnectionManagerDelegate>()
+        val delegates = ConcurrentHashMap<BluetoothConnectionManager, BearerTransportDelegate>()
 
         private fun newConnectionManager(): BluetoothConnectionManager {
             val cm: BluetoothConnectionManager = mock()
@@ -128,7 +128,7 @@ class BluetoothMeshServiceLifecycleTest {
             whenever(cm.addressPeerMap).thenReturn(ConcurrentHashMap())
             whenever(cm.isClientConnection(any())).thenReturn(false)
             doAnswer { invocation ->
-                val d: BluetoothConnectionManagerDelegate? = invocation.getArgument(0)
+                val d: BearerTransportDelegate? = invocation.getArgument(0)
                 if (d == null) delegates.remove(cm) else delegates[cm] = d
                 null
             }.whenever(cm).delegate = anyOrNull()
@@ -138,11 +138,8 @@ class BluetoothMeshServiceLifecycleTest {
 
         val fragmentManager = FragmentManager()
         val bleBearer = BleBearer(
-            context = context,
             myPeerID = fingerprint.take(16),
             debugSettingsManager = telemetry,
-            fragmentManager = fragmentManager,
-            transferProgressManager = mock(),
             connectionManagerFactory = { newConnectionManager() },
         )
         val fakeBearer = FakeBearer()
@@ -369,7 +366,7 @@ class BluetoothMeshServiceLifecycleTest {
         // Late asynchronous GATT callbacks on the OLD stack: production code always goes
         // through `delegate?.…`, which reset() nulled — so nothing may be invoked.
         h.delegates[oldCm]?.onPacketReceived(h.leavePacket(9_000u), "stalePeer", null)
-        h.delegates[oldCm]?.onDeviceDisconnected(mock())
+        h.delegates[oldCm]?.onDeviceDisconnected("AA:BB:CC:DD:EE:FF")
         h.scheduler.runCurrent()
 
         assertTrue("stale packet must not reach the new generation's incoming", received.isEmpty())
