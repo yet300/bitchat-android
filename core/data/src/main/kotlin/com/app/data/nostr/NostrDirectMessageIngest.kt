@@ -4,7 +4,6 @@ package com.app.data.nostr
 
 import android.content.Context
 import com.app.common.utils.Log
-import com.app.data.AppStateStore
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.domain.model.ConversationId
 import com.app.domain.repository.GeohashRepository
@@ -13,6 +12,7 @@ import com.app.transport.SeenMessageStore
 import com.app.transport.features.file.FileUtils
 import com.app.transport.model.BitchatFilePacket
 import com.app.transport.model.BitchatMessage
+import com.app.transport.model.messageTypeForMime
 import com.app.transport.model.DeliveryStatus
 import com.app.transport.model.NoisePayloadType
 import com.app.transport.nostr.GeohashAliasRegistry
@@ -217,7 +217,7 @@ class NostrDirectMessageIngest(
                     id = UUID.randomUUID().toString().uppercase(),
                     sender = senderNickname(senderPubkey),
                     content = savedPath,
-                    type = FileUtils.messageTypeForMime(file.mimeType),
+                    type = messageTypeForMime(file.mimeType),
                     timestamp = timestamp,
                     isRelay = false,
                     isPrivate = true,
