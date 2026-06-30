@@ -1,9 +1,13 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.app.transport.nostr
 
 import com.app.common.utils.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.random.Random
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Nostr Proof of Work (PoW) implementation following NIP-13
@@ -94,7 +98,7 @@ object NostrProofOfWork {
         if (targetDifficulty <= 0) return@withContext event
         
         Log.d(TAG, "Starting PoW mining for difficulty $targetDifficulty...")
-        val startTime = System.currentTimeMillis()
+        val startTime = Clock.System.now().toEpochMilliseconds()
         
         var nonce = Random.nextLong(0, 1_000_000).toString()
         var iterations = 0
@@ -108,7 +112,7 @@ object NostrProofOfWork {
             val actualDifficulty = calculateDifficulty(eventId)
             
             if (actualDifficulty >= targetDifficulty) {
-                val timeElapsed = System.currentTimeMillis() - startTime
+                val timeElapsed = Clock.System.now().toEpochMilliseconds() - startTime
                 Log.i(TAG, "✅ PoW mining successful! Difficulty: $actualDifficulty, iterations: $iterations, time: ${timeElapsed}ms")
                 
                 // Return the event with the computed ID
@@ -121,12 +125,12 @@ object NostrProofOfWork {
             
             // Log progress every 100,000 iterations
             if (iterations % 100_000 == 0) {
-                val timeElapsed = System.currentTimeMillis() - startTime
+                val timeElapsed = Clock.System.now().toEpochMilliseconds() - startTime
                 Log.d(TAG, "PoW mining progress: $iterations iterations, ${timeElapsed}ms elapsed")
             }
         }
         
-        val timeElapsed = System.currentTimeMillis() - startTime
+        val timeElapsed = Clock.System.now().toEpochMilliseconds() - startTime
         Log.w(TAG, "❌ PoW mining failed after $maxIterations iterations (${timeElapsed}ms)")
         return@withContext null
     }
@@ -148,7 +152,7 @@ object NostrProofOfWork {
         newTags.add(listOf("nonce", nonce, targetDifficulty.toString()))
         
         // Update created_at as recommended by NIP-13
-        val updatedCreatedAt = (System.currentTimeMillis() / 1000).toInt()
+        val updatedCreatedAt = (Clock.System.now().toEpochMilliseconds() / 1000).toInt()
         
         return event.copy(
             tags = newTags,
