@@ -15,8 +15,10 @@ import com.app.transport.net.SocksAddressSource
 import com.app.transport.net.TorDataDirProvider
 import com.app.transport.net.TorHttpReset
 import com.app.transport.net.WebSocketClientProvider
+import com.app.transport.nostr.AndroidRelayDirectoryStorage
 import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.nostr.NostrIdentityBridge
+import com.app.transport.nostr.RelayDirectoryStorage
 import com.app.transport.routing.MeshPeerIdSource
 import com.app.transport.routing.NostrIdentityProvider
 import dev.zacsweers.metro.AppScope
@@ -89,6 +91,11 @@ object AndroidTransportBindings {
     @Provides
     fun provideTorDataDirProvider(application: Application): TorDataDirProvider =
         TorDataDirProvider { File(application.filesDir, "arti").apply { mkdirs() }.absolutePath }
+
+    /** Relay CSV storage (bundled asset + filesDir cache) for the commonMain RelayDirectory. */
+    @Provides
+    fun provideRelayDirectoryStorage(application: Application): RelayDirectoryStorage =
+        AndroidRelayDirectoryStorage(application)
 
     /** Lets the commonMain Tor manager rebuild the OkHttp/Tor clients on circuit changes. */
     @Provides

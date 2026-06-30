@@ -36,7 +36,7 @@ class BitchatApplication : Application(), MetroApplication {
         } catch (_: Exception){}
 
         // Initialize relay directory (loads assets/nostr_relays.csv)
-        appGraph.relayDirectory.initialize(this)
+        appGraph.relayDirectory.initialize()
 
         // Initialize LocationNotesManager dependencies early so sheet subscriptions can start immediately
         try { LocationNotesInitializer.initialize(appGraph.relayDirectory, appGraph.nostrRelayManager, appGraph.locationNotesManager, appGraph.nostrIdentityBridge) } catch (_: Exception) { }
