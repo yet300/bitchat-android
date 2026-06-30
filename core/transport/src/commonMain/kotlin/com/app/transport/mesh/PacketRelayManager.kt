@@ -1,12 +1,12 @@
 package com.app.transport.mesh
 
+import com.app.common.AppDispatchers
 import com.app.common.utils.Log
 import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
 import com.app.common.encoding.toHexString
 import com.app.transport.MeshDebugToggles
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
@@ -21,6 +21,7 @@ import kotlin.random.Random
 internal class PacketRelayManager(
     private val myPeerID: String,
     private val debugSettingsManager: MeshDebugToggles,
+    dispatchers: AppDispatchers = AppDispatchers(),
 ) {
     companion object {
         private const val TAG = "PacketRelayManager"
@@ -36,7 +37,7 @@ internal class PacketRelayManager(
     var delegate: PacketRelayManagerDelegate? = null
     
     // Coroutines
-    private val relayScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val relayScope = CoroutineScope(dispatchers.io + SupervisorJob())
     
     /**
      * Main entry point for relay decisions

@@ -1,7 +1,6 @@
 package com.app.transport.meshgraph
 
 import com.app.common.utils.Log
-import java.util.PriorityQueue
 
 /**
  * Computes shortest paths on the current mesh graph snapshot using Dijkstra.
@@ -24,13 +23,13 @@ internal object RoutePlanner {
             neighbors.getOrPut(e.b) { mutableSetOf() }.add(e.a)
         }
         // Ensure nodes known even if isolated
-        snapshot.nodes.forEach { n -> neighbors.putIfAbsent(n.peerID, mutableSetOf()) }
+        snapshot.nodes.forEach { n -> neighbors.getOrPut(n.peerID) { mutableSetOf() } }
 
         if (!neighbors.containsKey(src) || !neighbors.containsKey(dst)) return null
 
         val dist = mutableMapOf<String, Int>()
         val prev = mutableMapOf<String, String?>()
-        val pq = PriorityQueue<Pair<String, Int>>(compareBy { it.second })
+        val pq = BinaryMinHeap<Pair<String, Int>>(compareBy { it.second })
 
         neighbors.keys.forEach { v ->
             dist[v] = if (v == src) 0 else Int.MAX_VALUE
@@ -64,5 +63,64 @@ internal object RoutePlanner {
         path.reverse()
         Log.d(TAG, "Computed path $path")
         return path
+    }
+}
+
+/**
+ * Minimal binary min-heap used by Dijkstra in [RoutePlanner]. Replaces
+ * java.util.PriorityQueue, which is JVM-only, so the planner can live in commonMain.
+ * Not thread-safe; the planner uses it single-threaded.
+ */
+private class BinaryMinHeap<T>(private val comparator: Comparator<T>) {
+    private val heap = ArrayList<T>()
+
+    fun isNotEmpty(): Boolean = heap.isNotEmpty()
+
+    fun add(element: T) {
+        heap.add(element)
+        siftUp(heap.size - 1)
+    }
+
+    /** Remove and return the smallest element, or null if empty. */
+    fun poll(): T? {
+        if (heap.isEmpty()) return null
+        val min = heap[0]
+        val last = heap.removeAt(heap.size - 1)
+        if (heap.isNotEmpty()) {
+            heap[0] = last
+            siftDown(0)
+        }
+        return min
+    }
+
+    private fun siftUp(start: Int) {
+        var i = start
+        while (i > 0) {
+            val parent = (i - 1) / 2
+            if (comparator.compare(heap[i], heap[parent]) >= 0) break
+            swap(i, parent)
+            i = parent
+        }
+    }
+
+    private fun siftDown(start: Int) {
+        var i = start
+        val size = heap.size
+        while (true) {
+            val left = 2 * i + 1
+            val right = 2 * i + 2
+            var smallest = i
+            if (left < size && comparator.compare(heap[left], heap[smallest]) < 0) smallest = left
+            if (right < size && comparator.compare(heap[right], heap[smallest]) < 0) smallest = right
+            if (smallest == i) break
+            swap(i, smallest)
+            i = smallest
+        }
+    }
+
+    private fun swap(a: Int, b: Int) {
+        val tmp = heap[a]
+        heap[a] = heap[b]
+        heap[b] = tmp
     }
 }
