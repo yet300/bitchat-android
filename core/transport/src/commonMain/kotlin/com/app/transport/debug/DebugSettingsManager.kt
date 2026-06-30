@@ -1,18 +1,22 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.app.transport.debug
 
 import com.app.transport.MeshTelemetry
 
+import co.touchlab.stately.collections.ConcurrentMutableMap
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ConcurrentLinkedQueue
 import com.app.transport.protocol.BitchatPacket
 import com.app.common.encoding.toHexString
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import kotlin.math.round
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Debug settings manager for controlling debug features and collecting debug data
@@ -81,18 +85,18 @@ class DebugSettingsManager(
     val relayStats: StateFlow<PacketRelayStats> = _relayStats.asStateFlow()
 
     // Timestamps to compute rolling window stats
-    private val relayTimestamps = ConcurrentLinkedQueue<Long>()
+    private val relayTimestamps = ConcurrentFifoQueue<Long>()
     // Per-device and per-peer rolling timestamps for stacked graphs
-    private val perDeviceRelayTimestamps = ConcurrentHashMap<String, ConcurrentLinkedQueue<Long>>()
-    private val perPeerRelayTimestamps = ConcurrentHashMap<String, ConcurrentLinkedQueue<Long>>()
+    private val perDeviceRelayTimestamps = ConcurrentMutableMap<String, ConcurrentFifoQueue<Long>>()
+    private val perPeerRelayTimestamps = ConcurrentMutableMap<String, ConcurrentFifoQueue<Long>>()
 
     // Additional buckets to split incoming vs outgoing
-    private val incomingTimestamps = ConcurrentLinkedQueue<Long>()
-    private val outgoingTimestamps = ConcurrentLinkedQueue<Long>()
-    private val perDeviceIncoming = ConcurrentHashMap<String, ConcurrentLinkedQueue<Long>>()
-    private val perDeviceOutgoing = ConcurrentHashMap<String, ConcurrentLinkedQueue<Long>>()
-    private val perPeerIncoming = ConcurrentHashMap<String, ConcurrentLinkedQueue<Long>>()
-    private val perPeerOutgoing = ConcurrentHashMap<String, ConcurrentLinkedQueue<Long>>()
+    private val incomingTimestamps = ConcurrentFifoQueue<Long>()
+    private val outgoingTimestamps = ConcurrentFifoQueue<Long>()
+    private val perDeviceIncoming = ConcurrentMutableMap<String, ConcurrentFifoQueue<Long>>()
+    private val perDeviceOutgoing = ConcurrentMutableMap<String, ConcurrentFifoQueue<Long>>()
+    private val perPeerIncoming = ConcurrentMutableMap<String, ConcurrentFifoQueue<Long>>()
+    private val perPeerOutgoing = ConcurrentMutableMap<String, ConcurrentFifoQueue<Long>>()
 
     // Expose current per-second rates (updated when logging/pruning occurs)
     private val _perDeviceLastSecond: MutableStateFlow<Map<String, Int>> = MutableStateFlow(emptyMap())
@@ -134,12 +138,12 @@ class DebugSettingsManager(
     val perPeerOutgoingTotal: StateFlow<Map<String, Long>> = _perPeerOutgoingTotalsFlow.asStateFlow()
     
     // Internal data storage for managing debug data
-    private val debugMessageQueue = ConcurrentLinkedQueue<DebugMessage>()
-    private val scanResultsQueue = ConcurrentLinkedQueue<DebugScanResult>()
+    private val debugMessageQueue = ConcurrentFifoQueue<DebugMessage>()
+    private val scanResultsQueue = ConcurrentFifoQueue<DebugScanResult>()
     
     private fun updateRelayStatsFromTimestamps() {
         if (!_debugSheetVisible.value) return
-        val now = System.currentTimeMillis()
+        val now = Clock.System.now().toEpochMilliseconds()
         // prune older than 15m
         while (true) {
             val head = relayTimestamps.peek() ?: break
@@ -148,11 +152,12 @@ class DebugSettingsManager(
             } else break
         }
         // prune per-device and per-peer and compute 1s/60s rates
-        fun pruneAndCount1s(map: MutableMap<String, ConcurrentLinkedQueue<Long>>): Map<String, Int> {
+        fun pruneAndCount1s(map: ConcurrentMutableMap<String, ConcurrentFifoQueue<Long>>): Map<String, Int> {
             val result = mutableMapOf<String, Int>()
-            val iterator = map.entries.iterator()
-            while (iterator.hasNext()) {
-                val (key, q) = iterator.next()
+            val emptyKeys = mutableListOf<String>()
+            // Snapshot keys to avoid mutating the map while iterating it.
+            for (key in map.keys.toList()) {
+                val q = map[key] ?: continue
                 // prune this queue
                 while (true) {
                     val ts = q.peek() ?: break
@@ -164,15 +169,17 @@ class DebugSettingsManager(
                 val count1s = q.count { now - it <= 1_000L }
                 if (q.isEmpty()) {
                     // cleanup empty queues to prevent unbounded growth
-                    iterator.remove()
+                    emptyKeys.add(key)
                 }
                 if (count1s > 0) result[key] = count1s
             }
+            emptyKeys.forEach { map.remove(it) }
             return result
         }
-        fun pruneAndCount60s(map: MutableMap<String, ConcurrentLinkedQueue<Long>>): Map<String, Int> {
+        fun pruneAndCount60s(map: ConcurrentMutableMap<String, ConcurrentFifoQueue<Long>>): Map<String, Int> {
             val result = mutableMapOf<String, Int>()
-            map.forEach { (key, q) ->
+            for (key in map.keys.toList()) {
+                val q = map[key] ?: continue
                 val count60 = q.count { now - it <= 60_000L }
                 if (count60 > 0) result[key] = count60
             }
@@ -354,7 +361,7 @@ class DebugSettingsManager(
         val clamped = value.coerceIn(0.1, 5.0)
         debugPreferenceManager.setGcsFprPercent(clamped)
         _gcsFprPercent.value = clamped
-        addDebugMessage(DebugMessage.SystemMessage("🎯 GCS FPR set to ${String.format("%.2f", clamped)}%"))
+        addDebugMessage(DebugMessage.SystemMessage("🎯 GCS FPR set to ${format2dp(clamped)}%"))
     }
     
     // MARK: - Debug Message Creation Helpers
@@ -513,16 +520,16 @@ class DebugSettingsManager(
             emitVisualEvent(MeshVisualEvent.RouteActivity(fullRoute))
         }
 
-        val now = System.currentTimeMillis()
+        val now = Clock.System.now().toEpochMilliseconds()
         val visible = _debugSheetVisible.value
         if (visible) incomingTimestamps.offer(now)
         fromDeviceAddress?.let {
-            perDeviceIncoming.getOrPut(it) { ConcurrentLinkedQueue() }.offer(now)
+            perDeviceIncoming.getOrPut(it) { ConcurrentFifoQueue() }.offer(now)
             deviceIncomingTotalsMap[it] = (deviceIncomingTotalsMap[it] ?: 0L) + 1L
             _perDeviceIncomingTotalsFlow.value = deviceIncomingTotalsMap.toMap()
         }
         
-        perPeerIncoming.getOrPut(fromPeerID) { ConcurrentLinkedQueue() }.offer(now)
+        perPeerIncoming.getOrPut(fromPeerID) { ConcurrentFifoQueue() }.offer(now)
         peerIncomingTotalsMap[fromPeerID] = (peerIncomingTotalsMap[fromPeerID] ?: 0L) + 1L
         _perPeerIncomingTotalsFlow.value = peerIncomingTotalsMap.toMap()
         
@@ -541,16 +548,16 @@ class DebugSettingsManager(
             val routeStr = if (routeInfo != null) " $routeInfo" else ""
             addDebugMessage(DebugMessage.PacketEvent("📤 Outgoing v$packetVersion $packetType to $who (${toPeerID ?: "?"}, ${toDeviceAddress ?: "?"})$routeStr"))
         }
-        val now = System.currentTimeMillis()
+        val now = Clock.System.now().toEpochMilliseconds()
         val visible = _debugSheetVisible.value
         if (visible) outgoingTimestamps.offer(now)
         toDeviceAddress?.let {
-            perDeviceOutgoing.getOrPut(it) { ConcurrentLinkedQueue() }.offer(now)
+            perDeviceOutgoing.getOrPut(it) { ConcurrentFifoQueue() }.offer(now)
             deviceOutgoingTotalsMap[it] = (deviceOutgoingTotalsMap[it] ?: 0L) + 1L
             _perDeviceOutgoingTotalsFlow.value = deviceOutgoingTotalsMap.toMap()
         }
         (toPeerID ?: previousHopPeerID)?.let {
-            perPeerOutgoing.getOrPut(it) { ConcurrentLinkedQueue() }.offer(now)
+            perPeerOutgoing.getOrPut(it) { ConcurrentFifoQueue() }.offer(now)
             peerOutgoingTotalsMap[it] = (peerOutgoingTotalsMap[it] ?: 0L) + 1L
             _perPeerOutgoingTotalsFlow.value = peerOutgoingTotalsMap.toMap()
         }
@@ -575,4 +582,12 @@ class DebugSettingsManager(
         _scanResults.value = emptyList()
         addDebugMessage(DebugMessage.SystemMessage("🗑️ Scan results cleared"))
     }
+}
+
+/** Two-decimal formatting for debug log strings (commonMain-safe replacement for String.format). */
+private fun format2dp(value: Double): String {
+    val scaled = round(value * 100).toLong()
+    val negative = scaled < 0
+    val abs = if (negative) -scaled else scaled
+    return (if (negative) "-" else "") + "${abs / 100}." + (abs % 100).toString().padStart(2, '0')
 }
