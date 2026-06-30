@@ -1,5 +1,6 @@
 package com.app.transport.meshgraph
 
+import com.app.common.encoding.hexEncodedString
 import com.app.common.utils.Log
 
 /**
@@ -67,11 +68,6 @@ internal object GossipTLV {
         return result
     }
 
-    private fun bytesToPeerIdHex(bytes: ByteArray): String {
-        val sb = StringBuilder()
-        for (b in bytes.take(8)) {
-            sb.append(String.format("%02x", b))
-        }
-        return sb.toString()
-    }
+    private fun bytesToPeerIdHex(bytes: ByteArray): String =
+        bytes.take(8).toByteArray().hexEncodedString()
 }

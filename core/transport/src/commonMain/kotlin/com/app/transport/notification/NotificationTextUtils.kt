@@ -22,7 +22,7 @@ object NotificationTextUtils {
                 BitchatMessageType.Audio -> "🎤 sent a voice message"
                 BitchatMessageType.File -> {
                     // Show just the filename (not the full path)
-                    val name = try { java.io.File(message.content).name } catch (_: Exception) { null }
+                    val name = message.content.substringAfterLast('/').substringAfterLast('\\').takeIf { it.isNotBlank() }
                     if (!name.isNullOrBlank()) {
                         val lower = name.lowercase()
                         val icon = when {

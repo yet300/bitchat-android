@@ -1,9 +1,13 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.app.transport.nostr
 
 import com.app.common.utils.Log
 import com.app.common.serialization.JsonConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * NIP-17 Protocol Implementation for Private Direct Messages
@@ -27,7 +31,7 @@ object NostrProtocol {
         // 1. Create the rumor (unsigned kind 14) with p-tag
         val rumorBase = NostrEvent(
             pubkey = senderIdentity.publicKeyHex,
-            createdAt = (System.currentTimeMillis() / 1000).toInt(),
+            createdAt = (Clock.System.now().toEpochMilliseconds() / 1000).toInt(),
             kind = NostrKind.DIRECT_MESSAGE,
             tags = listOf(listOf("p", recipientPubkey)),
             content = content
@@ -121,7 +125,7 @@ object NostrProtocol {
         
         val event = NostrEvent(
             pubkey = senderIdentity.publicKeyHex,
-            createdAt = (System.currentTimeMillis() / 1000).toInt(),
+            createdAt = (Clock.System.now().toEpochMilliseconds() / 1000).toInt(),
             kind = NostrKind.TEXT_NOTE,
             tags = tags,
             content = content
@@ -143,7 +147,7 @@ object NostrProtocol {
 
         val event = NostrEvent(
             pubkey = senderIdentity.publicKeyHex,
-            createdAt = (System.currentTimeMillis() / 1000).toInt(),
+            createdAt = (Clock.System.now().toEpochMilliseconds() / 1000).toInt(),
             kind = NostrKind.GEOHASH_PRESENCE,
             tags = tags,
             content = ""
@@ -178,7 +182,7 @@ object NostrProtocol {
         
         var event = NostrEvent(
             pubkey = senderIdentity.publicKeyHex,
-            createdAt = (System.currentTimeMillis() / 1000).toInt(),
+            createdAt = (Clock.System.now().toEpochMilliseconds() / 1000).toInt(),
             kind = NostrKind.EPHEMERAL_EVENT,
             tags = tags,
             content = content
