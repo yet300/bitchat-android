@@ -61,7 +61,7 @@ object AppShutdownCoordinator {
             // Stop Tor temporarily (do not change user setting)
             val torProvider = (app as com.yet.bitmessage.android.BitchatApplication).appGraph.artiTorManager
             val torStop = async {
-                try { torProvider.applyMode(app, TorMode.OFF) } catch (_: Exception) { }
+                try { torProvider.applyMode(TorMode.OFF) } catch (_: Exception) { }
             }
 
             // Clear AppState in-memory store
