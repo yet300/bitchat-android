@@ -1,6 +1,6 @@
 # `:core:transport` — platform boundaries
 
-Status after the `transport-kmp2` migration: **commonMain ≈ 82 `.kt`, androidMain = 21, iosMain = 0.**
+Status after the `transport-kmp2` migration: **commonMain ≈ 86 `.kt`, androidMain = 20, iosMain = 0.**
 
 `commonMain` now owns the whole transport *logic*: the binary protocol (`BinaryProtocol`/models/TLV),
 Nostr (crypto + relay manager + filters + NIP-17/44), GCS/gossip sync, the mesh graph + route planner,
@@ -50,19 +50,15 @@ iOS equivalent: an `IncomingFileStore` over the iOS file APIs, and a Darwin `Htt
 
 ## Deferred — portable, not yet moved (not genuinely platform)
 
-- **`debug/DebugSettingsManager`** — only `java.util.concurrent` (`ConcurrentHashMap` +
-  `ConcurrentLinkedQueue`, 6 queues + 6 maps-of-queues with offer/peek/poll). No `android.*`. Needs a
-  non-trivial queue rewrite (no direct Stately equivalent for a concurrent queue); debug-only and
-  non-blocking since the `MeshTelemetry` port is already commonMain. Move in a focused follow-up.
-- **`nostr/RelayDirectory`** — implements commonMain `GeohashRelaySource`. The relay lookup + CSV
-  parse + haversine are pure; what is Android is the on-disk cache (`Application.filesDir` +
-  `java.io.File`/`FileInputStream`/`MessageDigest`) and bundled-asset loading. The HTTP download path
-  already uses the now-common `HttpClientProvider`. **okio** (`okio.Path` + `okio.FileSystem`, owner-
-  approved) is the intended replacement for `java.io.File`; split the pure half into commonMain and
-  invert the filesDir base + asset bytes behind a small provider.
 - **`mesh/MeshGattConstants`** — trivially portable (`java.util.UUID` → `kotlin.uuid.Uuid`), but the
   values are BLE GATT UUIDs consumed only by the androidMain BLE stack, so moving them has little
   value until an iOS BLE bearer needs them. Move alongside the iOS BLE work.
+
+> Done since the first cut of this doc: `debug/DebugSettingsManager` moved to commonMain (its
+> `ConcurrentLinkedQueue` usage replaced by a small `ConcurrentFifoQueue` = ArrayDeque + stately
+> Lock); `nostr/RelayDirectory` moved to commonMain over **kotlinx-io** `SystemFileSystem`/`Path`
+> (already a project dependency — no okio needed), with the bundled-asset + filesDir-cache half
+> inverted behind the `RelayDirectoryStorage` seam (`AndroidRelayDirectoryStorage`).
 
 ## iOS seam inventory (entry points for a later iOS port)
 
@@ -73,7 +69,7 @@ for each (no transport logic needs rewriting):
 | --- | --- | --- |
 | `mesh/MeshBearer` | `BleBearer` (+ `WifiAwareBearer`) | CoreBluetooth (BLE only) |
 | `IncomingFileStore` | `AndroidIncomingFileStore` | iOS file APIs |
-| `GeohashRelaySource` | `RelayDirectory` | iOS file-cache + bundled relays |
+| `RelayDirectoryStorage` | `AndroidRelayDirectoryStorage` | iOS bundled CSV + cache dir (RelayDirectory itself is commonMain) |
 | `WebSocketClientProvider` / `HttpClientEngineFactory` | `HttpClientProvider` (common) + OkHttp factory | Darwin engine factory |
 | `NicknameSource`, `ServiceNotifier` | `BluetoothMeshService` | iOS mesh coordinator |
 | `SocksAddressSource` / `TorDataDirProvider` / `TorHttpReset` | `ArtiTorManager` (common) / DI filesDir / `HttpClientProvider` | iOS data-dir; Tor client is already KMP |
