@@ -1,5 +1,6 @@
 package com.yet.bitmessage.android.di
 
+import android.app.Application
 import com.app.crypto.EncryptionService
 import com.app.data.AppStateStore
 import com.app.data.favorites.FavoritesPersistenceService
@@ -11,6 +12,8 @@ import com.app.transport.model.ReadReceipt
 import com.app.transport.net.ArtiTorManager
 import com.app.transport.net.HttpClientProvider
 import com.app.transport.net.SocksAddressSource
+import com.app.transport.net.TorDataDirProvider
+import com.app.transport.net.TorHttpReset
 import com.app.transport.net.WebSocketClientProvider
 import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.nostr.NostrIdentityBridge
@@ -19,8 +22,11 @@ import com.app.transport.routing.NostrIdentityProvider
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
+import com.app.transport.net.androidHttpClientEngineFactory
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
+import io.ktor.client.engine.HttpClientEngineFactory
+import java.io.File
 
 /**
  * App-agnostic transport-wiring SPIs consumed by [com.app.transport.mesh.BluetoothMeshService].
@@ -78,6 +84,22 @@ object AndroidTransportBindings {
     @Provides
     fun provideSocksAddressSource(arti: Lazy<ArtiTorManager>): SocksAddressSource =
         SocksAddressSource { arti.value.currentSocksAddress() }
+
+    /** Arti data dir under the app filesDir — the platform half of the Tor manager's data-dir seam. */
+    @Provides
+    fun provideTorDataDirProvider(application: Application): TorDataDirProvider =
+        TorDataDirProvider { File(application.filesDir, "arti").apply { mkdirs() }.absolutePath }
+
+    /** Lets the commonMain Tor manager rebuild the OkHttp/Tor clients on circuit changes. */
+    @Provides
+    fun provideTorHttpReset(impl: HttpClientProvider): TorHttpReset = TorHttpReset { impl.reset() }
+
+    /**
+     * Android ktor engine for the commonMain HttpClientProvider. OkHttp supports both WebSockets
+     * (Nostr relays) and a SOCKS proxy (Arti/Tor). iOS will provide a Darwin engine later.
+     */
+    @Provides
+    fun provideHttpClientEngineFactory(): HttpClientEngineFactory<*> = androidHttpClientEngineFactory()
 
     /** Binds the commonMain WebSocket seam to the androidMain OkHttp/Tor HttpClientProvider. */
     @Provides

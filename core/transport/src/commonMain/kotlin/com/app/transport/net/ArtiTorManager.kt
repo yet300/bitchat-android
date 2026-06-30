@@ -1,16 +1,17 @@
 package com.app.transport.net
 
-import android.app.Application
+import com.app.common.AppDispatchers
 import com.app.common.utils.Log
 import com.app.transport.TorConstants
 import com.yet.tor.ArtiConfig
 import com.yet.tor.ArtiTorClient
 import com.yet.tor.TorState as LibTorState
+import co.touchlab.stately.concurrency.Lock
+import co.touchlab.stately.concurrency.withLock
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
@@ -20,10 +21,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withLock as withCoroutineLock
 import kotlinx.coroutines.withTimeoutOrNull
-import java.io.File
-import java.net.InetSocketAddress
+import kotlin.concurrent.Volatile
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Tor provider backed by the ArtiTor library (io.github.yet300:tor) — a KMP wrapper over Arti.
@@ -32,13 +33,17 @@ import java.net.InetSocketAddress
  * [com.yet.tor.TorStatus] signal, so this manager no longer scrapes Arti log lines to infer state.
  * It keeps the retry / inactivity / port policy and the StateFlow surface that the rest of the app
  * (HttpClientProvider, settings UI) depends on.
+ *
+ * Platform seams: [TorDataDirProvider] supplies the Arti data dir (Android filesDir) and
+ * [TorHttpReset] rebuilds the HTTP client on Tor state changes, so this orchestrator is commonMain.
  */
 @SingleIn(AppScope::class)
 @Inject
 class ArtiTorManager(
-    private val application: Application,
+    private val dataDirProvider: TorDataDirProvider,
     private val torPreferenceManager: TorPreferenceManager,
-    private val httpClientProvider: HttpClientProvider,
+    private val httpReset: TorHttpReset,
+    dispatchers: AppDispatchers = AppDispatchers(),
 ) {
     enum class TorState {
         OFF,
@@ -68,15 +73,17 @@ class ArtiTorManager(
         private const val BOOTSTRAP_TIMEOUT_MS = 180_000L
     }
 
-    private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val appScope = CoroutineScope(dispatchers.io + SupervisorJob())
 
     /** One reusable client; the native side supports stop -> start cycles. */
     private val client = ArtiTorClient()
 
+    private val initLock = Lock()
+
     @Volatile
     private var initialized = false
     @Volatile
-    private var socksAddr: InetSocketAddress? = null
+    private var socksAddr: SocksProxyAddress? = null
     @Volatile
     private var desiredMode: TorMode = TorMode.OFF
     @Volatile
@@ -104,14 +111,14 @@ class ArtiTorManager(
 
     fun init() {
         if (initialized) return
-        synchronized(this) {
+        initLock.withLock {
             if (initialized) return
             initialized = true
 
             // First-class status: map the library's bootstrap/state signal onto our flow.
             appScope.launch {
                 client.status.collect { s ->
-                    s.socksPort?.let { socksAddr = InetSocketAddress("127.0.0.1", it) }
+                    s.socksPort?.let { socksAddr = SocksProxyAddress("127.0.0.1", it) }
                     _statusFlow.update { cur ->
                         cur.copy(
                             bootstrapPercent = s.bootstrapPercent,
@@ -133,20 +140,20 @@ class ArtiTorManager(
             if (savedMode == TorMode.ON) {
                 if (currentSocksPort < DEFAULT_SOCKS_PORT) currentSocksPort = DEFAULT_SOCKS_PORT
                 desiredMode = savedMode
-                socksAddr = InetSocketAddress("127.0.0.1", currentSocksPort)
-                runCatching { httpClientProvider.reset() }
+                socksAddr = SocksProxyAddress("127.0.0.1", currentSocksPort)
+                runCatching { httpReset.reset() }
             }
-            appScope.launch { applyMode(application, savedMode) }
+            appScope.launch { applyMode(savedMode) }
             appScope.launch {
-                torPreferenceManager.modeFlow.collect { mode -> applyMode(application, mode) }
+                torPreferenceManager.modeFlow.collect { mode -> applyMode(mode) }
             }
         }
     }
 
-    fun currentSocksAddress(): InetSocketAddress? = socksAddr
+    fun currentSocksAddress(): SocksProxyAddress? = socksAddr
 
-    suspend fun applyMode(application: Application, mode: TorMode) {
-        applyMutex.withLock {
+    suspend fun applyMode(mode: TorMode) {
+        applyMutex.withCoroutineLock {
             try {
                 desiredMode = mode
                 val s = _statusFlow.value
@@ -181,7 +188,7 @@ class ArtiTorManager(
                             it.copy(mode = TorMode.ON, running = false, bootstrapPercent = 0, state = TorState.STARTING)
                         }
                         // Set the SOCKS address eagerly so no direct connection slips out before bootstrap.
-                        socksAddr = InetSocketAddress("127.0.0.1", currentSocksPort)
+                        socksAddr = SocksProxyAddress("127.0.0.1", currentSocksPort)
                         resetNetworkConnections()
                         startArti()
                     }
@@ -199,12 +206,12 @@ class ArtiTorManager(
         startJob = appScope.launch {
             // Reuse one client across cycles; make sure any previous run is torn down first.
             client.stop()
-            val dataDir = File(application.filesDir, "arti").apply { mkdirs() }.absolutePath
+            val dataDir = dataDirProvider.artiDataDir()
             Log.i(TAG, "Starting Arti on port $port (data=$dataDir)…")
 
             // Bound the bootstrap. Arti retries directory fetches internally, so we don't restart on
             // short stalls — only if it never reaches RUNNING within the timeout.
-            val result = withTimeoutOrNull(BOOTSTRAP_TIMEOUT_MS) {
+            val result = withTimeoutOrNull(BOOTSTRAP_TIMEOUT_MS.milliseconds) {
                 client.start(ArtiConfig(dataDir = dataDir, socksPort = port))
             }
             if (desiredMode != TorMode.ON) return@launch
@@ -220,7 +227,7 @@ class ArtiTorManager(
                 result.isSuccess -> {
                     lifecycleState = LifecycleState.RUNNING
                     retryAttempts = 0
-                    socksAddr = InetSocketAddress("127.0.0.1", port)
+                    socksAddr = SocksProxyAddress("127.0.0.1", port)
                     Log.i(TAG, "Tor RUNNING: proxy at $socksAddr")
                     resetNetworkConnections()
                 }
@@ -275,7 +282,7 @@ class ArtiTorManager(
     var onConnectionsReset: (() -> Unit)? = null
 
     private fun resetNetworkConnections() {
-        runCatching { httpClientProvider.reset() }
+        runCatching { httpReset.reset() }
         runCatching { onConnectionsReset?.invoke() }
     }
 
