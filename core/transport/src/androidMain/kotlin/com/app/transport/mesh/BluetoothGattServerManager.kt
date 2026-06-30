@@ -1,5 +1,9 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package com.app.transport.mesh
 
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.toJavaUuid
 import android.bluetooth.*
 import android.bluetooth.le.AdvertiseCallback
 import android.bluetooth.le.AdvertiseData
@@ -220,7 +224,7 @@ internal class BluetoothGattServerManager(
                     return
                 }
                 
-                if (characteristic.uuid == MeshGattConstants.CHARACTERISTIC_UUID) {
+                if (characteristic.uuid == MeshConstants.Mesh.Gatt.CHARACTERISTIC_UUID.toJavaUuid()) {
                     Log.i(TAG, "Server: Received packet from ${device.address}, size: ${value.size} bytes")
                     val packet = BitchatPacket.fromBinaryData(value)
                     if (packet != null) {
@@ -294,7 +298,7 @@ internal class BluetoothGattServerManager(
         
         // Create characteristic with notification support
         characteristic = BluetoothGattCharacteristic(
-            MeshGattConstants.CHARACTERISTIC_UUID,
+            MeshConstants.Mesh.Gatt.CHARACTERISTIC_UUID.toJavaUuid(),
             BluetoothGattCharacteristic.PROPERTY_READ or 
             BluetoothGattCharacteristic.PROPERTY_WRITE or 
             BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE or
@@ -304,12 +308,12 @@ internal class BluetoothGattServerManager(
         )
         
         val descriptor = BluetoothGattDescriptor(
-            MeshGattConstants.DESCRIPTOR_UUID,
+            MeshConstants.Mesh.Gatt.DESCRIPTOR_UUID.toJavaUuid(),
             BluetoothGattDescriptor.PERMISSION_READ or BluetoothGattDescriptor.PERMISSION_WRITE
         )
         characteristic?.addDescriptor(descriptor)
         
-        val service = BluetoothGattService(MeshGattConstants.SERVICE_UUID, BluetoothGattService.SERVICE_TYPE_PRIMARY)
+        val service = BluetoothGattService(MeshConstants.Mesh.Gatt.SERVICE_UUID.toJavaUuid(), BluetoothGattService.SERVICE_TYPE_PRIMARY)
         service.addCharacteristic(characteristic)
         
         gattServer?.addService(service)
@@ -354,7 +358,7 @@ internal class BluetoothGattServerManager(
         val settings = powerManager.getAdvertiseSettings()
         
         val data = AdvertiseData.Builder()
-            .addServiceUuid(ParcelUuid(MeshGattConstants.SERVICE_UUID))
+            .addServiceUuid(ParcelUuid(MeshConstants.Mesh.Gatt.SERVICE_UUID.toJavaUuid()))
             .setIncludeTxPowerLevel(false)
             .setIncludeDeviceName(false)
             .build()
@@ -368,7 +372,7 @@ internal class BluetoothGattServerManager(
         }
         
         val scanResponse = AdvertiseData.Builder()
-            .addServiceData(ParcelUuid(MeshGattConstants.SERVICE_UUID), peerIDBytes)
+            .addServiceData(ParcelUuid(MeshConstants.Mesh.Gatt.SERVICE_UUID.toJavaUuid()), peerIDBytes)
             .setIncludeTxPowerLevel(false)
             .setIncludeDeviceName(false)
             .build()
