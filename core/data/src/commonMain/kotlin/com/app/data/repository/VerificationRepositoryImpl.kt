@@ -1,4 +1,4 @@
-package com.yet.bitmessage.android.verification
+package com.app.data.repository
 
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.VerificationRepository

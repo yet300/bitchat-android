@@ -37,9 +37,6 @@ import com.app.domain.repository.MediaCleaner
 import com.app.domain.repository.MeshResetPort
 import com.app.domain.repository.PeerVerificationRepository
 import com.app.domain.repository.PlaceGeocoder
-import com.app.domain.repository.PowRepository
-import com.app.domain.repository.TorRepository
-import com.app.domain.repository.VerificationRepository
 import com.app.transport.features.file.FileUtils
 import com.app.domain.app.AppForegroundState
 import com.yet.bitmessage.android.app.AndroidAppForegroundState
@@ -49,10 +46,7 @@ import com.yet.bitmessage.android.geohash.AndroidPlaceGeocoder
 import com.app.common.permission.PermissionController
 import com.yet.bitmessage.android.connectivity.AndroidConnectivityRepository
 import com.yet.bitmessage.android.power.AndroidBatteryOptimizationRepository
-import com.yet.bitmessage.android.settings.PowRepositoryImpl
-import com.yet.bitmessage.android.settings.TorRepositoryImpl
 import com.yet.bitmessage.android.verification.VerificationCoordinator
-import com.yet.bitmessage.android.verification.VerificationRepositoryImpl
 import com.app.crypto.secure.KSafeSecureKeyValueStore
 import com.app.crypto.secure.SecureKeyValueStore
 import eu.anifantakis.lib.ksafe.KSafe
@@ -76,15 +70,6 @@ import dev.zacsweers.metro.SingleIn
 @ContributesTo(AppScope::class)
 @BindingContainer
 abstract class AndroidDataBindings {
-
-    @Binds
-    abstract val TorRepositoryImpl.bindTorRepository: TorRepository
-
-    @Binds
-    abstract val PowRepositoryImpl.bindPowRepository: PowRepository
-
-    @Binds
-    abstract val VerificationRepositoryImpl.bindVerificationRepository: VerificationRepository
 
     /** The graph-owned coordinator is the [PeerVerificationRepository] and the BMS verify listener. */
     @Binds
