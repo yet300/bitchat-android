@@ -6,6 +6,7 @@ import com.app.domain.repository.TorRepository
 import com.app.transport.net.TorMode
 import com.app.transport.net.TorPreferenceManager
 import com.app.transport.nostr.PoWPreferenceManager
+import dev.zacsweers.metro.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.map
  * domain settings ports, so the feature module depends only on :core:domain (DIP). Theme is backed
  * directly by :core:data over the durable SettingsStore (no dependency on the legacy app manager).
  */
+@Inject
 class TorRepositoryImpl(
     private val manager: TorPreferenceManager,
 ) : TorRepository {
@@ -21,6 +23,7 @@ class TorRepositoryImpl(
     override suspend fun setTorEnabled(enabled: Boolean) = manager.set(if (enabled) TorMode.ON else TorMode.OFF)
 }
 
+@Inject
 class PowRepositoryImpl(
     private val manager: PoWPreferenceManager,
 ) : PowRepository {

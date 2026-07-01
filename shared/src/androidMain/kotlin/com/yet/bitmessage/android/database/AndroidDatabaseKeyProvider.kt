@@ -4,6 +4,9 @@ import com.app.common.encoding.dataFromHexString
 import com.app.common.encoding.hexEncodedString
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.domain.repository.DatabaseKeyProvider
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.security.SecureRandom
@@ -21,6 +24,8 @@ import java.security.SecureRandom
  * follow-up alongside the iOS SQLCipher driver. Lives in :shared androidMain like the other platform
  * providers so :core:database carries no key-management dependency.
  */
+@SingleIn(AppScope::class)
+@Inject
 class AndroidDatabaseKeyProvider(
     private val secureStore: SecureIdentityStateManager,
 ) : DatabaseKeyProvider {

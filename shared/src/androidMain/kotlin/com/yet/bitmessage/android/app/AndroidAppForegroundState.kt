@@ -7,6 +7,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.app.domain.app.AppForegroundState
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,6 +20,8 @@ import kotlinx.coroutines.flow.asStateFlow
  * The observer must be attached on the main thread; DI may construct this singleton lazily off-main,
  * so registration (and the initial value read) is posted to the main looper.
  */
+@SingleIn(AppScope::class)
+@Inject
 class AndroidAppForegroundState : AppForegroundState {
     private val _isForeground = MutableStateFlow(false)
     override val isForeground: StateFlow<Boolean> = _isForeground.asStateFlow()
