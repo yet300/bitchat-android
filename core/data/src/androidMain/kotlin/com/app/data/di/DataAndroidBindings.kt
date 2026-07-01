@@ -1,54 +1,55 @@
-package com.yet.bitmessage.android.di
+package com.app.data.di
 
 import android.app.Application
 import android.content.Context
 import com.app.common.AppDispatchers
+import com.app.common.permission.PermissionController
+import com.app.common.settings.SettingsStore
 import com.app.crypto.EncryptionService
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.identity.SecureIdentityStateManager
+import com.app.crypto.secure.KSafeSecureKeyValueStore
+import com.app.crypto.secure.SecureKeyValueStore
+import com.app.data.app.AndroidAppForegroundState
+import com.app.data.connectivity.AndroidConnectivityRepository
+import com.app.data.geohash.AndroidPlaceGeocoder
+import com.app.data.power.AndroidBatteryOptimizationRepository
+import com.app.data.verification.VerificationCoordinator
+import com.app.database.db.DB_FILE_NAME
+import com.app.database.db.DatabaseManager
+import com.app.domain.app.AppForegroundState
+import com.app.domain.repository.BatteryOptimizationRepository
+import com.app.domain.repository.ConnectivityRepository
+import com.app.domain.repository.DatabaseKeyProvider
+import com.app.domain.repository.DatabasePanicWiper
+import com.app.domain.repository.MediaCleaner
+import com.app.domain.repository.MeshResetPort
+import com.app.domain.repository.PeerVerificationRepository
+import com.app.domain.repository.PlaceGeocoder
 import com.app.transport.FavoriteNostrLink
 import com.app.transport.GeohashReadReceiptRouter
 import com.app.transport.IncomingMessageSink
 import com.app.transport.NicknameSource
 import com.app.transport.SeenMessageStore
-import com.app.transport.mesh.TransferProgressManager
-import com.app.transport.meshgraph.MeshGraphService
+import com.app.transport.VerificationService
 import com.app.transport.debug.DebugPreferenceManager
 import com.app.transport.debug.DebugSettingsManager
+import com.app.transport.features.file.AndroidIncomingFileStore
+import com.app.transport.features.file.FileUtils
+import com.app.transport.features.file.IncomingFileStore
 import com.app.transport.mesh.BleBearer
-import com.app.transport.mesh.createAndroidBleBearer
-import com.app.transport.mesh.FragmentManager
 import com.app.transport.mesh.BluetoothMeshService
+import com.app.transport.mesh.FragmentManager
 import com.app.transport.mesh.MeshBearer
 import com.app.transport.mesh.MeshLifecycleController
-import com.app.transport.nostr.NostrRelayManager
 import com.app.transport.mesh.MeshNetwork
+import com.app.transport.mesh.MeshService
+import com.app.transport.mesh.TransferProgressManager
+import com.app.transport.mesh.createAndroidBleBearer
+import com.app.transport.meshgraph.MeshGraphService
 import com.app.transport.net.TorPreferenceManager
+import com.app.transport.nostr.NostrRelayManager
 import com.app.transport.notification.ServiceNotifier
-import com.app.domain.repository.ConnectivityRepository
-import com.app.domain.repository.DatabaseKeyProvider
-import com.app.domain.repository.DatabasePanicWiper
-import com.app.database.db.DatabaseManager
-import com.app.database.db.DB_FILE_NAME
-import com.yet.bitmessage.android.database.AndroidDatabaseKeyProvider
-import com.app.common.settings.SettingsStore
-import com.app.domain.repository.BatteryOptimizationRepository
-import com.app.domain.repository.MediaCleaner
-import com.app.domain.repository.MeshResetPort
-import com.app.domain.repository.PeerVerificationRepository
-import com.app.domain.repository.PlaceGeocoder
-import com.app.transport.features.file.FileUtils
-import com.app.domain.app.AppForegroundState
-import com.yet.bitmessage.android.app.AndroidAppForegroundState
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import com.yet.bitmessage.android.geohash.AndroidPlaceGeocoder
-import com.app.common.permission.PermissionController
-import com.yet.bitmessage.android.connectivity.AndroidConnectivityRepository
-import com.yet.bitmessage.android.power.AndroidBatteryOptimizationRepository
-import com.yet.bitmessage.android.verification.VerificationCoordinator
-import com.app.crypto.secure.KSafeSecureKeyValueStore
-import com.app.crypto.secure.SecureKeyValueStore
 import eu.anifantakis.lib.ksafe.KSafe
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Binds
@@ -57,19 +58,28 @@ import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.IntoSet
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Platform providers for the data layer's infrastructure dependencies (the leaf objects the
- * repository implementations in :core:data depend on). Each one delegates to the existing
- * process-wide singleton / holder so the graph and the still-living legacy paths share a *single*
- * instance during the Strangler-Fig transition — no duplicated mesh / favorites / identity state.
+ * repository implementations depend on) — moved here from :shared androidMain. :core:data is the
+ * bridge layer that depends on both :core:domain (the ports) and :core:transport/:core:crypto/
+ * :core:database (the impls), so these domain-port-over-transport wirings live here rather than in
+ * :shared or in :core:transport (which cannot see :core:domain).
  *
- * Constructor-injectable impls are bound via `@Binds` (feature-module convention); the leaves that
- * need a `Context` or bespoke construction stay `@Provides` in the [companion] object.
+ * Each leaf delegates to the graph-owned process-wide singleton so the graph and the still-living
+ * legacy paths share a *single* instance during the Strangler-Fig transition. `Context` is supplied
+ * by the application graph factory.
+ *
+ * Constructor-injectable impls are bound via `@Binds`; the leaves that need a `Context` or bespoke
+ * construction stay `@Provides` in the [companion]. This is the single androidMain data binding
+ * container (it also carries the concrete-mesh [MeshService] adapter and the Context-backed
+ * `IncomingFileStore`, previously in a separate `DataProviders`).
  */
 @ContributesTo(AppScope::class)
 @BindingContainer
-abstract class AndroidDataBindings {
+abstract class DataAndroidBindings {
 
     /** The graph-owned coordinator is the [PeerVerificationRepository] and the BMS verify listener. */
     @Binds
@@ -78,10 +88,6 @@ abstract class AndroidDataBindings {
     /** Process foreground/background signal (ProcessLifecycleOwner) for data-saving throttling. */
     @Binds
     abstract val AndroidAppForegroundState.bindAppForegroundState: AppForegroundState
-
-    /** Hardware-rooted SQLCipher passphrase (stored via the encrypted secret store, never plaintext). */
-    @Binds
-    abstract val AndroidDatabaseKeyProvider.bindDatabaseKeyProvider: DatabaseKeyProvider
 
     /** Narrow lifecycle contract for the foreground service (ISP); same underlying BMS. */
     @Binds
@@ -99,9 +105,22 @@ abstract class AndroidDataBindings {
         @SingleIn(AppScope::class)
         fun provideApplication(context: Context): Application = context.applicationContext as Application
 
+        /** The commonMain mesh port, implemented by the androidMain [BluetoothMeshService]. */
+        @Provides
+        fun provideMeshService(mesh: BluetoothMeshService): MeshService = mesh
+
+        /**
+         * The `IncomingFileStore` seam (transport's commonMain port) used by `NostrDirectMessageIngest`
+         * to persist incoming Nostr file transfers without holding an Android `Context` itself.
+         */
+        @Provides
+        @SingleIn(AppScope::class)
+        fun provideIncomingFileStore(context: Context): IncomingFileStore =
+            AndroidIncomingFileStore(context.applicationContext)
+
         /**
          * Single app-wide KSafe **plain** store for all non-secret preferences (theme, toggles,
-         * onboarding flags, mesh settings). [SettingsStoreImpl] writes everything here with
+         * onboarding flags, mesh settings). [SettingsStore] writes everything here with
          * `KSafeWriteMode.Plain`. Secrets stay in the encrypted vault ([SecureKeyValueStore]), not here.
          */
         @Provides
@@ -176,7 +195,7 @@ abstract class AndroidDataBindings {
             incomingSink: IncomingMessageSink,
             favoriteNostrLink: FavoriteNostrLink,
             geohashReadReceiptRouter: GeohashReadReceiptRouter,
-            verificationService: com.app.transport.VerificationService,
+            verificationService: VerificationService,
             fragmentManager: FragmentManager,
             bleBearer: BleBearer,
             meshNetwork: MeshNetwork,

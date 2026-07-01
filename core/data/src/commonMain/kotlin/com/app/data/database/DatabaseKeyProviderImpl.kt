@@ -1,15 +1,15 @@
-package com.yet.bitmessage.android.database
+package com.app.data.database
 
+import com.app.common.AppDispatchers
 import com.app.common.encoding.dataFromHexString
 import com.app.common.encoding.hexEncodedString
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.domain.repository.DatabaseKeyProvider
+import dev.whyoleg.cryptography.random.CryptographyRandom
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.security.SecureRandom
 
 /**
  * Hardware-rooted SQLCipher passphrase. The passphrase is a 32-byte CSPRNG value, persisted through
@@ -20,30 +20,32 @@ import java.security.SecureRandom
  * First run generates and stores it; subsequent runs read it back. Crypto-erase ([destroyKey]) drops
  * the only stored copy, after which the encrypted database can no longer be opened.
  *
- * Android-only for now (the secret store is Android-backed); the iOS provider (Keychain-rooted) is a
- * follow-up alongside the iOS SQLCipher driver. Lives in :shared androidMain like the other platform
- * providers so :core:database carries no key-management dependency.
+ * Platform-free (commonMain): the CSPRNG is [CryptographyRandom] and the off-main hop uses the
+ * injected [AppDispatchers] (`dispatchers.io`), so no JVM types leak in. Only the secret-store backing is provided
+ * per-platform (Android Keystore now via KSafe; the iOS Keychain-rooted store is a follow-up
+ * alongside the iOS SQLCipher driver).
  */
 @SingleIn(AppScope::class)
 @Inject
-class AndroidDatabaseKeyProvider(
+class DatabaseKeyProviderImpl(
     private val secureStore: SecureIdentityStateManager,
+    private val dispatchers: AppDispatchers
 ) : DatabaseKeyProvider {
 
-    override suspend fun passphrase(): ByteArray = withContext(Dispatchers.IO) {
+    override suspend fun passphrase(): ByteArray = withContext(dispatchers.io) {
         val hex = secureStore.getSecureValue(KEY_DB_PASSPHRASE) ?: generateAndStore()
         hex.dataFromHexString() ?: error("Stored database passphrase is corrupt")
     }
 
     override suspend fun destroyKey() {
-        withContext(Dispatchers.IO) {
+        withContext(dispatchers.io) {
             // Crypto-erase: drop the only copy of the passphrase; the SQLCipher DB becomes unopenable.
             secureStore.removeSecureValue(KEY_DB_PASSPHRASE)
         }
     }
 
     private fun generateAndStore(): String {
-        val bytes = ByteArray(PASSPHRASE_BYTES).also { SecureRandom().nextBytes(it) }
+        val bytes = ByteArray(PASSPHRASE_BYTES).also { CryptographyRandom.nextBytes(it) }
         val hex = bytes.hexEncodedString()
         secureStore.storeSecureValue(KEY_DB_PASSPHRASE, hex)
         return hex

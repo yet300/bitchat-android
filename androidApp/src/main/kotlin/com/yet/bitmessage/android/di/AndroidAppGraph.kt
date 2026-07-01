@@ -2,9 +2,9 @@ package com.yet.bitmessage.android.di
 
 import android.content.Context
 import com.app.common.di.CommonBindings
+import com.app.data.di.DataAndroidBindings
 import com.app.data.di.DataBindings
-import com.yet.bitmessage.android.di.AndroidDataBindings
-import com.yet.bitmessage.android.di.AndroidTransportBindings
+import com.yet.bitmessage.di.AndroidTransportBindings
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
@@ -24,7 +24,7 @@ import dev.zacsweers.metrox.android.MetroAppComponentProviders
     bindingContainers = [
         CommonBindings::class,
         DataBindings::class,
-        AndroidDataBindings::class,
+        DataAndroidBindings::class,
         AndroidTransportBindings::class,
         AndroidAppBindings::class,
     ],

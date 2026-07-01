@@ -1,4 +1,4 @@
-package com.yet.bitmessage.android.connectivity
+package com.app.data.connectivity
 
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager

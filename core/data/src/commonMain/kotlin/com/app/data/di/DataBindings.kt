@@ -27,6 +27,7 @@ import com.app.data.repository.TorRepositoryImpl
 import com.app.data.repository.VerificationRepositoryImpl
 import com.app.data.channel.ChannelCipher
 import com.app.data.channel.EncryptionServiceChannelCipher
+import com.app.data.database.DatabaseKeyProviderImpl
 import com.app.data.nostr.CurrentGeohashSource
 import com.app.data.routing.MeshRouteStrategy
 import com.app.data.routing.MessageRouter
@@ -43,6 +44,7 @@ import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationPrefsRepository
 import com.app.domain.repository.ConversationRepository
+import com.app.domain.repository.DatabaseKeyProvider
 import com.app.domain.repository.DebugRepository
 import com.app.domain.repository.GeohashBookmarksRepository
 import com.app.domain.repository.GeohashRepository
@@ -162,6 +164,13 @@ abstract class DataBindings {
 
     @Binds
     internal abstract val VerificationRepositoryImpl.bindVerificationRepository: VerificationRepository
+
+    /**
+     * Hardware-rooted SQLCipher passphrase provider — platform-free (CryptographyRandom + ioDispatcher);
+     * only its secret-store backing is provided per-platform.
+     */
+    @Binds
+    internal abstract val DatabaseKeyProviderImpl.bindDatabaseKeyProvider: DatabaseKeyProvider
 
     @Binds
     internal abstract val RoutingMessageTransport.bindTransport: MessageTransport

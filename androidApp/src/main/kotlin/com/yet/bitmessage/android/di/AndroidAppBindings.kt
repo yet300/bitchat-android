@@ -2,10 +2,10 @@ package com.yet.bitmessage.android.di
 
 import android.content.Context
 import androidx.core.app.NotificationManagerCompat
+import com.app.data.DataManager
 import com.app.transport.NicknameSource
 import com.app.domain.repository.NotificationMutePolicy
 import com.app.transport.notification.ServiceNotifier
-import com.app.data.DataManager
 import com.yet.bitmessage.android.ui.NotificationManager
 import com.yet.bitmessage.android.notification.NotificationIntervalManager
 import dev.zacsweers.metro.AppScope
@@ -17,8 +17,9 @@ import dev.zacsweers.metro.SingleIn
 
 /**
  * App-resident bindings: the providers that touch :app-only artifacts (NotificationManager + its
- * resources, the legacy DataManager) and therefore cannot move to :shared. The app-agnostic
- * transport SPIs live in [com.yet.bitmessage.android.di.AndroidTransportBindings] in :shared.
+ * resources, the legacy DataManager) and therefore cannot move to a core module. The app-agnostic
+ * transport SPIs live in [com.yet.bitmessage.di.AndroidTransportBindings] in :shared; the data-layer
+ * platform providers live in :core:data `DataAndroidBindings`.
  */
 @ContributesTo(AppScope::class)
 @BindingContainer

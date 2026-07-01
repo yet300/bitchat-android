@@ -1,4 +1,4 @@
-package com.yet.bitmessage.android.app
+package com.app.data.app
 
 import android.os.Handler
 import android.os.Looper
