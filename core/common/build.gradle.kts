@@ -11,6 +11,8 @@ kotlin {
             implementation(libs.bundles.mvi)
 
             implementation(libs.kermit)
+
+            implementation(libs.grant.core)
         }
     }
 }

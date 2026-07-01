@@ -9,7 +9,7 @@ import com.app.domain.repository.MediaCleaner
 import com.app.domain.repository.MeshResetPort
 import com.app.domain.repository.MeshSettingsRepository
 import com.app.domain.repository.MessageRepository
-import com.app.domain.repository.NotificationPermissionRepository
+import com.app.common.permission.PermissionController
 import com.app.domain.repository.NotificationSettingsRepository
 import com.app.domain.repository.PowRepository
 import com.app.domain.repository.SettingsRepository
@@ -118,7 +118,7 @@ internal class DefaultSettingsComponentFactory(
     private val powRepository: PowRepository,
     private val meshSettingsRepository: MeshSettingsRepository,
     private val notificationSettingsRepository: NotificationSettingsRepository,
-    private val notificationPermissionRepository: NotificationPermissionRepository,
+    private val permissionController: PermissionController,
     private val verificationRepository: VerificationRepository,
     private val meshResetPort: MeshResetPort,
     private val mediaCleaner: MediaCleaner,
@@ -140,7 +140,7 @@ internal class DefaultSettingsComponentFactory(
                 powRepository = powRepository,
                 meshSettingsRepository = meshSettingsRepository,
                 notificationSettingsRepository = notificationSettingsRepository,
-                notificationPermissionRepository = notificationPermissionRepository,
+                permissionController = permissionController,
                 verificationRepository = verificationRepository,
                 panicWipe = PanicWipeUseCase(
                     messageRepository, contactRepository, identityRepository,

@@ -25,7 +25,6 @@ import com.app.transport.nostr.NostrRelayManager
 import com.app.transport.mesh.MeshNetwork
 import com.app.transport.net.TorPreferenceManager
 import com.app.transport.notification.ServiceNotifier
-import com.app.domain.repository.CameraPermissionRepository
 import com.app.domain.repository.ConnectivityRepository
 import com.app.domain.repository.DatabaseKeyProvider
 import com.app.domain.repository.DatabasePanicWiper
@@ -36,7 +35,6 @@ import com.app.common.settings.SettingsStore
 import com.app.domain.repository.BatteryOptimizationRepository
 import com.app.domain.repository.MediaCleaner
 import com.app.domain.repository.MeshResetPort
-import com.app.domain.repository.NotificationPermissionRepository
 import com.app.domain.repository.PeerVerificationRepository
 import com.app.domain.repository.PlaceGeocoder
 import com.app.domain.repository.PowRepository
@@ -50,11 +48,9 @@ import kotlinx.coroutines.withContext
 import com.yet.bitmessage.android.geohash.AndroidPlaceGeocoder
 import com.yet.bitmessage.android.connectivity.AndroidConnectivityRepository
 import com.yet.bitmessage.android.connectivity.RuntimePermissionRequester
-import com.yet.bitmessage.android.notification.AndroidNotificationPermissionRepository
 import com.yet.bitmessage.android.power.AndroidBatteryOptimizationRepository
 import com.yet.bitmessage.android.settings.PowRepositoryImpl
 import com.yet.bitmessage.android.settings.TorRepositoryImpl
-import com.yet.bitmessage.android.verification.AndroidCameraPermissionRepository
 import com.yet.bitmessage.android.verification.VerificationCoordinator
 import com.yet.bitmessage.android.verification.VerificationRepositoryImpl
 import com.app.crypto.secure.KSafeSecureKeyValueStore
@@ -280,22 +276,6 @@ abstract class AndroidDataBindings {
                 meshLifecycle,
                 nostrRelayManager,
             )
-
-        @Provides
-        @SingleIn(AppScope::class)
-        fun provideNotificationPermissionRepository(
-            context: Context,
-            permissionRequester: RuntimePermissionRequester,
-        ): NotificationPermissionRepository =
-            AndroidNotificationPermissionRepository(context.applicationContext, permissionRequester)
-
-        @Provides
-        @SingleIn(AppScope::class)
-        fun provideCameraPermissionRepository(
-            context: Context,
-            permissionRequester: RuntimePermissionRequester,
-        ): CameraPermissionRepository =
-            AndroidCameraPermissionRepository(context.applicationContext, permissionRequester)
 
         @Provides
         @SingleIn(AppScope::class)

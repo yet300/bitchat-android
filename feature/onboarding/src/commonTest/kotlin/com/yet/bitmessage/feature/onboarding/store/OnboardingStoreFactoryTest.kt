@@ -5,8 +5,9 @@ package com.yet.bitmessage.feature.onboarding.store
 import com.app.domain.model.TransportKind
 import com.app.domain.model.TransportStatus
 import com.app.domain.repository.BatteryOptimizationRepository
+import com.app.common.permission.AppPermission
+import com.app.common.permission.PermissionController
 import com.app.domain.repository.ConnectivityRepository
-import com.app.domain.repository.NotificationPermissionRepository
 import com.app.domain.repository.OnboardingRepository
 import com.app.domain.repository.SettingsRepository
 import com.app.domain.usecase.RequestBatteryExemptionOnceUseCase
@@ -58,10 +59,10 @@ class OnboardingStoreFactoryTest {
         override suspend fun enable(kind: TransportKind) { enabled += kind }
     }
 
-    private class FakeNotificationPermissionRepository : NotificationPermissionRepository {
+    private class FakePermissionController : PermissionController {
         var requests = 0
-        override fun observeGranted(): Flow<Boolean> = MutableStateFlow(false)
-        override suspend fun requestPermission() { requests++ }
+        override fun observeGranted(permission: AppPermission): Flow<Boolean> = MutableStateFlow(false)
+        override suspend fun requestPermission(permission: AppPermission) { requests++ }
     }
 
     private class FakeBatteryOptimizationRepository : BatteryOptimizationRepository {
@@ -77,7 +78,7 @@ class OnboardingStoreFactoryTest {
         settings: SettingsRepository = FakeSettingsRepository(),
         onboarding: OnboardingRepository = FakeOnboardingRepository(),
         connectivity: ConnectivityRepository = FakeConnectivityRepository(),
-        notifications: NotificationPermissionRepository = FakeNotificationPermissionRepository(),
+        notifications: PermissionController = FakePermissionController(),
         battery: BatteryOptimizationRepository = FakeBatteryOptimizationRepository(),
     ) = OnboardingStoreFactory(
         DefaultStoreFactory(),
@@ -122,7 +123,7 @@ class OnboardingStoreFactoryTest {
     @Test
     fun primer_steps_request_permission_then_advance_and_denial_does_not_block() = runTest {
         val connectivity = FakeConnectivityRepository()
-        val notifications = FakeNotificationPermissionRepository()
+        val notifications = FakePermissionController()
         val battery = FakeBatteryOptimizationRepository()
         val store = store(connectivity = connectivity, notifications = notifications, battery = battery)
 
@@ -145,7 +146,7 @@ class OnboardingStoreFactoryTest {
     @Test
     fun skip_on_a_primer_step_advances_without_requesting() = runTest {
         val connectivity = FakeConnectivityRepository()
-        val notifications = FakeNotificationPermissionRepository()
+        val notifications = FakePermissionController()
         val store = store(connectivity = connectivity, notifications = notifications)
 
         store.accept(OnboardingStore.Intent.Primary) // -> NICKNAME
