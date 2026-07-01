@@ -12,7 +12,6 @@ import com.app.crypto.secure.KSafeSecureKeyValueStore
 import com.app.crypto.secure.SecureKeyValueStore
 import com.app.data.app.AndroidAppForegroundState
 import com.app.data.connectivity.AndroidConnectivityRepository
-import com.app.data.geohash.AndroidPlaceGeocoder
 import com.app.data.power.AndroidBatteryOptimizationRepository
 import com.app.database.db.DB_FILE_NAME
 import com.app.database.db.DatabaseManager
@@ -23,7 +22,6 @@ import com.app.domain.repository.DatabaseKeyProvider
 import com.app.domain.repository.DatabasePanicWiper
 import com.app.domain.repository.MediaCleaner
 import com.app.domain.repository.MeshResetPort
-import com.app.domain.repository.PlaceGeocoder
 import com.app.transport.FavoriteNostrLink
 import com.app.transport.GeohashReadReceiptRouter
 import com.app.transport.IncomingMessageSink
@@ -248,10 +246,6 @@ abstract class DataAndroidBindings {
                     Unit
                 }
             }
-
-        @Provides
-        fun providePlaceGeocoder(context: Context, dispatchers: AppDispatchers): PlaceGeocoder =
-            AndroidPlaceGeocoder(context.applicationContext, dispatchers)
 
         @Provides
         @SingleIn(AppScope::class)

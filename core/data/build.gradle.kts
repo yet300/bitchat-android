@@ -17,6 +17,10 @@ kotlin {
             // CSPRNG for the platform-free SQLCipher passphrase (DatabaseKeyProviderImpl).
             implementation(libs.cryptography.core)
 
+            // Compass — commonMain forward geocoder (place name → coordinates) for the search Geo tab.
+            implementation(libs.compass.geocoder)
+            implementation(libs.compass.geocoder.mobile)
+
             implementation(libs.stately.concurrent.collections)
             implementation(libs.stately.concurrency)
             implementation(libs.kotlinx.io.core)
