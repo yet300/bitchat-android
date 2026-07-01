@@ -70,7 +70,7 @@ class BluetoothMeshService(
     val bleBearer: BleBearer,
     private val meshNetwork: MeshNetwork,
     private val dispatchers: AppDispatchers = AppDispatchers(),
-) : MeshLifecycleController {
+) : MeshLifecycleController, MeshService {
 
     companion object {
         private const val TAG = "BluetoothMeshService"
@@ -86,7 +86,7 @@ class BluetoothMeshService(
     // hex chars). Re-derived by reset() after panic rotates the Noise keys; read it live,
     // do not cache.
     @Volatile
-    var myPeerID: String = encryptionService.getIdentityFingerprint().take(16)
+    override var myPeerID: String = encryptionService.getIdentityFingerprint().take(16)
         private set
 
     // Engine components. Rebuilt in place by reset()/revival — the BMS object itself keeps
@@ -100,7 +100,7 @@ class BluetoothMeshService(
      * Narrow BLE debug surface for [com.bitchat.android.ui.debug.DebugSettingsSheet]
      * (GATT role controls, address diagnostics). Phase C removes this accessor.
      */
-    val bleDebug: BleDebugHandle get() = bleBearer
+    override val bleDebug: BleDebugHandle get() = bleBearer
     private var packetProcessor = PacketProcessor(myPeerID, debugSettingsManager)
     private lateinit var gossipSyncManager: GossipSyncManager
 
@@ -823,7 +823,7 @@ class BluetoothMeshService(
     /**
      * Send public message
      */
-    fun sendMessage(content: String, mentions: List<String> = emptyList(), channel: String? = null) {
+    override fun sendMessage(content: String, mentions: List<String>, channel: String?) {
         if (content.isEmpty()) return
         
         serviceScope.launch {
@@ -849,7 +849,7 @@ class BluetoothMeshService(
     /**
      * Send a file over mesh as a broadcast MESSAGE (public mesh timeline/channels).
      */
-    fun sendFileBroadcast(file: com.app.transport.model.BitchatFilePacket) {
+    override fun sendFileBroadcast(file: com.app.transport.model.BitchatFilePacket) {
         try {
             Log.d(TAG, "📤 sendFileBroadcast: name=${file.fileName}, size=${file.fileSize}")
             val payload = file.encode()
@@ -884,7 +884,7 @@ class BluetoothMeshService(
     /**
      * Send a file as an encrypted private message using Noise protocol
      */
-    fun sendFilePrivate(recipientPeerID: String, file: com.app.transport.model.BitchatFilePacket) {
+    override fun sendFilePrivate(recipientPeerID: String, file: com.app.transport.model.BitchatFilePacket) {
         try {
             Log.d(TAG, "📤 sendFilePrivate (ENCRYPTED): to=$recipientPeerID, name=${file.fileName}, size=${file.fileSize}")
             
@@ -948,7 +948,7 @@ class BluetoothMeshService(
         }
     }
 
-    fun cancelFileTransfer(transferId: String): Boolean {
+    override fun cancelFileTransfer(transferId: String): Boolean {
         return meshNetwork.cancelTransfer(transferId)
     }
 
@@ -963,7 +963,7 @@ class BluetoothMeshService(
      * Send private message - SIMPLIFIED iOS-compatible version 
      * Uses NoisePayloadType system exactly like iOS SimplifiedBluetoothService
      */
-    fun sendPrivateMessage(content: String, recipientPeerID: String, recipientNickname: String, messageID: String? = null) {
+    override fun sendPrivateMessage(content: String, recipientPeerID: String, recipientNickname: String, messageID: String?) {
         if (content.isEmpty() || recipientPeerID.isEmpty()) return
         if (recipientNickname.isEmpty()) return
         
@@ -1035,7 +1035,7 @@ class BluetoothMeshService(
      * Send read receipt for a received private message - NEW NoisePayloadType implementation
      * Uses same encryption approach as iOS SimplifiedBluetoothService
      */
-    fun sendReadReceipt(messageID: String, recipientPeerID: String, readerNickname: String) {
+    override fun sendReadReceipt(messageID: String, recipientPeerID: String, readerNickname: String) {
         serviceScope.launch {
             Log.d(TAG, "📖 Sending read receipt for message $messageID to $recipientPeerID")
 
@@ -1133,7 +1133,7 @@ class BluetoothMeshService(
     /**
      * Send broadcast announce with TLV-encoded identity announcement - exactly like iOS
      */
-    fun sendBroadcastAnnounce() {
+    override fun sendBroadcastAnnounce() {
         Log.d(TAG, "Sending broadcast announce")
         serviceScope.launch {
             val nickname = try { nicknameSource.nickname(myPeerID) } catch (_: Exception) { myPeerID }
@@ -1196,7 +1196,7 @@ class BluetoothMeshService(
     /**
      * Send announcement to specific peer with TLV-encoded identity announcement - exactly like iOS
      */
-    fun sendAnnouncementToPeer(peerID: String) {
+    override fun sendAnnouncementToPeer(peerID: String) {
         if (peerManager.hasAnnouncedToPeer(peerID)) return
         
         val nickname = try { nicknameSource.nickname(myPeerID) } catch (_: Exception) { myPeerID }
@@ -1290,7 +1290,7 @@ class BluetoothMeshService(
     /**
      * Get peer nicknames
      */
-    fun getPeerNicknames(): Map<String, String> = peerManager.getAllPeerNicknames()
+    override fun getPeerNicknames(): Map<String, String> = peerManager.getAllPeerNicknames()
     
     /**
      * Get peer RSSI values  
@@ -1300,7 +1300,7 @@ class BluetoothMeshService(
     /**
      * Check if we have an established Noise session with a peer  
      */
-    fun hasEstablishedSession(peerID: String): Boolean {
+    override fun hasEstablishedSession(peerID: String): Boolean {
         return encryptionService.hasEstablishedSession(peerID)
     }
     
@@ -1314,7 +1314,7 @@ class BluetoothMeshService(
     /**
      * Initiate Noise handshake with a specific peer (public API)
      */
-    fun initiateNoiseHandshake(peerID: String) {
+    override fun initiateNoiseHandshake(peerID: String) {
         // Delegate to the existing implementation in the MessageHandler delegate
         messageHandler.delegate?.initiateNoiseHandshake(peerID)
     }
@@ -1336,7 +1336,7 @@ class BluetoothMeshService(
     /**
      * Get peer info for verification purposes
      */
-    fun getPeerInfo(peerID: String): PeerInfo? {
+    override fun getPeerInfo(peerID: String): PeerInfo? {
         return peerManager.getPeerInfo(peerID)
     }
 
@@ -1396,7 +1396,7 @@ class BluetoothMeshService(
     /**
      * Get debug status information
      */
-    fun getDebugStatus(): String {
+    override fun getDebugStatus(): String {
         return buildString {
             appendLine("=== Bluetooth Mesh Service Debug Status ===")
             appendLine("My Peer ID: $myPeerID")

@@ -9,7 +9,7 @@ import dev.whyoleg.cryptography.algorithms.SHA256
  *
  * Backed by the platform cryptography-kotlin provider (JDK on android, CryptoKit on apple).
  */
-internal object Sha256 {
+object Sha256 {
 
     private val hasher by lazy { CryptographyProvider.Default.get(SHA256).hasher() }
 

@@ -1,25 +1,29 @@
 plugins {
-    alias(libs.plugins.local.android.library)
+    alias(libs.plugins.local.kotlin.multiplatform)
     alias(libs.plugins.metro)
 }
 
-dependencies {
-    implementation(projects.core.domain)
-    implementation(projects.core.common)
-    implementation(projects.core.crypto)
-    implementation(projects.core.transport)
-    implementation(projects.core.database)
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            implementation(projects.core.domain)
+            implementation(projects.core.common)
+            implementation(projects.core.crypto)
+            implementation(projects.core.transport)
+            implementation(projects.core.database)
 
-    implementation(libs.ksafe)
+            implementation(libs.ksafe)
 
-    // secp256k1-kmp JVM native lib for unit tests that exercise transport's Nostr crypto
-    // (the android JNI variant ships only android .so; host JVM tests need the jvm variant).
-    testImplementation(libs.secp256k1.jni.jvm)
+            implementation(libs.stately.concurrent.collections)
+            implementation(libs.stately.concurrency)
+            implementation(libs.kotlinx.io.core)
+        }
+        androidHostTest.dependencies {
+            implementation(libs.bundles.android.testing)
 
-    // In-memory JDBC SQLite driver for repository tests that round-trip through the DB DAOs.
-    testImplementation(libs.sqldelight.sqlite.driver)
+            implementation(libs.secp256k1.jni.jvm)
 
-    // Robolectric + KSafe round-trip for SettingsStoreImpl (KSafe needs a Context; plain mode works
-    // on the host JVM without a Keystore).
-    testImplementation(libs.bundles.android.testing)
+            implementation(libs.sqldelight.sqlite.driver)
+        }
+    }
 }
