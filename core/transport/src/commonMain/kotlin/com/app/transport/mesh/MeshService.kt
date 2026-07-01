@@ -1,6 +1,7 @@
 package com.app.transport.mesh
 
 import com.app.transport.model.BitchatFilePacket
+import com.app.transport.verification.VerifyEventListener
 
 /**
  * commonMain contract for the mesh operations the data layer drives (peer directory, Noise session
@@ -49,4 +50,17 @@ interface MeshService {
     fun cancelFileTransfer(transferId: String): Boolean
 
     fun getDebugStatus(): String
+
+    // --- Noise QR-verification surface (driven by the platform-free VerificationCoordinator) ---
+
+    /** The verify-event sink; the coordinator attaches itself so inbound challenges/responses land. */
+    var verifyEventListener: VerifyEventListener?
+
+    fun getPeerFingerprint(peerID: String): String?
+
+    fun getStaticNoisePublicKey(): ByteArray?
+
+    fun sendVerifyChallenge(peerID: String, noiseKeyHex: String, nonceA: ByteArray)
+
+    fun sendVerifyResponse(peerID: String, noiseKeyHex: String, nonceA: ByteArray)
 }

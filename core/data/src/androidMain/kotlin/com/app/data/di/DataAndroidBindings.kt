@@ -14,7 +14,6 @@ import com.app.data.app.AndroidAppForegroundState
 import com.app.data.connectivity.AndroidConnectivityRepository
 import com.app.data.geohash.AndroidPlaceGeocoder
 import com.app.data.power.AndroidBatteryOptimizationRepository
-import com.app.data.verification.VerificationCoordinator
 import com.app.database.db.DB_FILE_NAME
 import com.app.database.db.DatabaseManager
 import com.app.domain.app.AppForegroundState
@@ -24,7 +23,6 @@ import com.app.domain.repository.DatabaseKeyProvider
 import com.app.domain.repository.DatabasePanicWiper
 import com.app.domain.repository.MediaCleaner
 import com.app.domain.repository.MeshResetPort
-import com.app.domain.repository.PeerVerificationRepository
 import com.app.domain.repository.PlaceGeocoder
 import com.app.transport.FavoriteNostrLink
 import com.app.transport.GeohashReadReceiptRouter
@@ -80,10 +78,6 @@ import kotlinx.coroutines.withContext
 @ContributesTo(AppScope::class)
 @BindingContainer
 abstract class DataAndroidBindings {
-
-    /** The graph-owned coordinator is the [PeerVerificationRepository] and the BMS verify listener. */
-    @Binds
-    abstract val VerificationCoordinator.bindPeerVerificationRepository: PeerVerificationRepository
 
     /** Process foreground/background signal (ProcessLifecycleOwner) for data-saving throttling. */
     @Binds

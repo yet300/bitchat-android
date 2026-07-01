@@ -1,36 +1,39 @@
 package com.app.data.verification
 
+import co.touchlab.stately.collections.ConcurrentMutableMap
 import com.app.common.AppDispatchers
 import com.app.common.encoding.hexEncodedString
-import com.app.crypto.noise.NoiseSession
 import com.app.domain.model.Fingerprint
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.PeerVerificationRepository
 import com.app.domain.repository.VerifyScanResult
 import com.app.transport.VerificationService
-import com.app.transport.mesh.BluetoothMeshService
+import com.app.transport.mesh.MeshService
 import com.app.transport.verification.VerifyEventListener
+import dev.whyoleg.cryptography.random.CryptographyRandom
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import java.security.SecureRandom
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Phase C owner of the Noise QR-verification orchestration, re-homed from the legacy
  * `VerificationHandler` (which only ran while the legacy `ChatViewModel` was the BMS delegate).
- * Attaches itself as [BluetoothMeshService.verifyEventListener] so inbound challenges/responses are
- * handled in the Decompose app. All crypto is delegated to [VerificationService] — none is
- * reimplemented here. On a completed round-trip the peer's fingerprint is marked verified via
+ * Attaches itself as [MeshService.verifyEventListener] so inbound challenges/responses are handled in
+ * the Decompose app. All crypto is delegated to [VerificationService] — none is reimplemented here.
+ * On a completed round-trip the peer's fingerprint is marked verified via
  * [IdentityRepository.setVerified], which the contacts / chat-header indicators already observe.
+ *
+ * Platform-free (commonMain): depends on the commonMain [MeshService] port (not the concrete
+ * BluetoothMeshService), the [CryptographyRandom] CSPRNG and stately [ConcurrentMutableMap], so no
+ * JVM types leak in and it compiles under iosArm64.
  */
 @SingleIn(AppScope::class)
 @Inject
 class VerificationCoordinator(
-    private val meshService: BluetoothMeshService,
+    private val meshService: MeshService,
     private val verificationService: VerificationService,
     private val identityRepository: IdentityRepository,
     dispatchers: AppDispatchers,
@@ -45,8 +48,8 @@ class VerificationCoordinator(
         val sent: Boolean,
     )
 
-    private val pending = ConcurrentHashMap<String, Pending>()
-    private val lastInboundNonceByPeer = ConcurrentHashMap<String, ByteArray>()
+    private val pending = ConcurrentMutableMap<String, Pending>()
+    private val lastInboundNonceByPeer = ConcurrentMutableMap<String, ByteArray>()
 
     init {
         meshService.verifyEventListener = this
@@ -63,10 +66,10 @@ class VerificationCoordinator(
         } ?: return VerifyScanResult.PeerNotFound
 
         if (!pending.containsKey(peerID)) {
-            val nonce = ByteArray(NONCE_LEN).also { SecureRandom().nextBytes(it) }
+            val nonce = ByteArray(NONCE_LEN).also { CryptographyRandom.Default.nextBytes(it) }
             val entry = Pending(qr.noiseKeyHex, qr.signKeyHex, nonce, sent = false)
             pending[peerID] = entry
-            if (meshService.getSessionState(peerID) is NoiseSession.NoiseSessionState.Established) {
+            if (meshService.hasEstablishedSession(peerID)) {
                 meshService.sendVerifyChallenge(peerID, qr.noiseKeyHex, nonce)
                 pending[peerID] = entry.copy(sent = true)
             } else {
