@@ -1,4 +1,4 @@
-package com.yet.bitmessage.di
+package com.app.data.di
 
 import android.app.Application
 import com.app.crypto.EncryptionService
@@ -32,7 +32,8 @@ import java.io.File
 
 /**
  * App-agnostic transport-wiring SPIs consumed by [com.app.transport.mesh.BluetoothMeshService].
- * These delegate only to :core modules, so they live in :shared with the rest of the DI graph.
+ * They bridge :core:data types (AppStateStore, FavoritesPersistenceService, MessageRouter) onto the
+ * transport SPIs, so they live in :core:data androidMain alongside [DataAndroidBindings].
  * The providers that touch :app resources / classes (ServiceNotifier → NotificationManager + R,
  * NicknameSource → DataManager) stay in the app-resident `AndroidAppBindings`.
  */

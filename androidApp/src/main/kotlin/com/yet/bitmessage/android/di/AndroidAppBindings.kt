@@ -18,8 +18,8 @@ import dev.zacsweers.metro.SingleIn
 /**
  * App-resident bindings: the providers that touch :app-only artifacts (NotificationManager + its
  * resources, the legacy DataManager) and therefore cannot move to a core module. The app-agnostic
- * transport SPIs live in [com.yet.bitmessage.di.AndroidTransportBindings] in :shared; the data-layer
- * platform providers live in :core:data `DataAndroidBindings`.
+ * transport SPIs live in [com.app.data.di.AndroidTransportBindings]; the data-layer platform
+ * providers live in :core:data `DataAndroidBindings`.
  */
 @ContributesTo(AppScope::class)
 @BindingContainer
