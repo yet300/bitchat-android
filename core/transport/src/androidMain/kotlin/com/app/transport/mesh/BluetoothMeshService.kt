@@ -118,7 +118,7 @@ class BluetoothMeshService(
 
     // Narrow SPI for the Phase C app to own QR-verification orchestration without the full
     // delegate. Additive to [delegate]; both (if set) receive the verify events.
-    var verifyEventListener: VerifyEventListener? = null
+    override var verifyEventListener: VerifyEventListener? = null
 
     // Coroutines
     private var serviceScope = CoroutineScope(dispatchers.io + SupervisorJob())
@@ -1088,7 +1088,7 @@ class BluetoothMeshService(
 
     // MARK: QR Verification over Noise
 
-    fun sendVerifyChallenge(peerID: String, noiseKeyHex: String, nonceA: ByteArray) {
+    override fun sendVerifyChallenge(peerID: String, noiseKeyHex: String, nonceA: ByteArray) {
         val tlv = verificationService.buildVerifyChallenge(noiseKeyHex, nonceA)
         val payload = NoisePayload(
             type = NoisePayloadType.VERIFY_CHALLENGE,
@@ -1097,7 +1097,7 @@ class BluetoothMeshService(
         sendNoisePayloadToPeer(payload, peerID, "verify challenge")
     }
 
-    fun sendVerifyResponse(peerID: String, noiseKeyHex: String, nonceA: ByteArray) {
+    override fun sendVerifyResponse(peerID: String, noiseKeyHex: String, nonceA: ByteArray) {
         val tlv = verificationService.buildVerifyResponse(noiseKeyHex, nonceA) ?: return
         val payload = NoisePayload(
             type = NoisePayloadType.VERIFY_RESPONSE,
@@ -1322,7 +1322,7 @@ class BluetoothMeshService(
     /**
      * Get peer fingerprint for identity management
      */
-    fun getPeerFingerprint(peerID: String): String? {
+    override fun getPeerFingerprint(peerID: String): String? {
         return peerManager.getFingerprintForPeer(peerID)
     }
 
@@ -1360,7 +1360,7 @@ class BluetoothMeshService(
         return encryptionService.getIdentityFingerprint()
     }
 
-    fun getStaticNoisePublicKey(): ByteArray? {
+    override fun getStaticNoisePublicKey(): ByteArray? {
         return encryptionService.getStaticPublicKey()
     }
     

@@ -28,6 +28,7 @@ import com.app.data.repository.VerificationRepositoryImpl
 import com.app.data.channel.ChannelCipher
 import com.app.data.channel.EncryptionServiceChannelCipher
 import com.app.data.database.DatabaseKeyProviderImpl
+import com.app.data.verification.VerificationCoordinator
 import com.app.data.nostr.CurrentGeohashSource
 import com.app.data.routing.MeshRouteStrategy
 import com.app.data.routing.MessageRouter
@@ -58,6 +59,7 @@ import com.app.domain.repository.NotificationMutePolicy
 import com.app.domain.repository.NotificationSettingsRepository
 import com.app.domain.repository.OnboardingRepository
 import com.app.domain.repository.PeerRepository
+import com.app.domain.repository.PeerVerificationRepository
 import com.app.domain.repository.PowRepository
 import com.app.domain.repository.SearchRepository
 import com.app.domain.repository.SettingsRepository
@@ -171,6 +173,13 @@ abstract class DataBindings {
      */
     @Binds
     internal abstract val DatabaseKeyProviderImpl.bindDatabaseKeyProvider: DatabaseKeyProvider
+
+    /**
+     * Noise QR-verification coordinator — platform-free (drives the commonMain [MeshService] port).
+     * It is the [PeerVerificationRepository] and attaches itself as the mesh verify-event listener.
+     */
+    @Binds
+    internal abstract val VerificationCoordinator.bindPeerVerificationRepository: PeerVerificationRepository
 
     @Binds
     internal abstract val RoutingMessageTransport.bindTransport: MessageTransport
