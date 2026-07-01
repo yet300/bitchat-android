@@ -1,0 +1,380 @@
+@file:OptIn(ExperimentalTime::class)
+
+package com.app.data.favorites
+
+import co.touchlab.stately.concurrency.Lock
+import co.touchlab.stately.concurrency.withLock
+import com.app.common.encoding.hexEncodedString
+import com.app.common.utils.Log
+import com.app.crypto.identity.SecureIdentityStateManager
+import com.app.common.serialization.JsonConfig
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
+import com.app.transport.nostr.Bech32
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+
+/**
+ * Bridging Noise and Nostr favorites
+ * Direct port from iOS FavoritesPersistenceService.swift, with Android-specific
+ * peerID (16-hex) -> npub indexing for Nostr DM routing.
+ */
+data class FavoriteRelationship(
+    val peerNoisePublicKey: ByteArray,    // Noise static public key (32 bytes)
+    val peerNostrPublicKey: String?,      // npub bech32 string
+    val peerNickname: String,
+    val isFavorite: Boolean,              // We favorited them
+    val theyFavoritedUs: Boolean,         // They favorited us
+    val favoritedAt: Instant,
+    val lastUpdated: Instant
+) {
+    val isMutual: Boolean get() = isFavorite && theyFavoritedUs
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is FavoriteRelationship) return false
+
+        if (!peerNoisePublicKey.contentEquals(other.peerNoisePublicKey)) return false
+        if (peerNostrPublicKey != other.peerNostrPublicKey) return false
+        if (peerNickname != other.peerNickname) return false
+        if (isFavorite != other.isFavorite) return false
+        if (theyFavoritedUs != other.theyFavoritedUs) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = peerNoisePublicKey.contentHashCode()
+        result = 31 * result + (peerNostrPublicKey?.hashCode() ?: 0)
+        result = 31 * result + peerNickname.hashCode()
+        result = 31 * result + isFavorite.hashCode()
+        result = 31 * result + theyFavoritedUs.hashCode()
+        return result
+    }
+}
+
+interface FavoritesChangeListener {
+    fun onFavoriteChanged(noiseKeyHex: String)
+    fun onAllCleared()
+}
+
+/**
+ * Manages favorites with Noise↔Nostr mapping
+ * Graph-constructed singleton — injected via Metro @DependencyGraph.
+ */
+@SingleIn(AppScope::class)
+@Inject
+class FavoritesPersistenceService(private val stateManager: SecureIdentityStateManager) {
+
+    companion object {
+        private const val TAG = "FavoritesPersistenceService"
+        private const val FAVORITES_KEY = "favorite_relationships"      // noiseHex -> relationship
+        private const val PEERID_INDEX_KEY = "favorite_peerid_index"    // peerID(16-hex) -> npub
+    }
+
+    private val favorites = mutableMapOf<String, FavoriteRelationship>() // noiseHex -> relationship
+    // NEW: Index by current mesh peerID (16-hex) for direct lookup when sending Nostr DMs from mesh context
+    private val peerIdIndex = mutableMapOf<String, String>() // peerID (lowercase 16-hex) -> npub
+    private val listeners = mutableListOf<FavoritesChangeListener>()
+    private val listenersLock = Lock()
+
+    init {
+        loadFavorites()
+        loadPeerIdIndex()
+    }
+
+    /** Get favorite status for Noise public key */
+    fun getFavoriteStatus(noisePublicKey: ByteArray): FavoriteRelationship? {
+        val keyHex = noisePublicKey.hexEncodedString()
+        return favorites[keyHex]
+    }
+
+    /** Get favorite status for 16-hex peerID (by noiseHex prefix match) */
+    fun getFavoriteStatus(peerID: String): FavoriteRelationship? {
+        val pid = peerID.lowercase()
+        for ((_, relationship) in favorites) {
+            val noiseKeyHex = relationship.peerNoisePublicKey.hexEncodedString()
+            if (noiseKeyHex.startsWith(pid)) return relationship
+        }
+        return null
+    }
+
+    /** Update Nostr public key for a peer (indexed by Noise key) */
+    fun updateNostrPublicKey(noisePublicKey: ByteArray, nostrPubkey: String) {
+        val keyHex = noisePublicKey.hexEncodedString()
+        val existing = favorites[keyHex]
+
+        if (existing != null) {
+            val updated = existing.copy(
+                peerNostrPublicKey = nostrPubkey,
+                lastUpdated = Clock.System.now()
+            )
+            favorites[keyHex] = updated
+        } else {
+            val relationship = FavoriteRelationship(
+                peerNoisePublicKey = noisePublicKey,
+                peerNostrPublicKey = nostrPubkey,
+                peerNickname = "Unknown",
+                isFavorite = false,
+                theyFavoritedUs = false,
+                favoritedAt = Clock.System.now(),
+                lastUpdated = Clock.System.now()
+            )
+            favorites[keyHex] = relationship
+        }
+
+        saveFavorites()
+        notifyChanged(keyHex)
+        Log.d(TAG, "Updated Nostr pubkey association for ${keyHex.take(16)}...")
+    }
+
+
+    /** NEW: Update Nostr pubkey for specific mesh peerID (16-hex). */
+    fun updateNostrPublicKeyForPeerID(peerID: String, nostrPubkey: String) {
+        val pid = peerID.lowercase()
+        if (pid.length == 16 && pid.matches(Regex("^[0-9a-f]+$"))) {
+            peerIdIndex[pid] = nostrPubkey
+            savePeerIdIndex()
+            Log.d(TAG, "Indexed npub for peerID ${pid.take(8)}…")
+        } else {
+            Log.w(TAG, "updateNostrPublicKeyForPeerID called with non-16hex peerID: $peerID")
+        }
+    }
+
+
+    /** NEW: Resolve Nostr pubkey via current peerID mapping (fast path). */
+    fun findNostrPubkeyForPeerID(peerID: String): String? {
+        return peerIdIndex[peerID.lowercase()]
+    }
+
+    /** NEW: Resolve peerID (16-hex) for a given Nostr pubkey (npub or hex). */
+    fun findPeerIDForNostrPubkey(nostrPubkey: String): String? {
+        // First, try direct match in peerIdIndex (values are stored as npub strings)
+        peerIdIndex.entries.firstOrNull { it.value.equals(nostrPubkey, ignoreCase = true) }?.let { return it.key }
+        
+        // Attempt legacy mapping via favorites Noise key association
+        val targetHex = normalizeNostrKeyToHex(nostrPubkey)
+        if (targetHex != null) {
+            // Find relationship with matching nostr pubkey (normalized to hex) and then try to map to current peerID via noise key prefix
+            val rel = favorites.values.firstOrNull { it.peerNostrPublicKey?.let { stored -> normalizeNostrKeyToHex(stored) } == targetHex }
+            if (rel != null) {
+                val noiseHex = rel.peerNoisePublicKey.hexEncodedString()
+                // Return 16-hex prefix as best-effort if no explicit mapping exists
+                return noiseHex.take(16)
+            }
+        }
+        return null
+    }
+
+    /** Update favorite status */
+    fun updateFavoriteStatus(noisePublicKey: ByteArray, nickname: String, isFavorite: Boolean) {
+        val keyHex = noisePublicKey.hexEncodedString()
+
+        val existing = favorites[keyHex]
+
+        val updated = if (existing != null) {
+            existing.copy(
+                peerNickname = nickname,
+                isFavorite = isFavorite,
+                lastUpdated = Clock.System.now(),
+                favoritedAt = if (isFavorite && !existing.isFavorite) Clock.System.now() else existing.favoritedAt
+            )
+        } else {
+            FavoriteRelationship(
+                peerNoisePublicKey = noisePublicKey,
+                peerNostrPublicKey = null,
+                peerNickname = nickname,
+                isFavorite = isFavorite,
+                theyFavoritedUs = false,
+                favoritedAt = Clock.System.now(),
+                lastUpdated = Clock.System.now()
+            )
+        }
+
+        favorites[keyHex] = updated
+        saveFavorites()
+        notifyChanged(keyHex)
+
+        Log.d(TAG, "Updated favorite status for $nickname: $isFavorite")
+    }
+
+    /** Update peer favorited-us flag */
+    fun updatePeerFavoritedUs(noisePublicKey: ByteArray, theyFavoritedUs: Boolean) {
+        val keyHex = noisePublicKey.hexEncodedString()
+        val existing = favorites[keyHex]
+
+        if (existing != null) {
+            val updated = existing.copy(
+                theyFavoritedUs = theyFavoritedUs,
+                lastUpdated = Clock.System.now()
+            )
+            favorites[keyHex] = updated
+            saveFavorites()
+            notifyChanged(keyHex)
+
+            Log.d(TAG, "Updated peer favorited us for ${keyHex.take(16)}...: $theyFavoritedUs")
+        }
+    }
+
+    fun getMutualFavorites(): List<FavoriteRelationship> = favorites.values.filter { it.isMutual }
+    fun getOurFavorites(): List<FavoriteRelationship> = favorites.values.filter { it.isFavorite }
+
+    fun clearAllFavorites() {
+        favorites.clear()
+        saveFavorites()
+        peerIdIndex.clear()
+        savePeerIdIndex()
+        Log.i(TAG, "Cleared all favorites")
+        notifyAllCleared()
+    }
+
+    /** Find Noise key by Nostr pubkey */
+    fun findNoiseKey(forNostrPubkey: String): ByteArray? {
+        val targetHex = normalizeNostrKeyToHex(forNostrPubkey) ?: return null
+        return favorites.values.firstOrNull { rel ->
+            rel.peerNostrPublicKey?.let { stored -> normalizeNostrKeyToHex(stored) } == targetHex
+        }?.peerNoisePublicKey
+    }
+
+    /** Find Nostr pubkey by Noise key */
+    fun findNostrPubkey(forNoiseKey: ByteArray): String? {
+        val keyHex = forNoiseKey.hexEncodedString()
+        return favorites[keyHex]?.peerNostrPublicKey
+    }
+
+    // MARK: - Persistence
+
+    private fun loadFavorites() {
+        try {
+            val favoritesJson = stateManager.getSecureValue(FAVORITES_KEY)
+            if (favoritesJson != null) {
+                val data: Map<String, FavoriteRelationshipData> = JsonConfig.json.decodeFromString(
+                    MapSerializer(String.serializer(), FavoriteRelationshipData.serializer()),
+                    favoritesJson
+                )
+
+                favorites.clear()
+                data.forEach { (key, relationshipData) ->
+                    favorites[key] = relationshipData.toFavoriteRelationship()
+                }
+                Log.d(TAG, "Loaded ${favorites.size} favorite relationships")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load favorites: ${e.message}")
+        }
+    }
+
+    private fun saveFavorites() {
+        try {
+            val data = favorites.mapValues { (_, relationship) ->
+                FavoriteRelationshipData.fromFavoriteRelationship(relationship)
+            }
+            val favoritesJson = JsonConfig.json.encodeToString(
+                MapSerializer(String.serializer(), FavoriteRelationshipData.serializer()),
+                data
+            )
+            stateManager.storeSecureValue(FAVORITES_KEY, favoritesJson)
+            Log.d(TAG, "Saved ${favorites.size} favorite relationships")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save favorites: ${e.message}")
+        }
+    }
+
+    private fun loadPeerIdIndex() {
+        try {
+            val json = stateManager.getSecureValue(PEERID_INDEX_KEY)
+            if (json != null) {
+                val data: Map<String, String> = JsonConfig.json.decodeFromString(
+                    MapSerializer(String.serializer(), String.serializer()),
+                    json
+                )
+                peerIdIndex.clear()
+                peerIdIndex.putAll(data)
+                Log.d(TAG, "Loaded ${peerIdIndex.size} peerID→npub mappings")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load peerID index: ${e.message}")
+        }
+    }
+
+    private fun savePeerIdIndex() {
+        try {
+            val json = JsonConfig.json.encodeToString(
+                MapSerializer(String.serializer(), String.serializer()),
+                peerIdIndex
+            )
+            stateManager.storeSecureValue(PEERID_INDEX_KEY, json)
+            Log.d(TAG, "Saved ${peerIdIndex.size} peerID→npub mappings")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save peerID index: ${e.message}")
+        }
+    }
+
+    // MARK: - Listeners
+    fun addListener(listener: FavoritesChangeListener) {
+        listenersLock.withLock { if (!listeners.contains(listener)) listeners.add(listener) }
+    }
+    fun removeListener(listener: FavoritesChangeListener) {
+        listenersLock.withLock { listeners.remove(listener) }
+    }
+    private fun notifyChanged(noiseKeyHex: String) {
+        val snapshot = listenersLock.withLock { listeners.toList() }
+        snapshot.forEach { runCatching { it.onFavoriteChanged(noiseKeyHex) } }
+    }
+    private fun notifyAllCleared() {
+        val snapshot = listenersLock.withLock { listeners.toList() }
+        snapshot.forEach { runCatching { it.onAllCleared() } }
+    }
+
+    /** Normalize a Nostr public key string (npub bech32 or hex) to lowercase hex */
+    private fun normalizeNostrKeyToHex(value: String): String? = try {
+        if (value.startsWith("npub1")) {
+            val (hrp, data) = Bech32.decode(value)
+            if (hrp != "npub") null else data.hexEncodedString()
+        } else value.lowercase()
+    } catch (_: Exception) { null }
+}
+
+/** Serializable data for JSON storage */
+@Serializable
+private data class FavoriteRelationshipData(
+    val peerNoisePublicKeyHex: String,
+    val peerNostrPublicKey: String?,
+    val peerNickname: String,
+    val isFavorite: Boolean,
+    val theyFavoritedUs: Boolean,
+    val favoritedAt: Long,
+    val lastUpdated: Long
+) {
+    companion object {
+        fun fromFavoriteRelationship(relationship: FavoriteRelationship): FavoriteRelationshipData {
+            return FavoriteRelationshipData(
+                peerNoisePublicKeyHex = relationship.peerNoisePublicKey.hexEncodedString(),
+                peerNostrPublicKey = relationship.peerNostrPublicKey,
+                peerNickname = relationship.peerNickname,
+                isFavorite = relationship.isFavorite,
+                theyFavoritedUs = relationship.theyFavoritedUs,
+                favoritedAt = relationship.favoritedAt.toEpochMilliseconds(),
+                lastUpdated = relationship.lastUpdated.toEpochMilliseconds()
+            )
+        }
+    }
+
+    fun toFavoriteRelationship(): FavoriteRelationship {
+        val noiseKeyBytes = peerNoisePublicKeyHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        return FavoriteRelationship(
+            peerNoisePublicKey = noiseKeyBytes,
+            peerNostrPublicKey = peerNostrPublicKey,
+            peerNickname = peerNickname,
+            isFavorite = isFavorite,
+            theyFavoritedUs = theyFavoritedUs,
+            favoritedAt = Instant.fromEpochMilliseconds(favoritedAt),
+            lastUpdated = Instant.fromEpochMilliseconds(lastUpdated)
+        )
+    }
+}
