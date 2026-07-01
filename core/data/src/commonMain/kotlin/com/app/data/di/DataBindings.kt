@@ -28,6 +28,7 @@ import com.app.data.repository.VerificationRepositoryImpl
 import com.app.data.channel.ChannelCipher
 import com.app.data.channel.EncryptionServiceChannelCipher
 import com.app.data.database.DatabaseKeyProviderImpl
+import com.app.data.geohash.CompassPlaceGeocoder
 import com.app.data.verification.VerificationCoordinator
 import com.app.data.nostr.CurrentGeohashSource
 import com.app.data.routing.MeshRouteStrategy
@@ -60,6 +61,7 @@ import com.app.domain.repository.NotificationSettingsRepository
 import com.app.domain.repository.OnboardingRepository
 import com.app.domain.repository.PeerRepository
 import com.app.domain.repository.PeerVerificationRepository
+import com.app.domain.repository.PlaceGeocoder
 import com.app.domain.repository.PowRepository
 import com.app.domain.repository.SearchRepository
 import com.app.domain.repository.SettingsRepository
@@ -211,6 +213,10 @@ abstract class DataBindings {
             routingCore: RoutingCore,
             scope: CoroutineScope,
         ): MessageRouter = MessageRouter(routingCore, scope)
+
+        /** Forward geocoder (place name → geohash) backed by Compass' mobile Geocoder — platform-free. */
+        @Provides
+        fun providePlaceGeocoder(): PlaceGeocoder = CompassPlaceGeocoder()
 
         /** Narrow mesh ports (ISP) for the routing policy — implemented over the [MeshService] port. */
         @Provides
