@@ -19,9 +19,12 @@ import com.app.data.repository.NotificationSettingsRepositoryImpl
 import com.app.data.repository.OnboardingRepositoryImpl
 import com.app.data.repository.PeerRepositoryImpl
 import com.app.data.repository.SearchRepositoryImpl
+import com.app.data.repository.PowRepositoryImpl
 import com.app.data.repository.SettingsRepositoryImpl
 import com.app.data.repository.SettingsStoreImpl
 import com.app.data.repository.ThemeRepositoryImpl
+import com.app.data.repository.TorRepositoryImpl
+import com.app.data.repository.VerificationRepositoryImpl
 import com.app.data.channel.ChannelCipher
 import com.app.data.channel.EncryptionServiceChannelCipher
 import com.app.data.nostr.CurrentGeohashSource
@@ -53,9 +56,12 @@ import com.app.domain.repository.NotificationMutePolicy
 import com.app.domain.repository.NotificationSettingsRepository
 import com.app.domain.repository.OnboardingRepository
 import com.app.domain.repository.PeerRepository
+import com.app.domain.repository.PowRepository
 import com.app.domain.repository.SearchRepository
 import com.app.domain.repository.SettingsRepository
 import com.app.domain.repository.ThemeRepository
+import com.app.domain.repository.TorRepository
+import com.app.domain.repository.VerificationRepository
 import com.app.common.settings.SettingsStore
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Binds
@@ -145,6 +151,17 @@ abstract class DataBindings {
 
     @Binds
     internal abstract val IdentityRepositoryImpl.bindIdentity: IdentityRepository
+
+    // Thin adapters over the graph-owned transport preference managers (Tor, PoW) and the verification
+    // service — moved from :shared androidMain (pure Kotlin, no android types).
+    @Binds
+    internal abstract val TorRepositoryImpl.bindTorRepository: TorRepository
+
+    @Binds
+    internal abstract val PowRepositoryImpl.bindPowRepository: PowRepository
+
+    @Binds
+    internal abstract val VerificationRepositoryImpl.bindVerificationRepository: VerificationRepository
 
     @Binds
     internal abstract val RoutingMessageTransport.bindTransport: MessageTransport

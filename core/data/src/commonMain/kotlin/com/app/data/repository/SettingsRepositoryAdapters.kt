@@ -1,4 +1,4 @@
-package com.yet.bitmessage.android.settings
+package com.app.data.repository
 
 import com.app.domain.repository.PowDifficultyLevel
 import com.app.domain.repository.PowRepository

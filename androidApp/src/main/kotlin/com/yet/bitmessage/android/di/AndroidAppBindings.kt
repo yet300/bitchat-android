@@ -5,7 +5,7 @@ import androidx.core.app.NotificationManagerCompat
 import com.app.transport.NicknameSource
 import com.app.domain.repository.NotificationMutePolicy
 import com.app.transport.notification.ServiceNotifier
-import com.yet.bitmessage.android.data.DataManager
+import com.app.data.DataManager
 import com.yet.bitmessage.android.ui.NotificationManager
 import com.yet.bitmessage.android.notification.NotificationIntervalManager
 import dev.zacsweers.metro.AppScope

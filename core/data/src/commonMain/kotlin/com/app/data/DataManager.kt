@@ -1,4 +1,4 @@
-package com.yet.bitmessage.android.data
+package com.app.data
 
 import com.app.common.utils.Log
 import com.app.common.serialization.JsonConfig
