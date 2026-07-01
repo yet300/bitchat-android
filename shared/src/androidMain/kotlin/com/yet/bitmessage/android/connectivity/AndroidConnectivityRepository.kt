@@ -1,6 +1,5 @@
 package com.yet.bitmessage.android.connectivity
 
-import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
@@ -8,22 +7,20 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.os.Build
 import android.provider.Settings
-import androidx.core.content.ContextCompat
 import com.app.common.permission.AppPermission
 import com.app.common.permission.PermissionController
 import com.app.domain.model.TransportKind
 import com.app.domain.model.TransportState
 import com.app.domain.model.TransportStatus
 import com.app.domain.repository.ConnectivityRepository
-import com.app.transport.mesh.BluetoothPermissions
 import com.app.transport.mesh.MeshLifecycleController
 import com.app.transport.mesh.aware.WifiAwareSupport
 import com.app.transport.net.TorMode
 import com.app.transport.net.TorPreferenceManager
 import com.app.transport.nostr.NostrRelayManager
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.delay
 
@@ -49,7 +46,7 @@ class AndroidConnectivityRepository(
         }
     }
 
-    private fun snapshot(): List<TransportStatus> {
+    private suspend fun snapshot(): List<TransportStatus> {
         val bluetooth = bluetoothState()
         val internet = internetState()
         return listOf(
@@ -71,7 +68,7 @@ class AndroidConnectivityRepository(
             null
         }
 
-    private fun bluetoothState(): TransportState {
+    private suspend fun bluetoothState(): TransportState {
         if (!context.packageManager.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
             return TransportState.UNAVAILABLE
         }
@@ -80,7 +77,7 @@ class AndroidConnectivityRepository(
         return if (adapter.isEnabled) TransportState.ON else TransportState.OFF
     }
 
-    private fun wifiAwareState(): TransportState {
+    private suspend fun wifiAwareState(): TransportState {
         val status = WifiAwareSupport.evaluate(context)
         return when {
             !status.supported -> TransportState.UNAVAILABLE
@@ -134,23 +131,14 @@ class AndroidConnectivityRepository(
     private fun bluetoothAdapter(): BluetoothAdapter? =
         (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
 
-    private fun hasBluetoothRuntimePermission(): Boolean =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            BluetoothPermissions.required().all { isGranted(it) }
-        } else {
-            isGranted(Manifest.permission.ACCESS_FINE_LOCATION) ||
-                isGranted(Manifest.permission.ACCESS_COARSE_LOCATION)
-        }
+    // Status read via the app's PermissionController (Grant checkStatus) — it resolves the SDK-version
+    // permission set (BLE scan/connect + advertise, or legacy location) internally.
+    private suspend fun hasBluetoothRuntimePermission(): Boolean =
+        permissionController.observeGranted(AppPermission.Bluetooth).first() &&
+            permissionController.observeGranted(AppPermission.BluetoothAdvertise).first()
 
-    private fun hasWifiAwarePermission(): Boolean =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            isGranted(Manifest.permission.NEARBY_WIFI_DEVICES)
-        } else {
-            isGranted(Manifest.permission.ACCESS_FINE_LOCATION)
-        }
-
-    private fun isGranted(permission: String): Boolean =
-        ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+    private suspend fun hasWifiAwarePermission(): Boolean =
+        permissionController.observeGranted(AppPermission.NearbyWifi).first()
 
     private fun startSystemIntent(action: String) {
         val intent = Intent(action).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
