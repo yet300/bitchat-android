@@ -1,8 +1,9 @@
 package com.yet.bitmessage.feature.chats.conversations.settings.store
 
+import com.app.common.permission.AppPermission
+import com.app.common.permission.PermissionController
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.MeshSettingsRepository
-import com.app.domain.repository.NotificationPermissionRepository
 import com.app.domain.repository.NotificationSettingsRepository
 import com.app.domain.repository.PowRepository
 import com.app.domain.repository.SettingsRepository
@@ -27,7 +28,7 @@ internal class SettingsStoreFactory(
     private val powRepository: PowRepository,
     private val meshSettingsRepository: MeshSettingsRepository,
     private val notificationSettingsRepository: NotificationSettingsRepository,
-    private val notificationPermissionRepository: NotificationPermissionRepository,
+    private val permissionController: PermissionController,
     private val verificationRepository: VerificationRepository,
     private val panicWipe: PanicWipeUseCase,
 ) {
@@ -88,7 +89,7 @@ internal class SettingsStoreFactory(
                         meshSettingsRepository.observeBackgroundEnabled().collect { dispatch(SettingsStore.Msg.BackgroundLoaded(it)) }
                     }
                     scope.launch {
-                        notificationPermissionRepository.observeGranted().collect { granted ->
+                        permissionController.observeGranted(AppPermission.Notifications).collect { granted ->
                             val status = if (granted) NotifPermissionStatus.GRANTED else NotifPermissionStatus.DENIED
                             dispatch(SettingsStore.Msg.NotifPermissionLoaded(status))
                         }
@@ -128,7 +129,7 @@ internal class SettingsStoreFactory(
                     notificationSettingsRepository.setGlobalMuteEnabled(intent.enabled)
                 }
                 SettingsStore.Intent.EnableNotificationsClicked -> scope.launch {
-                    notificationPermissionRepository.requestPermission()
+                    permissionController.requestPermission(AppPermission.Notifications)
                 }
                 SettingsStore.Intent.ShowMyQrClicked -> scope.launch {
                     dispatch(SettingsStore.Msg.MyQrLoaded(verificationRepository.buildMyVerificationQr()))

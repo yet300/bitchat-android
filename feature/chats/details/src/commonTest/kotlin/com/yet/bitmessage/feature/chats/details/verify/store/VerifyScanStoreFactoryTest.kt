@@ -2,7 +2,8 @@
 
 package com.yet.bitmessage.feature.chats.details.verify.store
 
-import com.app.domain.repository.CameraPermissionRepository
+import com.app.common.permission.AppPermission
+import com.app.common.permission.PermissionController
 import com.app.domain.repository.PeerVerificationRepository
 import com.app.domain.repository.VerifyScanResult
 import com.arkivanov.mvikotlin.main.store.DefaultStoreFactory
@@ -28,11 +29,16 @@ class VerifyScanStoreFactoryTest {
 
     @AfterTest fun tearDown() = Dispatchers.resetMain()
 
-    private class FakeCameraPermissionRepository : CameraPermissionRepository {
+    private class FakePermissionController : PermissionController {
         val granted = MutableStateFlow(false)
         var requested = false
-        override fun observeGranted(): Flow<Boolean> = granted
-        override suspend fun requestPermission() { requested = true }
+        override fun observeGranted(permission: AppPermission): Flow<Boolean> = granted
+        override suspend fun requestPermission(permission: AppPermission): Boolean {
+            requested = true; return granted.value
+        }
+        override suspend fun requestPermissions(permissions: List<AppPermission>): Boolean {
+            requested = true; return granted.value
+        }
     }
 
     private class FakePeerVerificationRepository(
@@ -46,20 +52,20 @@ class VerifyScanStoreFactoryTest {
     }
 
     private fun factory(
-        camera: FakeCameraPermissionRepository = FakeCameraPermissionRepository(),
+        camera: FakePermissionController = FakePermissionController(),
         verify: FakePeerVerificationRepository = FakePeerVerificationRepository(),
     ) = VerifyScanStoreFactory(DefaultStoreFactory(), camera, verify)
 
     @Test
     fun camera_permission_loads_into_state() = runTest {
-        val camera = FakeCameraPermissionRepository().apply { granted.value = true }
+        val camera = FakePermissionController().apply { granted.value = true }
         val store = factory(camera = camera).create()
         assertTrue(store.state.cameraGranted)
     }
 
     @Test
     fun request_camera_permission_routes_to_repository() = runTest {
-        val camera = FakeCameraPermissionRepository()
+        val camera = FakePermissionController()
         val store = factory(camera = camera).create()
         store.accept(VerifyScanStore.Intent.RequestCameraPermission)
         assertTrue(camera.requested)

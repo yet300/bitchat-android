@@ -1,8 +1,9 @@
 package com.yet.bitmessage.feature.onboarding.store
 
 import com.app.domain.model.TransportKind
+import com.app.common.permission.AppPermission
+import com.app.common.permission.PermissionController
 import com.app.domain.repository.ConnectivityRepository
-import com.app.domain.repository.NotificationPermissionRepository
 import com.app.domain.repository.OnboardingRepository
 import com.app.domain.repository.SettingsRepository
 import com.app.domain.usecase.RequestBatteryExemptionOnceUseCase
@@ -19,7 +20,7 @@ internal class OnboardingStoreFactory(
     private val settingsRepository: SettingsRepository,
     private val onboardingRepository: OnboardingRepository,
     private val connectivityRepository: ConnectivityRepository,
-    private val notificationPermissionRepository: NotificationPermissionRepository,
+    private val permissionController: PermissionController,
     private val requestBatteryExemptionOnce: RequestBatteryExemptionOnceUseCase,
 ) {
     fun create(): OnboardingStore =
@@ -65,7 +66,7 @@ internal class OnboardingStoreFactory(
                             // Optional, one-time: keep the background mesh alive under OEM standby.
                             requestBatteryExemptionOnce()
                         }
-                        OnboardingStep.NOTIFICATIONS -> notificationPermissionRepository.requestPermission()
+                        OnboardingStep.NOTIFICATIONS -> permissionController.requestPermission(AppPermission.Notifications)
                         else -> Unit
                     }
                     advance()

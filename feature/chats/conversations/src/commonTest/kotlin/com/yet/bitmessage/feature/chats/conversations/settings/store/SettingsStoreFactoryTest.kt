@@ -14,7 +14,8 @@ import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.MeshSettingsRepository
 import com.app.domain.repository.MessageRepository
-import com.app.domain.repository.NotificationPermissionRepository
+import com.app.common.permission.AppPermission
+import com.app.common.permission.PermissionController
 import com.app.domain.repository.NotificationSettingsRepository
 import com.app.domain.repository.PowDifficultyLevel
 import com.app.domain.repository.PowRepository
@@ -135,11 +136,16 @@ class SettingsStoreFactoryTest {
         override suspend fun setGlobalMuteEnabled(enabled: Boolean) { globalMute.value = enabled }
     }
 
-    private class FakeNotificationPermissionRepository : NotificationPermissionRepository {
+    private class FakePermissionController : PermissionController {
         val granted = MutableStateFlow(false)
         var requested = false
-        override fun observeGranted(): Flow<Boolean> = granted
-        override suspend fun requestPermission() { requested = true }
+        override fun observeGranted(permission: AppPermission): Flow<Boolean> = granted
+        override suspend fun requestPermission(permission: AppPermission): Boolean {
+            requested = true; return granted.value
+        }
+        override suspend fun requestPermissions(permissions: List<AppPermission>): Boolean {
+            requested = true; return granted.value
+        }
     }
 
     private class FakeVerificationRepository(
@@ -162,7 +168,7 @@ class SettingsStoreFactoryTest {
         pow: FakePowRepository = FakePowRepository(),
         mesh: FakeMeshSettingsRepository = FakeMeshSettingsRepository(),
         notifSettings: FakeNotificationSettingsRepository = FakeNotificationSettingsRepository(),
-        notifPermission: FakeNotificationPermissionRepository = FakeNotificationPermissionRepository(),
+        notifPermission: FakePermissionController = FakePermissionController(),
         verification: FakeVerificationRepository = FakeVerificationRepository(),
     ) = SettingsStoreFactory(
         storeFactory = DefaultStoreFactory(),
@@ -173,7 +179,7 @@ class SettingsStoreFactoryTest {
         powRepository = pow,
         meshSettingsRepository = mesh,
         notificationSettingsRepository = notifSettings,
-        notificationPermissionRepository = notifPermission,
+        permissionController = notifPermission,
         verificationRepository = verification,
         panicWipe = PanicWipeUseCase(
             messages, contacts, identity,
@@ -252,7 +258,7 @@ class SettingsStoreFactoryTest {
 
     @Test
     fun notification_permission_status_loads() = runTest {
-        val notifPermission = FakeNotificationPermissionRepository().apply { granted.value = true }
+        val notifPermission = FakePermissionController().apply { granted.value = true }
         val store = factory(notifPermission = notifPermission).create()
 
         assertEquals(NotifPermissionStatus.GRANTED, store.state.notifPermission)
@@ -260,7 +266,7 @@ class SettingsStoreFactoryTest {
 
     @Test
     fun enable_notifications_requests_permission() = runTest {
-        val notifPermission = FakeNotificationPermissionRepository()
+        val notifPermission = FakePermissionController()
         val store = factory(notifPermission = notifPermission).create()
 
         store.accept(SettingsStore.Intent.EnableNotificationsClicked)

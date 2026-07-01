@@ -1,6 +1,7 @@
 package com.yet.bitmessage.feature.chats.details.verify.store
 
-import com.app.domain.repository.CameraPermissionRepository
+import com.app.common.permission.AppPermission
+import com.app.common.permission.PermissionController
 import com.app.domain.repository.PeerVerificationRepository
 import com.app.domain.repository.VerifyScanResult
 import com.arkivanov.mvikotlin.core.store.Reducer
@@ -12,7 +13,7 @@ import kotlinx.coroutines.launch
 
 internal class VerifyScanStoreFactory(
     private val storeFactory: StoreFactory,
-    private val cameraPermissionRepository: CameraPermissionRepository,
+    private val permissionController: PermissionController,
     private val peerVerificationRepository: PeerVerificationRepository,
 ) {
     fun create(): VerifyScanStore =
@@ -39,7 +40,7 @@ internal class VerifyScanStoreFactory(
         override fun executeAction(action: VerifyScanStore.Action) {
             when (action) {
                 VerifyScanStore.Action.Load -> scope.launch {
-                    cameraPermissionRepository.observeGranted()
+                    permissionController.observeGranted(AppPermission.Camera)
                         .collect { dispatch(VerifyScanStore.Msg.CameraGranted(it)) }
                 }
             }
@@ -48,7 +49,7 @@ internal class VerifyScanStoreFactory(
         override fun executeIntent(intent: VerifyScanStore.Intent) {
             when (intent) {
                 VerifyScanStore.Intent.RequestCameraPermission -> scope.launch {
-                    cameraPermissionRepository.requestPermission()
+                    permissionController.requestPermission(AppPermission.Camera)
                 }
                 is VerifyScanStore.Intent.QrScanned -> {
                     // Ignore repeat frames once a challenge has already started.

@@ -1,7 +1,7 @@
 package com.yet.bitmessage.feature.chats.details.verify
 
 import com.app.common.decompose.asValue
-import com.app.domain.repository.CameraPermissionRepository
+import com.app.common.permission.PermissionController
 import com.app.domain.repository.PeerVerificationRepository
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.value.Value
@@ -34,7 +34,7 @@ internal class DefaultVerifyScanComponent(
 @Inject
 internal class DefaultVerifyScanComponentFactory(
     private val storeFactory: StoreFactory,
-    private val cameraPermissionRepository: CameraPermissionRepository,
+    private val permissionController: PermissionController,
     private val peerVerificationRepository: PeerVerificationRepository,
 ) : VerifyScanComponent.Factory {
     override fun create(componentContext: ComponentContext, onClose: () -> Unit): VerifyScanComponent =
@@ -42,7 +42,7 @@ internal class DefaultVerifyScanComponentFactory(
             componentContext = componentContext,
             storeFactory = VerifyScanStoreFactory(
                 storeFactory = storeFactory,
-                cameraPermissionRepository = cameraPermissionRepository,
+                permissionController = permissionController,
                 peerVerificationRepository = peerVerificationRepository,
             ),
             onClose = onClose,
