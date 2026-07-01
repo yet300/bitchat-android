@@ -1,4 +1,4 @@
-package com.yet.bitmessage.android.geohash
+package com.app.data.geohash
 
 import android.content.Context
 import android.location.Geocoder

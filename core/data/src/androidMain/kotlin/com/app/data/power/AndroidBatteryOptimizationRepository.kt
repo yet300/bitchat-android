@@ -1,4 +1,4 @@
-package com.yet.bitmessage.android.power
+package com.app.data.power
 
 import android.annotation.SuppressLint
 import android.content.Context

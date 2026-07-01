@@ -1,4 +1,4 @@
-package com.yet.bitmessage.android.di
+package com.yet.bitmessage.di
 
 import android.app.Application
 import com.app.crypto.EncryptionService
