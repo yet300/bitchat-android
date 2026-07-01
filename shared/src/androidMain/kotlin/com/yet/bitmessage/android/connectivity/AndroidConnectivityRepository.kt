@@ -8,10 +8,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.ContextCompat
+import com.app.common.permission.AppPermission
+import com.app.common.permission.PermissionController
 import com.app.domain.model.TransportKind
 import com.app.domain.model.TransportState
 import com.app.domain.model.TransportStatus
@@ -36,7 +37,7 @@ import kotlinx.coroutines.delay
 class AndroidConnectivityRepository(
     private val context: Context,
     private val torPreferenceManager: TorPreferenceManager,
-    private val permissionRequester: RuntimePermissionRequester,
+    private val permissionController: PermissionController,
     private val meshLifecycle: MeshLifecycleController,
     private val nostrRelayManager: NostrRelayManager,
 ) : ConnectivityRepository {
@@ -106,21 +107,20 @@ class AndroidConnectivityRepository(
 
     override suspend fun enable(kind: TransportKind) {
         when (kind) {
+            // Grant maps to the SDK-appropriate BLE permissions (scan/connect + advertise, or legacy
+            // location) and handles the permanently-denied -> app-settings fallback itself.
             TransportKind.BLUETOOTH ->
-                if (!hasBluetoothRuntimePermission()) requestOrSettings(bluetoothPermissions())
-                else startSystemIntent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                if (!hasBluetoothRuntimePermission()) {
+                    permissionController.requestPermissions(
+                        listOf(AppPermission.Bluetooth, AppPermission.BluetoothAdvertise),
+                    )
+                } else {
+                    startSystemIntent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                }
 
             TransportKind.WIFI_AWARE ->
-                if (!hasWifiAwarePermission()) {
-                    val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        Manifest.permission.NEARBY_WIFI_DEVICES
-                    } else {
-                        Manifest.permission.ACCESS_FINE_LOCATION
-                    }
-                    requestOrSettings(listOf(permission))
-                } else {
-                    startSystemIntent(Settings.ACTION_WIFI_SETTINGS)
-                }
+                if (!hasWifiAwarePermission()) permissionController.requestPermission(AppPermission.NearbyWifi)
+                else startSystemIntent(Settings.ACTION_WIFI_SETTINGS)
 
             TransportKind.INTERNET -> startSystemIntent(Settings.ACTION_WIRELESS_SETTINGS)
 
@@ -130,21 +130,6 @@ class AndroidConnectivityRepository(
             }
         }
     }
-
-    /**
-     * Ask for the missing runtime [permissions] via the in-app system dialog; only fall back to the
-     * app-settings deep link when the dialog can't help (permanently denied, or no Activity attached).
-     * On grant the next [observe] poll reflects the new state — the radio itself (if off) is then a
-     * separate one-tap "Enable" step.
-     */
-    private suspend fun requestOrSettings(permissions: List<String>) {
-        when (permissionRequester.request(permissions)) {
-            PermissionOutcome.GRANTED, PermissionOutcome.DENIED -> Unit
-            PermissionOutcome.PERMANENTLY_DENIED, PermissionOutcome.NO_HOST -> openAppSettings()
-        }
-    }
-
-    private fun bluetoothPermissions(): List<String> = BluetoothPermissions.toRequest()
 
     private fun bluetoothAdapter(): BluetoothAdapter? =
         (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
@@ -167,16 +152,8 @@ class AndroidConnectivityRepository(
     private fun isGranted(permission: String): Boolean =
         ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
 
-    private fun openAppSettings() = startSystemIntent(
-        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-        Uri.fromParts("package", context.packageName, null),
-    )
-
-    private fun startSystemIntent(action: String, data: Uri? = null) {
-        val intent = Intent(action).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            if (data != null) this.data = data
-        }
+    private fun startSystemIntent(action: String) {
+        val intent = Intent(action).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
         runCatching { context.startActivity(intent) }
     }
 

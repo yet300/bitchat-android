@@ -33,7 +33,12 @@ class VerifyScanStoreFactoryTest {
         val granted = MutableStateFlow(false)
         var requested = false
         override fun observeGranted(permission: AppPermission): Flow<Boolean> = granted
-        override suspend fun requestPermission(permission: AppPermission) { requested = true }
+        override suspend fun requestPermission(permission: AppPermission): Boolean {
+            requested = true; return granted.value
+        }
+        override suspend fun requestPermissions(permissions: List<AppPermission>): Boolean {
+            requested = true; return granted.value
+        }
     }
 
     private class FakePeerVerificationRepository(

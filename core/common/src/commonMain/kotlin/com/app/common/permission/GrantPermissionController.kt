@@ -15,8 +15,9 @@ import kotlin.time.Duration.Companion.milliseconds
  * [PermissionController] over Grant (headless KMP permissions). Maps the app's [AppPermission] to
  * Grant's [AppGrant] and owns the system dialog / app-settings fallback, so callers stay free of any
  * platform permission types. Grant runs the system dialog from its own transparent Activity — no
- * Context or ActivityResult plumbing leaks up here. The [GrantManager] is built at the platform DI
- * edge (androidMain `GrantFactory.create`).
+ * Context or ActivityResult plumbing leaks up here — and resolves the SDK-version permission
+ * differences (BLE scan/connect vs legacy location, NEARBY_WIFI_DEVICES vs location, …) internally.
+ * The [GrantManager] is built at the platform DI edge (androidMain `GrantFactory.create`).
  *
  * `observeGranted` polls [GrantManager.checkStatus] while collected (the permission panels are
  * short-lived); a permanently-denied request routes the user to the app-settings screen.
@@ -35,15 +36,27 @@ class GrantPermissionController(
         }
     }
 
-    override suspend fun requestPermission(permission: AppPermission) {
+    override suspend fun requestPermission(permission: AppPermission): Boolean {
         val grantPermission = permission.toGrant()
-        if (grant.checkStatus(grantPermission) == GrantStatus.GRANTED) return
-        if (grant.request(grantPermission) == GrantStatus.DENIED_ALWAYS) grant.openSettings()
+        if (grant.checkStatus(grantPermission) == GrantStatus.GRANTED) return true
+        val status = grant.request(grantPermission)
+        if (status == GrantStatus.DENIED_ALWAYS) grant.openSettings()
+        return status == GrantStatus.GRANTED
+    }
+
+    override suspend fun requestPermissions(permissions: List<AppPermission>): Boolean {
+        val results = grant.request(permissions.map { it.toGrant() })
+        if (results.values.any { it == GrantStatus.DENIED_ALWAYS }) grant.openSettings()
+        return results.values.all { it == GrantStatus.GRANTED }
     }
 
     private fun AppPermission.toGrant(): AppGrant = when (this) {
         AppPermission.Camera -> AppGrant.CAMERA
+        AppPermission.Microphone -> AppGrant.MICROPHONE
         AppPermission.Notifications -> AppGrant.NOTIFICATION
+        AppPermission.Bluetooth -> AppGrant.BLUETOOTH
+        AppPermission.BluetoothAdvertise -> AppGrant.BLUETOOTH_ADVERTISE
+        AppPermission.NearbyWifi -> AppGrant.NEARBY_WIFI_DEVICES
     }
 
     private companion object {

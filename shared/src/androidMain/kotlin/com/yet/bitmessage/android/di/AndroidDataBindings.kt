@@ -46,8 +46,8 @@ import com.yet.bitmessage.android.app.AndroidAppForegroundState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.yet.bitmessage.android.geohash.AndroidPlaceGeocoder
+import com.app.common.permission.PermissionController
 import com.yet.bitmessage.android.connectivity.AndroidConnectivityRepository
-import com.yet.bitmessage.android.connectivity.RuntimePermissionRequester
 import com.yet.bitmessage.android.power.AndroidBatteryOptimizationRepository
 import com.yet.bitmessage.android.settings.PowRepositoryImpl
 import com.yet.bitmessage.android.settings.TorRepositoryImpl
@@ -251,11 +251,6 @@ abstract class AndroidDataBindings {
                 }
             }
 
-        /** Graph-owned holder the Activity attaches its ActivityResult permission launcher into. */
-        @Provides
-        @SingleIn(AppScope::class)
-        fun provideRuntimePermissionRequester(): RuntimePermissionRequester = RuntimePermissionRequester()
-
         @Provides
         fun providePlaceGeocoder(context: Context, dispatchers: AppDispatchers): PlaceGeocoder =
             AndroidPlaceGeocoder(context.applicationContext, dispatchers)
@@ -265,14 +260,14 @@ abstract class AndroidDataBindings {
         fun provideConnectivityRepository(
             context: Context,
             torPreferenceManager: TorPreferenceManager,
-            permissionRequester: RuntimePermissionRequester,
+            permissionController: PermissionController,
             meshLifecycle: MeshLifecycleController,
             nostrRelayManager: NostrRelayManager,
         ): ConnectivityRepository =
             AndroidConnectivityRepository(
                 context.applicationContext,
                 torPreferenceManager,
-                permissionRequester,
+                permissionController,
                 meshLifecycle,
                 nostrRelayManager,
             )

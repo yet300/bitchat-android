@@ -62,7 +62,8 @@ class OnboardingStoreFactoryTest {
     private class FakePermissionController : PermissionController {
         var requests = 0
         override fun observeGranted(permission: AppPermission): Flow<Boolean> = MutableStateFlow(false)
-        override suspend fun requestPermission(permission: AppPermission) { requests++ }
+        override suspend fun requestPermission(permission: AppPermission): Boolean { requests++; return false }
+        override suspend fun requestPermissions(permissions: List<AppPermission>): Boolean { requests++; return false }
     }
 
     private class FakeBatteryOptimizationRepository : BatteryOptimizationRepository {

@@ -35,7 +35,6 @@ import com.app.transport.nostr.PoWPreferenceManager
 import com.app.transport.nostr.RelayDirectory
 import com.app.data.nostr.NostrDirectMessageIngest
 import com.app.data.nostr.NostrMessageSender
-import com.yet.bitmessage.android.connectivity.RuntimePermissionRequester
 import com.yet.bitmessage.android.service.MeshServicePreferences
 import com.yet.bitmessage.di.AppGraph as SharedAppGraph
 
@@ -99,9 +98,6 @@ interface AppGraph : SharedAppGraph {
     // for the foreground service (invariant: the service owns the mesh lifecycle).
     val bluetoothMeshService: BluetoothMeshService
     val meshLifecycleController: MeshLifecycleController
-
-    /** Bridge the Phase C Activity attaches its runtime-permission launcher into. */
-    val runtimePermissionRequester: RuntimePermissionRequester
 
     /**
      * Graph-owned QR-verification coordinator. Exposed so the Phase C entry can resolve it eagerly,

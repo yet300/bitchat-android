@@ -7,13 +7,10 @@ import com.app.common.utils.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import com.app.domain.model.ConversationId
 import com.app.domain.model.PeerId
 import com.app.domain.usecase.ParseGeohashUseCase
 import com.arkivanov.decompose.defaultComponentContext
-import com.yet.bitmessage.android.connectivity.PermissionOutcome
-import com.yet.bitmessage.android.connectivity.RuntimePermissionRequester
 import com.yet.bitmessage.android.di.appGraph
 import com.yet.bitmessage.android.service.MeshForegroundService
 import com.yet.bitmessage.android.ui.NotificationManager
@@ -21,18 +18,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import com.yet.bitmessage.feature.root.RootComponent
 import com.yet.bitmessage.ui.App
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * The app's launcher entry: the Decompose + Compose Multiplatform UI from :shared, bound to the
  * single application graph ([com.yet.bitmessage.android.BitchatApplication.appGraph]).
  *
  * It also:
- * - bridges the data layer's connectivity repair to an in-app system permission dialog via a
- *   [RuntimePermissionRequester.Host] backed by an ActivityResult launcher;
  * - starts the mesh foreground service in a lifecycle-aware, best-effort way (deferred to onStart
  *   when the process can't yet promote to foreground — avoids ForegroundServiceStartNotAllowed on
  *   Android 12+; upstream parity #714). The service is the foreground owner of the mesh lifecycle.
@@ -40,32 +32,7 @@ import kotlinx.coroutines.withContext
 class BitMessageActivity : ComponentActivity() {
 
     private lateinit var rootComponent: RootComponent
-    private var pendingPermission: CompletableDeferred<Map<String, Boolean>>? = null
     private var pendingMeshForegroundServiceStart = false
-
-    // Must be registered before the Activity is STARTED, hence a field initializer.
-    private val permissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
-            pendingPermission?.complete(result)
-            pendingPermission = null
-        }
-
-    private val permissionHost = object : RuntimePermissionRequester.Host {
-        override suspend fun request(permissions: List<String>): PermissionOutcome =
-            withContext(Dispatchers.Main.immediate) {
-                if (permissions.isEmpty()) return@withContext PermissionOutcome.GRANTED
-                val deferred = CompletableDeferred<Map<String, Boolean>>()
-                pendingPermission = deferred
-                permissionLauncher.launch(permissions.toTypedArray())
-                val result = deferred.await()
-                when {
-                    result.values.all { it } -> PermissionOutcome.GRANTED
-                    // Rationale still allowed ⇒ the OS will show the dialog again on retry.
-                    permissions.any { shouldShowRequestPermissionRationale(it) } -> PermissionOutcome.DENIED
-                    else -> PermissionOutcome.PERMANENTLY_DENIED
-                }
-            }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -75,8 +42,6 @@ class BitMessageActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             setRecentsScreenshotEnabled(false)
         }
-
-        appGraph.runtimePermissionRequester.attach(permissionHost)
 
         // Force eager creation so the verify coordinator attaches as the BMS verify listener.
         appGraph.peerVerificationRepository
@@ -104,11 +69,6 @@ class BitMessageActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         if (pendingMeshForegroundServiceStart) startMeshForegroundServiceBestEffort()
-    }
-
-    override fun onDestroy() {
-        appGraph.runtimePermissionRequester.detach(permissionHost)
-        super.onDestroy()
     }
 
     /**
