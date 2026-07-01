@@ -3,6 +3,7 @@ package com.yet.bitmessage.android.verification
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.VerificationRepository
 import com.app.transport.VerificationService
+import dev.zacsweers.metro.Inject
 
 /**
  * Builds this device's verification payload via the graph-owned [VerificationService] (no crypto
@@ -10,6 +11,7 @@ import com.app.transport.VerificationService
  * of truth. QR encoding/rendering happens in the UI layer (qrose), so no platform QR dependency is
  * needed here.
  */
+@Inject
 class VerificationRepositoryImpl(
     private val verificationService: VerificationService,
     private val identityRepository: IdentityRepository,
