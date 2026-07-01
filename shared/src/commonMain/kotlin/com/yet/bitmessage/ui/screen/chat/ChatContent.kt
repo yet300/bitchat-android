@@ -132,7 +132,9 @@ fun ChatContent(component: ChatComponent, modifier: Modifier = Modifier) {
     val model by component.model.subscribeAsState()
     val sheet by component.sheetSlot.subscribeAsState()
     val launchAttachmentPicker = rememberAttachmentPicker(onPicked = component::onAttachmentPicked)
-    val audioRecorder = rememberAudioRecorderController()
+    val audioRecorder = rememberAudioRecorderController(
+        onRequestPermission = component::requestMicrophonePermission,
+    )
     // Geo media has no Nostr file path yet (AttachmentSender drops it), so hide attach there.
     val canAttach = model.conversationId !is ConversationId.Geohash
 

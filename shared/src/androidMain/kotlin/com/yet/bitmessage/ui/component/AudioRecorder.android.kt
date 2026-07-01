@@ -1,45 +1,38 @@
 package com.yet.bitmessage.ui.component
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
 import android.media.MediaRecorder
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.ContextCompat
 import com.app.common.utils.Log
+import kotlinx.coroutines.launch
 import java.io.File
 
 @Composable
-actual fun rememberAudioRecorderController(): AudioRecorderController {
+actual fun rememberAudioRecorderController(
+    onRequestPermission: suspend () -> Boolean,
+): AudioRecorderController {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val requestPermission = rememberUpdatedState(onRequestPermission)
     val impl = remember { AndroidAudioRecorderController(context.applicationContext) }
-
-    val permLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) impl.startInternal()
-    }
 
     DisposableEffect(impl) { onDispose { impl.release() } }
 
-    return remember(impl, permLauncher) {
+    return remember(impl, scope) {
         object : AudioRecorderController {
             override val isRecording: State<Boolean> = impl.isRecording
 
+            // The mic permission is owned by the feature component (DI); we only record once granted.
             override fun start() {
-                if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
-                    == PackageManager.PERMISSION_GRANTED
-                ) {
-                    impl.startInternal()
-                } else {
-                    permLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                scope.launch {
+                    if (requestPermission.value()) impl.startInternal()
                 }
             }
 

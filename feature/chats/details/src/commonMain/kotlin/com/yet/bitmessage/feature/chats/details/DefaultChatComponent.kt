@@ -1,5 +1,7 @@
 package com.yet.bitmessage.feature.chats.details
 
+import com.app.common.permission.AppPermission
+import com.app.common.permission.PermissionController
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationRepository
@@ -40,6 +42,7 @@ internal class DefaultChatComponent(
     storeFactory: ChatStoreFactory,
     private val verifyScanFactory: VerifyScanComponent.Factory,
     private val locationNotesFactory: LocationNotesComponent.Factory,
+    private val permissionController: PermissionController,
     private val onFinished: () -> Unit,
     private val onOpenConversation: (ConversationId) -> Unit,
 ) : ChatComponent, ComponentContext by componentContext {
@@ -86,6 +89,9 @@ internal class DefaultChatComponent(
 
     override fun onAttachmentPicked(attachment: Attachment) =
         store.accept(ChatStore.Intent.SendAttachment(attachment))
+
+    override suspend fun requestMicrophonePermission(): Boolean =
+        permissionController.requestPermission(AppPermission.Microphone)
 
     override fun onCancelTransfer(messageId: String) =
         store.accept(ChatStore.Intent.CancelTransfer(messageId))
@@ -147,6 +153,7 @@ internal class DefaultChatComponentFactory(
     private val noiseSession: NoiseSessionPort,
     private val verifyScanFactory: VerifyScanComponent.Factory,
     private val locationNotesFactory: LocationNotesComponent.Factory,
+    private val permissionController: PermissionController,
 ) : ChatComponent.Factory {
     override fun create(
         componentContext: ComponentContext,
@@ -174,6 +181,7 @@ internal class DefaultChatComponentFactory(
         ),
         verifyScanFactory = verifyScanFactory,
         locationNotesFactory = locationNotesFactory,
+        permissionController = permissionController,
         onFinished = onFinished,
         onOpenConversation = onOpenConversation,
     )

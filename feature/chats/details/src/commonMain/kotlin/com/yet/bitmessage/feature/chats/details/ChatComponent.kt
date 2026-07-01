@@ -29,6 +29,13 @@ interface ChatComponent {
     /** Send a picked media attachment (image / audio / file) into this conversation. */
     fun onAttachmentPicked(attachment: Attachment)
 
+    /**
+     * Request the microphone runtime permission (over the app's `PermissionController`) before a voice
+     * recording starts; returns whether it is granted. The recorder UI calls this and records only on
+     * success — the permission logic stays in the DI layer, not the Compose actual.
+     */
+    suspend fun requestMicrophonePermission(): Boolean
+
     /** Cancel an in-flight outgoing attachment transfer and drop its message. */
     fun onCancelTransfer(messageId: String)
 
