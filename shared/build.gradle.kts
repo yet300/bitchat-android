@@ -77,6 +77,12 @@ kotlin {
             implementation(libs.qrose)
             implementation(libs.maplibre.compose)
 
+            // FileKit — multiplatform file picker (replaces the androidMain AttachmentPicker actual).
+            implementation(libs.filekit.core)
+            implementation(libs.filekit.dialogs.compose)
+
+            implementation(libs.kotlinx.io.core)
+
             implementation(libs.bundles.decompose)
             implementation(libs.decompose.compose)
             implementation(libs.decompose.compose.experimental)
