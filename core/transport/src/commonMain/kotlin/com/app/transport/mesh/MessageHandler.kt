@@ -461,8 +461,9 @@ internal class MessageHandler(
      */
     private suspend fun handlePrivateMessage(packet: BitchatPacket, peerID: String) {
         try {
-            // Verify signature if present
-            if (packet.signature != null && !delegate?.verifySignature(packet, peerID)!!) {
+            // Verify signature if present. A null delegate must not NPE here; treat an
+            // unverifiable signature as invalid and drop.
+            if (packet.signature != null && delegate?.verifySignature(packet, peerID) != true) {
                 Log.w(TAG, "Invalid signature for private message from $peerID")
                 return
             }

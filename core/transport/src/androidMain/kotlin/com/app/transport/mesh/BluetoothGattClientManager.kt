@@ -526,8 +526,9 @@ internal class BluetoothGattClientManager(
                     Log.d(TAG, "Client: Parsed packet type ${packet.type} from $peerID")
                     delegate?.onPacketReceived(packet, peerID, gatt.device)
                 } else {
+                    // Do not dump raw frame bytes: a malformed frame can still carry another peer's
+                    // ciphertext / routing metadata (traffic-analysis leak). Log the length only.
                     Log.w(TAG, "Client: Failed to parse packet from ${gatt.device.address}, size: ${value.size} bytes")
-                    Log.w(TAG, "Client: Packet data: ${value.joinToString(" ") { "%02x".format(it) }}")
                 }
             }
             
