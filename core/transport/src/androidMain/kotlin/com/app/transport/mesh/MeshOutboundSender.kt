@@ -1,0 +1,547 @@
+package com.app.transport.mesh
+
+import com.app.common.utils.Log
+import com.app.crypto.EncryptionService
+import com.app.transport.GeohashReadReceiptRouter
+import com.app.transport.MeshConstants
+import com.app.transport.NicknameSource
+import com.app.transport.SeenMessageStore
+import com.app.transport.VerificationService
+import com.app.transport.meshgraph.MeshGraphService
+import com.app.transport.meshgraph.RoutePlanner
+import com.app.transport.model.BitchatFilePacket
+import com.app.transport.model.IdentityAnnouncement
+import com.app.transport.model.NoisePayload
+import com.app.transport.model.NoisePayloadType
+import com.app.transport.model.PrivateMessagePacket
+import com.app.transport.model.RoutedPacket
+import com.app.transport.protocol.BitchatPacket
+import com.app.transport.protocol.MessageType
+import com.app.transport.protocol.SpecialRecipients
+import com.app.transport.sync.GossipSyncManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+
+/**
+ * Outbound send path of the mesh engine: builds, signs and broadcasts every packet the
+ * local node originates (public/private messages, files, receipts, verify TLVs, announces,
+ * leave). Extracted from [BluetoothMeshService]; one instance per component generation —
+ * rebuilt together with PeerManager/GossipSyncManager on reset/revival.
+ */
+internal class MeshOutboundSender(
+    private val myPeerID: String,
+    private val encryptionService: EncryptionService,
+    private val meshNetwork: MeshNetwork,
+    private val meshGraphService: MeshGraphService,
+    private val peerManager: PeerManager,
+    private val gossipSyncManager: GossipSyncManager,
+    private val nicknameSource: NicknameSource,
+    private val seenMessageStore: SeenMessageStore,
+    private val geohashReadReceiptRouter: GeohashReadReceiptRouter,
+    private val verificationService: VerificationService,
+    private val scope: CoroutineScope,
+    private val initiateHandshake: (String) -> Unit,
+) {
+
+    companion object {
+        private const val TAG = "MeshOutboundSender"
+        private val MAX_TTL: UByte = MeshConstants.MESSAGE_TTL_HOPS
+    }
+
+    /**
+     * Send public message
+     */
+    fun sendMessage(content: String, mentions: List<String>, channel: String?) {
+        if (content.isEmpty()) return
+
+        scope.launch {
+            val packet = BitchatPacket(
+                version = 1u,
+                type = MessageType.MESSAGE.value,
+                senderID = hexStringToByteArray(myPeerID),
+                recipientID = SpecialRecipients.BROADCAST,
+                timestamp = System.currentTimeMillis().toULong(),
+                payload = content.toByteArray(Charsets.UTF_8),
+                signature = null,
+                ttl = MAX_TTL
+            )
+
+            // Sign the packet before broadcasting
+            val signedPacket = signPacketBeforeBroadcast(packet)
+            meshNetwork.broadcast(RoutedPacket(signedPacket))
+            // Track our own broadcast message for sync
+            try { gossipSyncManager.onPublicPacketSeen(signedPacket) } catch (_: Exception) { }
+        }
+    }
+
+    /**
+     * Send a file over mesh as a broadcast MESSAGE (public mesh timeline/channels).
+     */
+    fun sendFileBroadcast(file: BitchatFilePacket) {
+        try {
+            Log.d(TAG, "📤 sendFileBroadcast: name=${file.fileName}, size=${file.fileSize}")
+            val payload = file.encode()
+            if (payload == null) {
+                Log.e(TAG, "❌ Failed to encode file packet in sendFileBroadcast")
+                return
+            }
+            Log.d(TAG, "📦 Encoded payload: ${payload.size} bytes")
+            scope.launch {
+                val packet = BitchatPacket(
+                    version = 2u,  // FILE_TRANSFER uses v2 for 4-byte payload length to support large files
+                    type = MessageType.FILE_TRANSFER.value,
+                    senderID = hexStringToByteArray(myPeerID),
+                    recipientID = SpecialRecipients.BROADCAST,
+                    timestamp = System.currentTimeMillis().toULong(),
+                    payload = payload,
+                    signature = null,
+                    ttl = MAX_TTL
+                )
+                val signed = signPacketBeforeBroadcast(packet)
+                // Use a stable transferId based on the file TLV payload for progress tracking
+                val transferId = sha256Hex(payload)
+                meshNetwork.broadcast(RoutedPacket(signed, transferId = transferId))
+                try { gossipSyncManager.onPublicPacketSeen(signed) } catch (_: Exception) { }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ sendFileBroadcast failed: ${e.message}", e)
+            Log.e(TAG, "❌ File: name=${file.fileName}, size=${file.fileSize}")
+        }
+    }
+
+    /**
+     * Send a file as an encrypted private message using Noise protocol
+     */
+    fun sendFilePrivate(recipientPeerID: String, file: BitchatFilePacket) {
+        try {
+            Log.d(TAG, "📤 sendFilePrivate (ENCRYPTED): to=$recipientPeerID, name=${file.fileName}, size=${file.fileSize}")
+
+            scope.launch {
+                // Check if we have an established Noise session
+                if (encryptionService.hasEstablishedSession(recipientPeerID)) {
+                    try {
+                        // Encode the file packet as TLV
+                        val filePayload = file.encode()
+                        if (filePayload == null) {
+                            Log.e(TAG, "❌ Failed to encode file packet for private send")
+                            return@launch
+                        }
+                        Log.d(TAG, "📦 Encoded file TLV: ${filePayload.size} bytes")
+
+                        // Create NoisePayload wrapper (type byte + file TLV data) - same as iOS
+                        val noisePayload = NoisePayload(
+                            type = NoisePayloadType.FILE_TRANSFER,
+                            data = filePayload
+                        )
+
+                        // Encrypt the payload using Noise
+                        val encrypted = encryptionService.encrypt(noisePayload.encode(), recipientPeerID)
+                        if (encrypted == null) {
+                            Log.e(TAG, "❌ Failed to encrypt file for $recipientPeerID")
+                            return@launch
+                        }
+                        Log.d(TAG, "🔐 Encrypted file payload: ${encrypted.size} bytes")
+
+                        // Create NOISE_ENCRYPTED packet (not FILE_TRANSFER!)
+                        val packet = BitchatPacket(
+                            version = 1u,
+                            type = MessageType.NOISE_ENCRYPTED.value,
+                            senderID = hexStringToByteArray(myPeerID),
+                            recipientID = hexStringToByteArray(recipientPeerID),
+                            timestamp = System.currentTimeMillis().toULong(),
+                            payload = encrypted,
+                            signature = null,
+                            ttl = MeshConstants.MESSAGE_TTL_HOPS
+                        )
+
+                        // Sign and send the encrypted packet
+                        val signed = signPacketBeforeBroadcast(packet)
+                        // Use a stable transferId based on the unencrypted file TLV payload for progress tracking
+                        val transferId = sha256Hex(filePayload)
+                        meshNetwork.broadcast(RoutedPacket(signed, transferId = transferId))
+                        Log.d(TAG, "✅ Sent encrypted file to $recipientPeerID")
+
+                    } catch (e: Exception) {
+                        Log.e(TAG, "❌ Failed to encrypt file for $recipientPeerID: ${e.message}", e)
+                    }
+                } else {
+                    // No session - initiate handshake but don't queue file
+                    Log.w(TAG, "⚠️ No Noise session with $recipientPeerID for file transfer, initiating handshake")
+                    initiateHandshake(recipientPeerID)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ sendFilePrivate failed: ${e.message}", e)
+            Log.e(TAG, "❌ File: to=$recipientPeerID, name=${file.fileName}, size=${file.fileSize}")
+        }
+    }
+
+    /**
+     * Send private message - SIMPLIFIED iOS-compatible version
+     * Uses NoisePayloadType system exactly like iOS SimplifiedBluetoothService
+     */
+    fun sendPrivateMessage(content: String, recipientPeerID: String, recipientNickname: String, messageID: String?) {
+        if (content.isEmpty() || recipientPeerID.isEmpty()) return
+        if (recipientNickname.isEmpty()) return
+
+        scope.launch {
+            val finalMessageID = messageID ?: java.util.UUID.randomUUID().toString()
+
+            Log.d(TAG, "📨 Sending PM to $recipientPeerID: ${content.take(30)}...")
+
+            // Check if we have an established Noise session
+            if (encryptionService.hasEstablishedSession(recipientPeerID)) {
+                try {
+                    // Create TLV-encoded private message exactly like iOS
+                    val privateMessage = PrivateMessagePacket(
+                        messageID = finalMessageID,
+                        content = content
+                    )
+
+                    val tlvData = privateMessage.encode()
+                    if (tlvData == null) {
+                        Log.e(TAG, "Failed to encode private message with TLV")
+                        return@launch
+                    }
+
+                    // Create message payload with NoisePayloadType prefix: [type byte] + [TLV data]
+                    val messagePayload = NoisePayload(
+                        type = NoisePayloadType.PRIVATE_MESSAGE,
+                        data = tlvData
+                    )
+
+                    // Encrypt the payload
+                    val encrypted = encryptionService.encrypt(messagePayload.encode(), recipientPeerID)
+
+                    // Create NOISE_ENCRYPTED packet exactly like iOS
+                    val packet = BitchatPacket(
+                        version = 1u,
+                        type = MessageType.NOISE_ENCRYPTED.value,
+                        senderID = hexStringToByteArray(myPeerID),
+                        recipientID = hexStringToByteArray(recipientPeerID),
+                        timestamp = System.currentTimeMillis().toULong(),
+                        payload = encrypted,
+                        signature = null,
+                        ttl = MAX_TTL
+                    )
+
+                    // Sign the packet before broadcasting
+                    val signedPacket = signPacketBeforeBroadcast(packet)
+                    meshNetwork.broadcast(RoutedPacket(signedPacket))
+                    Log.d(TAG, "📤 Sent encrypted private message to $recipientPeerID (${encrypted.size} bytes)")
+
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to encrypt private message for $recipientPeerID: ${e.message}")
+                }
+            } else {
+                // Fire and forget - initiate handshake but don't queue exactly like iOS
+                Log.d(TAG, "🤝 No session with $recipientPeerID, initiating handshake")
+                initiateHandshake(recipientPeerID)
+            }
+        }
+    }
+
+    /**
+     * Send read receipt for a received private message - NoisePayloadType implementation
+     * Uses same encryption approach as iOS SimplifiedBluetoothService
+     */
+    fun sendReadReceipt(messageID: String, recipientPeerID: String, readerNickname: String) {
+        scope.launch {
+            Log.d(TAG, "📖 Sending read receipt for message $messageID to $recipientPeerID")
+
+            // Route geohash read receipts via the relay (resolved + routed in the app layer)
+            if (geohashReadReceiptRouter.routeIfGeohashAlias(messageID, recipientPeerID)) {
+                return@launch
+            }
+
+            try {
+                // Avoid duplicate read receipts: check persistent store first
+                if (seenMessageStore.hasRead(messageID)) {
+                    Log.d(TAG, "Skipping read receipt for $messageID - already marked read")
+                    return@launch
+                }
+
+                // Create read receipt payload using NoisePayloadType exactly like iOS
+                val readReceiptPayload = NoisePayload(
+                    type = NoisePayloadType.READ_RECEIPT,
+                    data = messageID.toByteArray(Charsets.UTF_8)
+                )
+
+                // Encrypt the payload
+                val encrypted = encryptionService.encrypt(readReceiptPayload.encode(), recipientPeerID)
+
+                // Create NOISE_ENCRYPTED packet exactly like iOS
+                val packet = BitchatPacket(
+                    version = 1u,
+                    type = MessageType.NOISE_ENCRYPTED.value,
+                    senderID = hexStringToByteArray(myPeerID),
+                    recipientID = hexStringToByteArray(recipientPeerID),
+                    timestamp = System.currentTimeMillis().toULong(),
+                    payload = encrypted,
+                    signature = null,
+                    ttl = MeshConstants.MESSAGE_TTL_HOPS // Same TTL as iOS messageTTL
+                )
+
+                // Sign the packet before broadcasting
+                val signedPacket = signPacketBeforeBroadcast(packet)
+                meshNetwork.broadcast(RoutedPacket(signedPacket))
+                Log.d(TAG, "📤 Sent read receipt to $recipientPeerID for message $messageID")
+
+                // Persist as read after successful send
+                seenMessageStore.markRead(messageID)
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send read receipt to $recipientPeerID: ${e.message}")
+            }
+        }
+    }
+
+    // MARK: QR Verification over Noise
+
+    fun sendVerifyChallenge(peerID: String, noiseKeyHex: String, nonceA: ByteArray) {
+        val tlv = verificationService.buildVerifyChallenge(noiseKeyHex, nonceA)
+        val payload = NoisePayload(
+            type = NoisePayloadType.VERIFY_CHALLENGE,
+            data = tlv
+        )
+        sendNoisePayloadToPeer(payload, peerID, "verify challenge")
+    }
+
+    fun sendVerifyResponse(peerID: String, noiseKeyHex: String, nonceA: ByteArray) {
+        val tlv = verificationService.buildVerifyResponse(noiseKeyHex, nonceA) ?: return
+        val payload = NoisePayload(
+            type = NoisePayloadType.VERIFY_RESPONSE,
+            data = tlv
+        )
+        sendNoisePayloadToPeer(payload, peerID, "verify response")
+    }
+
+    private fun sendNoisePayloadToPeer(payload: NoisePayload, recipientPeerID: String, label: String) {
+        scope.launch {
+            try {
+                val encrypted = encryptionService.encrypt(payload.encode(), recipientPeerID)
+                val packet = BitchatPacket(
+                    version = 1u,
+                    type = MessageType.NOISE_ENCRYPTED.value,
+                    senderID = hexStringToByteArray(myPeerID),
+                    recipientID = hexStringToByteArray(recipientPeerID),
+                    timestamp = System.currentTimeMillis().toULong(),
+                    payload = encrypted,
+                    signature = null,
+                    ttl = MeshConstants.MESSAGE_TTL_HOPS
+                )
+
+                val signedPacket = signPacketBeforeBroadcast(packet)
+                meshNetwork.broadcast(RoutedPacket(signedPacket))
+                Log.d(TAG, "📤 Sent $label to $recipientPeerID (${payload.data.size} bytes)")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send $label to $recipientPeerID: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Send broadcast announce with TLV-encoded identity announcement - exactly like iOS
+     */
+    fun sendBroadcastAnnounce() {
+        Log.d(TAG, "Sending broadcast announce")
+        scope.launch {
+            val tlvPayload = buildAnnouncePayload() ?: return@launch
+
+            val announcePacket = BitchatPacket(
+                type = MessageType.ANNOUNCE.value,
+                ttl = MAX_TTL,
+                senderID = myPeerID,
+                payload = tlvPayload
+            )
+
+            // Sign the packet using our signing key (exactly like iOS)
+            val signedPacket = encryptionService.signData(announcePacket.toBinaryDataForSigning()!!)?.let { signature ->
+                announcePacket.copy(signature = signature)
+            } ?: announcePacket
+
+            meshNetwork.broadcast(RoutedPacket(signedPacket))
+            Log.d(TAG, "Sent iOS-compatible signed TLV announce (${tlvPayload.size} bytes)")
+            // Track announce for sync
+            try { gossipSyncManager.onPublicPacketSeen(signedPacket) } catch (_: Exception) { }
+        }
+    }
+
+    /**
+     * Send announcement to specific peer with TLV-encoded identity announcement - exactly like iOS
+     */
+    fun sendAnnouncementToPeer(peerID: String) {
+        if (peerManager.hasAnnouncedToPeer(peerID)) return
+
+        val tlvPayload = buildAnnouncePayload() ?: return
+
+        val packet = BitchatPacket(
+            type = MessageType.ANNOUNCE.value,
+            ttl = MAX_TTL,
+            senderID = myPeerID,
+            payload = tlvPayload
+        )
+
+        // Sign the packet using our signing key (exactly like iOS)
+        val signedPacket = encryptionService.signData(packet.toBinaryDataForSigning()!!)?.let { signature ->
+            packet.copy(signature = signature)
+        } ?: packet
+
+        meshNetwork.broadcast(RoutedPacket(signedPacket))
+        peerManager.markPeerAsAnnouncedTo(peerID)
+        Log.d(TAG, "Sent iOS-compatible signed TLV peer announce to $peerID (${tlvPayload.size} bytes)")
+
+        // Track announce for sync
+        try { gossipSyncManager.onPublicPacketSeen(signedPacket) } catch (_: Exception) { }
+    }
+
+    /**
+     * Builds the announce TLV payload: identity announcement plus a gossip TLV of up to 10
+     * direct neighbors. Also refreshes our own node in the mesh graph. Returns null when no
+     * identity keys are available (nothing to announce).
+     */
+    private fun buildAnnouncePayload(): ByteArray? {
+        val nickname = try { nicknameSource.nickname(myPeerID) } catch (_: Exception) { myPeerID }
+
+        // Get the static public key for the announcement
+        val staticKey = encryptionService.getStaticPublicKey()
+        if (staticKey == null) {
+            Log.e(TAG, "No static public key available for announcement")
+            return null
+        }
+
+        // Get the signing public key for the announcement
+        val signingKey = encryptionService.getSigningPublicKey()
+        if (signingKey == null) {
+            Log.e(TAG, "No signing public key available for announcement")
+            return null
+        }
+
+        // Create iOS-compatible IdentityAnnouncement with TLV encoding
+        val announcement = IdentityAnnouncement(nickname, staticKey, signingKey)
+        val encoded = announcement.encode()
+        if (encoded == null) {
+            Log.e(TAG, "Failed to encode announcement as TLV")
+            return null
+        }
+        var tlvPayload: ByteArray = encoded
+
+        // Append gossip TLV containing up to 10 direct neighbors (compact IDs)
+        try {
+            val directPeers = getDirectPeerIDsForGossip()
+            if (directPeers.isNotEmpty()) {
+                val gossip = com.app.transport.meshgraph.GossipTLV.encodeNeighbors(directPeers)
+                tlvPayload = tlvPayload + gossip
+            }
+            // Always update our own node in the mesh graph with the neighbor list we used
+            try {
+                meshGraphService
+                    .updateFromAnnouncement(myPeerID, nickname, directPeers, System.currentTimeMillis().toULong())
+            } catch (_: Exception) { }
+        } catch (_: Exception) { }
+
+        return tlvPayload
+    }
+
+    /**
+     * Collect up to 10 direct neighbors for gossip TLV.
+     */
+    private fun getDirectPeerIDsForGossip(): List<String> {
+        return try {
+            // Prefer verified peers that are currently marked as direct
+            val verified = peerManager.getVerifiedPeers()
+            val direct = verified.filter { it.value.isDirectConnection }.keys.toList()
+            direct.take(10)
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    /**
+     * Send leave announcement
+     */
+    fun sendLeaveAnnouncement() {
+        val packet = BitchatPacket(
+            type = MessageType.LEAVE.value,
+            ttl = MAX_TTL,
+            senderID = myPeerID,
+            payload = byteArrayOf()
+        )
+
+        // Sign the packet before broadcasting
+        val signedPacket = signPacketBeforeBroadcast(packet)
+        meshNetwork.broadcast(RoutedPacket(signedPacket))
+    }
+
+    /**
+     * Sign packet before broadcasting using our signing private key
+     */
+    fun signPacketBeforeBroadcast(packet: BitchatPacket): BitchatPacket {
+        return try {
+            // Optionally compute and attach a source route for addressed packets
+            val withRoute = try {
+                val rec = packet.recipientID
+                if (rec != null && !rec.contentEquals(SpecialRecipients.BROADCAST)) {
+                    val dest = rec.joinToString("") { b -> "%02x".format(b) }
+                    val path = RoutePlanner.shortestPath(myPeerID, dest, meshGraphService)
+                    if (path != null && path.size >= 3) {
+                        // Exclude first (sender) and last (recipient); only intermediates
+                        val intermediates = path.subList(1, path.size - 1)
+                        val hopsBytes = intermediates.map { hexStringToByteArray(it) }
+                        Log.d(TAG, "✅ Signed packet type ${packet.type} (route ${hopsBytes.size} hops: $intermediates)")
+                        // Attach route and upgrade to v2 (required for HAS_ROUTE flag)
+                        packet.copy(route = hopsBytes, version = 2u)
+                    } else packet.copy(route = null)
+                } else packet
+            } catch (_: Exception) { packet }
+
+            // Get the canonical packet data for signing (without signature)
+            val packetDataForSigning = withRoute.toBinaryDataForSigning()
+            if (packetDataForSigning == null) {
+                Log.w(TAG, "Failed to encode packet type ${packet.type} for signing, sending unsigned")
+                return withRoute
+            }
+
+            // Sign the packet data using our signing key
+            val signature = encryptionService.signData(packetDataForSigning)
+            if (signature != null) {
+                Log.d(TAG, "✅ Signed packet type ${packet.type} (signature ${signature.size} bytes)")
+                withRoute.copy(signature = signature)
+            } else {
+                Log.w(TAG, "Failed to sign packet type ${packet.type}, sending unsigned")
+                withRoute
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error signing packet type ${packet.type}: ${e.message}, sending unsigned")
+            packet
+        }
+    }
+
+    /**
+     * Convert hex string peer ID to binary data (8 bytes) - exactly same as iOS
+     */
+    fun hexStringToByteArray(hexString: String): ByteArray {
+        val result = ByteArray(8) { 0 } // Initialize with zeros, exactly 8 bytes
+        var tempID = hexString
+        var index = 0
+
+        while (tempID.length >= 2 && index < 8) {
+            val hexByte = tempID.substring(0, 2)
+            val byte = hexByte.toIntOrNull(16)?.toByte()
+            if (byte != null) {
+                result[index] = byte
+            }
+            tempID = tempID.substring(2)
+            index++
+        }
+
+        return result
+    }
+
+    // Local helper to hash payloads to a stable hex ID for progress mapping
+    private fun sha256Hex(bytes: ByteArray): String = try {
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        md.update(bytes)
+        md.digest().joinToString("") { "%02x".format(it) }
+    } catch (_: Exception) { bytes.size.toString(16) }
+}

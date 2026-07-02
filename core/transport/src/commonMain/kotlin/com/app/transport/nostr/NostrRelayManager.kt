@@ -26,7 +26,6 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.coroutines.*
 import kotlin.math.min
 import kotlin.math.pow
-import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -94,33 +93,15 @@ class NostrRelayManager internal constructor(
     // Internal state
     private val relaysList = mutableListOf<Relay>()
     private val connections = ConcurrentMutableMap<String, DefaultClientWebSocketSession>()
-    private val subscriptions = ConcurrentMutableMap<String, Set<String>>() // relay URL -> subscription IDs
-    private val messageHandlers = ConcurrentMutableMap<String, (NostrEvent) -> Unit>()
-    
-    // Persistent subscription tracking for robust reconnection
-    private val activeSubscriptions = ConcurrentMutableMap<String, SubscriptionInfo>() // subscription ID -> info
-    
-    /**
-     * Information about an active subscription that needs to be maintained across reconnections
-     */
-    data class SubscriptionInfo(
-        val id: String,
-        val filter: NostrFilter,
-        val handler: (NostrEvent) -> Unit,
-        val targetRelayUrls: Set<String>? = null, // null means all relays
-        val createdAt: Long = Clock.System.now().toEpochMilliseconds(),
-        val originGeohash: String? = null // used for logging and grouping
-    )
-    
+
     // Events waiting for disconnected relays; drained per relay on reconnect.
     private val pendingEvents = PendingEventQueue<NostrEvent>()
     
     // Coroutine scope for background operations
     private val scope = CoroutineScope(dispatchers.io + SupervisorJob())
-    
-    // Subscription validation timer
-    private var subscriptionValidationJob: Job? = null
-    private val SUBSCRIPTION_VALIDATION_INTERVAL = NostrConstants.SUBSCRIPTION_VALIDATION_INTERVAL_MS // 30 seconds
+
+    // Subscription bookkeeping/restoration/validation (shares the live connections map)
+    private val registry = NostrSubscriptionRegistry(scope, connections)
     
     // ktor client for WebSocket connections (via provider to honor Tor)
     private val httpClient: HttpClient
@@ -172,7 +153,7 @@ class NostrRelayManager internal constructor(
         geohash: String,
         filter: NostrFilter,
         relayDirectory: GeohashRelaySource,
-        id: String = generateSubscriptionId(),
+        id: String = registry.generateSubscriptionId(),
         handler: (NostrEvent) -> Unit,
         includeDefaults: Boolean = false,
         nRelays: Int = 5
@@ -187,9 +168,7 @@ class NostrRelayManager internal constructor(
             targetRelayUrls = relayUrls
         ).also {
             // update origin geohash for this subscription
-            activeSubscriptions[it]?.let { sub ->
-                activeSubscriptions[it] = sub.copy(originGeohash = geohash)
-            }
+            registry.setOriginGeohash(it, geohash)
         }
     }
 
@@ -272,7 +251,7 @@ class NostrRelayManager internal constructor(
         }
         
         // Start periodic subscription validation
-        startSubscriptionValidation()
+        registry.startValidation()
     }
     
     /**
@@ -282,16 +261,16 @@ class NostrRelayManager internal constructor(
         Log.d(TAG, "Disconnecting from all relays")
         
         // Stop subscription validation
-        stopSubscriptionValidation()
+        registry.stopValidation()
         
         connections.values.forEach { session ->
             closeSession(session, "Manual disconnect")
         }
         connections.clear()
         
-        // Clear subscriptions
-        subscriptions.clear()
-        
+        // Clear per-relay subscription tracking (active subscriptions survive for restore)
+        registry.clearRelayTracking()
+
         updateConnectionStatus()
     }
     
@@ -323,103 +302,15 @@ class NostrRelayManager internal constructor(
      */
     fun subscribe(
         filter: NostrFilter,
-        id: String = generateSubscriptionId(),
+        id: String = registry.generateSubscriptionId(),
         handler: (NostrEvent) -> Unit,
         targetRelayUrls: List<String>? = null
-    ): String {
-        // Store subscription info for persistent tracking
-        val subscriptionInfo = SubscriptionInfo(
-            id = id,
-            filter = filter,
-            handler = handler,
-            targetRelayUrls = targetRelayUrls?.toSet()
-        )
-        
-        activeSubscriptions[id] = subscriptionInfo
-        messageHandlers[id] = handler
-        
-        Log.d(TAG, "📡 Subscribing to Nostr filter id=$id ${filter.getDebugDescription()}")
-        
-        // Send subscription to appropriate relays
-        sendSubscriptionToRelays(subscriptionInfo)
-        
-        return id
-    }
-    
-    /**
-     * Send a subscription to the appropriate relays
-     */
-    private fun sendSubscriptionToRelays(subscriptionInfo: SubscriptionInfo) {
-        val request = NostrRequest.Subscribe(subscriptionInfo.id, listOf(subscriptionInfo.filter))
-        val message = NostrRequest.toJson(request)
-        
-        // DEBUG: Log the actual serialized message format
-        Log.v(TAG, "🔍 DEBUG: Serialized subscription message: $message")
-        
-        scope.launch {
-            val targetRelays = subscriptionInfo.targetRelayUrls?.toList() ?: connections.keys.toList()
-            
-            targetRelays.forEach { relayUrl ->
-                val webSocket = connections[relayUrl]
-                if (webSocket != null) {
-                    try {
-                        val success = webSocket.trySendText(message)
-                        if (success) {
-                            // Track subscription for this relay
-                            val currentSubs = subscriptions[relayUrl] ?: emptySet()
-                            subscriptions[relayUrl] = currentSubs + subscriptionInfo.id
-                            
-                            Log.v(TAG, "✅ Subscription '${subscriptionInfo.id}' sent to relay: $relayUrl")
-                        } else {
-                            Log.w(TAG, "❌ Failed to send subscription to $relayUrl: WebSocket send failed")
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "❌ Failed to send subscription to $relayUrl: ${e.message}")
-                    }
-                } else {
-                    Log.v(TAG, "⏳ Relay $relayUrl not connected, subscription will be sent on reconnection")
-                }
-            }
-            
-            if (connections.isEmpty()) {
-                Log.w(TAG, "⚠️ No relay connections available for subscription, will retry on reconnection")
-            }
-        }
-    }
-    
+    ): String = registry.subscribe(filter, id, handler, targetRelayUrls)
+
     /**
      * Unsubscribe from a subscription
      */
-    fun unsubscribe(id: String) {
-        // Remove from persistent tracking
-        val subscriptionInfo = activeSubscriptions.remove(id)
-        messageHandlers.remove(id)
-        
-        if (subscriptionInfo == null) {
-            Log.w(TAG, "⚠️ Attempted to unsubscribe from unknown subscription: $id")
-            return
-        }
-        
-        Log.d(TAG, "🚫 Unsubscribing from subscription: $id")
-        
-        val request = NostrRequest.Close(id)
-        val message = NostrRequest.toJson(request)
-        
-        scope.launch {
-            connections.forEach { (relayUrl, webSocket) ->
-                val currentSubs = subscriptions[relayUrl]
-                if (currentSubs?.contains(id) == true) {
-                    try {
-                        webSocket.trySendText(message)
-                        subscriptions[relayUrl] = currentSubs - id
-                        Log.v(TAG, "Unsubscribed '$id' from relay: $relayUrl")
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Failed to unsubscribe from $relayUrl: ${e.message}")
-                    }
-                }
-            }
-        }
-    }
+    fun unsubscribe(id: String) = registry.unsubscribe(id)
     
     /**
      * Manually retry connection to a specific relay
@@ -463,15 +354,7 @@ class NostrRelayManager internal constructor(
      * Force re-establishment of all subscriptions on currently connected relays
      * Useful for ensuring subscription consistency after network issues
      */
-    fun reestablishAllSubscriptions() {
-        Log.d(TAG, "🔄 Force re-establishing all ${activeSubscriptions.size} active subscriptions")
-        
-        scope.launch {
-            connections.forEach { (relayUrl, webSocket) ->
-                restoreSubscriptionsForRelay(relayUrl, webSocket)
-            }
-        }
-    }
+    fun reestablishAllSubscriptions() = registry.reestablishAll()
     
     /**
      * Clear all subscription tracking, message handlers, routing caches, and queued messages.
@@ -480,9 +363,7 @@ class NostrRelayManager internal constructor(
     fun clearAllSubscriptions() {
         try {
             // Clear persistent subscription tracking
-            activeSubscriptions.clear()
-            messageHandlers.clear()
-            subscriptions.clear()
+            registry.clearAll()
 
             // Clear routing caches (per-geohash relay selections)
             geohashToRelays.clear()
@@ -521,106 +402,20 @@ class NostrRelayManager internal constructor(
     /**
      * Get the count of active subscriptions
      */
-    fun getActiveSubscriptionCount(): Int {
-        return activeSubscriptions.size
-    }
-    
+    fun getActiveSubscriptionCount(): Int = registry.getActiveSubscriptionCount()
+
     /**
      * Get information about all active subscriptions (for debugging)
      */
-    fun getActiveSubscriptions(): Map<String, SubscriptionInfo> {
-        return activeSubscriptions.toMap()
-    }
-    
+    internal fun getActiveSubscriptions(): Map<String, NostrSubscriptionRegistry.SubscriptionInfo> =
+        registry.getActiveSubscriptions()
+
     /**
      * Validate subscription consistency across all relays
      * Returns a report of any inconsistencies found
      */
-    fun validateSubscriptionConsistency(): SubscriptionConsistencyReport {
-        val expectedSubs = activeSubscriptions.keys
-        val actualSubsByRelay = subscriptions.toMap()
-        val inconsistencies = mutableListOf<String>()
-        
-        connections.keys.forEach { relayUrl ->
-            val actualSubs = actualSubsByRelay[relayUrl] ?: emptySet()
-            val expectedForRelay = expectedSubs.filter { subId ->
-                val subInfo = activeSubscriptions[subId]
-                subInfo?.targetRelayUrls == null || subInfo.targetRelayUrls.contains(relayUrl)
-            }.toSet()
-            
-            val missing = expectedForRelay - actualSubs
-            val extra = actualSubs - expectedForRelay
-            
-            if (missing.isNotEmpty()) {
-                inconsistencies.add("Relay $relayUrl missing subscriptions: $missing")
-            }
-            if (extra.isNotEmpty()) {
-                inconsistencies.add("Relay $relayUrl has extra subscriptions: $extra")
-            }
-        }
-        
-        return SubscriptionConsistencyReport(
-            isConsistent = inconsistencies.isEmpty(),
-            inconsistencies = inconsistencies,
-            totalActiveSubscriptions = activeSubscriptions.size,
-            connectedRelayCount = connections.size
-        )
-    }
-    
-    data class SubscriptionConsistencyReport(
-        val isConsistent: Boolean,
-        val inconsistencies: List<String>,
-        val totalActiveSubscriptions: Int,
-        val connectedRelayCount: Int
-    )
-    
-    /**
-     * Start periodic subscription validation to ensure robustness
-     */
-    private fun startSubscriptionValidation() {
-        stopSubscriptionValidation() // Stop any existing validation
-        
-        subscriptionValidationJob = scope.launch {
-            while (isActive) {
-                delay(SUBSCRIPTION_VALIDATION_INTERVAL)
-                
-                try {
-                    val report = validateSubscriptionConsistency()
-                    if (!report.isConsistent && report.connectedRelayCount > 0) {
-                        Log.w(TAG, "⚠️ Subscription inconsistencies detected: ${report.inconsistencies}")
-                        
-                        // Auto-repair: re-establish subscriptions for relays with missing ones
-                        connections.forEach { (relayUrl, webSocket) ->
-                            val currentSubs = subscriptions[relayUrl] ?: emptySet()
-                            val expectedSubs = activeSubscriptions.keys.filter { subId ->
-                                val subInfo = activeSubscriptions[subId]
-                                subInfo?.targetRelayUrls == null || subInfo.targetRelayUrls.contains(relayUrl)
-                            }.toSet()
-                            
-                            val missingSubs = expectedSubs - currentSubs
-                            if (missingSubs.isNotEmpty()) {
-                                Log.i(TAG, "🔧 Auto-repairing ${missingSubs.size} missing subscriptions for $relayUrl")
-                                restoreSubscriptionsForRelay(relayUrl, webSocket)
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error during subscription validation: ${e.message}")
-                }
-            }
-        }
-        
-        Log.d(TAG, "🔄 Started periodic subscription validation (${SUBSCRIPTION_VALIDATION_INTERVAL / 1000}s interval)")
-    }
-    
-    /**
-     * Stop periodic subscription validation
-     */
-    private fun stopSubscriptionValidation() {
-        subscriptionValidationJob?.cancel()
-        subscriptionValidationJob = null
-        Log.v(TAG, "⏹️ Stopped subscription validation")
-    }
+    internal fun validateSubscriptionConsistency(): NostrSubscriptionRegistry.ConsistencyReport =
+        registry.validateConsistency()
     
     // MARK: - Private Methods
     
@@ -699,7 +494,7 @@ class NostrRelayManager internal constructor(
                     updateRelaysList()
                     
                     // CLIENT-SIDE FILTER ENFORCEMENT: Ensure this event matches the subscription's filter
-                    activeSubscriptions[response.subscriptionId]?.let { subInfo ->
+                    registry.subscriptionFor(response.subscriptionId)?.let { subInfo ->
                         val matches = try { subInfo.filter.matches(response.event) } catch (e: Exception) { true }
                         if (!matches) {
                             Log.v(TAG, "🚫 Dropping event ${response.event.id.take(16)}... not matching filter for sub=${response.subscriptionId}")
@@ -712,7 +507,7 @@ class NostrRelayManager internal constructor(
                     val wasProcessed = eventDeduplicator.processEvent(response.event) { event ->
                         // Only log non-gift-wrap events to reduce noise
                         if (event.kind != NostrKind.GIFT_WRAP) {
-                            val originGeo = activeSubscriptions[response.subscriptionId]?.originGeohash
+                            val originGeo = registry.subscriptionFor(response.subscriptionId)?.originGeohash
                             if (originGeo != null) {
                                 Log.v(TAG, "📥 Processing event (kind=${event.kind}) from relay=$relayUrl geo=$originGeo sub=${response.subscriptionId}")
                             } else {
@@ -721,7 +516,7 @@ class NostrRelayManager internal constructor(
                         }
                         
                         // Call handler for new events only
-                        val handler = messageHandlers[response.subscriptionId]
+                        val handler = registry.handlerFor(response.subscriptionId)
                         if (handler != null) {
                             scope.launch(Dispatchers.Main) {
                                 handler(event)
@@ -838,47 +633,6 @@ class NostrRelayManager internal constructor(
         _isConnected.value = connected
     }
     
-    private fun generateSubscriptionId(): String {
-        return "sub-${Clock.System.now().toEpochMilliseconds()}-${Random.nextInt(1000)}"
-    }
-    
-    /**
-     * Restore all active subscriptions for a specific relay that just reconnected
-     */
-    private fun restoreSubscriptionsForRelay(relayUrl: String, webSocket: DefaultClientWebSocketSession) {
-        val subscriptionsToRestore = activeSubscriptions.values.filter { subscriptionInfo ->
-            // Include subscription if it targets all relays or specifically targets this relay
-            subscriptionInfo.targetRelayUrls == null || subscriptionInfo.targetRelayUrls.contains(relayUrl)
-        }
-        
-        if (subscriptionsToRestore.isEmpty()) {
-            Log.v(TAG, "🔄 No subscriptions to restore for relay: $relayUrl")
-            return
-        }
-        
-        Log.d(TAG, "🔄 Restoring ${subscriptionsToRestore.size} subscriptions for relay: $relayUrl")
-        
-        subscriptionsToRestore.forEach { subscriptionInfo ->
-            try {
-                val request = NostrRequest.Subscribe(subscriptionInfo.id, listOf(subscriptionInfo.filter))
-                val message = NostrRequest.toJson(request)
-                
-                val success = webSocket.trySendText(message)
-                if (success) {
-                    // Track subscription for this relay
-                    val currentSubs = subscriptions[relayUrl] ?: emptySet()
-                    subscriptions[relayUrl] = currentSubs + subscriptionInfo.id
-                    
-                    Log.v(TAG, "✅ Restored subscription '${subscriptionInfo.id}' to relay: $relayUrl")
-                } else {
-                    Log.w(TAG, "❌ Failed to restore subscription '${subscriptionInfo.id}' to $relayUrl: WebSocket send failed")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Failed to restore subscription '${subscriptionInfo.id}' to $relayUrl: ${e.message}")
-            }
-        }
-    }
-    
     /**
      * Handle a freshly opened relay session: mark connected, restore subscriptions, flush the queue.
      * Equivalent to the former WebSocketListener.onOpen.
@@ -888,7 +642,7 @@ class NostrRelayManager internal constructor(
         updateRelayStatus(relayUrl, true)
 
         // Restore all active subscriptions for this relay
-        restoreSubscriptionsForRelay(relayUrl, session)
+        registry.restoreSubscriptionsForRelay(relayUrl, session)
 
         // Deliver any queued events that were waiting for this relay. An event submitted
         // concurrently with this drain may miss it and stay queued until the next
@@ -912,6 +666,3 @@ class NostrRelayManager internal constructor(
         }
     }
 }
-
-private fun DefaultClientWebSocketSession.trySendText(text: String): Boolean =
-    outgoing.trySend(Frame.Text(text)).isSuccess
