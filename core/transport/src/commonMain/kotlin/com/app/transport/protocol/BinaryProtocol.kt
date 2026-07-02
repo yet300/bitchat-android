@@ -449,6 +449,13 @@ internal object BinaryProtocol {
                     buffer.readShort().toUShort().toInt()
                 }
 
+                // Security check: the claimed plain size is attacker-controlled and becomes
+                // the decompression allocation bound — reject before inflating anything.
+                if (originalSize !in 1..MAX_PAYLOAD_LENGTH) {
+                    Log.w("BinaryProtocol", "🚫 Claimed decompressed size $originalSize out of bounds")
+                    return null
+                }
+
                 // Compressed payload
                 val compressedSize = payloadLength.toInt() - lengthFieldBytes
                 val compressedPayload = buffer.readByteArray(compressedSize)
