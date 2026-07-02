@@ -19,7 +19,6 @@ import com.app.transport.verification.VerifyEventListener
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 
 /**
  * Inter-component delegate wiring of one mesh engine generation. Extracted verbatim from
@@ -367,8 +366,8 @@ internal class MeshComponentWiring(
                 return SpecialRecipients.BROADCAST
             }
 
-            override fun handleNoiseHandshake(routed: RoutedPacket): Boolean {
-                return runBlocking { securityManager.handleNoiseHandshake(routed) }
+            override suspend fun handleNoiseHandshake(routed: RoutedPacket): Boolean {
+                return securityManager.handleNoiseHandshake(routed)
             }
 
             override fun handleNoiseEncrypted(routed: RoutedPacket) {
