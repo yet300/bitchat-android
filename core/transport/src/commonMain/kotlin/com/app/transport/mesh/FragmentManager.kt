@@ -5,6 +5,7 @@ package com.app.transport.mesh
 import co.touchlab.stately.collections.ConcurrentMutableMap
 import co.touchlab.stately.concurrency.Lock
 import co.touchlab.stately.concurrency.withLock
+import com.app.common.AppDispatchers
 import com.app.common.utils.Log
 import com.app.transport.MeshConstants
 import com.app.transport.protocol.BitchatPacket
@@ -24,8 +25,10 @@ import kotlin.time.ExperimentalTime
  * - Same reassembly logic and timeout handling
  * - Uses new FragmentPayload model for type safety
  */
-class FragmentManager {
-    
+class FragmentManager(
+    dispatchers: AppDispatchers = AppDispatchers(),
+) {
+
     companion object {
         private const val TAG = "FragmentManager"
         // iOS values: 512 MTU threshold, 469 max fragment size (512 MTU - headers)
@@ -48,7 +51,7 @@ class FragmentManager {
     internal var delegate: FragmentManagerDelegate? = null
     
     // Coroutines
-    private val managerScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val managerScope = CoroutineScope(dispatchers.io + SupervisorJob())
     
     init {
         startPeriodicCleanup()
