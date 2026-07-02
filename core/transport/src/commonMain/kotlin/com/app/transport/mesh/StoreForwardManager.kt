@@ -5,6 +5,7 @@ package com.app.transport.mesh
 import co.touchlab.stately.collections.ConcurrentMutableList
 import co.touchlab.stately.collections.ConcurrentMutableMap
 import co.touchlab.stately.collections.ConcurrentMutableSet
+import com.app.common.AppDispatchers
 import com.app.common.utils.Log
 import com.app.transport.MeshConstants
 import com.app.transport.protocol.BitchatPacket
@@ -18,8 +19,10 @@ import kotlin.time.ExperimentalTime
  * Manages store-and-forward messaging for offline peers
  * Extracted from BluetoothMeshService for better separation of concerns
  */
-internal class StoreForwardManager {
-    
+internal class StoreForwardManager(
+    dispatchers: AppDispatchers = AppDispatchers(),
+) {
+
     companion object {
         private const val TAG = "StoreForwardManager"
         private const val MESSAGE_CACHE_TIMEOUT = MeshConstants.StoreForward.MESSAGE_CACHE_TIMEOUT_MS  // 12 hours for regular peers
@@ -48,7 +51,7 @@ internal class StoreForwardManager {
     var delegate: StoreForwardManagerDelegate? = null
 
 
-    private val managerScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val managerScope = CoroutineScope(dispatchers.io + SupervisorJob())
     
     init {
         startPeriodicCleanup()

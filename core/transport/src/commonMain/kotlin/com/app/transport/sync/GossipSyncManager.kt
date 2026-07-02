@@ -5,6 +5,7 @@ package com.app.transport.sync
 import co.touchlab.stately.collections.ConcurrentMutableMap
 import co.touchlab.stately.concurrency.Lock
 import co.touchlab.stately.concurrency.withLock
+import com.app.common.AppDispatchers
 import com.app.common.encoding.hexEncodedString
 import com.app.common.utils.Log
 import com.app.transport.model.RequestSyncPacket
@@ -23,7 +24,8 @@ import kotlin.time.ExperimentalTime
 internal class GossipSyncManager(
     private val myPeerID: String,
     private val scope: CoroutineScope,
-    private val configProvider: ConfigProvider
+    private val configProvider: ConfigProvider,
+    private val dispatchers: AppDispatchers = AppDispatchers(),
 ) {
     interface Delegate {
         fun sendPacket(packet: BitchatPacket)
@@ -62,7 +64,7 @@ internal class GossipSyncManager(
     private var cleanupJob: Job? = null
     fun start() {
         periodicJob?.cancel()
-        periodicJob = scope.launch(Dispatchers.IO) {
+        periodicJob = scope.launch(dispatchers.io) {
             while (isActive) {
                 try {
                     delay(30_000)
@@ -74,7 +76,7 @@ internal class GossipSyncManager(
 
         // Start periodic cleanup of stale announcements and messages
         cleanupJob?.cancel()
-        cleanupJob = scope.launch(Dispatchers.IO) {
+        cleanupJob = scope.launch(dispatchers.io) {
             while (isActive) {
                 try {
                     delay(SyncDefaults.CLEANUP_INTERVAL_MS)
@@ -91,14 +93,14 @@ internal class GossipSyncManager(
     }
 
     fun scheduleInitialSync(delayMs: Long = 5_000L) {
-        scope.launch(Dispatchers.IO) {
+        scope.launch(dispatchers.io) {
             delay(delayMs)
             sendRequestSync()
         }
     }
 
     fun scheduleInitialSyncToPeer(peerID: String, delayMs: Long = 5_000L) {
-        scope.launch(Dispatchers.IO) {
+        scope.launch(dispatchers.io) {
             delay(delayMs)
             sendRequestSyncToPeer(peerID)
         }

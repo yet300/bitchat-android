@@ -4,6 +4,7 @@ package com.app.transport.nostr
 
 import co.touchlab.stately.collections.ConcurrentMutableMap
 import co.touchlab.stately.collections.ConcurrentMutableSet
+import com.app.common.AppDispatchers
 import com.app.common.utils.Log
 import com.app.common.serialization.JsonConfig
 import com.app.transport.NostrConstants
@@ -38,6 +39,7 @@ import kotlin.time.ExperimentalTime
 class NostrRelayManager internal constructor(
     private val eventDeduplicator: NostrEventDeduplicator,
     private val webSocketClientProvider: WebSocketClientProvider,
+    dispatchers: AppDispatchers = AppDispatchers(),
 ) {
 
     companion object {
@@ -114,7 +116,7 @@ class NostrRelayManager internal constructor(
     private val pendingEvents = PendingEventQueue<NostrEvent>()
     
     // Coroutine scope for background operations
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val scope = CoroutineScope(dispatchers.io + SupervisorJob())
     
     // Subscription validation timer
     private var subscriptionValidationJob: Job? = null

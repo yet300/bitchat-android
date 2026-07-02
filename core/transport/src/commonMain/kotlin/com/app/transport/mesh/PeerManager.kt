@@ -4,6 +4,7 @@ package com.app.transport.mesh
 
 import co.touchlab.stately.collections.ConcurrentMutableList
 import co.touchlab.stately.collections.ConcurrentMutableMap
+import com.app.common.AppDispatchers
 import com.app.common.utils.Log
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.transport.MeshConstants
@@ -71,6 +72,7 @@ data class PeerInfo(
  */
 internal class PeerManager(
     private val fingerprintManager: PeerFingerprintManager,
+    dispatchers: AppDispatchers = AppDispatchers(),
 ) {
 
     companion object {
@@ -93,7 +95,7 @@ internal class PeerManager(
     var isPeerDirectlyConnected: ((String) -> Boolean)? = null
 
     // Coroutines
-    private val managerScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val managerScope = CoroutineScope(dispatchers.io + SupervisorJob())
     
     init {
         startPeriodicCleanup()

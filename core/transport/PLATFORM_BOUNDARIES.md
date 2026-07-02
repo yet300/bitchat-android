@@ -1,78 +1,101 @@
 # `:core:transport` — platform boundaries
 
-Status after the `transport-kmp2` migration: **commonMain ≈ 86 `.kt`, androidMain = 20, iosMain = 0.**
+Status: **commonMain ≈ 90 `.kt`, androidMain = 19, nativeMain = 8, iosMain = 0.** Targets:
+`android`, `iosArm64`, `iosSimulatorArm64`. `commonMain` compiles **and links** under both iOS targets
+on every change.
 
-`commonMain` now owns the whole transport *logic*: the binary protocol (`BinaryProtocol`/models/TLV),
-Nostr (crypto + relay manager + filters + NIP-17/44), GCS/gossip sync, the mesh graph + route planner,
-the peer / fragment / store-forward managers, the mesh telemetry port, the verification QR codec,
-the Tor orchestrator (`ArtiTorManager`) and the ktor HTTP/WebSocket provider (`HttpClientProvider`).
+`commonMain` owns the whole transport *logic and the bearer facade*: the binary protocol
+(`BinaryProtocol`/models/TLV), Nostr (crypto + relay manager + filters + NIP-17/44), GCS/gossip sync,
+the mesh graph + route planner, the peer / fragment / store-forward managers, the mesh telemetry port,
+the verification QR codec, the Tor orchestrator (`ArtiTorManager`), the ktor HTTP/WebSocket provider
+(`HttpClientProvider`), the shared **`BleBearer`** facade + its `BearerTransport` SPI, the shared
+`FragmentingPacketSender`, the `MeshNetwork` multiplexer, and the GATT UUIDs / fragmentation / padding
+constants (`MeshConstants.Mesh.Gatt`, `MeshConstants.Fragmentation`, `BLEPacketPaddingPolicy`).
 
-What stays in `androidMain` is either **genuinely platform** (no portable equivalent — it *is* the
-OS API) or **deferred** (portable, but not yet moved). iOS actuals are intentionally **not** written
-in this pass; the seams below are the entry points an iOS port implements later.
+Each platform supplies only the **radio/OS plumbing** behind those seams. Coroutine dispatchers in
+commonMain go through the injected `com.app.common.AppDispatchers` (never `Dispatchers.IO` directly —
+absent on native); managers take `dispatchers: AppDispatchers = AppDispatchers()` and use
+`dispatchers.io`.
 
-## Genuinely platform — stays `androidMain` (group F)
+## Genuinely platform — `androidMain`
 
-These wrap Android-only OS surfaces. iOS would implement the same commonMain seam with a different
-mechanism (or, for Wi-Fi Aware, not at all — it has no iOS counterpart).
+Android-only OS surfaces. The Apple counterpart lives in `nativeMain` (or, for Wi-Fi Aware, does not
+exist).
 
-### BLE stack (`MeshBearer` over Bluetooth LE)
-- `mesh/BleBearer` — implements commonMain `MeshBearer`; the GATT-backed transport bearer.
-- `mesh/BluetoothConnectionManager`, `BluetoothConnectionTracker` — connection lifecycle/state.
+### BLE radio (behind the commonMain `BearerTransport` SPI)
+- `mesh/BluetoothConnectionManager` — implements commonMain `BearerTransport`; dual-role orchestrator.
+- `mesh/BluetoothConnectionTracker` — connection lifecycle/state, eviction policy.
 - `mesh/BluetoothGattClientManager`, `BluetoothGattServerManager` — GATT client/server (scan/advertise).
-- `mesh/BluetoothPacketBroadcaster` — writes packets onto GATT characteristics.
-- `mesh/MeshGattConstants` — GATT service/characteristic UUIDs (BLE-only; see *Deferred*).
+- `mesh/BluetoothPacketBroadcaster` — writes packets onto GATT characteristics (actor-serialized).
 - `mesh/BluetoothPermissions`, `BluetoothPermissionManager` — `android.Manifest` runtime permissions.
 - `mesh/PowerManager` — `BatteryManager` + `ProcessLifecycleOwner` adaptive duty-cycling.
+- `mesh/AndroidBleBearerFactory` — wires `BluetoothConnectionManager` into the shared `BleBearer`.
 
-iOS equivalent: CoreBluetooth (`CBCentralManager`/`CBPeripheralManager`) behind the same `MeshBearer`.
+Apple counterpart: `nativeMain/mesh/CoreBluetoothConnectionManager` implements the same
+`BearerTransport`; `NativeBleBearerFactory` wires it into the same commonMain `BleBearer`. The GATT
+service/characteristic UUIDs come from commonMain `MeshConstants.Mesh.Gatt` (byte-identical), and
+fragmentation/padding/(de)serialization are reused verbatim from commonMain — so the wire bytes match.
 
-### Wi-Fi Aware (Android-only, no iOS counterpart)
-- `mesh/WifiAwareBearer` — implements `MeshBearer` over `android.net.wifi.aware`.
+### Wi-Fi Aware (Android-only, no Apple counterpart)
+- `mesh/WifiAwareBearer` — implements commonMain `MeshBearer` over `android.net.wifi.aware`.
 - `mesh/aware/WifiAwareSupport`, `WifiAwareConnectionTracker`, `MeshConnectionTracker`, `SyncedSocket`.
 
-iOS equivalent: **none** — Wi-Fi Aware does not exist on iOS. iOS ships only the BLE bearer.
+Apple counterpart: **none** — Wi-Fi Aware does not exist on iOS. Apple ships only the BLE bearer.
 
 ### Foreground-service-owned mesh lifecycle
 - `mesh/BluetoothMeshService` — the FGS owner of the mesh lifecycle (hard project invariant), holds
-  `Context`, and supplies the commonMain `NicknameSource` / `ServiceNotifier` ports.
+  `Context`, and supplies the commonMain `NicknameSource` / `ServiceNotifier` ports. Consumes the
+  commonMain `MeshNetwork` + `BleBearer` as its single data path.
 
-iOS equivalent: a background-mode CoreBluetooth coordinator; the orchestration logic it threads
-through is already commonMain.
+Apple counterpart: a background-mode CoreBluetooth coordinator (not written yet — see *iOS follow-ups*);
+the orchestration it threads through is already commonMain.
 
 ### File + engine platform glue
 - `features/file/FileUtils` — `Context` cacheDir + `ContentResolver`/`Uri` + `java.io.File`.
 - `features/file/AndroidIncomingFileStore` — implements commonMain `IncomingFileStore` over `FileUtils`.
 - `net/AndroidHttpEngine` — exposes the OkHttp `HttpClientEngineFactory` for the commonMain
   `HttpClientProvider` (keeps `ktor-client-okhttp` an androidMain detail).
+- `nostr/AndroidRelayDirectoryStorage` — assets + filesDir behind the `RelayDirectoryStorage` seam.
 
-iOS equivalent: an `IncomingFileStore` over the iOS file APIs, and a Darwin `HttpClientEngineFactory`.
+## Genuinely platform — `nativeMain` (Apple / CoreBluetooth)
 
-## Deferred — portable, not yet moved (not genuinely platform)
+Real `platform.CoreBluetooth` + Foundation. Compiles + links under `iosArm64` and
+`iosSimulatorArm64`. (The simulator has **no BLE radio**, so on-device CoreBluetooth wire parity is a
+manual verification step, not a CI guarantee.)
 
-- **`mesh/MeshGattConstants`** — trivially portable (`java.util.UUID` → `kotlin.uuid.Uuid`), but the
-  values are BLE GATT UUIDs consumed only by the androidMain BLE stack, so moving them has little
-  value until an iOS BLE bearer needs them. Move alongside the iOS BLE work.
+- `mesh/CoreBluetoothConnectionManager` — `BearerTransport` over `CBCentralManager` +
+  `CBPeripheralManager` (dual-role).
+- `mesh/NativeBleBearerFactory` — builds the shared `BleBearer` over the CoreBluetooth stack.
+- `mesh/CoreBluetoothData` — `NSData` ↔ `ByteArray` bridges (byte-preserving).
+- `net/DarwinHttpEngine` — Darwin (`NSURLSession`) ktor `HttpClientEngineFactory`.
+- `platform/NativeAppDirectories` — caches / application-support roots + Arti/Tor data dir.
+- `nostr/NativeRelayDirectoryStorage` — bundle resource + caches dir behind `RelayDirectoryStorage`.
+- `features/file/NativeIncomingFileStore` — `IncomingFileStore` over kotlinx-io `SystemFileSystem`.
+- `di/NativeTransportBindings` — Metro `@BindingContainer` wiring the native providers.
 
-> Done since the first cut of this doc: `debug/DebugSettingsManager` moved to commonMain (its
-> `ConcurrentLinkedQueue` usage replaced by a small `ConcurrentFifoQueue` = ArrayDeque + stately
-> Lock); `nostr/RelayDirectory` moved to commonMain over **kotlinx-io** `SystemFileSystem`/`Path`
-> (already a project dependency — no okio needed), with the bundled-asset + filesDir-cache half
-> inverted behind the `RelayDirectoryStorage` seam (`AndroidRelayDirectoryStorage`).
+## Seam inventory (commonMain contract → per-platform impl)
 
-## iOS seam inventory (entry points for a later iOS port)
-
-commonMain interfaces with an androidMain implementation today — an iOS target implements an actual
-for each (no transport logic needs rewriting):
-
-| commonMain seam | androidMain impl | iOS impl mechanism |
+| commonMain seam | androidMain impl | nativeMain impl (Apple) |
 | --- | --- | --- |
-| `mesh/MeshBearer` | `BleBearer` (+ `WifiAwareBearer`) | CoreBluetooth (BLE only) |
-| `IncomingFileStore` | `AndroidIncomingFileStore` | iOS file APIs |
-| `RelayDirectoryStorage` | `AndroidRelayDirectoryStorage` | iOS bundled CSV + cache dir (RelayDirectory itself is commonMain) |
-| `WebSocketClientProvider` / `HttpClientEngineFactory` | `HttpClientProvider` (common) + OkHttp factory | Darwin engine factory |
-| `NicknameSource`, `ServiceNotifier` | `BluetoothMeshService` | iOS mesh coordinator |
-| `SocksAddressSource` / `TorDataDirProvider` / `TorHttpReset` | `ArtiTorManager` (common) / DI filesDir / `HttpClientProvider` | iOS data-dir; Tor client is already KMP |
+| `mesh/BleBearer` facade + `BearerTransport` | `BluetoothConnectionManager` (+ `AndroidBleBearerFactory`) | `CoreBluetoothConnectionManager` (+ `NativeBleBearerFactory`) |
+| `mesh/MeshBearer` (Wi-Fi Aware) | `WifiAwareBearer` | — (no Apple counterpart) |
+| `IncomingFileStore` | `AndroidIncomingFileStore` | `NativeIncomingFileStore` |
+| `RelayDirectoryStorage` | `AndroidRelayDirectoryStorage` | `NativeRelayDirectoryStorage` |
+| `WebSocketClientProvider` / `HttpClientEngineFactory` | `HttpClientProvider` (common) + OkHttp factory | `HttpClientProvider` (common) + Darwin factory |
+| `TorDataDirProvider` | DI filesDir path | `NativeAppDirectories.nativeArtiDataDir()` |
+| `NicknameSource`, `ServiceNotifier` | `BluetoothMeshService` (FGS) | *(deferred — iOS coordinator)* |
 
-`ArtiTorManager` and `HttpClientProvider` are already commonMain; iOS only needs to provide the
-`TorDataDirProvider` path and a Darwin `HttpClientEngineFactory`.
+`ArtiTorManager` and `HttpClientProvider` are already commonMain; each platform only supplies the data
+dir and the ktor engine factory.
+
+## iOS follow-ups (deferred — not written in this pass)
+
+- **`iosMain` Keychain / Secure Enclave actual** for secret storage (`SecureIdentityStateManager` in
+  `:core:crypto`). Until it exists an iOS build has no hardware-backed secret store — required before
+  any iOS release. `iosMain` source set is still empty; the CoreBluetooth stack lives in `nativeMain`
+  (shared across the Apple targets), and the remaining iOS-specific actuals (Keychain, `UIApplication`
+  background/state-restoration) are the outstanding work.
+- **iOS mesh coordinator** (`NicknameSource` / `ServiceNotifier` + background-mode CoreBluetooth
+  lifecycle) — the orchestration is already commonMain; only the platform lifecycle wrapper is missing.
+- **On-device CoreBluetooth wire parity** with the iOS bitchat client — must be verified on hardware;
+  the simulator has no BLE radio.
