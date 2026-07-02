@@ -2,9 +2,9 @@
 
 package com.app.transport.nostr
 
+import com.app.common.AppDispatchers
 import com.app.common.utils.Log
 import com.app.common.serialization.JsonConfig
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -14,6 +14,9 @@ import kotlin.time.ExperimentalTime
  * Compatible with iOS implementation
  */
 object NostrProtocol {
+
+    // Objects have no DI seam; AppDispatchers keeps the dispatcher convention (M3).
+    private val dispatchers = AppDispatchers()
 
     private const val TAG = "NostrProtocol"
     
@@ -115,7 +118,7 @@ object NostrProtocol {
         geohash: String,
         senderIdentity: NostrIdentity,
         nickname: String? = null
-    ): NostrEvent = withContext(Dispatchers.Default) {
+    ): NostrEvent = withContext(dispatchers.default) {
         val tags = mutableListOf<List<String>>()
         tags.add(listOf("g", geohash))
         
@@ -141,7 +144,7 @@ object NostrProtocol {
     suspend fun createGeohashPresenceEvent(
         geohash: String,
         senderIdentity: NostrIdentity
-    ): NostrEvent = withContext(Dispatchers.Default) {
+    ): NostrEvent = withContext(dispatchers.default) {
         val tags = mutableListOf<List<String>>()
         tags.add(listOf("g", geohash))
 
@@ -167,7 +170,7 @@ object NostrProtocol {
         powPreferenceManager: PoWPreferenceManager,
         nickname: String? = null,
         teleported: Boolean = false
-    ): NostrEvent = withContext(Dispatchers.Default) {
+    ): NostrEvent = withContext(dispatchers.default) {
         val tags = mutableListOf<List<String>>()
         tags.add(listOf("g", geohash))
         

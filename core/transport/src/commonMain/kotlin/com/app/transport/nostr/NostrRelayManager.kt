@@ -38,7 +38,7 @@ import kotlin.time.ExperimentalTime
 class NostrRelayManager internal constructor(
     private val eventDeduplicator: NostrEventDeduplicator,
     private val webSocketClientProvider: WebSocketClientProvider,
-    dispatchers: AppDispatchers = AppDispatchers(),
+    private val dispatchers: AppDispatchers = AppDispatchers(),
 ) {
 
     companion object {
@@ -58,10 +58,14 @@ class NostrRelayManager internal constructor(
         private const val BACKOFF_MULTIPLIER = NostrConstants.BACKOFF_MULTIPLIER
         private const val MAX_RECONNECT_ATTEMPTS = NostrConstants.MAX_RECONNECT_ATTEMPTS
         
-        // Track gift-wraps we initiated for logging
+        // Track gift-wraps we initiated for logging. Entries are removed when a relay
+        // answers OK; relays that never answer would otherwise leak entries for the
+        // process lifetime, so cap the set (log-level fidelity only, no behavior impact).
+        private const val MAX_PENDING_GIFT_WRAP_IDS = 1000
         private val pendingGiftWrapIDs = ConcurrentMutableSet<String>()
         
         fun registerPendingGiftWrap(id: String) {
+            if (pendingGiftWrapIDs.size >= MAX_PENDING_GIFT_WRAP_IDS) pendingGiftWrapIDs.clear()
             pendingGiftWrapIDs.add(id)
         }
 
@@ -518,7 +522,7 @@ class NostrRelayManager internal constructor(
                         // Call handler for new events only
                         val handler = registry.handlerFor(response.subscriptionId)
                         if (handler != null) {
-                            scope.launch(Dispatchers.Main) {
+                            scope.launch(dispatchers.main) {
                                 handler(event)
                             }
                         } else {
