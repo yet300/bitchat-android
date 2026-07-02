@@ -337,7 +337,9 @@ internal interface PacketProcessorDelegate {
     fun getBroadcastRecipient(): ByteArray
     
     // Message type handlers
-    fun handleNoiseHandshake(routed: RoutedPacket): Boolean
+    // Suspend: runs the (crypto-heavy) handshake inside the per-peer consumer coroutine
+    // instead of forcing implementers to block a pooled dispatcher thread via runBlocking.
+    suspend fun handleNoiseHandshake(routed: RoutedPacket): Boolean
     fun handleNoiseEncrypted(routed: RoutedPacket)
     fun handleAnnounce(routed: RoutedPacket)
     fun handleMessage(routed: RoutedPacket)
