@@ -2,8 +2,8 @@
 
 package com.app.transport.nostr
 
+import com.app.common.AppDispatchers
 import com.app.common.utils.Log
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.random.Random
 import kotlin.time.Clock
@@ -18,6 +18,9 @@ import kotlin.time.ExperimentalTime
  * Reference: https://github.com/nostr-protocol/nips/blob/master/13.md
  */
 object NostrProofOfWork {
+
+    // Objects have no DI seam; AppDispatchers keeps the dispatcher convention (M3).
+    private val dispatchers = AppDispatchers()
     
     private const val TAG = "NostrProofOfWork"
     
@@ -94,7 +97,7 @@ object NostrProofOfWork {
         event: NostrEvent,
         targetDifficulty: Int,
         maxIterations: Int = 1_000_000
-    ): NostrEvent? = withContext(Dispatchers.Default) {
+    ): NostrEvent? = withContext(dispatchers.default) {
         if (targetDifficulty <= 0) return@withContext event
         
         Log.d(TAG, "Starting PoW mining for difficulty $targetDifficulty...")

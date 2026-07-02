@@ -77,9 +77,8 @@ internal class NostrEventDeduplicator(
      * @return true if the event is a duplicate (already seen), false if it's new
      */
     fun isDuplicate(eventId: String): Boolean {
-        totalChecks++
-        
         lruLock.withLock {
+            totalChecks++
             val existingNode = nodeMap[eventId]
             
             if (existingNode != null) {
