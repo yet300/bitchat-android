@@ -232,8 +232,9 @@ internal class BluetoothGattServerManager(
                         Log.d(TAG, "Server: Parsed packet type ${packet.type} from $peerID")
                         delegate?.onPacketReceived(packet, peerID, device)
                     } else {
+                        // Do not dump raw frame bytes: a malformed frame can still carry another
+                        // peer's ciphertext / routing metadata (traffic-analysis leak). Length only.
                         Log.w(TAG, "Server: Failed to parse packet from ${device.address}, size: ${value.size} bytes")
-                        Log.w(TAG, "Server: Packet data: ${value.joinToString(" ") { "%02x".format(it) }}")
                     }
                     
                     if (responseNeeded) {

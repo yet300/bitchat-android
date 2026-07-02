@@ -27,6 +27,14 @@ internal class PacketProcessor(
     
     companion object {
         private const val TAG = "PacketProcessor"
+
+        // Hard bound on the number of per-peer serialization actors. peerID is derived from the
+        // attacker-controlled packet.senderID and the actor is created BEFORE signature validation,
+        // so an unbounded map would let a peer spoofing random sender IDs create one coroutine per
+        // fake ID. Beyond this cap the oldest actor is evicted (its channel closed); a real peer
+        // whose actor was evicted simply gets a fresh one on its next packet (the actor holds no
+        // per-peer state — it only serializes processing).
+        private const val MAX_PEER_ACTORS = 256
     }
     
     // Delegate for callbacks
@@ -86,9 +94,17 @@ internal class PacketProcessor(
             return
         }
         
-        // Get or create actor for this peer
+        // Get or create actor for this peer, evicting the oldest if we exceed the cap. Called from
+        // the single MeshNetwork.incoming collector, so no locking is needed here.
         val actor = actors.getOrPut(peerID) { getOrCreateActorForPeer(peerID) }
-        
+        if (actors.size > MAX_PEER_ACTORS) {
+            val eldest = actors.keys.firstOrNull { it != peerID }
+            if (eldest != null) {
+                actors.remove(eldest)?.close()
+                Log.d(TAG, "Evicted oldest peer actor $eldest (actor cap $MAX_PEER_ACTORS reached)")
+            }
+        }
+
         // Send packet to peer's dedicated actor for serialized processing
         processorScope.launch {
             try {
@@ -130,8 +146,10 @@ internal class PacketProcessor(
         val packet = routed.packet
         val peerID = routed.peerID ?: "unknown"
 
-        // Basic validation and security checks
-        if (!delegate?.validatePacketSecurity(packet, peerID)!!) {
+        // Basic validation and security checks. A null delegate (teardown/rebuild window) or a
+        // false result drops the packet — never NPE inside the per-peer consumer coroutine, which
+        // would permanently kill that peer's actor.
+        if (delegate?.validatePacketSecurity(packet, peerID) != true) {
             Log.d(TAG, "Packet failed security validation from ${formatPeerForLog(peerID)}")
             return
         }
