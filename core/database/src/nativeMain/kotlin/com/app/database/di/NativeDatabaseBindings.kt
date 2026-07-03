@@ -2,6 +2,7 @@ package com.app.database.di
 
 import com.app.database.db.DatabaseDriverFactory
 import com.app.database.db.NativeDatabaseDriverFactory
+import com.app.domain.repository.DatabaseKeyProvider
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
@@ -15,5 +16,6 @@ object NativeDatabaseBindings {
 
     @SingleIn(AppScope::class)
     @Provides
-    fun provideDatabaseDriverFactory(): DatabaseDriverFactory = NativeDatabaseDriverFactory()
+    fun provideDatabaseDriverFactory(keyProvider: DatabaseKeyProvider): DatabaseDriverFactory =
+        NativeDatabaseDriverFactory(keyProvider)
 }
