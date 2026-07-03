@@ -38,6 +38,11 @@ import com.app.data.routing.RoutingCore
 import com.app.data.routing.RoutingMessageTransport
 import com.app.data.routing.RouteSelector
 import com.app.data.session.MeshNoiseSessionPort
+import com.app.crypto.EncryptionService
+import com.app.crypto.identity.PeerFingerprintManager
+import com.app.crypto.identity.SecureIdentityStateManager
+import com.app.crypto.secure.SecureKeyValueStore
+import com.app.transport.mesh.FragmentManager
 import com.app.transport.mesh.MeshService
 import com.app.transport.routing.PeerKeyResolver
 import com.app.transport.routing.RouteStrategy
@@ -202,6 +207,29 @@ abstract class DataBindings {
     internal abstract val NostrRouteStrategy.bindNostrRouteStrategy: RouteStrategy
 
     companion object {
+
+        // KSafe is single-process and must be one instance per fileName (two live instances on one
+        // file diverge); the platform containers construct KSafe against these shared names, so the
+        // on-disk vault/prefs stores keep one identity across Android and Apple.
+        const val VAULT_FILE = "bitchat_vault"
+        const val PREFS_FILE = "bitchat_prefs"
+
+        @Provides
+        @SingleIn(AppScope::class)
+        fun provideEncryptionService(
+            store: SecureKeyValueStore,
+            peerFingerprintManager: PeerFingerprintManager,
+        ): EncryptionService = EncryptionService(store, peerFingerprintManager)
+
+        @Provides
+        @SingleIn(AppScope::class)
+        fun provideSecureIdentityStateManager(store: SecureKeyValueStore): SecureIdentityStateManager =
+            SecureIdentityStateManager(store)
+
+        /** Fragment reassembly state shared by the BLE stack and the mesh engine. */
+        @Provides
+        @SingleIn(AppScope::class)
+        fun provideFragmentManager(): FragmentManager = FragmentManager()
 
         /**
          * Wraps the graph-owned [RouteSelector] in the legacy [MessageRouter] facade, which keeps the
