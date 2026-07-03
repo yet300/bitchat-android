@@ -1,0 +1,222 @@
+package com.app.transport.mesh
+
+import com.app.common.encoding.toHexString
+import com.app.common.utils.Log
+import com.app.transport.MeshTrafficLog
+import com.app.transport.model.RoutedPacket
+import com.app.transport.protocol.MessageType
+import com.app.transport.protocol.SpecialRecipients
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+
+/** One BLE link the local node can write to right now. */
+internal data class BleNeighbor(
+    val linkAddress: String,
+    /** True for an outbound (client/central) link, false for an inbound (server/peripheral) one. */
+    val isClient: Boolean,
+    /** Logical peer bound to this link, if the handshake got that far. */
+    val peerID: String?,
+)
+
+/**
+ * The thin per-platform radio SPI under [BleSendCore]: everything above the raw GATT
+ * write/notify — fragmentation, target selection, source routing, anti-loop, padding,
+ * telemetry — lives in the shared core.
+ */
+internal interface BleRadioLink {
+    /**
+     * Snapshot of writable links, in send order: server (inbound) links first, then client
+     * (outbound) links — the order both platforms have always used.
+     */
+    fun neighbors(): List<BleNeighbor>
+
+    /** Writes one already-encoded frame to one link. Must not throw. */
+    fun writeToNeighbor(neighbor: BleNeighbor, frame: ByteArray): Boolean
+
+    /** Resolves the logical peer bound to a link address (relay-loop bookkeeping). */
+    fun peerForAddress(linkAddress: String): String?
+}
+
+/**
+ * Shared BLE send core (C1 unification): the send tree previously duplicated between the Android
+ * BluetoothPacketBroadcaster and the Apple CoreBluetoothConnectionManager.
+ *
+ * Owns, once, in commonMain:
+ *  - fragmentation, inter-fragment pacing, transfer progress and cancel ([FragmentingPacketSender]),
+ *  - `toBinaryData(padding = shouldPadForBLE(type))` — the iOS-compatible wire encoding,
+ *  - source routing for originating packets (behind [sourceRoutingEnabled]: the Apple bearer never
+ *    had it, so it stays off there until the owner enables it deliberately),
+ *  - directed-send-to-neighbor with broadcast fallback,
+ *  - broadcast with relay/sender anti-loop,
+ *  - per-target relay telemetry through the [MeshTrafficLog] port (null = silent, Apple today).
+ *
+ * Broadcast sends are serialized through an unbounded [Channel] with a single consumer — the same
+ * model as the JVM `actor` the Android broadcaster used (an actor IS a channel plus a consumer
+ * coroutine), so FIFO order and single-writer discipline are preserved. [sendToPeer] stays
+ * synchronous on the caller, exactly as before on both platforms.
+ */
+internal class BleSendCore(
+    private val scope: CoroutineScope,
+    fragmentManager: FragmentManager?,
+    transferProgressManager: TransferProgressManager,
+    private val myPeerID: String,
+    private val radio: BleRadioLink,
+    private val trafficLog: MeshTrafficLog?,
+    private val sourceRoutingEnabled: Boolean,
+    private val logTag: String,
+) {
+    private var nicknameResolver: ((String) -> String?)? = null
+
+    private val fragmentingSender =
+        FragmentingPacketSender(scope, fragmentManager, transferProgressManager, logTag)
+
+    private val sendQueue = Channel<RoutedPacket>(Channel.UNLIMITED)
+
+    init {
+        scope.launch {
+            for (routed in sendQueue) sendSinglePacketInternal(routed)
+        }
+    }
+
+    fun setNicknameResolver(resolver: (String) -> String?) {
+        nicknameResolver = resolver
+    }
+
+    /** Fragments (if needed) and queues each frame for the serialized broadcast consumer. */
+    fun broadcastPacket(routed: RoutedPacket) {
+        fragmentingSender.send(routed, "type ${routed.packet.type}") { fragment ->
+            enqueue(fragment)
+        }
+    }
+
+    fun cancelTransfer(transferId: String): Boolean = fragmentingSender.cancelTransfer(transferId)
+
+    /**
+     * Targeted send to a directly connected peer, bypassing the queue (historical behavior on
+     * both platforms). Server links are preferred over client links.
+     */
+    fun sendToPeer(targetPeerID: String, routed: RoutedPacket): Boolean {
+        val packet = routed.packet
+        // iOS-compatible: only Noise frames are padded over BLE (BLEPacketPaddingPolicy).
+        val data = packet.toBinaryData(padding = BLEPacketPaddingPolicy.shouldPadForBLE(packet.type)) ?: return false
+        for (neighbor in radio.neighbors()) {
+            if (neighbor.peerID != targetPeerID) continue
+            if (radio.writeToNeighbor(neighbor, data)) {
+                logPacketRelay(routed, toPeer = targetPeerID, toAddress = neighbor.linkAddress)
+                return true
+            }
+        }
+        return false
+    }
+
+    fun shutdown() {
+        sendQueue.close()
+    }
+
+    @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
+    fun getDebugInfo(): String = buildString {
+        appendLine("=== BLE Send Core Debug Info ===")
+        appendLine("Scope Active: ${scope.isActive}")
+        appendLine("Queue Closed: ${sendQueue.isClosedForSend}")
+        appendLine("Source Routing: $sourceRoutingEnabled")
+    }
+
+    private fun enqueue(routed: RoutedPacket): Boolean {
+        val result = sendQueue.trySend(routed)
+        if (result.isFailure) {
+            Log.w(logTag, "Send queue rejected packet, processing directly")
+            scope.launch { sendSinglePacketInternal(routed) }
+        }
+        return true
+    }
+
+    private fun sendSinglePacketInternal(routed: RoutedPacket) {
+        val packet = routed.packet
+        // iOS-compatible: only Noise frames are padded over BLE (BLEPacketPaddingPolicy).
+        val data = packet.toBinaryData(padding = BLEPacketPaddingPolicy.shouldPadForBLE(packet.type)) ?: return
+        val senderID = packet.senderID.toHexString()
+        val routeInfo = packet.route?.takeIf { it.isNotEmpty() }?.let { "routed: ${it.size} hops" }
+        val neighbors = radio.neighbors()
+
+        // Source routing for originating packets: send ONLY to the first hop when we authored the
+        // packet and it carries an explicit route; fall back to broadcast if the hop is gone.
+        if (sourceRoutingEnabled && senderID == myPeerID && !packet.route.isNullOrEmpty()) {
+            val firstHop = packet.route!![0].toHexString()
+            for (hop in neighbors) {
+                if (hop.peerID != firstHop) continue
+                if (radio.writeToNeighbor(hop, data)) {
+                    logPacketRelay(routed, hop.peerID, hop.linkAddress, packet.version, routeInfo)
+                    return
+                }
+            }
+            Log.w(logTag, "Source routing: first hop $firstHop unreachable, broadcasting instead")
+        }
+
+        // Directed send when the unicast recipient is a direct neighbor (server link first).
+        val recipientID = packet.recipientID
+        if (recipientID != null && !recipientID.contentEquals(SpecialRecipients.BROADCAST)) {
+            val recipient = recipientID.toHexString()
+            for (neighbor in neighbors) {
+                if (neighbor.peerID != recipient) continue
+                if (radio.writeToNeighbor(neighbor, data)) {
+                    logPacketRelay(routed, neighbor.peerID, neighbor.linkAddress, packet.version, routeInfo)
+                    return
+                }
+            }
+        }
+
+        // Broadcast to every neighbor except the relayer and the original sender (loop avoidance).
+        neighbors.forEach { neighbor ->
+            if (neighbor.linkAddress == routed.relayAddress) return@forEach
+            if (neighbor.peerID == senderID) return@forEach
+            if (radio.writeToNeighbor(neighbor, data)) {
+                logPacketRelay(routed, neighbor.peerID, neighbor.linkAddress, packet.version, routeInfo)
+            }
+        }
+    }
+
+    private fun logPacketRelay(
+        routed: RoutedPacket,
+        toPeer: String?,
+        toAddress: String,
+        packetVersion: UByte = 1u,
+        routeInfo: String? = null,
+    ) {
+        val log = trafficLog ?: return
+        try {
+            val packet = routed.packet
+            val typeName = MessageType.fromValue(packet.type)?.name ?: packet.type.toString()
+            val senderPeerID = routed.peerID ?: packet.senderID.toHexString()
+            val incomingAddr = routed.relayAddress
+            val incomingPeer = incomingAddr?.let { radio.peerForAddress(it) }
+            log.logOutgoing(
+                packetType = typeName,
+                toPeerID = toPeer,
+                toNickname = toPeer?.let { nicknameResolver?.invoke(it) },
+                toDeviceAddress = toAddress,
+                previousHopPeerID = incomingPeer,
+                packetVersion = packetVersion,
+                routeInfo = routeInfo,
+            )
+            log.logPacketRelayDetailed(
+                packetType = typeName,
+                senderPeerID = senderPeerID,
+                senderNickname = nicknameResolver?.invoke(senderPeerID),
+                fromPeerID = incomingPeer,
+                fromNickname = incomingPeer?.let { nicknameResolver?.invoke(it) },
+                fromDeviceAddress = incomingAddr,
+                toPeerID = toPeer,
+                toNickname = toPeer?.let { nicknameResolver?.invoke(it) },
+                toDeviceAddress = toAddress,
+                ttl = packet.ttl,
+                isRelay = true,
+                packetVersion = packetVersion,
+                routeInfo = routeInfo,
+            )
+        } catch (_: Exception) {
+            // Telemetry must never break the send path.
+        }
+    }
+}

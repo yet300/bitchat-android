@@ -5,23 +5,15 @@ package com.app.transport.mesh
 import co.touchlab.stately.collections.ConcurrentMutableMap
 import com.app.common.AppDispatchers
 import com.app.common.utils.Log
-import com.app.common.encoding.hexEncodedString
 import com.app.common.encoding.toHexString
 import com.app.transport.MeshConstants
-import com.app.transport.crypto.Sha256
 import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
-import com.app.transport.protocol.MessageType
-import com.app.transport.protocol.SpecialRecipients
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import platform.CoreBluetooth.CBATTErrorSuccess
 import platform.CoreBluetooth.CBATTRequest
 import platform.CoreBluetooth.CBAdvertisementDataServiceUUIDsKey
@@ -81,7 +73,6 @@ internal class CoreBluetoothConnectionManager(
 
     private companion object {
         const val TAG = "CoreBluetoothConnectionManager"
-        const val INTER_FRAGMENT_DELAY_MS = 20L
         // CoreBluetooth has no MTU-request API: the central learns the negotiated ATT MTU and
         // exposes it via maximumWriteValueLengthForType; fragmentation uses the commonMain cap.
     }
@@ -101,8 +92,6 @@ internal class CoreBluetoothConnectionManager(
 
     /** linkAddress -> logical peerID, owned by the bearer via [BleBearer.bindPeer]. */
     override val addressPeerMap = ConcurrentMutableMap<String, String>()
-
-    private val transferJobs = ConcurrentMutableMap<String, Job>()
 
     private var mutableCharacteristic: CBMutableCharacteristic? = null
 
@@ -144,6 +133,7 @@ internal class CoreBluetoothConnectionManager(
 
     fun shutdown() {
         stopServices()
+        sendCore.shutdown()
         scope.cancel()
     }
 
@@ -183,104 +173,52 @@ internal class CoreBluetoothConnectionManager(
     }
 
     // -----------------------------------------------------------------
-    // Send (mirrors BluetoothPacketBroadcaster)
+    // Send — shared BleSendCore (C1); only the raw CB writes below are Apple-specific.
+    // Source routing stays disabled here to preserve the pre-unification target set
+    // (the Apple bearer never source-routed); the owner can enable it deliberately.
     // -----------------------------------------------------------------
+
+    private val sendCore = BleSendCore(
+        scope = scope,
+        fragmentManager = fragmentManager,
+        transferProgressManager = transferProgressManager,
+        myPeerID = myPeerID,
+        radio = RadioLink(),
+        trafficLog = null,
+        sourceRoutingEnabled = false,
+        logTag = TAG,
+    )
 
     override fun broadcastPacket(routed: RoutedPacket) {
         if (!active) return
-        val packet = routed.packet
-        val isFile = packet.type == MessageType.FILE_TRANSFER.value
-        val transferId = routed.transferId ?: (if (isFile) sha256Hex(packet.payload) else null)
-
-        if (fragmentManager != null) {
-            val fragments = try {
-                fragmentManager.createFragments(packet)
-            } catch (e: Exception) {
-                Log.e(TAG, "Fragment creation failed: ${e.message}")
-                return
-            }
-            if (fragments.size > 1) {
-                if (transferId != null) transferProgressManager.start(transferId, fragments.size)
-                val job = scope.launch {
-                    var sent = 0
-                    fragments.forEach { fragment ->
-                        if (!isActive) return@launch
-                        if (transferId != null && transferJobs.get(transferId)?.isCancelled == true) return@launch
-                        sendSinglePacket(RoutedPacket(fragment, transferId = transferId))
-                        delay(INTER_FRAGMENT_DELAY_MS)
-                        if (transferId != null) {
-                            sent += 1
-                            transferProgressManager.progress(transferId, sent, fragments.size)
-                            if (sent == fragments.size) transferProgressManager.complete(transferId, fragments.size)
-                        }
-                    }
-                }
-                if (transferId != null) {
-                    transferJobs.put(transferId, job)
-                    job.invokeOnCompletion { transferJobs.remove(transferId) }
-                }
-                return
-            }
-        }
-
-        if (transferId != null) transferProgressManager.start(transferId, 1)
-        sendSinglePacket(routed)
-        if (transferId != null) {
-            transferProgressManager.progress(transferId, 1, 1)
-            transferProgressManager.complete(transferId, 1)
-        }
+        sendCore.broadcastPacket(routed)
     }
 
     override fun sendToPeer(peerID: String, routed: RoutedPacket): Boolean {
         if (!active) return false
-        val targetPeerID = peerID
-        val packet = routed.packet
-        val data = packet.toBinaryData(padding = BLEPacketPaddingPolicy.shouldPadForBLE(packet.type)) ?: return false
-
-        // Server-side connection first (notify the subscribed central), then client-side (write).
-        subscribedCentrals.entries.firstOrNull { addressPeerMap.get(it.key) == targetPeerID }?.let { (_, central) ->
-            if (notifyCentral(central, data)) return true
-        }
-        connectedPeripherals.entries.firstOrNull { addressPeerMap.get(it.key) == targetPeerID }?.let { (addr, peripheral) ->
-            if (writeToPeripheral(addr, peripheral, data)) return true
-        }
-        return false
+        return sendCore.sendToPeer(peerID, routed)
     }
 
-    override fun cancelTransfer(transferId: String): Boolean {
-        val job = transferJobs.remove(transferId) ?: return false
-        job.cancel()
-        return true
-    }
+    override fun cancelTransfer(transferId: String): Boolean = sendCore.cancelTransfer(transferId)
 
-    private fun sendSinglePacket(routed: RoutedPacket) {
-        val packet = routed.packet
-        val data = packet.toBinaryData(padding = BLEPacketPaddingPolicy.shouldPadForBLE(packet.type)) ?: return
-        val senderID = packet.senderID.toHexString()
-        val relayAddress = routed.relayAddress
-
-        // Directed send for a unicast recipient that is a direct neighbor.
-        if (packet.recipientID != null && !packet.recipientID.contentEquals(SpecialRecipients.BROADCAST)) {
-            val recipientID = packet.recipientID!!.toHexString()
-            subscribedCentrals.entries.firstOrNull { addressPeerMap.get(it.key) == recipientID }?.let { (_, central) ->
-                if (notifyCentral(central, data)) return
+    private inner class RadioLink : BleRadioLink {
+        override fun neighbors(): List<BleNeighbor> =
+            subscribedCentrals.keys.map { addr ->
+                BleNeighbor(addr, isClient = false, peerID = addressPeerMap.get(addr))
+            } + connectedPeripherals.keys.map { addr ->
+                BleNeighbor(addr, isClient = true, peerID = addressPeerMap.get(addr))
             }
-            connectedPeripherals.entries.firstOrNull { addressPeerMap.get(it.key) == recipientID }?.let { (addr, peripheral) ->
-                if (writeToPeripheral(addr, peripheral, data)) return
-            }
-        }
 
-        // Broadcast to every neighbor except the relayer and the original sender (loop avoidance).
-        subscribedCentrals.entries.forEach { (addr, central) ->
-            if (addr == relayAddress) return@forEach
-            if (addressPeerMap.get(addr) == senderID) return@forEach
-            notifyCentral(central, data)
-        }
-        connectedPeripherals.entries.forEach { (addr, peripheral) ->
-            if (addr == relayAddress) return@forEach
-            if (addressPeerMap.get(addr) == senderID) return@forEach
-            writeToPeripheral(addr, peripheral, data)
-        }
+        override fun peerForAddress(linkAddress: String): String? = addressPeerMap.get(linkAddress)
+
+        override fun writeToNeighbor(neighbor: BleNeighbor, frame: ByteArray): Boolean =
+            if (neighbor.isClient) {
+                val peripheral = connectedPeripherals.get(neighbor.linkAddress) ?: return false
+                writeToPeripheral(neighbor.linkAddress, peripheral, frame)
+            } else {
+                val central = subscribedCentrals.get(neighbor.linkAddress) ?: return false
+                notifyCentral(central, frame)
+            }
     }
 
     private fun notifyCentral(central: CBCentral, data: ByteArray): Boolean {
@@ -303,9 +241,6 @@ internal class CoreBluetoothConnectionManager(
             false
         }
     }
-
-    private fun sha256Hex(bytes: ByteArray): String =
-        Sha256.digest(bytes).hexEncodedString()
 
     // -----------------------------------------------------------------
     // Incoming

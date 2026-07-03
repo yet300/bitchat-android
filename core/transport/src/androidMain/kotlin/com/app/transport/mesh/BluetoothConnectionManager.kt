@@ -40,7 +40,12 @@ internal class BluetoothConnectionManager(
     // Component managers
     private val permissionManager = BluetoothPermissionManager(context)
     private val connectionTracker = BluetoothConnectionTracker(connectionScope, powerManager)
-    private val packetBroadcaster = BluetoothPacketBroadcaster(connectionScope, connectionTracker, fragmentManager, myPeerID, debugSettingsManager, transferProgressManager)
+    private val packetBroadcaster = BluetoothPacketBroadcaster(
+        connectionScope, connectionTracker, fragmentManager, myPeerID, debugSettingsManager,
+        transferProgressManager,
+        gattServerProvider = { serverManager.getGattServer() },
+        characteristicProvider = { serverManager.getCharacteristic() },
+    )
     
     // Delegate for component managers to call back to main manager
     private val componentDelegate = object : BluetoothConnectionManagerDelegate {
@@ -283,21 +288,12 @@ internal class BluetoothConnectionManager(
     override fun broadcastPacket(routed: RoutedPacket) {
         if (!isActive) return
         
-        packetBroadcaster.broadcastPacket(
-            routed,
-            serverManager.getGattServer(),
-            serverManager.getCharacteristic()
-        )
+        packetBroadcaster.broadcastPacket(routed)
     }
 
     override fun sendToPeer(peerID: String, routed: RoutedPacket): Boolean {
         if (!isActive) return false
-        return packetBroadcaster.sendToPeer(
-            peerID,
-            routed,
-            serverManager.getGattServer(),
-            serverManager.getCharacteristic()
-        )
+        return packetBroadcaster.sendToPeer(peerID, routed)
     }
 
     override fun cancelTransfer(transferId: String): Boolean {
