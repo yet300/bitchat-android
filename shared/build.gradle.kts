@@ -9,16 +9,20 @@ plugins {
 }
 
 kotlin {
-//    listOf(
-//        iosArm64(),
-//        iosSimulatorArm64()
-//    ).forEach { iosTarget ->
-//        iosTarget.binaries.framework {
-//            baseName = "Shared"
-//            isStatic = true
-//        }
-//    }
-    
+    listOf(
+        iosArm64(),
+        iosSimulatorArm64()
+    ).forEach { iosTarget ->
+        iosTarget.binaries.framework {
+            baseName = "Shared"
+            binaryOption("bundleId", "com.yet.bitmessage.shared")
+            isStatic = true
+            export(projects.feature.root)
+            export(libs.bundles.decompose)
+        }
+    }
+
+
     androidLibrary {
        namespace = "com.yet.bitmessage.shared"
        compileSdk = libs.versions.compileSdk.get().toInt()
@@ -56,7 +60,7 @@ kotlin {
             implementation(projects.core.data)
             implementation(projects.core.database)
 
-            implementation(projects.feature.root)
+            api(projects.feature.root)
             implementation(projects.feature.onboarding)
             implementation(projects.feature.map)
             implementation(projects.feature.debug)
@@ -83,11 +87,16 @@ kotlin {
 
             implementation(libs.kotlinx.io.core)
 
-            implementation(libs.bundles.decompose)
+            api(libs.bundles.decompose)
             implementation(libs.decompose.compose)
             implementation(libs.decompose.compose.experimental)
 
             implementation(libs.ksafe)
+        }
+        iosMain.dependencies {
+            // JSON armor for SerializableContainer in the NSCoder state-preservation bridge
+            // (StateKeeperUtils); no @Serializable codegen here, so the plugin is not applied.
+            implementation(libs.kotlinx.serialization.json)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

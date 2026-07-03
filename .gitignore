@@ -66,3 +66,6 @@ tools/arti-build/target/
 
 # Local agent settings (skill symlinks are committed; local settings are not)
 .claude/settings.local.json
+
+# Xcode user state
+xcuserdata/
