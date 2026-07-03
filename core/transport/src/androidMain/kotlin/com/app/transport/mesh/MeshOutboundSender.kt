@@ -16,6 +16,7 @@ import com.app.transport.model.NoisePayloadType
 import com.app.transport.model.PrivateMessagePacket
 import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
+import com.app.transport.protocol.peerIdToRoutingBytes
 import com.app.transport.protocol.MessageType
 import com.app.transport.protocol.SpecialRecipients
 import com.app.transport.sync.GossipSyncManager
@@ -58,7 +59,7 @@ internal class MeshOutboundSender(
             val packet = BitchatPacket(
                 version = 1u,
                 type = MessageType.MESSAGE.value,
-                senderID = hexStringToByteArray(myPeerID),
+                senderID = peerIdToRoutingBytes(myPeerID),
                 recipientID = SpecialRecipients.BROADCAST,
                 timestamp = System.currentTimeMillis().toULong(),
                 payload = content.toByteArray(Charsets.UTF_8),
@@ -90,7 +91,7 @@ internal class MeshOutboundSender(
                 val packet = BitchatPacket(
                     version = 2u,  // FILE_TRANSFER uses v2 for 4-byte payload length to support large files
                     type = MessageType.FILE_TRANSFER.value,
-                    senderID = hexStringToByteArray(myPeerID),
+                    senderID = peerIdToRoutingBytes(myPeerID),
                     recipientID = SpecialRecipients.BROADCAST,
                     timestamp = System.currentTimeMillis().toULong(),
                     payload = payload,
@@ -146,8 +147,8 @@ internal class MeshOutboundSender(
                         val packet = BitchatPacket(
                             version = 1u,
                             type = MessageType.NOISE_ENCRYPTED.value,
-                            senderID = hexStringToByteArray(myPeerID),
-                            recipientID = hexStringToByteArray(recipientPeerID),
+                            senderID = peerIdToRoutingBytes(myPeerID),
+                            recipientID = peerIdToRoutingBytes(recipientPeerID),
                             timestamp = System.currentTimeMillis().toULong(),
                             payload = encrypted,
                             signature = null,
@@ -217,8 +218,8 @@ internal class MeshOutboundSender(
                     val packet = BitchatPacket(
                         version = 1u,
                         type = MessageType.NOISE_ENCRYPTED.value,
-                        senderID = hexStringToByteArray(myPeerID),
-                        recipientID = hexStringToByteArray(recipientPeerID),
+                        senderID = peerIdToRoutingBytes(myPeerID),
+                        recipientID = peerIdToRoutingBytes(recipientPeerID),
                         timestamp = System.currentTimeMillis().toULong(),
                         payload = encrypted,
                         signature = null,
@@ -274,8 +275,8 @@ internal class MeshOutboundSender(
                 val packet = BitchatPacket(
                     version = 1u,
                     type = MessageType.NOISE_ENCRYPTED.value,
-                    senderID = hexStringToByteArray(myPeerID),
-                    recipientID = hexStringToByteArray(recipientPeerID),
+                    senderID = peerIdToRoutingBytes(myPeerID),
+                    recipientID = peerIdToRoutingBytes(recipientPeerID),
                     timestamp = System.currentTimeMillis().toULong(),
                     payload = encrypted,
                     signature = null,
@@ -323,8 +324,8 @@ internal class MeshOutboundSender(
                 val packet = BitchatPacket(
                     version = 1u,
                     type = MessageType.NOISE_ENCRYPTED.value,
-                    senderID = hexStringToByteArray(myPeerID),
-                    recipientID = hexStringToByteArray(recipientPeerID),
+                    senderID = peerIdToRoutingBytes(myPeerID),
+                    recipientID = peerIdToRoutingBytes(recipientPeerID),
                     timestamp = System.currentTimeMillis().toULong(),
                     payload = encrypted,
                     signature = null,
@@ -487,7 +488,7 @@ internal class MeshOutboundSender(
                     if (path != null && path.size >= 3) {
                         // Exclude first (sender) and last (recipient); only intermediates
                         val intermediates = path.subList(1, path.size - 1)
-                        val hopsBytes = intermediates.map { hexStringToByteArray(it) }
+                        val hopsBytes = intermediates.map { peerIdToRoutingBytes(it) }
                         Log.d(TAG, "✅ Signed packet type ${packet.type} (route ${hopsBytes.size} hops: $intermediates)")
                         // Attach route and upgrade to v2 (required for HAS_ROUTE flag)
                         packet.copy(route = hopsBytes, version = 2u)
@@ -515,27 +516,6 @@ internal class MeshOutboundSender(
             Log.w(TAG, "Error signing packet type ${packet.type}: ${e.message}, sending unsigned")
             packet
         }
-    }
-
-    /**
-     * Convert hex string peer ID to binary data (8 bytes) - exactly same as iOS
-     */
-    fun hexStringToByteArray(hexString: String): ByteArray {
-        val result = ByteArray(8) { 0 } // Initialize with zeros, exactly 8 bytes
-        var tempID = hexString
-        var index = 0
-
-        while (tempID.length >= 2 && index < 8) {
-            val hexByte = tempID.substring(0, 2)
-            val byte = hexByte.toIntOrNull(16)?.toByte()
-            if (byte != null) {
-                result[index] = byte
-            }
-            tempID = tempID.substring(2)
-            index++
-        }
-
-        return result
     }
 
     // Local helper to hash payloads to a stable hex ID for progress mapping

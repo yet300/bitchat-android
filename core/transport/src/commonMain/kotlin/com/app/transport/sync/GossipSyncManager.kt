@@ -10,6 +10,7 @@ import com.app.common.encoding.hexEncodedString
 import com.app.common.utils.Log
 import com.app.transport.model.RequestSyncPacket
 import com.app.transport.protocol.BitchatPacket
+import com.app.transport.protocol.peerIdToRoutingBytes
 import com.app.transport.protocol.MessageType
 import com.app.transport.protocol.SpecialRecipients
 import kotlinx.coroutines.*
@@ -151,7 +152,7 @@ internal class GossipSyncManager(
 
         val packet = BitchatPacket(
             type = MessageType.REQUEST_SYNC.value,
-            senderID = hexStringToByteArray(myPeerID),
+            senderID = peerIdToRoutingBytes(myPeerID),
             timestamp = Clock.System.now().toEpochMilliseconds().toULong(),
             payload = payload,
             ttl = SyncDefaults.SYNC_TTL_HOPS // neighbors only
@@ -166,8 +167,8 @@ internal class GossipSyncManager(
 
         val packet = BitchatPacket(
             type = MessageType.REQUEST_SYNC.value,
-            senderID = hexStringToByteArray(myPeerID),
-            recipientID = hexStringToByteArray(peerID),
+            senderID = peerIdToRoutingBytes(myPeerID),
+            recipientID = peerIdToRoutingBytes(peerID),
             timestamp = Clock.System.now().toEpochMilliseconds().toULong(),
             payload = payload,
             ttl = SyncDefaults.SYNC_TTL_HOPS // neighbor only
@@ -209,20 +210,6 @@ internal class GossipSyncManager(
                 Log.d(TAG, "Sent sync message: Type ${toSend.type} to $fromPeerID packet id ${idBytes.hexEncodedString()}")
             }
         }
-    }
-
-    private fun hexStringToByteArray(hexString: String): ByteArray {
-        val result = ByteArray(8) { 0 }
-        var tempID = hexString
-        var index = 0
-        while (tempID.length >= 2 && index < 8) {
-            val hexByte = tempID.substring(0, 2)
-            val byte = hexByte.toIntOrNull(16)?.toByte()
-            if (byte != null) result[index] = byte
-            tempID = tempID.substring(2)
-            index++
-        }
-        return result
     }
 
     private fun hexToBytes(hex: String): ByteArray {

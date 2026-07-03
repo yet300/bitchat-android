@@ -14,6 +14,7 @@ import com.app.transport.model.PrivateMessagePacket
 import com.app.transport.model.RoutedPacket
 import com.app.transport.model.messageTypeForMime
 import com.app.transport.protocol.BitchatPacket
+import com.app.transport.protocol.peerIdToRoutingBytes
 import com.app.transport.protocol.MessageType
 import com.app.transport.sync.PacketIdUtil
 import com.app.common.encoding.toHexString
@@ -221,8 +222,8 @@ internal class MessageHandler(
                 val packet = BitchatPacket(
                     version = 1u,
                     type = MessageType.NOISE_ENCRYPTED.value,
-                    senderID = hexStringToByteArray(myPeerID),
-                    recipientID = hexStringToByteArray(senderPeerID),
+                    senderID = peerIdToRoutingBytes(myPeerID),
+                    recipientID = peerIdToRoutingBytes(senderPeerID),
                     timestamp = Clock.System.now().toEpochMilliseconds().toULong(),
                     payload = encryptedPayload,
                     signature = null,
@@ -354,8 +355,8 @@ internal class MessageHandler(
                 val responsePacket = BitchatPacket(
                     version = 1u,
                     type = MessageType.NOISE_HANDSHAKE.value,
-                    senderID = hexStringToByteArray(myPeerID),
-                    recipientID = hexStringToByteArray(peerID),
+                    senderID = peerIdToRoutingBytes(myPeerID),
+                    recipientID = peerIdToRoutingBytes(peerID),
                     timestamp = Clock.System.now().toEpochMilliseconds().toULong(),
                     payload = response,
                     signature = null,
@@ -537,27 +538,6 @@ internal class MessageHandler(
             appendLine("Handler Scope Active: ${handlerScope.isActive}")
             appendLine("My Peer ID: $myPeerID")
         }
-    }
-    
-    /**
-     * Convert hex string peer ID to binary data (8 bytes) - same as iOS implementation
-     */
-    private fun hexStringToByteArray(hexString: String): ByteArray {
-        val result = ByteArray(8) { 0 } // Initialize with zeros, exactly 8 bytes
-        var tempID = hexString
-        var index = 0
-        
-        while (tempID.length >= 2 && index < 8) {
-            val hexByte = tempID.substring(0, 2)
-            val byte = hexByte.toIntOrNull(16)?.toByte()
-            if (byte != null) {
-                result[index] = byte
-            }
-            tempID = tempID.substring(2)
-            index++
-        }
-        
-        return result
     }
 
     /**

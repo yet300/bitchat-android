@@ -251,6 +251,55 @@ class SecurityManagerTest {
         assertFalse("Duplicate packet should be rejected", result2)
     }
 
+    /**
+     * Pins the M1 dedup-key fix: the key is sha256(payload)-based (iOS
+     * BLEReceivePipeline parity), so distinct packets sharing sender, timestamp,
+     * type and even the first 64 payload bytes must NOT be collapsed as duplicates.
+     * The previous key hashed only the first 64 bytes with the forgeable 32-bit
+     * contentHashCode and would have dropped the second packet.
+     */
+    @Test
+    fun `validatePacket - distinct payloads with same sender timestamp type and 64-byte prefix are both accepted`() {
+        setupKnownPeer(otherPeerID, otherSigningKey)
+
+        val prefix = ByteArray(64) { 7 }
+        fun packet(tail: Byte) = BitchatPacket(
+            version = 1u,
+            type = MessageType.MESSAGE.value,
+            senderID = byteArrayOf(0xAA.toByte(), 0xAA.toByte(), 0xBB.toByte(), 0xBB.toByte(), 0xCC.toByte(), 0xCC.toByte(), 0xDD.toByte(), 0xDD.toByte()),
+            recipientID = null,
+            timestamp = 1_000_000uL,
+            payload = prefix + tail,
+            signature = validSignature,
+            ttl = 7u
+        )
+
+        assertTrue("First packet must be accepted", securityManager.validatePacket(packet(1), otherPeerID))
+        assertTrue(
+            "Second packet differing only past byte 64 must be accepted",
+            securityManager.validatePacket(packet(2), otherPeerID)
+        )
+    }
+
+    @Test
+    fun `validatePacket - identical payload with same sender and timestamp is still deduplicated`() {
+        setupKnownPeer(otherPeerID, otherSigningKey)
+
+        fun packet() = BitchatPacket(
+            version = 1u,
+            type = MessageType.MESSAGE.value,
+            senderID = byteArrayOf(0xAA.toByte(), 0xAA.toByte(), 0xBB.toByte(), 0xBB.toByte(), 0xCC.toByte(), 0xCC.toByte(), 0xDD.toByte(), 0xDD.toByte()),
+            recipientID = null,
+            timestamp = 2_000_000uL,
+            payload = dummyPayload,
+            signature = validSignature,
+            ttl = 7u
+        )
+
+        assertTrue(securityManager.validatePacket(packet(), otherPeerID))
+        assertFalse("Byte-identical replay must be dropped", securityManager.validatePacket(packet(), otherPeerID))
+    }
+
     @Test
     fun `validatePacket - handles ANNOUNCE duplicates correctly`() {
         val announcement = IdentityAnnouncement(
