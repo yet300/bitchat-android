@@ -35,6 +35,21 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         return appGraph.rootFactory.create(componentContext: context)
     }()
 
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        // The AppDelegate is the mesh lifecycle owner on iOS (no foreground-service concept):
+        // the BLE mesh runs while the process lives, kept alive in background by the
+        // bluetooth-central/peripheral background modes.
+        appGraph.meshLifecycleController.start()
+        return true
+    }
+
+    func applicationWillTerminate(_ application: UIApplication) {
+        appGraph.meshLifecycleController.stop()
+    }
+
     func application(_ application: UIApplication, shouldSaveSecureApplicationState coder: NSCoder) -> Bool {
         StateKeeperUtilsKt.save(coder: coder, state: stateKeeper.save())
         return true

@@ -108,7 +108,7 @@ internal class MeshComponentWiring(
                     type = MessageType.NOISE_HANDSHAKE.value,
                     senderID = peerIdToRoutingBytes(myPeerID),
                     recipientID = peerIdToRoutingBytes(peerID),
-                    timestamp = System.currentTimeMillis().toULong(),
+                    timestamp = epochMillis().toULong(),
                     payload = response,
                     ttl = MeshConstants.MESSAGE_TTL_HOPS
                 )
@@ -223,7 +223,7 @@ internal class MeshComponentWiring(
                             type = MessageType.NOISE_HANDSHAKE.value,
                             senderID = peerIdToRoutingBytes(myPeerID),
                             recipientID = peerIdToRoutingBytes(peerID),
-                            timestamp = System.currentTimeMillis().toULong(),
+                            timestamp = epochMillis().toULong(),
                             payload = handshakeData,
                             ttl = MeshConstants.MESSAGE_TTL_HOPS
                         )

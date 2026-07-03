@@ -1,6 +1,7 @@
 package com.app.data.di
 
 import com.app.common.AppDispatchers
+import com.app.crypto.EncryptionService
 import com.app.crypto.secure.KSafeSecureKeyValueStore
 import com.app.crypto.secure.SecureKeyValueStore
 import com.app.data.app.NativeAppForegroundState
@@ -11,10 +12,17 @@ import com.app.domain.app.AppForegroundState
 import com.app.domain.repository.DatabaseKeyProvider
 import com.app.domain.repository.DatabasePanicWiper
 import com.app.domain.repository.MediaCleaner
+import com.app.transport.debug.DebugSettingsManager
+import com.app.transport.mesh.BleBearer
+import com.app.transport.mesh.FragmentManager
+import com.app.transport.mesh.MeshBearer
+import com.app.transport.mesh.TransferProgressManager
+import com.app.transport.mesh.createNativeBleBearer
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Binds
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
+import dev.zacsweers.metro.IntoSet
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
 import eu.anifantakis.lib.ksafe.KSafe
@@ -38,6 +46,31 @@ abstract class NativeDataBindings {
     abstract val NativeAppForegroundState.bindAppForegroundState: AppForegroundState
 
     companion object {
+
+        /**
+         * Graph-owned [BleBearer] over the CoreBluetooth radio stack — the native counterpart of
+         * the Android provider in `DataAndroidBindings`. The same instance is multibound into
+         * [Set]<[MeshBearer]> (below) and injected into the shared `MeshCoordinator`.
+         */
+        @Provides
+        @SingleIn(AppScope::class)
+        fun provideBleBearer(
+            encryptionService: EncryptionService,
+            debugSettingsManager: DebugSettingsManager,
+            fragmentManager: FragmentManager,
+            transferProgressManager: TransferProgressManager,
+            dispatchers: AppDispatchers,
+        ): BleBearer = createNativeBleBearer(
+            myPeerID = encryptionService.getIdentityFingerprint().take(16),
+            debugSettingsManager = debugSettingsManager,
+            fragmentManager = fragmentManager,
+            transferProgressManager = transferProgressManager,
+            dispatchers = dispatchers,
+        )
+
+        @Provides
+        @IntoSet
+        fun provideBleBearerIntoSet(bleBearer: BleBearer): MeshBearer = bleBearer
 
         /**
          * Single app-wide KSafe **plain** store for all non-secret preferences (`SettingsStore` writes

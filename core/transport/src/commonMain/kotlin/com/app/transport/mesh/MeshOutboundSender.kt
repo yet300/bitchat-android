@@ -1,7 +1,11 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package com.app.transport.mesh
 
+import com.app.common.encoding.hexEncodedString
 import com.app.common.utils.Log
 import com.app.crypto.EncryptionService
+import com.app.transport.crypto.Sha256
 import com.app.transport.GeohashReadReceiptRouter
 import com.app.transport.MeshConstants
 import com.app.transport.NicknameSource
@@ -22,6 +26,8 @@ import com.app.transport.protocol.SpecialRecipients
 import com.app.transport.sync.GossipSyncManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /**
  * Outbound send path of the mesh engine: builds, signs and broadcasts every packet the
@@ -61,8 +67,8 @@ internal class MeshOutboundSender(
                 type = MessageType.MESSAGE.value,
                 senderID = peerIdToRoutingBytes(myPeerID),
                 recipientID = SpecialRecipients.BROADCAST,
-                timestamp = System.currentTimeMillis().toULong(),
-                payload = content.toByteArray(Charsets.UTF_8),
+                timestamp = epochMillis().toULong(),
+                payload = content.encodeToByteArray(),
                 signature = null,
                 ttl = MAX_TTL
             )
@@ -93,7 +99,7 @@ internal class MeshOutboundSender(
                     type = MessageType.FILE_TRANSFER.value,
                     senderID = peerIdToRoutingBytes(myPeerID),
                     recipientID = SpecialRecipients.BROADCAST,
-                    timestamp = System.currentTimeMillis().toULong(),
+                    timestamp = epochMillis().toULong(),
                     payload = payload,
                     signature = null,
                     ttl = MAX_TTL
@@ -149,7 +155,7 @@ internal class MeshOutboundSender(
                             type = MessageType.NOISE_ENCRYPTED.value,
                             senderID = peerIdToRoutingBytes(myPeerID),
                             recipientID = peerIdToRoutingBytes(recipientPeerID),
-                            timestamp = System.currentTimeMillis().toULong(),
+                            timestamp = epochMillis().toULong(),
                             payload = encrypted,
                             signature = null,
                             ttl = MeshConstants.MESSAGE_TTL_HOPS
@@ -186,7 +192,7 @@ internal class MeshOutboundSender(
         if (recipientNickname.isEmpty()) return
 
         scope.launch {
-            val finalMessageID = messageID ?: java.util.UUID.randomUUID().toString()
+            val finalMessageID = messageID ?: Uuid.random().toString()
 
             Log.d(TAG, "📨 Sending PM to $recipientPeerID: ${content.take(30)}...")
 
@@ -220,7 +226,7 @@ internal class MeshOutboundSender(
                         type = MessageType.NOISE_ENCRYPTED.value,
                         senderID = peerIdToRoutingBytes(myPeerID),
                         recipientID = peerIdToRoutingBytes(recipientPeerID),
-                        timestamp = System.currentTimeMillis().toULong(),
+                        timestamp = epochMillis().toULong(),
                         payload = encrypted,
                         signature = null,
                         ttl = MAX_TTL
@@ -265,7 +271,7 @@ internal class MeshOutboundSender(
                 // Create read receipt payload using NoisePayloadType exactly like iOS
                 val readReceiptPayload = NoisePayload(
                     type = NoisePayloadType.READ_RECEIPT,
-                    data = messageID.toByteArray(Charsets.UTF_8)
+                    data = messageID.encodeToByteArray()
                 )
 
                 // Encrypt the payload
@@ -277,7 +283,7 @@ internal class MeshOutboundSender(
                     type = MessageType.NOISE_ENCRYPTED.value,
                     senderID = peerIdToRoutingBytes(myPeerID),
                     recipientID = peerIdToRoutingBytes(recipientPeerID),
-                    timestamp = System.currentTimeMillis().toULong(),
+                    timestamp = epochMillis().toULong(),
                     payload = encrypted,
                     signature = null,
                     ttl = MeshConstants.MESSAGE_TTL_HOPS // Same TTL as iOS messageTTL
@@ -326,7 +332,7 @@ internal class MeshOutboundSender(
                     type = MessageType.NOISE_ENCRYPTED.value,
                     senderID = peerIdToRoutingBytes(myPeerID),
                     recipientID = peerIdToRoutingBytes(recipientPeerID),
-                    timestamp = System.currentTimeMillis().toULong(),
+                    timestamp = epochMillis().toULong(),
                     payload = encrypted,
                     signature = null,
                     ttl = MeshConstants.MESSAGE_TTL_HOPS
@@ -437,7 +443,7 @@ internal class MeshOutboundSender(
             // Always update our own node in the mesh graph with the neighbor list we used
             try {
                 meshGraphService
-                    .updateFromAnnouncement(myPeerID, nickname, directPeers, System.currentTimeMillis().toULong())
+                    .updateFromAnnouncement(myPeerID, nickname, directPeers, epochMillis().toULong())
             } catch (_: Exception) { }
         } catch (_: Exception) { }
 
@@ -483,7 +489,7 @@ internal class MeshOutboundSender(
             val withRoute = try {
                 val rec = packet.recipientID
                 if (rec != null && !rec.contentEquals(SpecialRecipients.BROADCAST)) {
-                    val dest = rec.joinToString("") { b -> "%02x".format(b) }
+                    val dest = rec.hexEncodedString()
                     val path = RoutePlanner.shortestPath(myPeerID, dest, meshGraphService)
                     if (path != null && path.size >= 3) {
                         // Exclude first (sender) and last (recipient); only intermediates
@@ -520,8 +526,6 @@ internal class MeshOutboundSender(
 
     // Local helper to hash payloads to a stable hex ID for progress mapping
     private fun sha256Hex(bytes: ByteArray): String = try {
-        val md = java.security.MessageDigest.getInstance("SHA-256")
-        md.update(bytes)
-        md.digest().joinToString("") { "%02x".format(it) }
+        Sha256.digest(bytes).hexEncodedString()
     } catch (_: Exception) { bytes.size.toString(16) }
 }
