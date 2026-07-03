@@ -18,7 +18,7 @@ import com.app.data.routing.MessageRouter
 import com.app.data.routing.PeerAddressResolver
 import com.app.transport.SeenMessageStore
 import com.app.transport.VerificationService
-import com.app.transport.mesh.BluetoothMeshService
+import com.app.transport.mesh.MeshCoordinator
 import com.app.transport.mesh.MeshLifecycleController
 import com.app.transport.mesh.TransferProgressManager
 import com.app.transport.meshgraph.MeshGraphService
@@ -96,7 +96,7 @@ interface AppGraph : SharedAppGraph {
     // Graph-owned mesh engine: full surface for the still-living god-classes
     // (MainActivity/ChatViewModel, retires Phase C) and the narrow lifecycle contract
     // for the foreground service (invariant: the service owns the mesh lifecycle).
-    val bluetoothMeshService: BluetoothMeshService
+    val meshCoordinator: MeshCoordinator
     val meshLifecycleController: MeshLifecycleController
 
     /**

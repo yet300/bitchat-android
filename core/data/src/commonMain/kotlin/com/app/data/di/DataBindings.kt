@@ -42,8 +42,24 @@ import com.app.crypto.EncryptionService
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.crypto.secure.SecureKeyValueStore
+import com.app.common.AppDispatchers
+import com.app.transport.FavoriteNostrLink
+import com.app.transport.GeohashReadReceiptRouter
+import com.app.transport.IncomingMessageSink
+import com.app.transport.NicknameSource
+import com.app.transport.SeenMessageStore
+import com.app.transport.VerificationService
+import com.app.transport.debug.DebugPreferenceManager
+import com.app.transport.debug.DebugSettingsManager
+import com.app.transport.features.file.IncomingFileStore
+import com.app.transport.mesh.BleBearer
 import com.app.transport.mesh.FragmentManager
+import com.app.transport.mesh.MeshCoordinator
+import com.app.transport.mesh.MeshLifecycleController
+import com.app.transport.mesh.MeshNetwork
 import com.app.transport.mesh.MeshService
+import com.app.transport.meshgraph.MeshGraphService
+import com.app.transport.notification.ServiceNotifier
 import com.app.transport.routing.PeerKeyResolver
 import com.app.transport.routing.RouteStrategy
 import com.app.transport.routing.SessionInitiator
@@ -81,14 +97,16 @@ import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.IntoSet
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
+import com.app.domain.repository.MeshResetPort
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.withContext
 
 /**
  * Binds the data-layer repository implementations to their domain ports, and provides the routing
  * facade + narrow mesh ports. All platform-free now: the mesh-coupled impls depend on the commonMain
- * [MeshService] port (implemented by the androidMain `BluetoothMeshService`), so nothing here needs
- * an android type. The only androidMain data binding is [DataAndroidBindings], which adapts the
- * concrete mesh service and the incoming-file store.
+ * [MeshService] port (implemented by the shared [MeshCoordinator], provided here), so nothing here
+ * needs a platform type. The platform containers ([DataAndroidBindings] / `NativeDataBindings`)
+ * contribute the BLE bearer and the platform-constructed leaves.
  *
  * @Provides live in the [companion] object (a @BindingContainer needs a concrete receiver for them);
  * the @Binds are abstract members. Contributed to [AppScope]; the application graph aggregates this.
@@ -230,6 +248,67 @@ abstract class DataBindings {
         @Provides
         @SingleIn(AppScope::class)
         fun provideFragmentManager(): FragmentManager = FragmentManager()
+
+        /**
+         * The platform-free mesh coordinator (owns MeshNetwork, the engine components and the
+         * outbound send path). The platform containers contribute the bearers into
+         * Set<MeshBearer> and the lifecycle owner (Android FGS / iOS app lifecycle) drives it
+         * through [MeshLifecycleController].
+         */
+        @Provides
+        @SingleIn(AppScope::class)
+        fun provideMeshCoordinator(
+            incomingFileStore: IncomingFileStore,
+            dispatchers: AppDispatchers,
+            debugSettingsManager: DebugSettingsManager,
+            debugPreferenceManager: DebugPreferenceManager,
+            seenMessageStore: SeenMessageStore,
+            meshGraphService: MeshGraphService,
+            peerFingerprintManager: PeerFingerprintManager,
+            encryptionService: EncryptionService,
+            serviceNotifier: ServiceNotifier,
+            nicknameSource: NicknameSource,
+            incomingSink: IncomingMessageSink,
+            favoriteNostrLink: FavoriteNostrLink,
+            geohashReadReceiptRouter: GeohashReadReceiptRouter,
+            verificationService: VerificationService,
+            fragmentManager: FragmentManager,
+            bleBearer: BleBearer,
+            meshNetwork: MeshNetwork,
+        ): MeshCoordinator = MeshCoordinator(
+            incomingFileStore,
+            debugSettingsManager,
+            debugPreferenceManager,
+            seenMessageStore,
+            meshGraphService,
+            peerFingerprintManager,
+            encryptionService,
+            serviceNotifier,
+            nicknameSource,
+            incomingSink,
+            favoriteNostrLink,
+            geohashReadReceiptRouter,
+            verificationService,
+            fragmentManager,
+            bleBearer,
+            meshNetwork,
+            dispatchers = dispatchers,
+        )
+
+        /** The commonMain mesh port, implemented by the shared [MeshCoordinator]. */
+        @Provides
+        fun provideMeshService(mesh: MeshCoordinator): MeshService = mesh
+
+        /** Narrow lifecycle contract for the platform lifecycle owner (ISP); same coordinator. */
+        @Provides
+        fun provideMeshLifecycleController(mesh: MeshCoordinator): MeshLifecycleController = mesh
+
+        /** Domain port for panic-wipe mesh identity rotation — delegates to the coordinator. */
+        @Provides
+        fun provideMeshResetPort(mesh: MeshCoordinator, dispatchers: AppDispatchers): MeshResetPort =
+            object : MeshResetPort {
+                override suspend fun reset() = withContext(dispatchers.io) { mesh.reset() }
+            }
 
         /**
          * Wraps the graph-owned [RouteSelector] in the legacy [MessageRouter] facade, which keeps the

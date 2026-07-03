@@ -1,5 +1,6 @@
 package com.yet.bitmessage.di
 
+import com.app.transport.mesh.MeshLifecycleController
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.createGraph
@@ -11,7 +12,14 @@ import dev.zacsweers.metro.createGraph
  * UIKit foreground state), all `@ContributesTo(AppScope)` and therefore aggregated automatically.
  */
 @DependencyGraph(scope = AppScope::class)
-interface IosAppGraph : AppGraph
+interface IosAppGraph : AppGraph {
+    /**
+     * Narrow mesh lifecycle handle for the Swift AppDelegate — the iOS lifecycle owner
+     * (no foreground-service concept here; the mesh runs while the app process lives,
+     * kept alive in background by the CoreBluetooth background modes).
+     */
+    val meshLifecycleController: MeshLifecycleController
+}
 
 private val graph: IosAppGraph by lazy { createGraph<IosAppGraph>() }
 

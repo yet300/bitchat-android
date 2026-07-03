@@ -1,6 +1,9 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.app.transport.mesh
 
-import android.content.Context
+import co.touchlab.stately.concurrency.Lock
+import co.touchlab.stately.concurrency.withLock
 import com.app.common.utils.Log
 import com.app.crypto.EncryptionService
 import com.app.crypto.identity.PeerFingerprintManager
@@ -18,11 +21,17 @@ import com.app.transport.IncomingMessageSink
 import com.app.transport.FavoriteNostrLink
 import com.app.transport.GeohashReadReceiptRouter
 import com.app.transport.SeenMessageStore
-import com.app.transport.features.file.AndroidIncomingFileStore
+import com.app.transport.features.file.IncomingFileStore
 import com.app.transport.meshgraph.MeshGraphService
 import com.app.transport.verification.VerifyEventListener
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.*
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.ExperimentalTime
+
+/** Wall-clock epoch millis for wire timestamps (same semantics as System.currentTimeMillis). */
+internal fun epochMillis(): Long = Clock.System.now().toEpochMilliseconds()
 
 /**
  * Bluetooth mesh service - REFACTORED to use component-based architecture
@@ -37,8 +46,8 @@ import kotlin.time.Duration.Companion.milliseconds
  * - BluetoothConnectionManager: BLE connections and GATT operations
  * - PacketProcessor: Incoming packet routing
  */
-class BluetoothMeshService(
-    private val context: Context,
+class MeshCoordinator(
+    private val incomingFileStore: IncomingFileStore,
     private val debugSettingsManager: MeshTelemetry,
     private val debugPreferenceManager: com.app.transport.debug.DebugPreferenceManager,
     private val seenMessageStore: SeenMessageStore,
@@ -65,7 +74,7 @@ class BluetoothMeshService(
 ) : MeshLifecycleController, MeshService {
 
     companion object {
-        private const val TAG = "BluetoothMeshService"
+        private const val TAG = "MeshCoordinator"
         private val MAX_TTL: UByte = MeshConstants.MESSAGE_TTL_HOPS
 
         // Grace period between stopServices() and the actual teardown, giving the leave
@@ -86,7 +95,7 @@ class BluetoothMeshService(
     private var peerManager = PeerManager(peerFingerprintManager)
     private var securityManager = SecurityManager(encryptionService, myPeerID)
     private var storeForwardManager = StoreForwardManager()
-    private var messageHandler = MessageHandler(myPeerID, AndroidIncomingFileStore(context.applicationContext), meshGraphService, dispatchers)
+    private var messageHandler = MessageHandler(myPeerID, incomingFileStore, meshGraphService, dispatchers)
 
     /**
      * Narrow BLE debug surface for [com.bitchat.android.ui.debug.DebugSettingsSheet]
@@ -101,7 +110,7 @@ class BluetoothMeshService(
     // Single monitor for all lifecycle transitions (start/stop/reset/finishStop): the
     // delayed teardown runs on IO while callers arrive on main — without one lock the
     // terminated/isActive/pendingStopJob handoff was only safe by call-site accident.
-    private val lifecycleLock = Any()
+    private val lifecycleLock = Lock()
 
     // Service state management
     @Volatile
@@ -273,7 +282,7 @@ class BluetoothMeshService(
         fragmentManager.clearAllFragments()
         securityManager = SecurityManager(encryptionService, myPeerID)
         storeForwardManager = StoreForwardManager()
-        messageHandler = MessageHandler(myPeerID, AndroidIncomingFileStore(context.applicationContext), meshGraphService, dispatchers)
+        messageHandler = MessageHandler(myPeerID, incomingFileStore, meshGraphService, dispatchers)
         packetProcessor = PacketProcessor(myPeerID, debugSettingsManager)
         bleBearer.reset(myPeerID)
         wireComponents()
@@ -287,7 +296,7 @@ class BluetoothMeshService(
      * changes, so no consumer is left holding a dead instance.
      */
     override fun reset() {
-        synchronized(lifecycleLock) {
+        lifecycleLock.withLock {
             Log.w(TAG, "🚨 Resetting mesh service in place — old peerID=$myPeerID")
             isActive = false
             stopComponentsNow()
@@ -342,7 +351,7 @@ class BluetoothMeshService(
     /**
      * Start the mesh service
      */
-    fun startServices(): Unit = synchronized(lifecycleLock) {
+    fun startServices(): Unit = lifecycleLock.withLock {
         // Prevent double starts (defensive programming)
         if (isActive) {
             Log.w(TAG, "Mesh service already active, ignoring duplicate start request")
@@ -383,7 +392,7 @@ class BluetoothMeshService(
      * announcement gets out; a startServices() call inside that window completes the stop
      * synchronously first (see [finishStop]) instead of racing against it.
      */
-    fun stopServices(): Unit = synchronized(lifecycleLock) {
+    fun stopServices(): Unit = lifecycleLock.withLock {
         if (!isActive) {
             Log.w(TAG, "Mesh service not active, ignoring stop request")
             return
@@ -410,7 +419,7 @@ class BluetoothMeshService(
      * ([stoppingScope] identity) — invoked either by the delayed teardown coroutine or
      * eagerly by [startServices] when a restart arrives inside the grace window.
      */
-    private fun finishStop(stoppingScope: CoroutineScope): Unit = synchronized(lifecycleLock) {
+    private fun finishStop(stoppingScope: CoroutineScope): Unit = lifecycleLock.withLock {
         if (terminated) return
         if (stoppingScope !== serviceScope) {
             // reset()/rebuild replaced the generation this stop belonged to; the old

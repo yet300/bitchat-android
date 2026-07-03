@@ -1,11 +1,9 @@
 package com.app.data.di
 
 import android.content.Context
-import com.app.common.AppDispatchers
 import com.app.common.permission.PermissionController
 import com.app.common.settings.SettingsStore
 import com.app.crypto.EncryptionService
-import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.secure.KSafeSecureKeyValueStore
 import com.app.crypto.secure.SecureKeyValueStore
 import com.app.data.app.AndroidAppForegroundState
@@ -19,31 +17,18 @@ import com.app.domain.repository.ConnectivityRepository
 import com.app.domain.repository.DatabaseKeyProvider
 import com.app.domain.repository.DatabasePanicWiper
 import com.app.domain.repository.MediaCleaner
-import com.app.domain.repository.MeshResetPort
-import com.app.transport.FavoriteNostrLink
-import com.app.transport.GeohashReadReceiptRouter
-import com.app.transport.IncomingMessageSink
-import com.app.transport.NicknameSource
-import com.app.transport.SeenMessageStore
-import com.app.transport.VerificationService
-import com.app.transport.debug.DebugPreferenceManager
 import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.features.file.AndroidIncomingFileStore
 import com.app.transport.features.file.FileUtils
 import com.app.transport.features.file.IncomingFileStore
 import com.app.transport.mesh.BleBearer
-import com.app.transport.mesh.BluetoothMeshService
 import com.app.transport.mesh.FragmentManager
 import com.app.transport.mesh.MeshBearer
 import com.app.transport.mesh.MeshLifecycleController
-import com.app.transport.mesh.MeshNetwork
-import com.app.transport.mesh.MeshService
 import com.app.transport.mesh.TransferProgressManager
 import com.app.transport.mesh.createAndroidBleBearer
-import com.app.transport.meshgraph.MeshGraphService
 import com.app.transport.net.TorPreferenceManager
 import com.app.transport.nostr.NostrRelayManager
-import com.app.transport.notification.ServiceNotifier
 import eu.anifantakis.lib.ksafe.KSafe
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Binds
@@ -68,8 +53,7 @@ import kotlinx.coroutines.withContext
  *
  * Constructor-injectable impls are bound via `@Binds`; the leaves that need a `Context` or bespoke
  * construction stay `@Provides` in the [companion]. This is the single androidMain data binding
- * container (it also carries the concrete-mesh [MeshService] adapter and the Context-backed
- * `IncomingFileStore`, previously in a separate `DataProviders`).
+ * container; the platform-free mesh coordinator wiring lives in [DataBindings].
  */
 @ContributesTo(AppScope::class)
 @BindingContainer
@@ -79,15 +63,7 @@ abstract class DataAndroidBindings {
     @Binds
     abstract val AndroidAppForegroundState.bindAppForegroundState: AppForegroundState
 
-    /** Narrow lifecycle contract for the foreground service (ISP); same underlying BMS. */
-    @Binds
-    abstract val BluetoothMeshService.bindMeshLifecycleController: MeshLifecycleController
-
     companion object {
-
-        /** The commonMain mesh port, implemented by the androidMain [BluetoothMeshService]. */
-        @Provides
-        fun provideMeshService(mesh: BluetoothMeshService): MeshService = mesh
 
         /**
          * The `IncomingFileStore` seam (transport's commonMain port) used by `NostrDirectMessageIngest`
@@ -120,7 +96,7 @@ abstract class DataAndroidBindings {
 
         /**
          * Graph-owned [BleBearer]. The same instance is multibound into [Set]<[MeshBearer]>
-         * (below) and injected into [BluetoothMeshService] — no construction inside BMS.
+         * (below) and injected into the shared `MeshCoordinator` — no construction inside it.
          */
         @Provides
         @SingleIn(AppScope::class)
@@ -141,53 +117,6 @@ abstract class DataAndroidBindings {
         @Provides
         @IntoSet
         fun provideBleBearerIntoSet(bleBearer: BleBearer): MeshBearer = bleBearer
-
-        @Provides
-        @SingleIn(AppScope::class)
-        fun provideBluetoothMeshService(
-            context: Context,
-            dispatchers: AppDispatchers,
-            debugSettingsManager: DebugSettingsManager,
-            debugPreferenceManager: DebugPreferenceManager,
-            seenMessageStore: SeenMessageStore,
-            meshGraphService: MeshGraphService,
-            peerFingerprintManager: PeerFingerprintManager,
-            encryptionService: EncryptionService,
-            serviceNotifier: ServiceNotifier,
-            nicknameSource: NicknameSource,
-            incomingSink: IncomingMessageSink,
-            favoriteNostrLink: FavoriteNostrLink,
-            geohashReadReceiptRouter: GeohashReadReceiptRouter,
-            verificationService: VerificationService,
-            fragmentManager: FragmentManager,
-            bleBearer: BleBearer,
-            meshNetwork: MeshNetwork,
-        ): BluetoothMeshService = BluetoothMeshService(
-            context.applicationContext,
-            debugSettingsManager,
-            debugPreferenceManager,
-            seenMessageStore,
-            meshGraphService,
-            peerFingerprintManager,
-            encryptionService,
-            serviceNotifier,
-            nicknameSource,
-            incomingSink,
-            favoriteNostrLink,
-            geohashReadReceiptRouter,
-            verificationService,
-            fragmentManager,
-            bleBearer,
-            meshNetwork,
-            dispatchers = dispatchers,
-        )
-
-        /** Domain port for panic-wipe mesh identity rotation — delegates to BMS.reset(). */
-        @Provides
-        fun provideMeshResetPort(mesh: BluetoothMeshService): MeshResetPort =
-            object : MeshResetPort {
-                override suspend fun reset() = withContext(Dispatchers.IO) { mesh.reset() }
-            }
 
         /** Domain port for panic-wipe media deletion — delegates to FileUtils.clearAllMedia(). */
         @Provides

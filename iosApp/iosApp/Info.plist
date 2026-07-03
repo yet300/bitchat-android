@@ -4,5 +4,14 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>bitchat uses Bluetooth to discover nearby peers and exchange end-to-end encrypted messages over the mesh, without internet.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>bitchat advertises over Bluetooth so nearby peers can find you and relay encrypted mesh messages.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>bluetooth-central</string>
+		<string>bluetooth-peripheral</string>
+	</array>
 </dict>
 </plist>

@@ -12,6 +12,7 @@ import com.app.transport.NicknameSource
 import com.app.transport.SeenMessageStore
 import com.app.transport.VerificationService
 import com.app.transport.debug.DebugPreferenceManager
+import com.app.transport.features.file.AndroidIncomingFileStore
 import com.app.transport.meshgraph.MeshGraphService
 import com.app.transport.model.RoutedPacket
 import com.app.transport.notification.ServiceNotifier
@@ -51,9 +52,9 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
- * Lifecycle tests for [BluetoothMeshService] start/stop/reset with generation rebuild.
+ * Lifecycle tests for [MeshCoordinator] start/stop/reset with generation rebuild.
  *
- * The audited machinery under test (do NOT redesign): the [BluetoothMeshService] lifecycle
+ * The audited machinery under test (do NOT redesign): the [MeshCoordinator] lifecycle
  * monitor, the pendingStopJob + generation-guarded finishStop, terminated-state revival via
  * rebuildComponents, and BleBearer.reset() delegate detach.
  *
@@ -77,7 +78,7 @@ class BluetoothMeshServiceLifecycleTest {
         const val FINGERPRINT_B = "ffeeddccbbaa9988ffeeddccbbaa9988"
         const val REMOTE_PEER = "cafe000000000001"
         /** Past the stop grace period, with margin (still below the 30 s announce loop). */
-        const val PAST_GRACE_MS = BluetoothMeshService.STOP_GRACE_PERIOD_MS * 5
+        const val PAST_GRACE_MS = MeshCoordinator.STOP_GRACE_PERIOD_MS * 5
     }
 
     /** Injection point for packets: a second bearer alongside the real BleBearer. */
@@ -145,8 +146,8 @@ class BluetoothMeshServiceLifecycleTest {
         val fakeBearer = FakeBearer()
         val meshNetwork = MeshNetwork(setOf(bleBearer, fakeBearer))
 
-        val bms = BluetoothMeshService(
-            context = context,
+        val bms = MeshCoordinator(
+            incomingFileStore = AndroidIncomingFileStore(context),
             debugSettingsManager = telemetry,
             debugPreferenceManager = debugPrefs,
             seenMessageStore = mock<SeenMessageStore>(),
