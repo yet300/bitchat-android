@@ -59,8 +59,8 @@ abstract class NativeDataBindings {
         /**
          * Panic crypto-erase of the DB: close the handle, destroy the passphrase (its only copy lives
          * behind the Keychain-rooted secret store), then drop the file via SQLiter's own path
-         * resolution. NOTE: until SQLCipher is wired on native the file itself is plaintext, so the
-         * deletion — not the key destruction — is what removes the data on iOS.
+         * resolution. The DB file is SQLCipher-encrypted with that passphrase, so the key destruction
+         * alone already makes it unreadable; the file deletion is defense in depth.
          */
         @Provides
         fun provideDatabasePanicWiper(

@@ -21,9 +21,8 @@ import kotlinx.coroutines.withContext
  * the only stored copy, after which the encrypted database can no longer be opened.
  *
  * Platform-free (commonMain): the CSPRNG is [CryptographyRandom] and the off-main hop uses the
- * injected [AppDispatchers] (`dispatchers.io`), so no JVM types leak in. Only the secret-store backing is provided
- * per-platform (Android Keystore now via KSafe; the iOS Keychain-rooted store is a follow-up
- * alongside the iOS SQLCipher driver).
+ * injected [AppDispatchers] (`dispatchers.io`), so no JVM types leak in. Only the secret-store backing
+ * is provided per-platform (KSafe: Android Keystore / iOS Keychain-Secure-Enclave).
  */
 @SingleIn(AppScope::class)
 @Inject
