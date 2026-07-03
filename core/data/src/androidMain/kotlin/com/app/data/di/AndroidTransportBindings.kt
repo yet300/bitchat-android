@@ -1,6 +1,6 @@
 package com.app.data.di
 
-import android.app.Application
+import android.content.Context
 import com.app.crypto.EncryptionService
 import com.app.data.AppStateStore
 import com.app.data.favorites.FavoritesPersistenceService
@@ -90,13 +90,15 @@ object AndroidTransportBindings {
 
     /** Arti data dir under the app filesDir — the platform half of the Tor manager's data-dir seam. */
     @Provides
-    fun provideTorDataDirProvider(application: Application): TorDataDirProvider =
-        TorDataDirProvider { File(application.filesDir, "arti").apply { mkdirs() }.absolutePath }
+    fun provideTorDataDirProvider(context: Context): TorDataDirProvider =
+        TorDataDirProvider {
+            File(context.applicationContext.filesDir, "arti").apply { mkdirs() }.absolutePath
+        }
 
     /** Relay CSV storage (bundled asset + filesDir cache) for the commonMain RelayDirectory. */
     @Provides
-    fun provideRelayDirectoryStorage(application: Application): RelayDirectoryStorage =
-        AndroidRelayDirectoryStorage(application)
+    fun provideRelayDirectoryStorage(context: Context): RelayDirectoryStorage =
+        AndroidRelayDirectoryStorage(context.applicationContext)
 
     /** Lets the commonMain Tor manager rebuild the OkHttp/Tor clients on circuit changes. */
     @Provides

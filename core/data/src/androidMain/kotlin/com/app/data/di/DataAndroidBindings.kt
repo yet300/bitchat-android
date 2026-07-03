@@ -1,13 +1,11 @@
 package com.app.data.di
 
-import android.app.Application
 import android.content.Context
 import com.app.common.AppDispatchers
 import com.app.common.permission.PermissionController
 import com.app.common.settings.SettingsStore
 import com.app.crypto.EncryptionService
 import com.app.crypto.identity.PeerFingerprintManager
-import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.crypto.secure.KSafeSecureKeyValueStore
 import com.app.crypto.secure.SecureKeyValueStore
 import com.app.data.app.AndroidAppForegroundState
@@ -87,16 +85,6 @@ abstract class DataAndroidBindings {
 
     companion object {
 
-        // KSafe is single-process and must be one instance per fileName (two live instances on one file
-        // diverge). The @SingleIn(AppScope) scope guarantees that here; the file names are unchanged from
-        // the previous crypto-layer holder so the on-disk vault/prefs stores keep their identity.
-        private const val VAULT_FILE = "bitchat_vault"
-        private const val PREFS_FILE = "bitchat_prefs"
-
-        @Provides
-        @SingleIn(AppScope::class)
-        fun provideApplication(context: Context): Application = context.applicationContext as Application
-
         /** The commonMain mesh port, implemented by the androidMain [BluetoothMeshService]. */
         @Provides
         fun provideMeshService(mesh: BluetoothMeshService): MeshService = mesh
@@ -118,7 +106,7 @@ abstract class DataAndroidBindings {
         @Provides
         @SingleIn(AppScope::class)
         fun provideKSafePrefs(context: Context): KSafe =
-            KSafe(context.applicationContext, fileName = PREFS_FILE)
+            KSafe(context.applicationContext, fileName = DataBindings.PREFS_FILE)
 
         /**
          * Encrypted secret store (KSafe AES-256-GCM, AES key in the Android Keystore/TEE) for all secrets
@@ -128,24 +116,7 @@ abstract class DataAndroidBindings {
         @Provides
         @SingleIn(AppScope::class)
         fun provideSecureKeyValueStore(context: Context): SecureKeyValueStore =
-            KSafeSecureKeyValueStore(KSafe(context.applicationContext, fileName = VAULT_FILE))
-
-        @Provides
-        @SingleIn(AppScope::class)
-        fun provideEncryptionService(
-            store: SecureKeyValueStore,
-            peerFingerprintManager: PeerFingerprintManager,
-        ): EncryptionService = EncryptionService(store, peerFingerprintManager)
-
-        @Provides
-        @SingleIn(AppScope::class)
-        fun provideSecureIdentityStateManager(store: SecureKeyValueStore): SecureIdentityStateManager =
-            SecureIdentityStateManager(store)
-
-        /** Fragment reassembly state shared by the BLE stack and the BMS engine. */
-        @Provides
-        @SingleIn(AppScope::class)
-        fun provideFragmentManager(): FragmentManager = FragmentManager()
+            KSafeSecureKeyValueStore(KSafe(context.applicationContext, fileName = DataBindings.VAULT_FILE))
 
         /**
          * Graph-owned [BleBearer]. The same instance is multibound into [Set]<[MeshBearer]>
