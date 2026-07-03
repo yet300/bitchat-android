@@ -148,6 +148,8 @@ class BleSendPathGoldenTest {
             myPeerID = MY_PEER,
             debugSettingsManager = trafficLog,
             transferProgressManager = TransferProgressManager(),
+            gattServerProvider = { gattServer },
+            characteristicProvider = { serverCharacteristic },
         )
     }
 
@@ -236,7 +238,7 @@ class BleSendPathGoldenTest {
     }
 
     private fun broadcast(routed: RoutedPacket) =
-        broadcaster.broadcastPacket(routed, gattServer, serverCharacteristic)
+        broadcaster.broadcastPacket(routed)
 
     // ------------------------------------------------------------------
     // GOLDEN cases
@@ -388,7 +390,7 @@ class BleSendPathGoldenTest {
         addClientNeighbor(ADDR_CLI_1, PEER_SRV_1) // same peer on a client link too
         val p = packet(recipient = hexToBytes(PEER_SRV_1))
 
-        val sent = broadcaster.sendToPeer(PEER_SRV_1, RoutedPacket(p), gattServer, serverCharacteristic)
+        val sent = broadcaster.sendToPeer(PEER_SRV_1, RoutedPacket(p))
 
         assertTrue(sent)
         assertEquals(1, emissions.size)
@@ -400,7 +402,7 @@ class BleSendPathGoldenTest {
     fun `sendToPeer to unknown peer sends nothing and returns false`() {
         defaultTopology()
         val p = packet(recipient = hexToBytes("9999999999999999"))
-        val sent = broadcaster.sendToPeer("9999999999999999", RoutedPacket(p), gattServer, serverCharacteristic)
+        val sent = broadcaster.sendToPeer("9999999999999999", RoutedPacket(p))
         assertFalse(sent)
         assertEquals(0, emissions.size)
     }
