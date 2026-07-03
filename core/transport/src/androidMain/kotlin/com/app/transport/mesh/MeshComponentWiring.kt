@@ -12,6 +12,7 @@ import com.app.transport.model.RoutedPacket
 import com.app.transport.notification.NotificationTextUtils
 import com.app.transport.notification.ServiceNotifier
 import com.app.transport.protocol.BitchatPacket
+import com.app.transport.protocol.peerIdToRoutingBytes
 import com.app.transport.protocol.MessageType
 import com.app.transport.protocol.SpecialRecipients
 import com.app.transport.sync.GossipSyncManager
@@ -105,8 +106,8 @@ internal class MeshComponentWiring(
                 val responsePacket = BitchatPacket(
                     version = 1u,
                     type = MessageType.NOISE_HANDSHAKE.value,
-                    senderID = outbound.hexStringToByteArray(myPeerID),
-                    recipientID = outbound.hexStringToByteArray(peerID),
+                    senderID = peerIdToRoutingBytes(myPeerID),
+                    recipientID = peerIdToRoutingBytes(peerID),
                     timestamp = System.currentTimeMillis().toULong(),
                     payload = response,
                     ttl = MeshConstants.MESSAGE_TTL_HOPS
@@ -220,8 +221,8 @@ internal class MeshComponentWiring(
                         val packet = BitchatPacket(
                             version = 1u,
                             type = MessageType.NOISE_HANDSHAKE.value,
-                            senderID = outbound.hexStringToByteArray(myPeerID),
-                            recipientID = outbound.hexStringToByteArray(peerID),
+                            senderID = peerIdToRoutingBytes(myPeerID),
+                            recipientID = peerIdToRoutingBytes(peerID),
                             timestamp = System.currentTimeMillis().toULong(),
                             payload = handshakeData,
                             ttl = MeshConstants.MESSAGE_TTL_HOPS

@@ -278,7 +278,10 @@ object NostrEmbeddedBitChat {
     }
     
     /**
-     * Convert hex string to byte array
+     * Convert hex string to byte array.
+     * Deliberately NOT the shared peerIdToRoutingBytes: this copy rejects odd-length
+     * input up-front (all-zero ID) while the shared helper zero-fills per-pair.
+     * Unifying the malformed-input policy is an owner decision (arch review L2).
      */
     private fun hexStringToByteArray(hexString: String): ByteArray {
         if (hexString.length % 2 != 0) {

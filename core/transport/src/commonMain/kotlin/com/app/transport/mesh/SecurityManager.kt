@@ -9,8 +9,10 @@ import com.app.transport.model.IdentityAnnouncement
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
 import com.app.transport.model.RoutedPacket
+import com.app.common.encoding.hexEncodedString
 import com.app.common.encoding.toHexString
 import com.app.transport.MeshConstants
+import com.app.transport.crypto.Sha256
 import co.touchlab.stately.collections.ConcurrentMutableMap
 import co.touchlab.stately.collections.ConcurrentMutableSet
 import kotlinx.coroutines.*
@@ -131,8 +133,9 @@ internal class SecurityManager(
             return false
         }
         
-        // Prevent duplicate handshake processing
-        val exchangeKey = "$peerID-${packet.payload.sliceArray(0 until minOf(16, packet.payload.size)).contentHashCode()}"
+        // Prevent duplicate handshake processing. Collision-resistant digest so distinct
+        // handshake messages can never be forged to collide (local-only key, not on the wire).
+        val exchangeKey = "$peerID-${Sha256.digest(packet.payload).copyOf(4).hexEncodedString()}"
         
         if (!forcedRehandshake && processedKeyExchanges.contains(exchangeKey)) {
             Log.d(TAG, "Already processed handshake: $exchangeKey")
@@ -226,20 +229,16 @@ internal class SecurityManager(
     }
     
     /**
-     * Generate message ID for duplicate detection
+     * Generate message ID for duplicate detection.
+     * Mirrors iOS BLEReceivePipeline.context: sender-timestamp-type-sha256(payload).prefix(4).
+     * The SHA-256 digest (vs. the previous 31-based contentHashCode over the first 64 bytes)
+     * makes the key collision-resistant so distinct packets cannot be forged to collide,
+     * and back-to-back packets sharing sender/timestamp/type are never collapsed.
+     * Local-only key — never serialized to the wire.
      */
     private fun generateMessageID(packet: BitchatPacket, peerID: String): String {
-        return when (MessageType.fromValue(packet.type)) {
-            MessageType.FRAGMENT -> {
-                // For fragments, include the payload hash to distinguish different fragments
-                "${packet.timestamp}-$peerID-${packet.type}-${packet.payload.contentHashCode()}"
-            }
-            else -> {
-                // For other messages, use a truncated payload hash
-                val payloadHash = packet.payload.sliceArray(0 until minOf(64, packet.payload.size)).contentHashCode()
-                "${packet.timestamp}-$peerID-$payloadHash"
-            }
-        }
+        val digestPrefix = Sha256.digest(packet.payload).copyOf(4).hexEncodedString()
+        return "$peerID-${packet.timestamp}-${packet.type}-$digestPrefix"
     }
     
     /**
