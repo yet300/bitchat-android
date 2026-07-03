@@ -17,8 +17,12 @@ import platform.Foundation.NSUserDomainMask
  * stores stay free of NSString/cinterop pointer juggling.
  */
 
-/** Caches root (system-purgeable). Mirrors Android cacheDir; used for incoming files + relay cache. */
-internal fun nativeCachesDirectory(): String =
+/**
+ * Caches root (system-purgeable). Mirrors Android cacheDir; used for incoming files + relay cache.
+ * Public: the data layer's panic-wipe MediaCleaner must delete the same incoming-media tree that
+ * NativeIncomingFileStore writes under this root.
+ */
+fun nativeCachesDirectory(): String =
     (NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, true)
         .firstOrNull() as? String)
         ?: NSTemporaryDirectory()
