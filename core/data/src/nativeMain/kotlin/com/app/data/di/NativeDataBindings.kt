@@ -2,7 +2,10 @@ package com.app.data.di
 
 import com.app.crypto.secure.KSafeSecureKeyValueStore
 import com.app.crypto.secure.SecureKeyValueStore
+import com.app.data.app.NativeAppForegroundState
+import com.app.domain.app.AppForegroundState
 import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Binds
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
@@ -20,22 +23,29 @@ import eu.anifantakis.lib.ksafe.KSafe
  */
 @ContributesTo(AppScope::class)
 @BindingContainer
-object NativeDataBindings {
+abstract class NativeDataBindings {
 
-    /**
-     * Single app-wide KSafe **plain** store for all non-secret preferences (`SettingsStore` writes
-     * with `KSafeWriteMode.Plain`). Secrets stay in the encrypted vault, not here.
-     */
-    @Provides
-    @SingleIn(AppScope::class)
-    fun provideKSafePrefs(): KSafe = KSafe(fileName = DataBindings.PREFS_FILE)
+    /** Process foreground/background signal (UIKit lifecycle) for data-saving throttling. */
+    @Binds
+    abstract val NativeAppForegroundState.bindAppForegroundState: AppForegroundState
 
-    /**
-     * Encrypted secret store (KSafe AES-256-GCM, key in the Keychain/Secure Enclave) for all secrets
-     * at rest — identity/signing/Nostr keys, the SQLCipher passphrase, favorites.
-     */
-    @Provides
-    @SingleIn(AppScope::class)
-    fun provideSecureKeyValueStore(): SecureKeyValueStore =
-        KSafeSecureKeyValueStore(KSafe(fileName = DataBindings.VAULT_FILE))
+    companion object {
+
+        /**
+         * Single app-wide KSafe **plain** store for all non-secret preferences (`SettingsStore` writes
+         * with `KSafeWriteMode.Plain`). Secrets stay in the encrypted vault, not here.
+         */
+        @Provides
+        @SingleIn(AppScope::class)
+        fun provideKSafePrefs(): KSafe = KSafe(fileName = DataBindings.PREFS_FILE)
+
+        /**
+         * Encrypted secret store (KSafe AES-256-GCM, key in the Keychain/Secure Enclave) for all
+         * secrets at rest — identity/signing/Nostr keys, the SQLCipher passphrase, favorites.
+         */
+        @Provides
+        @SingleIn(AppScope::class)
+        fun provideSecureKeyValueStore(): SecureKeyValueStore =
+            KSafeSecureKeyValueStore(KSafe(fileName = DataBindings.VAULT_FILE))
+    }
 }
