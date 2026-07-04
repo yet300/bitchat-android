@@ -48,7 +48,7 @@ kotlinx-coroutines = "1.11.0"
 kotlinxDatetime = "0.8.0"
 kotlinxIo = "0.9.0"
 kompress = "2.1.0"                # karmakrafts Kompress — pure-Kotlin KMP DEFLATE (RFC1951 raw), iOS-wire compatible
-artitor = "0.1.1"                 # io.github.yet300:tor — KMP Arti/Tor wrapper (first-class bootstrap status)
+artitor = "0.1.2"                 # io.github.yet300:tor — KMP Arti/Tor wrapper; 0.1.2 renames bundled sqlite3_* symbols so they cannot shadow SQLCipher in the iOS static link
 
 # Ktor (HTTP + WebSocket client; OkHttp engine honors the Arti SOCKS proxy)
 ktor = "3.5.0"
