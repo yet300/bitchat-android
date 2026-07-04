@@ -17,9 +17,14 @@ kotlin {
             implementation(libs.cryptography.core)
         }
         androidMain.dependencies {
+            // Android BLE/GATT + Wi-Fi Aware bearer stack (formerly :transport:mesh:ble-android).
             implementation(libs.cryptography.provider.jdk.bc)
+            implementation(libs.androidx.core.ktx)
+            implementation(libs.androidx.lifecycle.process)
+            implementation(libs.androidx.lifecycle.runtime.ktx)
         }
         nativeMain.dependencies {
+            // Apple CoreBluetooth bearer stack (formerly :transport:mesh:ble-apple).
             implementation(libs.cryptography.provider.apple)
         }
         androidHostTest.dependencies {

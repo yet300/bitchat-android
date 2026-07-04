@@ -26,14 +26,14 @@ kotlin {
             implementation(libs.kotlinx.io.core)
         }
         androidMain.dependencies {
-            implementation(projects.transport.mesh.bleAndroid)
+            implementation(projects.transport.mesh)
             // Platform DI edge (moved from :shared androidMain): AndroidAppForegroundState observes
             // ProcessLifecycleOwner for data-saving throttling.
             implementation(libs.androidx.lifecycle.process)
             implementation(libs.androidx.lifecycle.runtime.ktx)
         }
         nativeMain.dependencies {
-            implementation(projects.transport.mesh.bleApple)
+            implementation(projects.transport.mesh)
         }
         androidHostTest.dependencies {
             implementation(libs.bundles.android.testing)
