@@ -28,7 +28,6 @@ include(":core")
 include(":core:common")
 include(":core:domain")
 include(":core:crypto")
-include(":core:transport")
 include(":core:data")
 include(":core:database")
 
