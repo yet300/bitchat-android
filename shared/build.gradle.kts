@@ -56,7 +56,6 @@ kotlin {
             implementation(projects.core.domain)
             implementation(projects.core.common)
             implementation(projects.core.crypto)
-            implementation(projects.core.transport)
             implementation(projects.transport.di)
             implementation(projects.core.data)
             implementation(projects.core.database)
@@ -95,6 +94,8 @@ kotlin {
             implementation(libs.ksafe)
         }
         iosMain.dependencies {
+            // Apple BLE bearer + native transport seams (NativeTransportBindings moved here).
+            implementation(projects.transport.mesh.bleApple)
             // JSON armor for SerializableContainer in the NSCoder state-preservation bridge
             // (StateKeeperUtils); no @Serializable codegen here, so the plugin is not applied.
             implementation(libs.kotlinx.serialization.json)

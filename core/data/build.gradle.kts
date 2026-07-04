@@ -9,7 +9,7 @@ kotlin {
             implementation(projects.core.domain)
             implementation(projects.core.common)
             implementation(projects.core.crypto)
-            implementation(projects.core.transport)
+            implementation(projects.transport.di)
             implementation(projects.core.database)
 
             implementation(libs.ksafe)
@@ -26,10 +26,14 @@ kotlin {
             implementation(libs.kotlinx.io.core)
         }
         androidMain.dependencies {
+            implementation(projects.transport.mesh.bleAndroid)
             // Platform DI edge (moved from :shared androidMain): AndroidAppForegroundState observes
             // ProcessLifecycleOwner for data-saving throttling.
             implementation(libs.androidx.lifecycle.process)
             implementation(libs.androidx.lifecycle.runtime.ktx)
+        }
+        nativeMain.dependencies {
+            implementation(projects.transport.mesh.bleApple)
         }
         androidHostTest.dependencies {
             implementation(libs.bundles.android.testing)
