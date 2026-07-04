@@ -22,10 +22,6 @@ import io.ktor.client.engine.HttpClientEngineFactory
 @BindingContainer
 abstract class NativeTransportBindings {
 
-    /** Binds the commonMain WebSocket seam to the shared HttpClientProvider. */
-    @Binds
-    abstract val HttpClientProvider.bindWebSocketClientProvider: WebSocketClientProvider
-
     companion object {
         /** Apple ktor engine for the commonMain HttpClientProvider (Darwin/NSURLSession). */
         @Provides

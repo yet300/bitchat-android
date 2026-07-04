@@ -2,9 +2,6 @@ package com.app.transport.nostr
 
 import com.app.common.serialization.JsonConfig
 import com.app.common.settings.SettingsStore
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
 import co.touchlab.stately.collections.ConcurrentMutableMap
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
@@ -16,8 +13,6 @@ import kotlinx.serialization.builtins.serializer
  *
  * App-scoped singleton: the in-memory map is loaded once on construction and persisted on writes.
  */
-@SingleIn(AppScope::class)
-@Inject
 class GeohashAliasRegistry(
     private val settings: SettingsStore,
 ) {

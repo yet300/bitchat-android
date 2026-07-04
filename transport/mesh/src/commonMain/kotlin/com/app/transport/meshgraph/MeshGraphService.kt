@@ -3,9 +3,6 @@ package com.app.transport.meshgraph
 import co.touchlab.stately.collections.ConcurrentMutableMap
 import co.touchlab.stately.concurrency.Lock
 import co.touchlab.stately.concurrency.withLock
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,8 +11,6 @@ import kotlinx.coroutines.flow.asStateFlow
  * Maintains an internal graph of the mesh based on gossip.
  * Nodes are peers (peerID), edges are direct connections.
  */
-@SingleIn(AppScope::class)
-@Inject
 class MeshGraphService {
     data class GraphNode(val peerID: String, val nickname: String?)
     data class GraphEdge(val a: String, val b: String, val isConfirmed: Boolean, val confirmedBy: String? = null)

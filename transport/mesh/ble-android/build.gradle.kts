@@ -1,8 +1,5 @@
 plugins {
     id("com.plugins.androidLibraryPlugin")
-    // Temporary: WifiAwareBearer still carries Metro @Inject metadata until the
-    // de-DI phase replaces graph construction with a bearer factory call.
-    alias(libs.plugins.metro)
 }
 
 dependencies {

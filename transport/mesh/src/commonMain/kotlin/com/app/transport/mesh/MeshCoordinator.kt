@@ -91,7 +91,7 @@ class MeshCoordinator(
         private set
 
     // Engine components. Rebuilt in place by reset()/revival — the BMS object itself keeps
-    // its graph identity, so @SingleIn consumers never hold a stale reference.
+    // its graph identity, so  consumers never hold a stale reference.
     private var peerManager = PeerManager(peerFingerprintManager)
     private var securityManager = SecurityManager(encryptionService, myPeerID)
     private var storeForwardManager = StoreForwardManager()

@@ -1,9 +1,6 @@
 package com.app.transport.nostr
 
 import com.app.common.settings.SettingsStore
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,8 +11,6 @@ import kotlinx.coroutines.flow.asStateFlow
  * App-scoped singleton: persisted values are loaded once on construction; the reactive
  * [powEnabled] / [powDifficulty] / [isMining] flows are shared process-wide.
  */
-@SingleIn(AppScope::class)
-@Inject
 class PoWPreferenceManager(
     private val settings: SettingsStore,
 ) {

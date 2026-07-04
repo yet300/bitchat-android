@@ -22,7 +22,7 @@ sealed interface BearerEvent {
  *
  * Adding a new physical medium (BLE, Wi-Fi Aware, TCP relay …) means:
  *   1. Implementing this interface.
- *   2. Registering the class via Metro `@Binds @IntoSet` — no other changes required (OCP).
+ *   2. Registering the class via Metro ` ` — no other changes required (OCP).
  *
  * [MeshNetwork] consumes a `Set<MeshBearer>` and provides the unified
  * broadcast / unicast / incoming API that [BluetoothMeshService] talks to.

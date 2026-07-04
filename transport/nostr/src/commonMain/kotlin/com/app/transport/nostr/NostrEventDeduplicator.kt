@@ -5,9 +5,6 @@ import co.touchlab.stately.concurrency.Lock
 import co.touchlab.stately.concurrency.withLock
 import com.app.common.utils.Log
 import com.app.transport.NostrConstants
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
 import kotlin.concurrent.Volatile
 import kotlin.math.round
 
@@ -25,8 +22,6 @@ import kotlin.math.round
  * - Efficient O(1) lookup and insertion
  * - Memory-bounded to prevent unbounded growth
  */
-@SingleIn(AppScope::class)
-@Inject
 internal class NostrEventDeduplicator(
     private val maxCapacity: Int = DEFAULT_CAPACITY
 ) {

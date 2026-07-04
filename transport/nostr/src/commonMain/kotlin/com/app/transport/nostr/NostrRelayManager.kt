@@ -9,9 +9,6 @@ import com.app.common.utils.Log
 import com.app.common.serialization.JsonConfig
 import com.app.transport.NostrConstants
 import com.app.transport.net.WebSocketClientProvider
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import io.ktor.client.plugins.websocket.webSocketSession
@@ -33,8 +30,6 @@ import kotlin.time.ExperimentalTime
  * Manages WebSocket connections to Nostr relays
  * Compatible with iOS implementation with Android-specific optimizations
  */
-@SingleIn(AppScope::class)
-@Inject
 class NostrRelayManager internal constructor(
     private val eventDeduplicator: NostrEventDeduplicator,
     private val webSocketClientProvider: WebSocketClientProvider,

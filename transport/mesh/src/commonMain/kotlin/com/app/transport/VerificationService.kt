@@ -6,9 +6,6 @@ import com.app.crypto.EncryptionService
 import com.app.common.encoding.dataFromHexString
 import com.app.common.encoding.hexEncodedString
 import dev.whyoleg.cryptography.random.CryptographyRandom
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
 import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
 import kotlin.concurrent.Volatile
@@ -22,8 +19,6 @@ import kotlin.time.ExperimentalTime
  * Graph-owned; the EncryptionService is injected (formerly a static configure()
  * call from BluetoothMeshService with a WeakReference holder).
  */
-@SingleIn(AppScope::class)
-@Inject
 class VerificationService(private val encryptionService: EncryptionService) {
 
     private companion object {

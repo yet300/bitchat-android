@@ -1,9 +1,6 @@
 package com.app.transport.net
 
 import com.app.common.settings.SettingsStore
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -13,8 +10,6 @@ import kotlinx.coroutines.flow.StateFlow
  * App-scoped singleton: the current value is loaded once on construction and exposed reactively
  * via [modeFlow] for the Tor manager / settings UI.
  */
-@SingleIn(AppScope::class)
-@Inject
 class TorPreferenceManager(
     private val settings: SettingsStore,
 ) {

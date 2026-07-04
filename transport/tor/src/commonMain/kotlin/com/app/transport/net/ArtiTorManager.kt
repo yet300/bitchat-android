@@ -8,9 +8,6 @@ import com.yet.tor.ArtiTorClient
 import com.yet.tor.TorState as LibTorState
 import co.touchlab.stately.concurrency.Lock
 import co.touchlab.stately.concurrency.withLock
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -37,8 +34,6 @@ import kotlin.time.Duration.Companion.milliseconds
  * Platform seams: [TorDataDirProvider] supplies the Arti data dir (Android filesDir) and
  * [TorHttpReset] rebuilds the HTTP client on Tor state changes, so this orchestrator is commonMain.
  */
-@SingleIn(AppScope::class)
-@Inject
 class ArtiTorManager(
     private val dataDirProvider: TorDataDirProvider,
     private val torPreferenceManager: TorPreferenceManager,

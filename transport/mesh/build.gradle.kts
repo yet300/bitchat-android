@@ -1,8 +1,5 @@
 plugins {
     alias(libs.plugins.local.kotlin.multiplatform)
-    // Temporary: moved classes still carry Metro @Inject metadata until the
-    // de-DI phase replaces graph construction with MeshTransport.create().
-    alias(libs.plugins.metro)
 }
 
 kotlin {

@@ -26,10 +26,6 @@ import com.app.transport.mesh.aware.WifiAwareSupport
 import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.SpecialRecipients
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.ContributesIntoSet
-import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -73,10 +69,7 @@ import java.util.concurrent.atomic.AtomicLong
  * [MeshNetwork], [BleBearer], or [BluetoothMeshService]. The peer ID is re-derived from
  * [EncryptionService] on every (re)start, so a panic reset only needs a bearer restart.
  */
-@ContributesIntoSet(AppScope::class)
-@SingleIn(AppScope::class)
-@Inject
-internal class WifiAwareBearer(
+class WifiAwareBearer(
     private val context: Context,
     private val encryptionService: EncryptionService,
     debugSettingsManager: DebugSettingsManager,

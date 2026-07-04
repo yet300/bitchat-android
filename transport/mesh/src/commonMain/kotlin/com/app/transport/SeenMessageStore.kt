@@ -5,17 +5,12 @@ import co.touchlab.stately.concurrency.withLock
 import com.app.common.utils.Log
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.common.serialization.JsonConfig
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
 import kotlinx.serialization.Serializable
 
 /**
  * Persistent store for message IDs we've already acknowledged (DELIVERED) or READ.
  * Limits to last MAX_IDS entries per set to avoid memory bloat.
  */
-@SingleIn(AppScope::class)
-@Inject
 class SeenMessageStore(private val secure: SecureIdentityStateManager) {
     companion object {
         private const val TAG = "SeenMessageStore"

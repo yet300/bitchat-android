@@ -71,18 +71,6 @@ object TransportDataBindings {
             }
         }
 
-    /**
-     * SOCKS address for Tor-routed traffic. Lazy<ArtiTorManager> breaks the construction
-     * cycle (the manager resets HttpClientProvider's cached clients on Tor state changes);
-     * the address is consulted per connection, by which time the manager exists.
-     */
-    @Provides
-    fun provideSocksAddressSource(arti: Lazy<ArtiTorManager>): SocksAddressSource =
-        SocksAddressSource { arti.value.currentSocksAddress() }
-
-    /** Lets the commonMain Tor manager rebuild the HTTP/Tor clients on circuit changes. */
-    @Provides
-    fun provideTorHttpReset(impl: HttpClientProvider): TorHttpReset = TorHttpReset { impl.reset() }
 
     /**
      * Our own mesh peer id, read live from the Noise identity fingerprint — the same

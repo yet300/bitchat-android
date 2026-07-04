@@ -9,9 +9,6 @@ import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.transport.crypto.HmacSha256
 import com.app.transport.crypto.Sha256
 import dev.whyoleg.cryptography.random.CryptographyRandom
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Clock
@@ -103,8 +100,6 @@ data class NostrIdentity(
  * Bridge between Noise and Nostr identities
  * Manages persistent storage and per-geohash identity derivation
  */
-@SingleIn(AppScope::class)
-@Inject
 class NostrIdentityBridge(private val stateManager: SecureIdentityStateManager) {
 
     private companion object {

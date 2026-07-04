@@ -3,9 +3,6 @@ package com.app.transport.nostr
 import com.app.common.AppDispatchers
 import com.app.common.utils.Log
 import com.app.common.geohash.Geohash
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,8 +12,6 @@ import kotlinx.coroutines.flow.asStateFlow
  * Manages location notes (kind=1 text notes with geohash tags)
  * iOS-compatible implementation with StateFlow for UI binding
  */
-@SingleIn(AppScope::class)
-@Inject
 class LocationNotesManager(
     private val dispatchers: AppDispatchers = AppDispatchers(),
 ) {
