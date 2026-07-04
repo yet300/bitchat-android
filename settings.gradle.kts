@@ -36,8 +36,6 @@ include(":transport:protocol")
 include(":transport:tor")
 include(":transport:nostr")
 include(":transport:mesh")
-include(":transport:mesh:ble-android")
-include(":transport:mesh:ble-apple")
 include(":transport:di")
 include(":transport:sdk")
 

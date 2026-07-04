@@ -88,7 +88,7 @@ dependencies {
     implementation(projects.core.common)
     implementation(projects.core.domain)
     implementation(projects.core.crypto)
-    implementation(projects.transport.mesh.bleAndroid)
+    implementation(projects.transport.mesh)
     implementation(projects.transport.di)
     implementation(projects.core.data)
     implementation(projects.core.database)
