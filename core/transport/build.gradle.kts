@@ -40,6 +40,9 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtime.ktx)
         }
         nativeMain.dependencies {
+            // Shim: re-export the Apple BLE bearer so :core:data's native bindings keep resolving.
+            api(projects.transport.mesh.bleApple)
+
             implementation(libs.cryptography.provider.apple)
             implementation(libs.ktor.client.darwin)
         }

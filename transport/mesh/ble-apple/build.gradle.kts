@@ -15,5 +15,8 @@ kotlin {
             api(projects.transport.mesh)
             implementation(projects.core.common)
         }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+        }
     }
 }
