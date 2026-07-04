@@ -12,7 +12,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /** One BLE link the local node can write to right now. */
-internal data class BleNeighbor(
+data class BleNeighbor(
     val linkAddress: String,
     /** True for an outbound (client/central) link, false for an inbound (server/peripheral) one. */
     val isClient: Boolean,
@@ -25,7 +25,7 @@ internal data class BleNeighbor(
  * write/notify — fragmentation, target selection, source routing, anti-loop, padding,
  * telemetry — lives in the shared core.
  */
-internal interface BleRadioLink {
+interface BleRadioLink {
     /**
      * Snapshot of writable links, in send order: server (inbound) links first, then client
      * (outbound) links — the order both platforms have always used.
@@ -57,7 +57,7 @@ internal interface BleRadioLink {
  * coroutine), so FIFO order and single-writer discipline are preserved. [sendToPeer] stays
  * synchronous on the caller, exactly as before on both platforms.
  */
-internal class BleSendCore(
+class BleSendCore(
     private val scope: CoroutineScope,
     fragmentManager: FragmentManager?,
     transferProgressManager: TransferProgressManager,
