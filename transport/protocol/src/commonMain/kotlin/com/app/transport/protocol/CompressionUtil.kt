@@ -17,7 +17,7 @@ import dev.karmakrafts.kompress.deflate.Inflater
  * peer's streams. The wire contract is mutual inflate-compatibility, not byte-identical
  * compress — proven both directions against java.util.zip in CompressionInteropTest.
  */
-internal object CompressionUtil {
+object CompressionUtil {
     private const val COMPRESSION_THRESHOLD = 100  // bytes - same as iOS
     private const val DEFLATE_LEVEL = 6            // zlib default level; deterministic output
     private const val DEFLATE_BUFFER = 1024

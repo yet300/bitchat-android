@@ -17,7 +17,7 @@ import com.app.common.encoding.hexEncodedString
  * 
  * Total header size: 13 bytes
  */
-internal data class FragmentPayload(
+data class FragmentPayload(
     val fragmentID: ByteArray,      // 8 bytes - random fragment identifier
     val index: Int,                 // Fragment index (0-based)
     val total: Int,                 // Total number of fragments
