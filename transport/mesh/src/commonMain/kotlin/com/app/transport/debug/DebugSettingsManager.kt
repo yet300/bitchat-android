@@ -11,9 +11,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import com.app.transport.protocol.BitchatPacket
 import com.app.common.encoding.toHexString
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
 import kotlin.math.round
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -21,8 +18,6 @@ import kotlin.time.ExperimentalTime
 /**
  * Debug settings manager for controlling debug features and collecting debug data
  */
-@SingleIn(AppScope::class)
-@Inject
 class DebugSettingsManager(
     private val debugPreferenceManager: DebugPreferenceManager,
 ) : MeshTelemetry {

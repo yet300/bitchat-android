@@ -1,9 +1,6 @@
 package com.app.transport.mesh
 
 import com.app.common.AppDispatchers
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -17,8 +14,6 @@ data class TransferProgressEvent(
     val completed: Boolean
 )
 
-@SingleIn(AppScope::class)
-@Inject
 class TransferProgressManager(
     dispatchers: AppDispatchers = AppDispatchers(),
 ) {

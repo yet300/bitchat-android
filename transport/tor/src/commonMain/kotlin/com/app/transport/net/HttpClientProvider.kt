@@ -2,9 +2,6 @@ package com.app.transport.net
 
 import co.touchlab.stately.concurrency.Lock
 import co.touchlab.stately.concurrency.withLock
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngineConfig
 import io.ktor.client.engine.HttpClientEngineFactory
@@ -23,8 +20,6 @@ import io.ktor.client.plugins.websocket.WebSockets
  * Graph-owned: the SOCKS source is injected (formerly a mutable static wired by
  * ArtiTorManager.init()).
  */
-@SingleIn(AppScope::class)
-@Inject
 class HttpClientProvider(
     private val socksAddressSource: SocksAddressSource,
     private val engineFactory: HttpClientEngineFactory<*>,

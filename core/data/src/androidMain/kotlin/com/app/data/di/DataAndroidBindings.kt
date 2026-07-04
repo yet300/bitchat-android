@@ -21,11 +21,10 @@ import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.features.file.AndroidIncomingFileStore
 import com.app.transport.features.file.FileUtils
 import com.app.transport.features.file.IncomingFileStore
-import com.app.transport.mesh.BleBearer
-import com.app.transport.mesh.FragmentManager
-import com.app.transport.mesh.MeshBearer
+import com.app.transport.MeshBearerBuilder
+import com.app.transport.MeshBearers
 import com.app.transport.mesh.MeshLifecycleController
-import com.app.transport.mesh.TransferProgressManager
+import com.app.transport.mesh.WifiAwareBearer
 import com.app.transport.mesh.createAndroidBleBearer
 import com.app.transport.net.TorPreferenceManager
 import com.app.transport.nostr.NostrRelayManager
@@ -95,28 +94,34 @@ abstract class DataAndroidBindings {
             KSafeSecureKeyValueStore(KSafe(context.applicationContext, fileName = DataBindings.VAULT_FILE))
 
         /**
-         * Graph-owned [BleBearer]. The same instance is multibound into [Set]<[MeshBearer]>
-         * (below) and injected into the shared `MeshCoordinator` — no construction inside it.
+         * Builds the Android mesh bearers from the shared engine collaborators the SDK hands us:
+         * the BLE bearer over the GATT stack plus the Wi-Fi Aware bearer, both sharing the mesh's
+         * FragmentManager/TransferProgressManager. Replaces the old hand-wired BleBearer + Set
+         * multibinding — the SDK's `MeshTransport.create` assembles the network from these.
          */
         @Provides
         @SingleIn(AppScope::class)
-        fun provideBleBearer(
+        fun provideMeshBearerBuilder(
             context: Context,
             encryptionService: EncryptionService,
             debugSettingsManager: DebugSettingsManager,
-            fragmentManager: FragmentManager,
-            transferProgressManager: TransferProgressManager,
-        ): BleBearer = createAndroidBleBearer(
-            context = context.applicationContext,
-            myPeerID = encryptionService.getIdentityFingerprint().take(16),
-            debugSettingsManager = debugSettingsManager,
-            fragmentManager = fragmentManager,
-            transferProgressManager = transferProgressManager,
-        )
-
-        @Provides
-        @IntoSet
-        fun provideBleBearerIntoSet(bleBearer: BleBearer): MeshBearer = bleBearer
+        ): MeshBearerBuilder = MeshBearerBuilder { scope ->
+            val ble = createAndroidBleBearer(
+                context = context.applicationContext,
+                myPeerID = scope.myPeerID,
+                debugSettingsManager = scope.telemetry,
+                fragmentManager = scope.fragmentManager,
+                transferProgressManager = scope.transferProgressManager,
+            )
+            val wifiAware = WifiAwareBearer(
+                context = context.applicationContext,
+                encryptionService = encryptionService,
+                debugSettingsManager = debugSettingsManager,
+                fragmentManager = scope.fragmentManager,
+                transferProgressManager = scope.transferProgressManager,
+            )
+            MeshBearers(primary = ble, additional = setOf(wifiAware))
+        }
 
         /** Domain port for panic-wipe media deletion — delegates to FileUtils.clearAllMedia(). */
         @Provides

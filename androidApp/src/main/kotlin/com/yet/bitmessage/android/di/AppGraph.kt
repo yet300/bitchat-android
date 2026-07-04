@@ -72,7 +72,6 @@ interface AppGraph : SharedAppGraph {
     val appStateStore: AppStateStore
     // temporary Phase-D/DI-core bridge, retires Phase C
     val seenMessageStore: SeenMessageStore
-    val transferProgressManager: TransferProgressManager
     val meshGraphService: MeshGraphService
     val nostrRelayManager: NostrRelayManager
     val nostrIdentityBridge: NostrIdentityBridge
@@ -93,10 +92,9 @@ interface AppGraph : SharedAppGraph {
     val verificationService: VerificationService
     val notificationMutePolicy: NotificationMutePolicy
 
-    // Graph-owned mesh engine: full surface for the still-living god-classes
-    // (MainActivity/ChatViewModel, retires Phase C) and the narrow lifecycle contract
-    // for the foreground service (invariant: the service owns the mesh lifecycle).
-    val meshCoordinator: MeshCoordinator
+    // Graph-owned mesh engine: the narrow lifecycle contract for the foreground service
+    // (invariant: the service owns the mesh lifecycle). The concrete coordinator is now
+    // built by the SDK's MeshTransport factory and is not exposed directly.
     val meshLifecycleController: MeshLifecycleController
 
     /**

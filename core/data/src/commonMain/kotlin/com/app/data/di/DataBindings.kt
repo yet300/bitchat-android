@@ -1,8 +1,19 @@
 package com.app.data.di
 
+import com.app.common.AppDispatchers
 import com.app.common.encoding.hexEncodedString
+import com.app.common.settings.SettingsStore
+import com.app.crypto.EncryptionService
+import com.app.crypto.identity.PeerFingerprintManager
+import com.app.crypto.identity.SecureIdentityStateManager
+import com.app.crypto.secure.SecureKeyValueStore
 import com.app.data.DbMessagePersistence
 import com.app.data.MessagePersistence
+import com.app.data.channel.ChannelCipher
+import com.app.data.channel.EncryptionServiceChannelCipher
+import com.app.data.database.DatabaseKeyProviderImpl
+import com.app.data.geohash.CompassPlaceGeocoder
+import com.app.data.nostr.CurrentGeohashSource
 import com.app.data.repository.ChannelRepositoryImpl
 import com.app.data.repository.ContactRepositoryImpl
 import com.app.data.repository.ConversationPrefsRepositoryImpl
@@ -18,51 +29,21 @@ import com.app.data.repository.NotificationMutePolicyImpl
 import com.app.data.repository.NotificationSettingsRepositoryImpl
 import com.app.data.repository.OnboardingRepositoryImpl
 import com.app.data.repository.PeerRepositoryImpl
-import com.app.data.repository.SearchRepositoryImpl
 import com.app.data.repository.PowRepositoryImpl
+import com.app.data.repository.SearchRepositoryImpl
 import com.app.data.repository.SettingsRepositoryImpl
 import com.app.data.repository.SettingsStoreImpl
 import com.app.data.repository.ThemeRepositoryImpl
 import com.app.data.repository.TorRepositoryImpl
 import com.app.data.repository.VerificationRepositoryImpl
-import com.app.data.channel.ChannelCipher
-import com.app.data.channel.EncryptionServiceChannelCipher
-import com.app.data.database.DatabaseKeyProviderImpl
-import com.app.data.geohash.CompassPlaceGeocoder
-import com.app.data.verification.VerificationCoordinator
-import com.app.data.nostr.CurrentGeohashSource
 import com.app.data.routing.MeshRouteStrategy
 import com.app.data.routing.MessageRouter
 import com.app.data.routing.NostrRouteStrategy
+import com.app.data.routing.RouteSelector
 import com.app.data.routing.RoutingCore
 import com.app.data.routing.RoutingMessageTransport
-import com.app.data.routing.RouteSelector
 import com.app.data.session.MeshNoiseSessionPort
-import com.app.crypto.EncryptionService
-import com.app.crypto.identity.PeerFingerprintManager
-import com.app.crypto.identity.SecureIdentityStateManager
-import com.app.crypto.secure.SecureKeyValueStore
-import com.app.common.AppDispatchers
-import com.app.transport.FavoriteNostrLink
-import com.app.transport.GeohashReadReceiptRouter
-import com.app.transport.IncomingMessageSink
-import com.app.transport.NicknameSource
-import com.app.transport.SeenMessageStore
-import com.app.transport.VerificationService
-import com.app.transport.debug.DebugPreferenceManager
-import com.app.transport.debug.DebugSettingsManager
-import com.app.transport.features.file.IncomingFileStore
-import com.app.transport.mesh.BleBearer
-import com.app.transport.mesh.FragmentManager
-import com.app.transport.mesh.MeshCoordinator
-import com.app.transport.mesh.MeshLifecycleController
-import com.app.transport.mesh.MeshNetwork
-import com.app.transport.mesh.MeshService
-import com.app.transport.meshgraph.MeshGraphService
-import com.app.transport.notification.ServiceNotifier
-import com.app.transport.routing.PeerKeyResolver
-import com.app.transport.routing.RouteStrategy
-import com.app.transport.routing.SessionInitiator
+import com.app.data.verification.VerificationCoordinator
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationPrefsRepository
@@ -73,8 +54,9 @@ import com.app.domain.repository.GeohashBookmarksRepository
 import com.app.domain.repository.GeohashRepository
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.LocationNotesRepository
-import com.app.domain.repository.MessageRepository
+import com.app.domain.repository.MeshResetPort
 import com.app.domain.repository.MeshSettingsRepository
+import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.MessageTransport
 import com.app.domain.repository.NoiseSessionPort
 import com.app.domain.repository.NotificationMutePolicy
@@ -89,15 +71,19 @@ import com.app.domain.repository.SettingsRepository
 import com.app.domain.repository.ThemeRepository
 import com.app.domain.repository.TorRepository
 import com.app.domain.repository.VerificationRepository
-import com.app.common.settings.SettingsStore
+import com.app.transport.mesh.MeshCoordinator
+import com.app.transport.mesh.MeshLifecycleController
+import com.app.transport.mesh.MeshService
+import com.app.transport.routing.PeerKeyResolver
+import com.app.transport.routing.RouteStrategy
+import com.app.transport.routing.SessionInitiator
 import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.Binds
 import dev.zacsweers.metro.BindingContainer
+import dev.zacsweers.metro.Binds
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.IntoSet
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
-import com.app.domain.repository.MeshResetPort
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.withContext
 
@@ -244,68 +230,15 @@ abstract class DataBindings {
         fun provideSecureIdentityStateManager(store: SecureKeyValueStore): SecureIdentityStateManager =
             SecureIdentityStateManager(store)
 
-        /** Fragment reassembly state shared by the BLE stack and the mesh engine. */
-        @Provides
-        @SingleIn(AppScope::class)
-        fun provideFragmentManager(): FragmentManager = FragmentManager()
-
         /**
-         * The platform-free mesh coordinator (owns MeshNetwork, the engine components and the
-         * outbound send path). The platform containers contribute the bearers into
-         * Set<MeshBearer> and the lifecycle owner (Android FGS / iOS app lifecycle) drives it
-         * through [MeshLifecycleController].
+         * Domain port for panic-wipe mesh identity rotation — delegates to the mesh lifecycle
+         * controller (the coordinator built by [com.app.transport.di.TransportFactoryBindings]).
          */
         @Provides
-        @SingleIn(AppScope::class)
-        fun provideMeshCoordinator(
-            incomingFileStore: IncomingFileStore,
+        fun provideMeshResetPort(
+            mesh: MeshLifecycleController,
             dispatchers: AppDispatchers,
-            debugSettingsManager: DebugSettingsManager,
-            debugPreferenceManager: DebugPreferenceManager,
-            seenMessageStore: SeenMessageStore,
-            meshGraphService: MeshGraphService,
-            peerFingerprintManager: PeerFingerprintManager,
-            encryptionService: EncryptionService,
-            serviceNotifier: ServiceNotifier,
-            nicknameSource: NicknameSource,
-            incomingSink: IncomingMessageSink,
-            favoriteNostrLink: FavoriteNostrLink,
-            geohashReadReceiptRouter: GeohashReadReceiptRouter,
-            verificationService: VerificationService,
-            fragmentManager: FragmentManager,
-            bleBearer: BleBearer,
-            meshNetwork: MeshNetwork,
-        ): MeshCoordinator = MeshCoordinator(
-            incomingFileStore,
-            debugSettingsManager,
-            debugPreferenceManager,
-            seenMessageStore,
-            meshGraphService,
-            peerFingerprintManager,
-            encryptionService,
-            serviceNotifier,
-            nicknameSource,
-            incomingSink,
-            favoriteNostrLink,
-            geohashReadReceiptRouter,
-            verificationService,
-            fragmentManager,
-            bleBearer,
-            meshNetwork,
-            dispatchers = dispatchers,
-        )
-
-        /** The commonMain mesh port, implemented by the shared [MeshCoordinator]. */
-        @Provides
-        fun provideMeshService(mesh: MeshCoordinator): MeshService = mesh
-
-        /** Narrow lifecycle contract for the platform lifecycle owner (ISP); same coordinator. */
-        @Provides
-        fun provideMeshLifecycleController(mesh: MeshCoordinator): MeshLifecycleController = mesh
-
-        /** Domain port for panic-wipe mesh identity rotation — delegates to the coordinator. */
-        @Provides
-        fun provideMeshResetPort(mesh: MeshCoordinator, dispatchers: AppDispatchers): MeshResetPort =
+        ): MeshResetPort =
             object : MeshResetPort {
                 override suspend fun reset() = withContext(dispatchers.io) { mesh.reset() }
             }

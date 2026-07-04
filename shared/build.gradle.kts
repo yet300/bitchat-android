@@ -57,6 +57,7 @@ kotlin {
             implementation(projects.core.common)
             implementation(projects.core.crypto)
             implementation(projects.core.transport)
+            implementation(projects.transport.di)
             implementation(projects.core.data)
             implementation(projects.core.database)
 

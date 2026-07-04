@@ -59,6 +59,15 @@ class MeshBearers(
 )
 
 /**
+ * Named seam for the platform bearer builder, so a DI graph can bind an implementation (e.g. one
+ * that captures an Android `Context`) and hand it to [MeshTransportConfig.bearers]. Consumers that
+ * do not use DI can pass a plain lambda instead.
+ */
+fun interface MeshBearerBuilder {
+    fun build(scope: MeshBearerScope): MeshBearers
+}
+
+/**
  * Configuration for [MeshTransport.create]. The platform BLE stack is supplied through [bearers]: a
  * builder that receives the shared engine collaborators and returns the constructed radios, so this
  * commonMain module never references the Android/Apple BLE code.
@@ -97,6 +106,7 @@ class MeshTransport private constructor(
     private val coordinator: MeshCoordinator,
     val fragmentManager: FragmentManager,
     val meshNetwork: MeshNetwork,
+    val transferProgressManager: TransferProgressManager,
 ) {
     /** The mesh data-path port consumed by the routing layer. */
     val service: MeshService get() = coordinator
@@ -137,7 +147,7 @@ class MeshTransport private constructor(
                 meshNetwork = meshNetwork,
                 dispatchers = config.dispatchers,
             )
-            return MeshTransport(coordinator, fragmentManager, meshNetwork)
+            return MeshTransport(coordinator, fragmentManager, meshNetwork, transferProgressManager)
         }
     }
 }

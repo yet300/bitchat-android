@@ -2,8 +2,6 @@ package com.app.data.di
 
 import android.content.Context
 import com.app.transport.net.TorDataDirProvider
-import com.app.transport.net.WebSocketClientProvider
-import com.app.transport.net.HttpClientProvider
 import com.app.transport.net.androidHttpClientEngineFactory
 import com.app.transport.nostr.AndroidRelayDirectoryStorage
 import com.app.transport.nostr.RelayDirectoryStorage
@@ -43,7 +41,4 @@ object AndroidTransportBindings {
     @Provides
     fun provideHttpClientEngineFactory(): HttpClientEngineFactory<*> = androidHttpClientEngineFactory()
 
-    /** Binds the commonMain WebSocket seam to the androidMain OkHttp/Tor HttpClientProvider. */
-    @Provides
-    fun provideWebSocketClientProvider(impl: HttpClientProvider): WebSocketClientProvider = impl
 }

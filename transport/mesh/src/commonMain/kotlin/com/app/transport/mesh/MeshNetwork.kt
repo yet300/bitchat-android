@@ -9,9 +9,6 @@ import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
 import com.app.transport.sync.PacketIdUtil
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.merge
@@ -34,13 +31,11 @@ enum class SendPath {
  *
  * New transport media (Wi-Fi Aware, TCP relay …) are added by:
  *   1. Implementing [MeshBearer].
- *   2. Registering via Metro `@Binds @IntoSet` — no changes here (OCP).
+ *   2. Registering via Metro ` ` — no changes here (OCP).
  *
  * Lives in :core:transport (per MIGRATION_PLAN §6 it is a transport-layer entity) so that
  * [BluetoothMeshService] can consume it as its single data path.
  */
-@SingleIn(AppScope::class)
-@Inject
 class MeshNetwork(
     private val bearers: Set<MeshBearer>,
 ) {

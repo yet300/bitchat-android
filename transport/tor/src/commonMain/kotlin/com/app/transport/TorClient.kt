@@ -53,6 +53,7 @@ class TorConfig(
 class TorClient private constructor(
     val torManager: ArtiTorManager,
     val httpClientProvider: HttpClientProvider,
+    val torPreferenceManager: TorPreferenceManager,
 ) {
     /** WebSocket client seam (Nostr relays), backed by the same Tor-aware HTTP provider. */
     val webSocketClientProvider: WebSocketClientProvider get() = httpClientProvider
@@ -74,7 +75,7 @@ class TorClient private constructor(
                 httpReset = { http.reset() },
                 dispatchers = config.dispatchers,
             )
-            return TorClient(manager, http)
+            return TorClient(manager, http, preferences)
         }
     }
 }

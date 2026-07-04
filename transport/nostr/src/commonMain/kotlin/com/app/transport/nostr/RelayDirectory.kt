@@ -9,9 +9,6 @@ import com.app.common.settings.SettingsStore
 import com.app.transport.net.HttpClientProvider
 import co.touchlab.stately.concurrency.Lock
 import co.touchlab.stately.concurrency.withLock
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -43,8 +40,6 @@ import kotlin.time.ExperimentalTime
  * kotlinx-io's [SystemFileSystem]; the bundled CSV and the cache path come from the platform
  * [RelayDirectoryStorage] seam, so this stays platform-free.
  */
-@SingleIn(AppScope::class)
-@Inject
 class RelayDirectory(
     private val settings: SettingsStore,
     private val httpClientProvider: HttpClientProvider,
