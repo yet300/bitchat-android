@@ -14,6 +14,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Local ArtiTor builds (io.github.yet300:tor) until the release reaches Maven Central.
+        mavenLocal {
+            content { includeGroup("io.github.yet300") }
+        }
     }
 }
 

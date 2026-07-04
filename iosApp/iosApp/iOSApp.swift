@@ -47,7 +47,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
-        appGraph.meshLifecycleController.stop()
+        appGraph.meshLifecycleController.stop_()
     }
 
     func application(_ application: UIApplication, shouldSaveSecureApplicationState coder: NSCoder) -> Bool {
