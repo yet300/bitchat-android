@@ -1,11 +1,14 @@
 plugins {
-    // Applied by id: the alias carries version "unspecified", which Gradle rejects
-    // once build-logic is already on the build classpath via the KMP convention plugin.
     id("com.plugins.androidLibraryPlugin")
+    // Temporary: WifiAwareBearer still carries Metro @Inject metadata until the
+    // de-DI phase replaces graph construction with a bearer factory call.
+    alias(libs.plugins.metro)
 }
 
 dependencies {
     api(projects.transport.mesh)
+    implementation(projects.core.common)
+    implementation(projects.core.crypto)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.process)
