@@ -10,7 +10,7 @@ internal fun Project.configureKotlinMultiplatform(
     jvmToolchain(JDK_VERSION)
 
     extensions.configure<KotlinMultiplatformAndroidLibraryExtension>("android") {
-        val moduleName = path.split(":").drop(2).joinToString(".")
+        val moduleName = path.split(":").drop(2).joinToString(".").replace('-', '.')
         namespace = if (moduleName.isNotEmpty()) "org.yet.$moduleName" else "org.yet.bitMessage"
 
         compileSdk = libs.findVersion("compileSdk").get().requiredVersion.toInt()
