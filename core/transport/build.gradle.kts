@@ -10,6 +10,7 @@ kotlin {
             // depend on transport:* directly and :core:transport is retired.
             api(projects.transport.protocol)
             api(projects.transport.tor)
+            api(projects.transport.nostr)
 
             implementation(projects.core.common)
             implementation(projects.core.crypto)
