@@ -11,14 +11,14 @@ import dev.whyoleg.cryptography.algorithms.SHA256
  *
  * Output is standard SHA-256 / RFC 2104 HMAC, byte-identical across providers and platforms.
  */
-internal object Sha256 {
+object Sha256 {
 
     private val hasher by lazy { CryptographyProvider.Default.get(SHA256).hasher() }
 
     fun digest(data: ByteArray): ByteArray = hasher.hashBlocking(data)
 }
 
-internal object HmacSha256 {
+object HmacSha256 {
 
     private val hmac by lazy { CryptographyProvider.Default.get(HMAC) }
 
