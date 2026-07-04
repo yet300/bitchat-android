@@ -30,6 +30,8 @@ kotlin {
             implementation(libs.artitor)
         }
         androidMain.dependencies {
+            // Shim: re-export the Android BLE bearer so :core:data's android bindings keep resolving.
+            api(projects.transport.mesh.bleAndroid)
 
             implementation(libs.ktor.client.okhttp)
 
