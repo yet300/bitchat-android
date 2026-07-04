@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
  * Ported from upstream (wifi-aware branch); upstream's static TransferProgressManager
  * is replaced by the graph-owned instance.
  */
-internal class FragmentingPacketSender(
+class FragmentingPacketSender(
     private val scope: CoroutineScope,
     private val fragmentManager: FragmentManager?,
     private val transferProgressManager: TransferProgressManager,

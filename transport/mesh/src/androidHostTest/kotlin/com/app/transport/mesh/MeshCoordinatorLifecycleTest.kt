@@ -12,7 +12,7 @@ import com.app.transport.NicknameSource
 import com.app.transport.SeenMessageStore
 import com.app.transport.VerificationService
 import com.app.transport.debug.DebugPreferenceManager
-import com.app.transport.features.file.AndroidIncomingFileStore
+import com.app.transport.features.file.IncomingFileStore
 import com.app.transport.meshgraph.MeshGraphService
 import com.app.transport.model.RoutedPacket
 import com.app.transport.notification.ServiceNotifier
@@ -48,7 +48,6 @@ import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
@@ -105,8 +104,6 @@ class BluetoothMeshServiceLifecycleTest {
     private class Harness {
         val scheduler = TestCoroutineScheduler()
         val dispatcher = StandardTestDispatcher(scheduler)
-        val context = RuntimeEnvironment.getApplication()
-
         @Volatile
         var fingerprint: String = FINGERPRINT_A
 
@@ -120,11 +117,11 @@ class BluetoothMeshServiceLifecycleTest {
             on { getGcsFprPercent(any()) } doAnswer { it.getArgument(0) }
         }
 
-        val managers = mutableListOf<BluetoothConnectionManager>()
-        val delegates = ConcurrentHashMap<BluetoothConnectionManager, BearerTransportDelegate>()
+        val managers = mutableListOf<BearerTransport>()
+        val delegates = ConcurrentHashMap<BearerTransport, BearerTransportDelegate>()
 
-        private fun newConnectionManager(): BluetoothConnectionManager {
-            val cm: BluetoothConnectionManager = mock()
+        private fun newConnectionManager(): BearerTransport {
+            val cm: BearerTransport = mock()
             whenever(cm.startServices()).thenReturn(true)
             whenever(cm.addressPeerMap).thenReturn(ConcurrentHashMap())
             whenever(cm.isClientConnection(any())).thenReturn(false)
@@ -147,7 +144,7 @@ class BluetoothMeshServiceLifecycleTest {
         val meshNetwork = MeshNetwork(setOf(bleBearer, fakeBearer))
 
         val bms = MeshCoordinator(
-            incomingFileStore = AndroidIncomingFileStore(context),
+            incomingFileStore = mock<IncomingFileStore>(),
             debugSettingsManager = telemetry,
             debugPreferenceManager = debugPrefs,
             seenMessageStore = mock<SeenMessageStore>(),
