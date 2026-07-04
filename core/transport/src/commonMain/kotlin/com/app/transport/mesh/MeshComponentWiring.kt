@@ -290,7 +290,9 @@ internal class MeshComponentWiring(
                             if (peer.isNotEmpty()) incomingSink.addPrivateMessage(peer, message)
                         }
                         message.channel != null -> {
-                            incomingSink.addChannelMessage(message.channel, message)
+                            // Explicit local: smart cast is unavailable across module boundaries.
+                            val channel = message.channel ?: ""
+                            incomingSink.addChannelMessage(channel, message)
                         }
                         else -> {
                             incomingSink.addPublicMessage(message)

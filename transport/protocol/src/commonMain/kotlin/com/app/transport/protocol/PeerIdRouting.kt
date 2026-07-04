@@ -15,7 +15,7 @@ package com.app.transport.protocol
  * same bytes. Unifying the malformed-input policy with iOS is an owner
  * decision (see docs/TRANSPORT_ROBUSTNESS_ARCH_REVIEW.md L2).
  */
-internal fun peerIdToRoutingBytes(hexString: String): ByteArray {
+fun peerIdToRoutingBytes(hexString: String): ByteArray {
     val result = ByteArray(8) { 0 }
     var tempID = hexString
     var index = 0

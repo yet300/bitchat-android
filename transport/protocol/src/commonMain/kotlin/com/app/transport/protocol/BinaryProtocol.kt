@@ -32,7 +32,7 @@ enum class MessageType(val value: UByte) {
 /**
  * Special recipient IDs - exact same as iOS version
  */
-internal object SpecialRecipients {
+object SpecialRecipients {
     val BROADCAST = ByteArray(8) { 0xFF.toByte() }  // All 0xFF = broadcast
 }
 
@@ -159,7 +159,7 @@ data class BitchatPacket(
 /**
  * Binary Protocol implementation - supports v1 and v2, backward compatible
  */
-internal object BinaryProtocol {
+object BinaryProtocol {
     private const val HEADER_SIZE_V1 = 14
     private const val HEADER_SIZE_V2 = 16
     private const val SENDER_ID_SIZE = 8

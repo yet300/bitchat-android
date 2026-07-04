@@ -11,5 +11,8 @@ kotlin {
             implementation(libs.kotlinx.io.core)
             implementation(libs.kompress.core)
         }
+        androidHostTest.dependencies {
+            implementation(libs.bundles.android.testing)
+        }
     }
 }

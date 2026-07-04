@@ -6,6 +6,10 @@ plugins {
 kotlin {
     sourceSets {
         commonMain.dependencies {
+            // Shim: re-export the extracted SDK modules until all consumers
+            // depend on transport:* directly and :core:transport is retired.
+            api(projects.transport.protocol)
+
             implementation(projects.core.common)
             implementation(projects.core.crypto)
 
