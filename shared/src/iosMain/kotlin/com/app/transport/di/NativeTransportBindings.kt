@@ -2,15 +2,12 @@ package com.app.transport.di
 
 import com.app.transport.features.file.IncomingFileStore
 import com.app.transport.features.file.NativeIncomingFileStore
-import com.app.transport.net.HttpClientProvider
 import com.app.transport.net.TorDataDirProvider
-import com.app.transport.net.WebSocketClientProvider
 import com.app.transport.net.darwinHttpClientEngineFactory
 import com.app.transport.nostr.NativeRelayDirectoryStorage
 import com.app.transport.nostr.RelayDirectoryStorage
 import com.app.transport.platform.nativeArtiDataDir
 import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.Binds
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
@@ -27,7 +24,7 @@ abstract class NativeTransportBindings {
         @Provides
         fun provideHttpClientEngineFactory(): HttpClientEngineFactory<*> = darwinHttpClientEngineFactory()
 
-        /** Relay CSV storage (bundle resource + caches-dir cache) for the commonMain RelayDirectory. */
+        /** Relay CSV storage (app-bundle resource + caches-dir cache) for the commonMain RelayDirectory. */
         @Provides
         @SingleIn(AppScope::class)
         fun provideRelayDirectoryStorage(): RelayDirectoryStorage = NativeRelayDirectoryStorage()
