@@ -20,8 +20,11 @@ jobs:
       
       - name: Fetch GeoRelays
         run: |
-          wget https://raw.githubusercontent.com/permissionlesstech/georelays/refs/heads/main/nostr_relays.csv
-          mv nostr_relays.csv ./app/src/main/assets/nostr_relays.csv
+          wget -q https://raw.githubusercontent.com/permissionlesstech/georelays/refs/heads/main/nostr_relays.csv -O nostr_relays.csv
+          # Ship the same list to both platform bundles (Android assets + iOS app bundle).
+          cp nostr_relays.csv androidApp/src/main/assets/nostr_relays.csv
+          cp nostr_relays.csv iosApp/iosApp/nostr_relays.csv
+          rm -f nostr_relays.csv
 
       - name: Check for changes
         id: git-check
@@ -33,7 +36,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add app/src/main/assets/nostr_relays.csv
+          git add androidApp/src/main/assets/nostr_relays.csv iosApp/iosApp/nostr_relays.csv
           git commit -m "Automated update of relay data - $(date -u)"
           git push
         env:
