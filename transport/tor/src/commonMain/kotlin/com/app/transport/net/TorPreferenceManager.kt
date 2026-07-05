@@ -25,8 +25,12 @@ class TorPreferenceManager(
     fun get(): TorMode = read()
 
     private fun read(): TorMode {
-        val saved = settings.getString(KEY_TOR_MODE, TorMode.ON.name)
-        return runCatching { TorMode.valueOf(saved) }.getOrDefault(TorMode.ON)
+        // Default OFF: relays/DM connect directly (fast, reliable) out of the box. Routing Nostr
+        // over the bundled Arti SOCKS proxy is slow to bootstrap (~30-120s) and drops many circuits
+        // ("Protocol error while launching a data stream"), which stalls geohash presence and DMs.
+        // Tor stays user-toggleable in settings for those who want it.
+        val saved = settings.getString(KEY_TOR_MODE, TorMode.OFF.name)
+        return runCatching { TorMode.valueOf(saved) }.getOrDefault(TorMode.OFF)
     }
 
     private companion object {
