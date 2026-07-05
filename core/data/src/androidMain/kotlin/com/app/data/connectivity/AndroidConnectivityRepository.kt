@@ -14,10 +14,9 @@ import com.app.domain.model.TransportKind
 import com.app.domain.model.TransportState
 import com.app.domain.model.TransportStatus
 import com.app.domain.repository.ConnectivityRepository
+import com.app.data.tor.TorUserPreferenceManager
 import com.app.transport.mesh.MeshLifecycleController
 import com.app.transport.mesh.aware.WifiAwareSupport
-import com.app.transport.net.TorMode
-import com.app.transport.net.TorPreferenceManager
 import com.app.transport.nostr.NostrRelayManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -33,7 +32,7 @@ import kotlinx.coroutines.delay
  */
 class AndroidConnectivityRepository(
     private val context: Context,
-    private val torPreferenceManager: TorPreferenceManager,
+    private val torUserPreference: TorUserPreferenceManager,
     private val permissionController: PermissionController,
     private val meshLifecycle: MeshLifecycleController,
     private val nostrRelayManager: NostrRelayManager,
@@ -100,7 +99,7 @@ class AndroidConnectivityRepository(
     }
 
     private fun torState(): TransportState =
-        if (torPreferenceManager.get() == TorMode.OFF) TransportState.OFF else TransportState.ON
+        if (!torUserPreference.get()) TransportState.OFF else TransportState.ON
 
     override suspend fun enable(kind: TransportKind) {
         when (kind) {
@@ -122,8 +121,7 @@ class AndroidConnectivityRepository(
             TransportKind.INTERNET -> startSystemIntent(Settings.ACTION_WIRELESS_SETTINGS)
 
             TransportKind.TOR -> {
-                val next = if (torPreferenceManager.get() == TorMode.OFF) TorMode.ON else TorMode.OFF
-                torPreferenceManager.set(next)
+                torUserPreference.set(!torUserPreference.get())
             }
         }
     }

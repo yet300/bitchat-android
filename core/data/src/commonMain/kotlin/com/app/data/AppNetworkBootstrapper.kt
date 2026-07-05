@@ -2,6 +2,7 @@ package com.app.data
 
 import com.app.common.utils.Log
 import com.app.data.nostr.NostrDirectMessageIngest
+import com.app.data.tor.TorActivationController
 import com.app.transport.net.ArtiTorManager
 import com.app.transport.nostr.LocationNotesInitializer
 import com.app.transport.nostr.LocationNotesManager
@@ -36,6 +37,7 @@ class AppNetworkBootstrapper(
     private val locationNotesManager: LocationNotesManager,
     private val nostrIdentityBridge: NostrIdentityBridge,
     private val nostrDirectMessageIngest: NostrDirectMessageIngest,
+    private val torActivationController: TorActivationController,
 ) {
     private companion object {
         private const val TAG = "AppNetworkBootstrapper"
@@ -48,6 +50,11 @@ class AppNetworkBootstrapper(
         try {
             artiTorManager.init()
             artiTorManager.onConnectionsReset = { nostrRelayManager.resetAllConnections() }
+            // Dynamic activation: derive the effective Tor mode from the user preference AND the
+            // policy (location authorized or a mutual favorite), like the reference iOS
+            // NetworkActivationService. Writes the effective mode that ArtiTorManager already reacts
+            // to, so at first launch relays connect directly (fast) and Tor engages on demand.
+            torActivationController.start()
         } catch (_: Exception) {
         }
 

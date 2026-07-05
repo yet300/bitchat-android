@@ -25,10 +25,10 @@ class TorPreferenceManager(
     fun get(): TorMode = read()
 
     private fun read(): TorMode {
-        // Default OFF: relays/DM connect directly (fast, reliable) out of the box. Routing Nostr
-        // over the bundled Arti SOCKS proxy is slow to bootstrap (~30-120s) and drops many circuits
-        // ("Protocol error while launching a data stream"), which stalls geohash presence and DMs.
-        // Tor stays user-toggleable in settings for those who want it.
+        // This is the EFFECTIVE mode that drives the Arti engine, written by
+        // TorActivationController (user preference AND activation policy). The user-facing toggle
+        // lives in TorUserPreferenceManager. Default OFF so nothing routes over a not-yet-useful
+        // Tor circuit before the controller evaluates the policy at launch.
         val saved = settings.getString(KEY_TOR_MODE, TorMode.OFF.name)
         return runCatching { TorMode.valueOf(saved) }.getOrDefault(TorMode.OFF)
     }

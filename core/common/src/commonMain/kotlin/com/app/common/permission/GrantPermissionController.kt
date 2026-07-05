@@ -57,6 +57,7 @@ class GrantPermissionController(
         AppPermission.Bluetooth -> AppGrant.BLUETOOTH
         AppPermission.BluetoothAdvertise -> AppGrant.BLUETOOTH_ADVERTISE
         AppPermission.NearbyWifi -> AppGrant.NEARBY_WIFI_DEVICES
+        AppPermission.Location -> AppGrant.LOCATION
     }
 
     private companion object {
