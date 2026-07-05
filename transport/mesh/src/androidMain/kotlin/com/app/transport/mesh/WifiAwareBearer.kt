@@ -351,8 +351,21 @@ class WifiAwareBearer(
                     }
                     wifiAwareSession = session
                     Log.i(TAG, "Wi-Fi Aware attached; starting publish & subscribe (peerID=$myPeerID)")
-                    startPublish(session, generation)
-                    startSubscribe(session, generation)
+                    // publish()/subscribe() run on this Aware callback thread and throw
+                    // SecurityException when Location is disabled (NEARBY_WIFI_DEVICES/location
+                    // requirement). Unguarded, that propagates out of the framework callback and
+                    // crashes the whole process. Aware is an optional bearer (BLE is primary), so
+                    // disable it and retry later instead of taking the app down with it.
+                    try {
+                        startPublish(session, generation)
+                        startSubscribe(session, generation)
+                    } catch (e: SecurityException) {
+                        Log.w(TAG, "Wi-Fi Aware publish/subscribe denied (location disabled?): ${e.message}; disabling Aware bearer, will retry")
+                        isActive = false
+                        runCatching { session.close() }
+                        if (wifiAwareSession === session) wifiAwareSession = null
+                        scheduleRestart(30_000)
+                    }
                 }
 
                 override fun onAttachFailed() {
