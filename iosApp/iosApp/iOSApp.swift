@@ -43,6 +43,11 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         // the BLE mesh runs while the process lives, kept alive in background by the
         // bluetooth-central/peripheral background modes.
         appGraph.meshLifecycleController.start()
+
+        // Same launch-time Nostr/Tor bootstrap the Android Application runs (Tor, relay directory,
+        // location notes, identity warm-up, DM ingest). Without it geohash channels have no relays.
+        // Non-blocking: each step dispatches its own work.
+        appGraph.appNetworkBootstrapper.start()
         return true
     }
 

@@ -6,7 +6,6 @@ import com.yet.bitmessage.android.di.AppGraph
 import dev.zacsweers.metro.createGraphFactory
 import dev.zacsweers.metrox.android.MetroAppComponentProviders
 import dev.zacsweers.metrox.android.MetroApplication
-import com.app.transport.nostr.LocationNotesInitializer
 
 /**
  * Main application class for bitchat Android
@@ -25,32 +24,9 @@ class BitchatApplication : Application(), MetroApplication {
     override fun onCreate() {
         super.onCreate()
 
-        // Initialize Tor first so any early network goes over Tor
-        try {
-            val torProvider = appGraph.artiTorManager
-            torProvider.init()
-            // Reconnect Nostr relays when Tor resets (wired here so ArtiTorManager stays unaware of nostr)
-            torProvider.onConnectionsReset = {
-                appGraph.nostrRelayManager.resetAllConnections()
-            }
-        } catch (_: Exception){}
-
-        // Initialize relay directory (loads assets/nostr_relays.csv)
-        appGraph.relayDirectory.initialize()
-
-        // Initialize LocationNotesManager dependencies early so sheet subscriptions can start immediately
-        try { LocationNotesInitializer.initialize(appGraph.relayDirectory, appGraph.nostrRelayManager, appGraph.locationNotesManager, appGraph.nostrIdentityBridge) } catch (_: Exception) { }
-
-        // Warm up Nostr identity to ensure npub is available for favorite notifications
-        try {
-            appGraph.nostrIdentityBridge.getCurrentNostrIdentity()
-        } catch (_: Exception) { }
-
-        // Start the incoming Nostr DM ingest (account + per-geohash gift wraps). It also connects the
-        // default relays at startup so favorite DMs and receipts flow even with Tor off / no geo open.
-        try {
-            appGraph.nostrDirectMessageIngest.start()
-        } catch (_: Exception) { }
-
+        // Launch-time Nostr/Tor bootstrap (Tor → relay-reset hook → relay directory → location notes
+        // → identity warm-up → DM ingest). Hoisted into the shared AppNetworkBootstrapper so iOS runs
+        // the identical sequence; order and per-step resilience are preserved there.
+        appGraph.appNetworkBootstrapper.start()
     }
 }

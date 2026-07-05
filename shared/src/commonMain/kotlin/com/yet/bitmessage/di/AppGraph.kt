@@ -1,5 +1,6 @@
 package com.yet.bitmessage.di
 
+import com.app.data.AppNetworkBootstrapper
 import com.yet.bitmessage.feature.root.RootComponent
 
 /**
@@ -9,4 +10,11 @@ import com.yet.bitmessage.feature.root.RootComponent
  */
 interface AppGraph {
     val rootFactory: RootComponent.Factory
+
+    /**
+     * Launch-time Nostr/Tor bootstrap. Exposed on the shared contract so both the Android
+     * `Application` and the iOS `AppDelegate` run the identical sequence via a single hoisted
+     * entry point (`start()`), rather than each duplicating it.
+     */
+    val appNetworkBootstrapper: AppNetworkBootstrapper
 }
