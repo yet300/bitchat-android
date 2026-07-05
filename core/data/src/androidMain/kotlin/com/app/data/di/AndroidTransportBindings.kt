@@ -1,8 +1,6 @@
 package com.app.data.di
 
 import android.content.Context
-import com.app.data.tor.AndroidLocationAuthorizationSource
-import com.app.data.tor.LocationAuthorizationSource
 import com.app.transport.net.TorDataDirProvider
 import com.app.transport.net.androidHttpClientEngineFactory
 import com.app.transport.nostr.AndroidRelayDirectoryStorage
@@ -11,7 +9,6 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
-import dev.zacsweers.metro.SingleIn
 import io.ktor.client.engine.HttpClientEngineFactory
 import java.io.File
 
@@ -43,11 +40,5 @@ object AndroidTransportBindings {
      */
     @Provides
     fun provideHttpClientEngineFactory(): HttpClientEngineFactory<*> = androidHttpClientEngineFactory()
-
-    /** Location-permission snapshot for the Tor activation policy. */
-    @Provides
-    @SingleIn(AppScope::class)
-    fun provideLocationAuthorizationSource(context: Context): LocationAuthorizationSource =
-        AndroidLocationAuthorizationSource(context.applicationContext)
 
 }
