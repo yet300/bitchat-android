@@ -17,6 +17,7 @@ import co.touchlab.stately.collections.ConcurrentMutableMap
 import co.touchlab.stately.collections.ConcurrentMutableSet
 import kotlinx.coroutines.*
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.ExperimentalTime
 
 /**
@@ -102,7 +103,7 @@ internal class SecurityManager(
      * Handle Noise handshake packet - SIMPLIFIED iOS-compatible version
      * Single handshake type with automatic response handling
      */
-    suspend fun handleNoiseHandshake(routed: RoutedPacket): Boolean {
+    fun handleNoiseHandshake(routed: RoutedPacket): Boolean {
         val packet = routed.packet
         val peerID = routed.peerID ?: "unknown"
 
@@ -349,7 +350,7 @@ internal class SecurityManager(
     private fun startPeriodicCleanup() {
         managerScope.launch {
             while (isActive) {
-                delay(CLEANUP_INTERVAL)
+                delay(CLEANUP_INTERVAL.milliseconds)
                 cleanupOldData()
             }
         }

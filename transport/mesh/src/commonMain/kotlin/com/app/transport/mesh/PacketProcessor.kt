@@ -156,7 +156,7 @@ internal class PacketProcessor(
 
         var validPacket = true
         val messageType = MessageType.fromValue(packet.type)
-        Log.d(TAG, "Processing packet type ${messageType} from ${formatPeerForLog(peerID)}")
+        Log.d(TAG, "Processing packet type $messageType from ${formatPeerForLog(peerID)}")
         // Verbose logging to debug manager (and chat via ChatViewModel observer)
         try {
             val mt = messageType?.name ?: packet.type.toString()
@@ -187,7 +187,7 @@ internal class PacketProcessor(
                         }
                     }
                 } else {
-                    Log.d(TAG, "Private packet type ${messageType} not addressed to us (from: ${formatPeerForLog(peerID)} to ${packet.recipientID?.hexEncodedString()}), skipping")
+                    Log.d(TAG, "Private packet type $messageType not addressed to us (from: ${formatPeerForLog(peerID)} to ${packet.recipientID?.hexEncodedString()}), skipping")
                 }
             }
         }
@@ -213,7 +213,7 @@ internal class PacketProcessor(
     /**
      * Handle Noise encrypted transport message
      */
-    private suspend fun handleNoiseEncrypted(routed: RoutedPacket) {
+    private fun handleNoiseEncrypted(routed: RoutedPacket) {
         val peerID = routed.peerID ?: "unknown"
         Log.d(TAG, "Processing Noise encrypted message from ${formatPeerForLog(peerID)}")
         delegate?.handleNoiseEncrypted(routed)
@@ -222,7 +222,7 @@ internal class PacketProcessor(
     /**
      * Handle announce message
      */
-    private suspend fun handleAnnounce(routed: RoutedPacket) {
+    private fun handleAnnounce(routed: RoutedPacket) {
         val peerID = routed.peerID ?: "unknown"
         Log.d(TAG, "Processing announce from ${formatPeerForLog(peerID)}")
         delegate?.handleAnnounce(routed)
@@ -231,7 +231,7 @@ internal class PacketProcessor(
     /**
      * Handle regular message
      */
-    private suspend fun handleMessage(routed: RoutedPacket) {
+    private fun handleMessage(routed: RoutedPacket) {
         val peerID = routed.peerID ?: "unknown"
         Log.d(TAG, "Processing message from ${formatPeerForLog(peerID)}")
         delegate?.handleMessage(routed)
@@ -240,7 +240,7 @@ internal class PacketProcessor(
     /**
      * Handle leave message
      */
-    private suspend fun handleLeave(routed: RoutedPacket) {
+    private fun handleLeave(routed: RoutedPacket) {
         val peerID = routed.peerID ?: "unknown"
         Log.d(TAG, "Processing leave from ${formatPeerForLog(peerID)}")
         delegate?.handleLeave(routed)
@@ -265,7 +265,7 @@ internal class PacketProcessor(
     /**
      * Handle REQUEST_SYNC packets (public, TTL=1)
      */
-    private suspend fun handleRequestSync(routed: RoutedPacket) {
+    private fun handleRequestSync(routed: RoutedPacket) {
         val peerID = routed.peerID ?: "unknown"
         Log.d(TAG, "Processing REQUEST_SYNC from ${formatPeerForLog(peerID)}")
         delegate?.handleRequestSync(routed)

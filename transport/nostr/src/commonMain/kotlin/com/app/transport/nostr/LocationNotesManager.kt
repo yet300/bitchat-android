@@ -7,6 +7,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Manages location notes (kind=1 text notes with geohash tags)
@@ -250,7 +251,7 @@ class LocationNotesManager(
                 
                 if (!noteIDs.contains(event.id)) {
                     noteIDs.add(event.id)
-                    val currentNotes = _notes.value ?: emptyList()
+                    val currentNotes = _notes.value
                     _notes.value = (currentNotes + localNote).sortedByDescending { it.createdAt }
                     
                     // Trim if exceeds max
@@ -297,7 +298,7 @@ class LocationNotesManager(
             scope.launch {
                 var attempts = 0
                 while (attempts < 10 && subscribeFunc == null) {
-                    delay(300)
+                    delay(300.milliseconds)
                     attempts++
                 }
                 val subNow = subscribeFunc
@@ -306,7 +307,7 @@ class LocationNotesManager(
                     subscribeAll()
                 } else {
                     // Give UI a chance to show empty state rather than spinner forever
-                    if (!_initialLoadComplete.value!!) {
+                    if (!_initialLoadComplete.value) {
                         _initialLoadComplete.value = true
                         _state.value = State.READY
                     }
@@ -336,8 +337,8 @@ class LocationNotesManager(
         
         // Mark initial load complete after brief delay to allow relay responses
         scope.launch {
-            delay(2000) // Wait 2 seconds for initial batch
-            if (!_initialLoadComplete.value!!) {
+            delay(2000.milliseconds) // Wait 2 seconds for initial batch
+            if (!_initialLoadComplete.value) {
                 _initialLoadComplete.value = true
                 _state.value = State.READY
                 Log.d(TAG, "Initial load complete for geohash: $currentGeohash (${noteIDs.size} notes)")
@@ -389,7 +390,7 @@ class LocationNotesManager(
         
         // Add to collection
         noteIDs.add(event.id)
-        val currentNotes = _notes.value ?: emptyList()
+        val currentNotes = _notes.value
         _notes.value = (currentNotes + note).sortedByDescending { it.createdAt }
         
         Log.d(TAG, "📥 Added note: ${note.displayName} - ${note.content.take(50)}")
@@ -400,7 +401,7 @@ class LocationNotesManager(
         }
         
         // Update state
-        if (!_initialLoadComplete.value!!) {
+        if (!_initialLoadComplete.value) {
             _initialLoadComplete.value = true
         }
         _state.value = State.READY
@@ -410,7 +411,7 @@ class LocationNotesManager(
      * Trim oldest notes to stay within memory limit
      */
     private fun trimOldestNotes() {
-        val currentNotes = _notes.value ?: return
+        val currentNotes = _notes.value
         if (currentNotes.size <= MAX_NOTES_IN_MEMORY) return
         
         val trimmed = currentNotes.sortedByDescending { it.createdAt }.take(MAX_NOTES_IN_MEMORY)

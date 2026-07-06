@@ -36,7 +36,7 @@ object MessagePadding {
         val paddingNeeded = targetSize - data.size
         
         // Constrain to 255 to fit a single-byte pad length marker
-        if (paddingNeeded <= 0 || paddingNeeded > 255) return data
+        if (paddingNeeded !in 1..255) return data
         
         val result = ByteArray(targetSize)
         
