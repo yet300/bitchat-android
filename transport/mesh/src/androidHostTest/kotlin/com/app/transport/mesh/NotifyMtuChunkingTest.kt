@@ -120,6 +120,38 @@ class NotifyMtuChunkingTest {
         assertNotNull(BinaryProtocol.decode(frames[0]))
     }
 
+    /**
+     * Chunk runs of two concurrently sent frames must never interleave on one link:
+     * interleaving desynchronizes the receiver's stream assembler into garbage frames
+     * (observed on-device as bogus packets with corrupted sender IDs).
+     */
+    @Test
+    fun `concurrent sends to one link keep each frame's chunks contiguous`() {
+        subscribe("AA:00:00:00:00:03", "3333333333333333")
+        // MTU stays 23 → every frame is chunked.
+
+        val frameA = requestSyncFrame()
+        val packetA = BitchatPacket.fromBinaryData(frameA)!!
+        val packetB = packetA.copy(timestamp = packetA.timestamp + 1u)
+        val frameB = BinaryProtocol.encode(packetB, padding = false)!!
+
+        val threads = listOf(
+            Thread { repeat(20) { broadcaster.sendToPeer("3333333333333333", RoutedPacket(packetA)) } },
+            Thread { repeat(20) { broadcaster.sendToPeer("3333333333333333", RoutedPacket(packetB)) } },
+        )
+        threads.forEach { it.start() }
+        threads.forEach { it.join() }
+
+        // Feeding the emissions in wire order into the assembler must yield exactly the
+        // 40 sent frames — any interleaving would corrupt the stream.
+        val assembler = BleFrameAssembler()
+        val frames = emissions.flatMap { assembler.append(it) }
+        assertEquals(40, frames.size)
+        frames.forEach { frame ->
+            assertTrue(frame.contentEquals(frameA) || frame.contentEquals(frameB))
+        }
+    }
+
     @Test
     fun `negotiated MTU 517 - frame goes out as a single notification`() {
         subscribe("AA:00:00:00:00:02", "2222222222222222")

@@ -14,6 +14,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Android radio adapter under the shared [BleSendCore] (C1 unification): supplies only the raw
@@ -47,6 +48,12 @@ internal class BluetoothPacketBroadcaster(
     }
 
     private val broadcasterScope = CoroutineScope(dispatchers.io + SupervisorJob())
+
+    // Serializes frame emission per link: notifyDevice is reached both from the queued
+    // broadcast consumer and from synchronous sendToPeer callers. A frame chunked to
+    // MTU−3 must hit the link as one contiguous chunk run — interleaving chunks of two
+    // frames desynchronizes the receiver's stream assembler into garbage frames.
+    private val emissionLocks = ConcurrentHashMap<String, Any>()
 
     private val sendCore = BleSendCore(
         scope = broadcasterScope,
@@ -101,42 +108,49 @@ internal class BluetoothPacketBroadcaster(
 
     /** Server -> client push via characteristic notify. */
     private fun notifyDevice(device: BluetoothDevice, data: ByteArray): Boolean {
-        return try {
-            val characteristic = characteristicProvider() ?: return false
-            val server = gattServerProvider() ?: return false
-            // The stack silently truncates a notification to the central's ATT MTU − 3:
-            // at the default MTU 23 a frame goes out as its first 20 bytes and the peer
-            // logs an unparseable packet. Chunk oversized frames instead — receivers
-            // (iOS NotificationStreamAssembler, our BleFrameAssembler) reassemble by the
-            // frame length declared in the header.
-            val maxChunk = (connectionTracker.getNegotiatedMtu(device.address) - 3).coerceAtLeast(1)
-            if (data.size <= maxChunk) {
-                characteristic.value = data
-                return server.notifyCharacteristicChanged(device, characteristic, false)
-            }
-            Log.d(TAG, "Chunking ${data.size}B notification to ${device.address} by $maxChunk bytes")
-            var offset = 0
-            while (offset < data.size) {
-                val end = minOf(offset + maxChunk, data.size)
-                characteristic.value = data.copyOfRange(offset, end)
-                if (!server.notifyCharacteristicChanged(device, characteristic, false)) {
-                    // A dropped middle chunk would corrupt the stream; the receiver's
-                    // stall reset recovers it, but this frame is lost — report failure.
-                    Log.w(TAG, "Notify chunk failed at $offset/${data.size} for ${device.address}")
-                    return false
+        val lock = emissionLocks.getOrPut(device.address) { Any() }
+        return synchronized(lock) {
+            try {
+                doNotifyDevice(device, data)
+            } catch (e: Exception) {
+                Log.w(TAG, "Error sending to server connection ${device.address}: ${e.message}")
+                connectionScope.launch {
+                    delay(CLEANUP_DELAY)
+                    connectionTracker.removeSubscribedDevice(device)
+                    connectionTracker.addressPeerMap.remove(device.address)
                 }
-                offset = end
+                false
             }
-            true
-        } catch (e: Exception) {
-            Log.w(TAG, "Error sending to server connection ${device.address}: ${e.message}")
-            connectionScope.launch {
-                delay(CLEANUP_DELAY)
-                connectionTracker.removeSubscribedDevice(device)
-                connectionTracker.addressPeerMap.remove(device.address)
-            }
-            false
         }
+    }
+
+    private fun doNotifyDevice(device: BluetoothDevice, data: ByteArray): Boolean {
+        val characteristic = characteristicProvider() ?: return false
+        val server = gattServerProvider() ?: return false
+        // The stack silently truncates a notification to the central's ATT MTU − 3:
+        // at the default MTU 23 a frame goes out as its first 20 bytes and the peer
+        // logs an unparseable packet. Chunk oversized frames instead — receivers
+        // (iOS NotificationStreamAssembler, our BleFrameAssembler) reassemble by the
+        // frame length declared in the header.
+        val maxChunk = (connectionTracker.getNegotiatedMtu(device.address) - 3).coerceAtLeast(1)
+        if (data.size <= maxChunk) {
+            characteristic.value = data
+            return server.notifyCharacteristicChanged(device, characteristic, false)
+        }
+        Log.d(TAG, "Chunking ${data.size}B notification to ${device.address} by $maxChunk bytes")
+        var offset = 0
+        while (offset < data.size) {
+            val end = minOf(offset + maxChunk, data.size)
+            characteristic.value = data.copyOfRange(offset, end)
+            if (!server.notifyCharacteristicChanged(device, characteristic, false)) {
+                // A dropped middle chunk would corrupt the stream; the receiver's
+                // stall reset recovers it, but this frame is lost — report failure.
+                Log.w(TAG, "Notify chunk failed at $offset/${data.size} for ${device.address}")
+                return false
+            }
+            offset = end
+        }
+        return true
     }
 
     /** Client -> server push via characteristic write. */

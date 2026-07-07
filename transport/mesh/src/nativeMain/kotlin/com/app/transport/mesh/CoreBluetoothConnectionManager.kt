@@ -3,6 +3,8 @@
 package com.app.transport.mesh
 
 import co.touchlab.stately.collections.ConcurrentMutableMap
+import co.touchlab.stately.concurrency.Lock
+import co.touchlab.stately.concurrency.withLock
 import com.app.common.AppDispatchers
 import com.app.common.utils.Log
 import com.app.common.encoding.toHexString
@@ -94,6 +96,14 @@ internal class CoreBluetoothConnectionManager(
     // their link's usable MTU, and the receiver reassembles by the header-declared frame
     // length (iOS reference client parity: NotificationStreamAssembler/BLEInboundWriteBuffer).
     private val frameAssemblers = ConcurrentMutableMap<String, BleFrameAssembler>()
+
+    // Serializes frame emission per link: a frame chunked to the link's usable MTU must
+    // hit the wire as one contiguous chunk run — interleaved chunks from concurrent
+    // callers (queued broadcast consumer vs. synchronous sendToPeer) desynchronize the
+    // receiver's stream assembler into garbage frames.
+    private val emissionLocks = ConcurrentMutableMap<String, Lock>()
+
+    private fun emissionLock(linkAddress: String) = emissionLocks.getOrPut(linkAddress) { Lock() }
 
     /** linkAddress -> logical peerID, owned by the bearer via [BleBearer.bindPeer]. */
     override val addressPeerMap = ConcurrentMutableMap<String, String>()
@@ -229,7 +239,7 @@ internal class CoreBluetoothConnectionManager(
 
     private fun notifyCentral(central: CBCentral, data: ByteArray): Boolean {
         val char = mutableCharacteristic ?: return false
-        return try {
+        return emissionLock(central.identifier.UUIDString).withLock { try {
             // CoreBluetooth truncates an update larger than the central's negotiated
             // maximumUpdateValueLength — chunk instead; receivers reassemble by the
             // frame length declared in the header.
@@ -254,12 +264,12 @@ internal class CoreBluetoothConnectionManager(
         } catch (e: Exception) {
             Log.w(TAG, "notifyCentral failed: ${e.message}")
             false
-        }
+        } }
     }
 
     private fun writeToPeripheral(addr: String, peripheral: CBPeripheral, data: ByteArray): Boolean {
         val char = peripheralCharacteristics.get(addr) ?: return false
-        return try {
+        return emissionLock(addr).withLock { try {
             // Writes above maximumWriteValueLengthForType are dropped/truncated by the
             // stack — chunk to the link's usable size (ATT MTU − 3 for withoutResponse).
             val maxChunk = peripheral
@@ -280,7 +290,7 @@ internal class CoreBluetoothConnectionManager(
         } catch (e: Exception) {
             Log.w(TAG, "writeToPeripheral failed: ${e.message}")
             false
-        }
+        } }
     }
 
     // -----------------------------------------------------------------

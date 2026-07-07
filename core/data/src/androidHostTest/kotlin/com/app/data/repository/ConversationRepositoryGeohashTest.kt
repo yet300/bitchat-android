@@ -62,11 +62,10 @@ class ConversationRepositoryGeohashTest {
 
         val conversations = repository.observeConversations().first()
 
-        assertEquals(1, conversations.size)
-        val conversation = conversations.single()
-        val id = conversation.id
-        assertTrue("expected Geohash id, got $id", id is ConversationId.Geohash)
-        id as ConversationId.Geohash
+        // Public (always present) + the geo conversation
+        assertEquals(2, conversations.size)
+        val conversation = conversations.first { it.id is ConversationId.Geohash }
+        val id = conversation.id as ConversationId.Geohash
         assertEquals(GEOHASH, id.channel.geohash)
         assertEquals(GeohashLevel.CITY, id.channel.level)
         assertEquals("#$GEOHASH", conversation.title)
@@ -77,19 +76,37 @@ class ConversationRepositoryGeohashTest {
     fun plainChannelTagStaysChannelConversation() = runTest {
         appStateStore.addChannelMessage("#general", message("m1"))
 
-        val id = repository.observeConversations().first().single().id
+        val ids = repository.observeConversations().first().map { it.id }
 
-        assertEquals(ConversationId.Channel("#general"), id)
+        assertTrue(ConversationId.Channel("#general") in ids)
     }
 
     @Test
     fun markReadResetsGeohashUnread() = runTest {
         appStateStore.addChannelMessage(GEO_TAG, message("m1"))
-        val id = repository.observeConversations().first().single().id
+        val id = repository.observeConversations().first().first { it.id is ConversationId.Geohash }.id
 
         repository.markRead(id)
 
         assertEquals(0, repository.observeUnreadCount().first())
-        assertEquals(0, repository.observeConversations().first().single().unreadCount)
+        assertEquals(
+            0,
+            repository.observeConversations().first().first { it.id is ConversationId.Geohash }.unreadCount,
+        )
+    }
+
+    /**
+     * The public mesh timeline must be reachable on a fresh install: hiding it until a
+     * message exists makes the global chat unopenable — nobody can send the first message.
+     */
+    @Test
+    fun publicConversationAlwaysPresentEvenWhenEmpty() = runTest {
+        val conversations = repository.observeConversations().first()
+
+        assertEquals(1, conversations.size)
+        val public = conversations.single()
+        assertEquals(ConversationId.PublicMesh, public.id)
+        assertEquals(0, public.unreadCount)
+        assertEquals(null, public.lastMessage)
     }
 }
