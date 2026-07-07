@@ -1,11 +1,12 @@
 package com.app.transport
 
 import com.app.common.AppDispatchers
-import com.app.common.settings.SettingsStore
 import com.app.crypto.EncryptionService
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.identity.SecureIdentityStateManager
+import com.app.transport.net.TorConfigStore
 import com.app.transport.net.TorDataDirProvider
+import com.app.transport.nostr.NostrConfigStore
 import com.app.transport.nostr.RelayDirectoryStorage
 import com.app.transport.meshgraph.MeshGraphService
 import io.ktor.client.engine.HttpClientEngineFactory
@@ -23,7 +24,8 @@ import kotlinx.coroutines.CoroutineScope
  * ```
  * val transport = BitchatTransport.create(
  *     BitchatTransportConfig(
- *         settings = appSettings,
+ *         torConfigStore = appTorConfigStore,
+ *         nostrConfigStore = appNostrConfigStore,
  *         encryption = encryptionService,
  *         fingerprints = peerFingerprintManager,
  *         stateManager = secureIdentityStateManager,
@@ -40,15 +42,16 @@ import kotlinx.coroutines.CoroutineScope
  */
 class BitchatTransportConfig(
     // shared
-    val settings: SettingsStore,
     val encryption: EncryptionService,
     val fingerprints: PeerFingerprintManager,
     val stateManager: SecureIdentityStateManager,
     val scope: CoroutineScope,
     // tor
+    val torConfigStore: TorConfigStore,
     val torDataDir: TorDataDirProvider,
     val httpEngineFactory: HttpClientEngineFactory<*>,
     // nostr
+    val nostrConfigStore: NostrConfigStore,
     val relayStorage: RelayDirectoryStorage,
     // mesh
     val callbacks: MeshCallbacks,
@@ -71,7 +74,7 @@ class BitchatTransport private constructor(
         fun create(config: BitchatTransportConfig): BitchatTransport {
             val tor = TorClient.create(
                 TorConfig(
-                    settings = config.settings,
+                    configStore = config.torConfigStore,
                     dataDir = config.torDataDir,
                     engineFactory = config.httpEngineFactory,
                     dispatchers = config.dispatchers,
@@ -79,7 +82,7 @@ class BitchatTransport private constructor(
             )
             val nostr = NostrClient.create(
                 NostrConfig(
-                    settings = config.settings,
+                    configStore = config.nostrConfigStore,
                     http = tor.httpClientProvider,
                     relayStorage = config.relayStorage,
                     stateManager = config.stateManager,

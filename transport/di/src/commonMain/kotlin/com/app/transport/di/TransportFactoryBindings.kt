@@ -1,7 +1,6 @@
 package com.app.transport.di
 
 import com.app.common.AppDispatchers
-import com.app.common.settings.SettingsStore
 import com.app.crypto.EncryptionService
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.identity.SecureIdentityStateManager
@@ -21,6 +20,7 @@ import com.app.transport.SeenMessageStore
 import com.app.transport.TorClient
 import com.app.transport.TorConfig
 import com.app.transport.VerificationService
+import com.app.transport.debug.DebugConfigStore
 import com.app.transport.debug.DebugPreferenceManager
 import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.features.file.IncomingFileStore
@@ -29,6 +29,7 @@ import com.app.transport.mesh.MeshNetwork
 import com.app.transport.mesh.MeshService
 import com.app.transport.meshgraph.MeshGraphService
 import com.app.transport.net.ArtiTorManager
+import com.app.transport.net.TorConfigStore
 import com.app.transport.net.HttpClientProvider
 import com.app.transport.net.TorDataDirProvider
 import com.app.transport.net.TorPreferenceManager
@@ -37,6 +38,7 @@ import com.app.transport.notification.ServiceNotifier
 import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.nostr.GeohashConversationRegistry
 import com.app.transport.nostr.LocationNotesManager
+import com.app.transport.nostr.NostrConfigStore
 import com.app.transport.nostr.NostrIdentityBridge
 import com.app.transport.nostr.NostrRelayManager
 import com.app.transport.nostr.NostrSubscriptionManager
@@ -56,9 +58,9 @@ import kotlinx.coroutines.CoroutineScope
  * the graph previously constructed by hand. Apps that do not use Metro simply do not include this
  * module and call the factories directly.
  *
- * The consumer graph must still provide the platform/app seams these factories need (settings, the
- * crypto services, the app callbacks/stores, the ktor engine, relay storage, the Tor data dir, the
- * app coroutine scope and the [MeshBearerBuilder]).
+ * The consumer graph must still provide the platform/app seams these factories need (the config
+ * store ports, the crypto services, the app callbacks/stores, the ktor engine, relay storage, the
+ * Tor data dir, the app coroutine scope and the [MeshBearerBuilder]).
  */
 @ContributesTo(AppScope::class)
 @BindingContainer
@@ -69,11 +71,11 @@ object TransportFactoryBindings {
     @Provides
     @SingleIn(AppScope::class)
     fun provideTorClient(
-        settings: SettingsStore,
+        configStore: TorConfigStore,
         dataDir: TorDataDirProvider,
         engineFactory: HttpClientEngineFactory<*>,
         dispatchers: AppDispatchers,
-    ): TorClient = TorClient.create(TorConfig(settings, dataDir, engineFactory, dispatchers))
+    ): TorClient = TorClient.create(TorConfig(configStore, dataDir, engineFactory, dispatchers))
 
     @Provides
     fun provideArtiTorManager(tor: TorClient): ArtiTorManager = tor.torManager
@@ -93,7 +95,7 @@ object TransportFactoryBindings {
     @Provides
     @SingleIn(AppScope::class)
     fun provideNostrClient(
-        settings: SettingsStore,
+        configStore: NostrConfigStore,
         http: HttpClientProvider,
         relayStorage: com.app.transport.nostr.RelayDirectoryStorage,
         stateManager: SecureIdentityStateManager,
@@ -101,7 +103,7 @@ object TransportFactoryBindings {
         dispatchers: AppDispatchers,
     ): NostrClient = NostrClient.create(
         NostrConfig(
-            settings = settings,
+            configStore = configStore,
             http = http,
             relayStorage = relayStorage,
             stateManager = stateManager,
@@ -142,8 +144,8 @@ object TransportFactoryBindings {
 
     @Provides
     @SingleIn(AppScope::class)
-    fun provideDebugPreferenceManager(settings: SettingsStore): DebugPreferenceManager =
-        DebugPreferenceManager(settings)
+    fun provideDebugPreferenceManager(store: DebugConfigStore): DebugPreferenceManager =
+        DebugPreferenceManager(store)
 
     @Provides
     @SingleIn(AppScope::class)

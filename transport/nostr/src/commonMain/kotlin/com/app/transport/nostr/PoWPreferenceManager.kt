@@ -1,25 +1,24 @@
 package com.app.transport.nostr
 
-import com.app.common.settings.SettingsStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Manages Proof of Work preferences for Nostr events, over the domain [SettingsStore] port.
+ * Manages Proof of Work preferences for Nostr events, over the [NostrConfigStore] port.
  *
  * App-scoped singleton: persisted values are loaded once on construction; the reactive
  * [powEnabled] / [powDifficulty] / [isMining] flows are shared process-wide.
  */
 class PoWPreferenceManager(
-    private val settings: SettingsStore,
+    private val store: NostrConfigStore,
 ) {
 
     // State flows for reactive UI
-    private val _powEnabled = MutableStateFlow(settings.getBoolean(KEY_POW_ENABLED, DEFAULT_POW_ENABLED))
+    private val _powEnabled = MutableStateFlow(store.getPowEnabled(DEFAULT_POW_ENABLED))
     val powEnabled: StateFlow<Boolean> = _powEnabled.asStateFlow()
 
-    private val _powDifficulty = MutableStateFlow(settings.getInt(KEY_POW_DIFFICULTY, DEFAULT_POW_DIFFICULTY))
+    private val _powDifficulty = MutableStateFlow(store.getPowDifficulty(DEFAULT_POW_DIFFICULTY))
     val powDifficulty: StateFlow<Int> = _powDifficulty.asStateFlow()
 
     // Mining state for animated indicators
@@ -36,7 +35,7 @@ class PoWPreferenceManager(
      */
     fun setPowEnabled(enabled: Boolean) {
         _powEnabled.value = enabled
-        settings.putBoolean(KEY_POW_ENABLED, enabled)
+        store.setPowEnabled(enabled)
     }
 
     /**
@@ -50,7 +49,7 @@ class PoWPreferenceManager(
     fun setPowDifficulty(difficulty: Int) {
         val clampedDifficulty = difficulty.coerceIn(0, 32)
         _powDifficulty.value = clampedDifficulty
-        settings.putInt(KEY_POW_DIFFICULTY, clampedDifficulty)
+        store.setPowDifficulty(clampedDifficulty)
     }
 
     /**
@@ -111,9 +110,6 @@ class PoWPreferenceManager(
     }
 
     private companion object {
-        const val KEY_POW_ENABLED = "pow_enabled"
-        const val KEY_POW_DIFFICULTY = "pow_difficulty"
-
         const val DEFAULT_POW_ENABLED = false
         const val DEFAULT_POW_DIFFICULTY = 12 // Reasonable default for geohash spam prevention
     }

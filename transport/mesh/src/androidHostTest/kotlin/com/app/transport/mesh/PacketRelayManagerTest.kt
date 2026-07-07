@@ -1,13 +1,11 @@
 package com.app.transport.mesh
 
-import com.app.common.settings.SettingsStore
+import com.app.transport.debug.DebugConfigStore
 import com.app.transport.debug.DebugPreferenceManager
 import com.app.transport.debug.DebugSettingsManager
 import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -31,7 +29,7 @@ class PacketRelayManagerTest {
 
     @Before
     fun setUp() {
-        val debugSettingsManager = DebugSettingsManager(DebugPreferenceManager(FakeSettingsStore()))
+        val debugSettingsManager = DebugSettingsManager(DebugPreferenceManager(FakeDebugConfigStore()))
         packetRelayManager = PacketRelayManager(myPeerID, debugSettingsManager)
         packetRelayManager.delegate = delegate
         whenever(delegate.getNetworkSize()).thenReturn(10)
@@ -107,24 +105,28 @@ class PacketRelayManagerTest {
         verify(delegate).broadcastPacket(any())
     }
 
-    /** Minimal in-memory [SettingsStore] returning defaults (debug toggles default-on). */
-    private class FakeSettingsStore : SettingsStore {
-        override fun getString(key: String, defaultValue: String): String = defaultValue
-        override fun getStringOrNull(key: String): String? = null
-        override fun putString(key: String, value: String) {}
-        override fun getBoolean(key: String, defaultValue: Boolean): Boolean = defaultValue
-        override fun putBoolean(key: String, value: Boolean) {}
-        override fun getInt(key: String, defaultValue: Int): Int = defaultValue
-        override fun putInt(key: String, value: Int) {}
-        override fun getLong(key: String, defaultValue: Long): Long = defaultValue
-        override fun putLong(key: String, value: Long) {}
-        override fun getDouble(key: String, defaultValue: Double): Double = defaultValue
-        override fun putDouble(key: String, value: Double) {}
-        override fun hasKey(key: String): Boolean = false
-        override fun remove(key: String) {}
-        override fun getStringFlow(key: String, defaultValue: String): Flow<String> = flowOf(defaultValue)
-        override fun getStringOrNullFlow(key: String): Flow<String?> = flowOf(null)
-        override fun getBooleanFlow(key: String, defaultValue: Boolean): Flow<Boolean> = flowOf(defaultValue)
+    /** Minimal in-memory [DebugConfigStore] returning defaults (debug toggles default-on). */
+    private class FakeDebugConfigStore : DebugConfigStore {
+        override fun getVerboseLogging(default: Boolean): Boolean = default
+        override fun setVerboseLogging(value: Boolean) {}
+        override fun getGattServerEnabled(default: Boolean): Boolean = default
+        override fun setGattServerEnabled(value: Boolean) {}
+        override fun getGattClientEnabled(default: Boolean): Boolean = default
+        override fun setGattClientEnabled(value: Boolean) {}
+        override fun getPacketRelayEnabled(default: Boolean): Boolean = default
+        override fun setPacketRelayEnabled(value: Boolean) {}
+        override fun getMaxConnectionsOverall(default: Int): Int = default
+        override fun setMaxConnectionsOverall(value: Int) {}
+        override fun getMaxConnectionsServer(default: Int): Int = default
+        override fun setMaxConnectionsServer(value: Int) {}
+        override fun getMaxConnectionsClient(default: Int): Int = default
+        override fun setMaxConnectionsClient(value: Int) {}
+        override fun getSeenPacketCapacity(default: Int): Int = default
+        override fun setSeenPacketCapacity(value: Int) {}
+        override fun getGcsMaxFilterBytes(default: Int): Int = default
+        override fun setGcsMaxFilterBytes(value: Int) {}
+        override fun getGcsFprPercent(default: Double): Double = default
+        override fun setGcsFprPercent(value: Double) {}
     }
 
     private fun hexStringToPeerBytes(hex: String): ByteArray {

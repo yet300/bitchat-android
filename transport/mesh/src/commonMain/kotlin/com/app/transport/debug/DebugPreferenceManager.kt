@@ -1,68 +1,52 @@
 package com.app.transport.debug
 
-import com.app.common.settings.SettingsStore
-
 /**
- * Settings-backed persistence for debug options, over the domain [SettingsStore] port.
- * Keeps the [DebugSettingsManager] stateless with regard to Android Context.
+ * Debug-option persistence over the [DebugConfigStore] port. Keeps the [DebugSettingsManager]
+ * free of any storage concern; defaults live here at the call sites, not in the store.
  */
 class DebugPreferenceManager(
-    private val settings: SettingsStore,
+    private val store: DebugConfigStore,
 ) {
 
-    fun getVerboseLogging(default: Boolean = false): Boolean = settings.getBoolean(KEY_VERBOSE, default)
+    fun getVerboseLogging(default: Boolean = false): Boolean = store.getVerboseLogging(default)
 
-    fun setVerboseLogging(value: Boolean) = settings.putBoolean(KEY_VERBOSE, value)
+    fun setVerboseLogging(value: Boolean) = store.setVerboseLogging(value)
 
-    fun getGattServerEnabled(default: Boolean = true): Boolean = settings.getBoolean(KEY_GATT_SERVER, default)
+    fun getGattServerEnabled(default: Boolean = true): Boolean = store.getGattServerEnabled(default)
 
-    fun setGattServerEnabled(value: Boolean) = settings.putBoolean(KEY_GATT_SERVER, value)
+    fun setGattServerEnabled(value: Boolean) = store.setGattServerEnabled(value)
 
-    fun getGattClientEnabled(default: Boolean = true): Boolean = settings.getBoolean(KEY_GATT_CLIENT, default)
+    fun getGattClientEnabled(default: Boolean = true): Boolean = store.getGattClientEnabled(default)
 
-    fun setGattClientEnabled(value: Boolean) = settings.putBoolean(KEY_GATT_CLIENT, value)
+    fun setGattClientEnabled(value: Boolean) = store.setGattClientEnabled(value)
 
-    fun getPacketRelayEnabled(default: Boolean = true): Boolean = settings.getBoolean(KEY_PACKET_RELAY, default)
+    fun getPacketRelayEnabled(default: Boolean = true): Boolean = store.getPacketRelayEnabled(default)
 
-    fun setPacketRelayEnabled(value: Boolean) = settings.putBoolean(KEY_PACKET_RELAY, value)
+    fun setPacketRelayEnabled(value: Boolean) = store.setPacketRelayEnabled(value)
 
     // Optional connection limits (0 or missing => use defaults)
-    fun getMaxConnectionsOverall(default: Int = 8): Int = settings.getInt(KEY_MAX_CONN_OVERALL, default)
+    fun getMaxConnectionsOverall(default: Int = 8): Int = store.getMaxConnectionsOverall(default)
 
-    fun setMaxConnectionsOverall(value: Int) = settings.putInt(KEY_MAX_CONN_OVERALL, value)
+    fun setMaxConnectionsOverall(value: Int) = store.setMaxConnectionsOverall(value)
 
-    fun getMaxConnectionsServer(default: Int = 8): Int = settings.getInt(KEY_MAX_CONN_SERVER, default)
+    fun getMaxConnectionsServer(default: Int = 8): Int = store.getMaxConnectionsServer(default)
 
-    fun setMaxConnectionsServer(value: Int) = settings.putInt(KEY_MAX_CONN_SERVER, value)
+    fun setMaxConnectionsServer(value: Int) = store.setMaxConnectionsServer(value)
 
-    fun getMaxConnectionsClient(default: Int = 8): Int = settings.getInt(KEY_MAX_CONN_CLIENT, default)
+    fun getMaxConnectionsClient(default: Int = 8): Int = store.getMaxConnectionsClient(default)
 
-    fun setMaxConnectionsClient(value: Int) = settings.putInt(KEY_MAX_CONN_CLIENT, value)
+    fun setMaxConnectionsClient(value: Int) = store.setMaxConnectionsClient(value)
 
     // Sync/GCS settings
-    fun getSeenPacketCapacity(default: Int = 500): Int = settings.getInt(KEY_SEEN_PACKET_CAP, default)
+    fun getSeenPacketCapacity(default: Int = 500): Int = store.getSeenPacketCapacity(default)
 
-    fun setSeenPacketCapacity(value: Int) = settings.putInt(KEY_SEEN_PACKET_CAP, value)
+    fun setSeenPacketCapacity(value: Int) = store.setSeenPacketCapacity(value)
 
-    fun getGcsMaxFilterBytes(default: Int = 400): Int = settings.getInt(KEY_GCS_MAX_BYTES, default)
+    fun getGcsMaxFilterBytes(default: Int = 400): Int = store.getGcsMaxFilterBytes(default)
 
-    fun setGcsMaxFilterBytes(value: Int) = settings.putInt(KEY_GCS_MAX_BYTES, value)
+    fun setGcsMaxFilterBytes(value: Int) = store.setGcsMaxFilterBytes(value)
 
-    fun getGcsFprPercent(default: Double = 1.0): Double = settings.getDouble(KEY_GCS_FPR, default)
+    fun getGcsFprPercent(default: Double = 1.0): Double = store.getGcsFprPercent(default)
 
-    fun setGcsFprPercent(value: Double) = settings.putDouble(KEY_GCS_FPR, value)
-
-    private companion object {
-        const val KEY_VERBOSE = "verbose_logging"
-        const val KEY_GATT_SERVER = "gatt_server_enabled"
-        const val KEY_GATT_CLIENT = "gatt_client_enabled"
-        const val KEY_PACKET_RELAY = "packet_relay_enabled"
-        const val KEY_MAX_CONN_OVERALL = "max_connections_overall"
-        const val KEY_MAX_CONN_SERVER = "max_connections_server"
-        const val KEY_MAX_CONN_CLIENT = "max_connections_client"
-        const val KEY_SEEN_PACKET_CAP = "seen_packet_capacity"
-        // GCS keys (no migration/back-compat)
-        const val KEY_GCS_MAX_BYTES = "gcs_max_filter_bytes"
-        const val KEY_GCS_FPR = "gcs_filter_fpr_percent"
-    }
+    fun setGcsFprPercent(value: Double) = store.setGcsFprPercent(value)
 }
