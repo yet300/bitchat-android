@@ -208,6 +208,7 @@ class DefaultChatsComponentTest {
         override fun onNotesClicked() = Unit
         override fun onParticipantSelected(pubkeyHex: String) = Unit
         override fun onDismissSheet() = Unit
+        override suspend fun requestMicrophonePermission(): Boolean = true
         override fun onBackClicked() = onFinished()
     }
 
