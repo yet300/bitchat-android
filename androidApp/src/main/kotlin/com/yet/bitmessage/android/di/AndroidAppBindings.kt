@@ -2,8 +2,6 @@ package com.yet.bitmessage.android.di
 
 import android.content.Context
 import androidx.core.app.NotificationManagerCompat
-import com.app.data.DataManager
-import com.app.transport.NicknameSource
 import com.app.domain.repository.NotificationMutePolicy
 import com.app.transport.notification.ServiceNotifier
 import com.yet.bitmessage.android.ui.NotificationManager
@@ -12,12 +10,11 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
-import com.app.common.settings.SettingsStore
 import dev.zacsweers.metro.SingleIn
 
 /**
  * App-resident bindings: the providers that touch :app-only artifacts (NotificationManager + its
- * resources, the legacy DataManager) and therefore cannot move to a core module. The app-agnostic
+ * resources) and therefore cannot move to a core module. The app-agnostic
  * transport SPIs live in [com.app.data.di.AndroidTransportBindings]; the data-layer platform
  * providers live in :core:data `DataAndroidBindings`.
  */
@@ -36,17 +33,4 @@ object AndroidAppBindings {
         NotificationIntervalManager(),
         notificationMutePolicy,
     )
-
-    @Provides
-    @SingleIn(AppScope::class)
-    fun provideNicknameSource(settings: SettingsStore): NicknameSource {
-        val dataManager = DataManager(settings)
-        return NicknameSource { fallback ->
-            try {
-                dataManager.loadNickname().ifBlank { fallback }
-            } catch (_: Exception) {
-                fallback
-            }
-        }
-    }
 }

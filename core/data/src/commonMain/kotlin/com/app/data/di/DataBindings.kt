@@ -71,6 +71,8 @@ import com.app.domain.repository.SettingsRepository
 import com.app.domain.repository.ThemeRepository
 import com.app.domain.repository.TorRepository
 import com.app.domain.repository.VerificationRepository
+import com.app.transport.NicknameHolder
+import com.app.transport.NicknameSource
 import com.app.transport.mesh.MeshCoordinator
 import com.app.transport.mesh.MeshLifecycleController
 import com.app.transport.mesh.MeshService
@@ -192,6 +194,14 @@ abstract class DataBindings {
     @Binds
     internal abstract val VerificationCoordinator.bindPeerVerificationRepository: PeerVerificationRepository
 
+    /**
+     * The mesh reads the nickname from the transport-owned in-memory [NicknameHolder]; the data
+     * layer pushes the encrypted-at-rest value into it ([SettingsRepositoryImpl] / `NicknameSync`),
+     * so no platform provider touches a settings backend.
+     */
+    @Binds
+    internal abstract val NicknameHolder.bindNicknameSource: NicknameSource
+
     @Binds
     internal abstract val RoutingMessageTransport.bindTransport: MessageTransport
 
@@ -217,6 +227,10 @@ abstract class DataBindings {
         // on-disk vault/prefs stores keep one identity across Android and Apple.
         const val VAULT_FILE = "bitchat_vault"
         const val PREFS_FILE = "bitchat_prefs"
+
+        @Provides
+        @SingleIn(AppScope::class)
+        fun provideNicknameHolder(): NicknameHolder = NicknameHolder()
 
         @Provides
         @SingleIn(AppScope::class)

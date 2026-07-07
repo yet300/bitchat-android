@@ -2,6 +2,7 @@ package com.app.data
 
 import com.app.common.utils.Log
 import com.app.data.nostr.NostrDirectMessageIngest
+import com.app.data.repository.NicknameSync
 import com.app.transport.net.ArtiTorManager
 import com.app.transport.nostr.LocationNotesInitializer
 import com.app.transport.nostr.LocationNotesManager
@@ -30,6 +31,7 @@ import dev.zacsweers.metro.SingleIn
 @SingleIn(AppScope::class)
 @Inject
 class AppNetworkBootstrapper(
+    private val nicknameSync: NicknameSync,
     private val artiTorManager: ArtiTorManager,
     private val nostrRelayManager: NostrRelayManager,
     private val relayDirectory: RelayDirectory,
@@ -43,6 +45,13 @@ class AppNetworkBootstrapper(
 
     /** Runs the launch-time network bootstrap once. Safe to call on the main thread. */
     fun start() {
+        // 0) Load the persisted nickname into the transport-side holder (and drop the legacy
+        // plaintext copy) before any bearer can send its first announce.
+        try {
+            nicknameSync.start()
+        } catch (_: Exception) {
+        }
+
         // 1) Initialize Tor first so any early network goes over Tor, and 2) reconnect Nostr relays
         // when Tor resets (wired here so ArtiTorManager stays unaware of nostr).
         try {
