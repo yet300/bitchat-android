@@ -3,6 +3,8 @@
 package com.app.transport.mesh
 
 import co.touchlab.stately.collections.ConcurrentMutableMap
+import co.touchlab.stately.concurrency.Lock
+import co.touchlab.stately.concurrency.withLock
 import com.app.common.AppDispatchers
 import com.app.common.utils.Log
 import com.app.common.encoding.toHexString
@@ -79,8 +81,10 @@ internal class CoreBluetoothConnectionManager(
 
     private val scope = CoroutineScope(dispatchers.io + SupervisorJob())
 
-    private val serviceCbUuid: CBUUID = CBUUID.UUIDWithString(MeshConstants.Mesh.Gatt.SERVICE_UUID.toString())
-    private val characteristicCbUuid: CBUUID = CBUUID.UUIDWithString(MeshConstants.Mesh.Gatt.CHARACTERISTIC_UUID.toString())
+    private val serviceCbUuid: CBUUID =
+        CBUUID.UUIDWithString(MeshConstants.Mesh.Gatt.SERVICE_UUID.toString())
+    private val characteristicCbUuid: CBUUID =
+        CBUUID.UUIDWithString(MeshConstants.Mesh.Gatt.CHARACTERISTIC_UUID.toString())
 
     // Client (central) state, keyed by CBPeripheral.identifier.UUIDString.
     private val connectedPeripherals = ConcurrentMutableMap<String, CBPeripheral>()
@@ -94,6 +98,14 @@ internal class CoreBluetoothConnectionManager(
     // their link's usable MTU, and the receiver reassembles by the header-declared frame
     // length (iOS reference client parity: NotificationStreamAssembler/BLEInboundWriteBuffer).
     private val frameAssemblers = ConcurrentMutableMap<String, BleFrameAssembler>()
+
+    // Serializes frame emission per link: a frame chunked to the link's usable MTU must
+    // hit the wire as one contiguous chunk run — interleaved chunks from concurrent
+    // callers (queued broadcast consumer vs. synchronous sendToPeer) desynchronize the
+    // receiver's stream assembler into garbage frames.
+    private val emissionLocks = ConcurrentMutableMap<String, Lock>()
+
+    private fun emissionLock(linkAddress: String) = emissionLocks.getOrPut(linkAddress) { Lock() }
 
     /** linkAddress -> logical peerID, owned by the bearer via [BleBearer.bindPeer]. */
     override val addressPeerMap = ConcurrentMutableMap<String, String>()
@@ -124,11 +136,23 @@ internal class CoreBluetoothConnectionManager(
 
     override fun stopServices() {
         active = false
-        try { centralManager.stopScan() } catch (_: Exception) {}
-        try { peripheralManager.stopAdvertising() } catch (_: Exception) {}
-        try { peripheralManager.removeAllServices() } catch (_: Exception) {}
+        try {
+            centralManager.stopScan()
+        } catch (_: Exception) {
+        }
+        try {
+            peripheralManager.stopAdvertising()
+        } catch (_: Exception) {
+        }
+        try {
+            peripheralManager.removeAllServices()
+        } catch (_: Exception) {
+        }
         connectedPeripherals.values.forEach { p ->
-            try { centralManager.cancelPeripheralConnection(p) } catch (_: Exception) {}
+            try {
+                centralManager.cancelPeripheralConnection(p)
+            } catch (_: Exception) {
+            }
         }
         connectedPeripherals.clear()
         peripheralCharacteristics.clear()
@@ -161,9 +185,9 @@ internal class CoreBluetoothConnectionManager(
     private fun setupService() {
         val properties: CBCharacteristicProperties =
             CBCharacteristicPropertyRead or
-                CBCharacteristicPropertyWrite or
-                CBCharacteristicPropertyWriteWithoutResponse or
-                CBCharacteristicPropertyNotify
+                    CBCharacteristicPropertyWrite or
+                    CBCharacteristicPropertyWriteWithoutResponse or
+                    CBCharacteristicPropertyNotify
         val permissions = CBAttributePermissionsReadable or CBAttributePermissionsWriteable
         val char = CBMutableCharacteristic(
             type = characteristicCbUuid,
@@ -229,57 +253,65 @@ internal class CoreBluetoothConnectionManager(
 
     private fun notifyCentral(central: CBCentral, data: ByteArray): Boolean {
         val char = mutableCharacteristic ?: return false
-        return try {
-            // CoreBluetooth truncates an update larger than the central's negotiated
-            // maximumUpdateValueLength — chunk instead; receivers reassemble by the
-            // frame length declared in the header.
-            val maxChunk = central.maximumUpdateValueLength.toInt().coerceAtLeast(1)
-            if (data.size <= maxChunk) {
-                return peripheralManager.updateValue(data.toNSData(), char, listOf(central))
-            }
-            Log.d(TAG, "Chunking ${data.size}B notification by $maxChunk bytes")
-            var offset = 0
-            while (offset < data.size) {
-                val end = minOf(offset + maxChunk, data.size)
-                val chunk = data.copyOfRange(offset, end)
-                if (!peripheralManager.updateValue(chunk.toNSData(), char, listOf(central))) {
-                    // Transmit queue full mid-frame: the frame is lost; the receiver's
-                    // stall reset cleans the stream.
-                    Log.w(TAG, "notifyCentral chunk failed at $offset/${data.size}")
-                    return false
+        return emissionLock(central.identifier.UUIDString).withLock {
+            try {
+                // CoreBluetooth truncates an update larger than the central's negotiated
+                // maximumUpdateValueLength — chunk instead; receivers reassemble by the
+                // frame length declared in the header.
+                val maxChunk = central.maximumUpdateValueLength.toInt().coerceAtLeast(1)
+                if (data.size <= maxChunk) {
+                    return peripheralManager.updateValue(data.toNSData(), char, listOf(central))
                 }
-                offset = end
+                Log.d(TAG, "Chunking ${data.size}B notification by $maxChunk bytes")
+                var offset = 0
+                while (offset < data.size) {
+                    val end = minOf(offset + maxChunk, data.size)
+                    val chunk = data.copyOfRange(offset, end)
+                    if (!peripheralManager.updateValue(chunk.toNSData(), char, listOf(central))) {
+                        // Transmit queue full mid-frame: the frame is lost; the receiver's
+                        // stall reset cleans the stream.
+                        Log.w(TAG, "notifyCentral chunk failed at $offset/${data.size}")
+                        return false
+                    }
+                    offset = end
+                }
+                true
+            } catch (e: Exception) {
+                Log.w(TAG, "notifyCentral failed: ${e.message}")
+                false
             }
-            true
-        } catch (e: Exception) {
-            Log.w(TAG, "notifyCentral failed: ${e.message}")
-            false
         }
     }
 
-    private fun writeToPeripheral(addr: String, peripheral: CBPeripheral, data: ByteArray): Boolean {
+    private fun writeToPeripheral(
+        addr: String,
+        peripheral: CBPeripheral,
+        data: ByteArray
+    ): Boolean {
         val char = peripheralCharacteristics.get(addr) ?: return false
-        return try {
-            // Writes above maximumWriteValueLengthForType are dropped/truncated by the
-            // stack — chunk to the link's usable size (ATT MTU − 3 for withoutResponse).
-            val maxChunk = peripheral
-                .maximumWriteValueLengthForType(CBCharacteristicWriteWithoutResponse)
-                .toInt()
-                .coerceAtLeast(1)
-            var offset = 0
-            while (offset < data.size) {
-                val end = minOf(offset + maxChunk, data.size)
-                peripheral.writeValue(
-                    data.copyOfRange(offset, end).toNSData(),
-                    char,
-                    CBCharacteristicWriteWithoutResponse,
-                )
-                offset = end
+        return emissionLock(addr).withLock {
+            try {
+                // Writes above maximumWriteValueLengthForType are dropped/truncated by the
+                // stack — chunk to the link's usable size (ATT MTU − 3 for withoutResponse).
+                val maxChunk = peripheral
+                    .maximumWriteValueLengthForType(CBCharacteristicWriteWithoutResponse)
+                    .toInt()
+                    .coerceAtLeast(1)
+                var offset = 0
+                while (offset < data.size) {
+                    val end = minOf(offset + maxChunk, data.size)
+                    peripheral.writeValue(
+                        data.copyOfRange(offset, end).toNSData(),
+                        char,
+                        CBCharacteristicWriteWithoutResponse,
+                    )
+                    offset = end
+                }
+                true
+            } catch (e: Exception) {
+                Log.w(TAG, "writeToPeripheral failed: ${e.message}")
+                false
             }
-            true
-        } catch (e: Exception) {
-            Log.w(TAG, "writeToPeripheral failed: ${e.message}")
-            false
         }
     }
 
@@ -307,7 +339,8 @@ internal class CoreBluetoothConnectionManager(
     // Central (client) delegate
     // -----------------------------------------------------------------
 
-    private inner class CentralDelegate : NSObject(), CBCentralManagerDelegateProtocol, CBPeripheralDelegateProtocol {
+    private inner class CentralDelegate : NSObject(), CBCentralManagerDelegateProtocol,
+        CBPeripheralDelegateProtocol {
 
         override fun centralManagerDidUpdateState(central: CBCentralManager) {
             if (central.state == CBManagerStatePoweredOn && active) startScan()
@@ -355,7 +388,7 @@ internal class CoreBluetoothConnectionManager(
         }
 
         override fun peripheral(peripheral: CBPeripheral, didDiscoverServices: NSError?) {
-            val service = (peripheral.services as? List<*>)
+            val service = peripheral.services
                 ?.filterIsInstance<CBService>()
                 ?.firstOrNull { it.UUID == serviceCbUuid } ?: return
             peripheral.discoverCharacteristics(listOf(characteristicCbUuid), service)
@@ -366,7 +399,7 @@ internal class CoreBluetoothConnectionManager(
             didDiscoverCharacteristicsForService: CBService,
             error: NSError?,
         ) {
-            val char = (didDiscoverCharacteristicsForService.characteristics as? List<*>)
+            val char = didDiscoverCharacteristicsForService.characteristics
                 ?.filterIsInstance<CBCharacteristic>()
                 ?.firstOrNull { it.UUID == characteristicCbUuid } ?: return
             val addr = peripheral.identifier.UUIDString
@@ -391,13 +424,17 @@ internal class CoreBluetoothConnectionManager(
     // Peripheral-manager (server) delegate
     // -----------------------------------------------------------------
 
-    private inner class PeripheralManagerDelegate : NSObject(), CBPeripheralManagerDelegateProtocol {
+    private inner class PeripheralManagerDelegate : NSObject(),
+        CBPeripheralManagerDelegateProtocol {
 
         override fun peripheralManagerDidUpdateState(peripheral: CBPeripheralManager) {
             if (peripheral.state == CBManagerStatePoweredOn && active) startAdvertising()
         }
 
-        override fun peripheralManager(peripheral: CBPeripheralManager, didReceiveWriteRequests: List<*>) {
+        override fun peripheralManager(
+            peripheral: CBPeripheralManager,
+            didReceiveWriteRequests: List<*>
+        ) {
             val requests = didReceiveWriteRequests.filterIsInstance<CBATTRequest>()
             requests.forEach { request ->
                 val value = request.value
@@ -458,7 +495,7 @@ internal class CoreBluetoothConnectionManager(
 
     override fun getConnectedDeviceEntries(): List<Triple<String, Boolean, Int?>> =
         connectedPeripherals.keys.map { Triple(it, true, null) } +
-            subscribedCentrals.keys.map { Triple(it, false, null) }
+                subscribedCentrals.keys.map { Triple(it, false, null) }
 
     override fun getLocalAdapterAddress(): String? = null
     override fun connectToAddress(address: String): Boolean = false

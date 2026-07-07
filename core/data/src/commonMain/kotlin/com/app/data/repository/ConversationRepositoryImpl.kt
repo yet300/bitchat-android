@@ -48,14 +48,12 @@ internal class ConversationRepositoryImpl(
             appStateStore.unreadCounts,
         ) { pub, priv, chan, unread ->
             buildList {
-                if (pub.isNotEmpty()) {
-                    add(
-                        conversation(
-                            ConversationId.PublicMesh, PUBLIC_TITLE, pub,
-                            unread[AppStateStore.publicConversationKey()] ?: 0,
-                        ),
-                    )
-                }
+                add(
+                    conversation(
+                        ConversationId.PublicMesh, PUBLIC_TITLE, pub,
+                        unread[AppStateStore.publicConversationKey()] ?: 0,
+                    ),
+                )
                 priv.forEach { (peerID, msgs) ->
                     if (msgs.isNotEmpty()) {
                         add(
