@@ -43,11 +43,11 @@ internal class PacketRelayManager(
      * Main entry point for relay decisions
      * Only packets that aren't specifically addressed to us should be passed here
      */
-    suspend fun handlePacketRelay(routed: RoutedPacket) {
+    fun handlePacketRelay(routed: RoutedPacket) {
         val packet = routed.packet
         val peerID = routed.peerID ?: "unknown"
         
-        Log.d(TAG, "Evaluating relay for packet type ${packet.type} from ${peerID} (TTL: ${packet.ttl})")
+        Log.d(TAG, "Evaluating relay for packet type ${packet.type} from $peerID (TTL: ${packet.ttl})")
         
         // Double-check this packet isn't addressed to us
         if (isPacketAddressedToMe(packet)) {

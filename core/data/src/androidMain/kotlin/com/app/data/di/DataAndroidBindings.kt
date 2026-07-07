@@ -26,14 +26,13 @@ import com.app.transport.MeshBearers
 import com.app.transport.mesh.MeshLifecycleController
 import com.app.transport.mesh.WifiAwareBearer
 import com.app.transport.mesh.createAndroidBleBearer
-import com.app.transport.net.TorPreferenceManager
+import com.app.data.tor.TorUserPreferenceManager
 import com.app.transport.nostr.NostrRelayManager
 import eu.anifantakis.lib.ksafe.KSafe
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Binds
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
-import dev.zacsweers.metro.IntoSet
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.Dispatchers
@@ -156,14 +155,14 @@ abstract class DataAndroidBindings {
         @SingleIn(AppScope::class)
         fun provideConnectivityRepository(
             context: Context,
-            torPreferenceManager: TorPreferenceManager,
+            torUserPreference: TorUserPreferenceManager,
             permissionController: PermissionController,
             meshLifecycle: MeshLifecycleController,
             nostrRelayManager: NostrRelayManager,
         ): ConnectivityRepository =
             AndroidConnectivityRepository(
                 context.applicationContext,
-                torPreferenceManager,
+                torUserPreference,
                 permissionController,
                 meshLifecycle,
                 nostrRelayManager,

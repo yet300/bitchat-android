@@ -118,9 +118,9 @@ data class BitchatFilePacket(
                         TLVType.MIME_TYPE -> mime = value.decodeToString()
                         TLVType.CONTENT -> {
                             // Expect a single CONTENT TLV
-                            if (contentBytes == null) contentBytes = value else {
+                            contentBytes = if (contentBytes == null) value else {
                                 // If multiple CONTENT TLVs appear, concatenate for tolerance
-                                contentBytes = (contentBytes!! + value)
+                                (contentBytes + value)
                             }
                         }
                     }
@@ -137,5 +137,27 @@ data class BitchatFilePacket(
                 return null
             }
         }
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other == null || this::class != other::class) return false
+
+        other as BitchatFilePacket
+
+        if (fileSize != other.fileSize) return false
+        if (fileName != other.fileName) return false
+        if (mimeType != other.mimeType) return false
+        if (!content.contentEquals(other.content)) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = fileSize.hashCode()
+        result = 31 * result + fileName.hashCode()
+        result = 31 * result + mimeType.hashCode()
+        result = 31 * result + content.contentHashCode()
+        return result
     }
 }

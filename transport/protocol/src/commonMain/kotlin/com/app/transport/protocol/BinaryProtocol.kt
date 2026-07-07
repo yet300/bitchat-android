@@ -24,7 +24,7 @@ enum class MessageType(val value: UByte) {
 
     companion object {
         fun fromValue(value: UByte): MessageType? {
-            return values().find { it.value == value }
+            return entries.find { it.value == value }
         }
     }
 }
@@ -290,7 +290,7 @@ object BinaryProtocol {
                 val originalSize = originalPayloadSize
                 if (originalSize != null) {
                     if (packet.version >= 2u.toUByte()) {
-                        buffer.writeInt(originalSize.toInt())
+                        buffer.writeInt(originalSize)
                     } else {
                         buffer.writeShort(originalSize.toShort())
                     }
@@ -369,7 +369,7 @@ object BinaryProtocol {
             }
 
             if (payloadLength.toLong() > MAX_PAYLOAD_LENGTH.toLong()) {
-                Log.w("BinaryProtocol", "Payload length ${payloadLength} exceeds maximum allowed (${MAX_PAYLOAD_LENGTH})")
+                Log.w("BinaryProtocol", "Payload length $payloadLength exceeds maximum allowed (${MAX_PAYLOAD_LENGTH})")
                 return null
             }
 

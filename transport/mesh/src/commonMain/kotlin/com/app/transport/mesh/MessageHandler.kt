@@ -63,7 +63,7 @@ internal class MessageHandler(
      * Handle Noise encrypted transport message - SIMPLIFIED iOS-compatible version
      * Uses NoisePayloadType system exactly like iOS SimplifiedBluetoothService
      */
-    suspend fun handleNoiseEncrypted(routed: RoutedPacket) {
+    fun handleNoiseEncrypted(routed: RoutedPacket) {
         val packet = routed.packet
         val peerID = routed.peerID ?: "unknown"
         
@@ -203,7 +203,7 @@ internal class MessageHandler(
     /**
      * Send delivery ACK for a received private message - exactly like iOS
      */
-    private suspend fun sendDeliveryAck(messageID: String, senderPeerID: String) {
+    private fun sendDeliveryAck(messageID: String, senderPeerID: String) {
         try {
             // Create ACK payload: [type byte] + [message ID] - exactly like iOS
             val ackPayload = NoisePayload(
@@ -241,7 +241,7 @@ internal class MessageHandler(
     /**
      * Handle announce message with TLV decoding and signature verification - exactly like iOS
      */
-    suspend fun handleAnnounce(routed: RoutedPacket): Boolean {
+    fun handleAnnounce(routed: RoutedPacket): Boolean {
         val packet = routed.packet
         val peerID = routed.peerID ?: "unknown"
 
@@ -328,7 +328,7 @@ internal class MessageHandler(
      * Handle Noise handshake - SIMPLIFIED iOS-compatible version
      * Single handshake type (0x10) with response determined by payload analysis
      */
-    suspend fun handleNoiseHandshake(routed: RoutedPacket) {
+    fun handleNoiseHandshake(routed: RoutedPacket) {
         val packet = routed.packet
         val peerID = routed.peerID ?: "unknown"
         
@@ -381,7 +381,7 @@ internal class MessageHandler(
     /**
      * Handle broadcast or private message
      */
-    suspend fun handleMessage(routed: RoutedPacket) {
+    fun handleMessage(routed: RoutedPacket) {
         val packet = routed.packet
         val peerID = routed.peerID ?: "unknown"
         if (peerID == myPeerID) return
@@ -406,7 +406,7 @@ internal class MessageHandler(
     /**
      * Handle broadcast message with verification enforcement
      */
-    private suspend fun handleBroadcastMessage(routed: RoutedPacket) {
+    private fun handleBroadcastMessage(routed: RoutedPacket) {
         val packet = routed.packet
         val peerID = routed.peerID ?: "unknown"
         
@@ -460,7 +460,7 @@ internal class MessageHandler(
     /**
      * Handle (decrypted) private message addressed to us
      */
-    private suspend fun handlePrivateMessage(packet: BitchatPacket, peerID: String) {
+    private fun handlePrivateMessage(packet: BitchatPacket, peerID: String) {
         try {
             // Verify signature if present. A null delegate must not NPE here; treat an
             // unverifiable signature as invalid and drop.
@@ -513,7 +513,7 @@ internal class MessageHandler(
     /**
      * Handle leave message
      */
-    suspend fun handleLeave(routed: RoutedPacket) {
+    fun handleLeave(routed: RoutedPacket) {
         val packet = routed.packet
         val peerID = routed.peerID ?: "unknown"
         val content = packet.payload.decodeToString()

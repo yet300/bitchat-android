@@ -47,4 +47,7 @@ sealed interface AppPermission {
 
     /** Wi-Fi Aware neighbour discovery (Android 13+ NEARBY_WIFI_DEVICES, or location on older OS). */
     data object NearbyWifi : AppPermission
+
+    /** Foreground location (Android ACCESS_FINE/COARSE_LOCATION, iOS when-in-use). */
+    data object Location : AppPermission
 }
