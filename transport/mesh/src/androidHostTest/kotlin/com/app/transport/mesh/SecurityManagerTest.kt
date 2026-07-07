@@ -8,7 +8,7 @@ import com.app.transport.model.IdentityAnnouncement
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
 import org.junit.After
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -99,7 +99,7 @@ class SecurityManagerTest {
 
         val result = securityManager.validatePacket(packet, otherPeerID)
         
-        assertFalse("Packet without signature should be rejected", result)
+        assertEquals("Packet without signature should be rejected", PacketValidationResult.DROP, result)
     }
 
     @Test
@@ -116,7 +116,7 @@ class SecurityManagerTest {
 
         val result = securityManager.validatePacket(packet, otherPeerID)
         
-        assertFalse("Packet with invalid signature should be rejected", result)
+        assertEquals("Packet with invalid signature should be rejected", PacketValidationResult.DROP, result)
     }
 
     @Test
@@ -133,7 +133,7 @@ class SecurityManagerTest {
 
         val result = securityManager.validatePacket(packet, unknownPeerID)
         
-        assertFalse("Packet from unknown peer should be rejected (cannot verify signature)", result)
+        assertEquals("Packet from unknown peer should be rejected (cannot verify signature)", PacketValidationResult.DROP, result)
     }
 
     @Test
@@ -150,7 +150,7 @@ class SecurityManagerTest {
 
         val result = securityManager.validatePacket(packet, otherPeerID)
         
-        assertTrue("Valid signed packet from known peer should be accepted", result)
+        assertEquals("Valid signed packet from known peer should be accepted", PacketValidationResult.ACCEPT, result)
     }
 
     @Test
@@ -174,7 +174,7 @@ class SecurityManagerTest {
         
         val result = securityManager.validatePacket(packet, unknownPeerID)
         
-        assertTrue("ANNOUNCE from unknown peer should be accepted (key extracted from payload)", result)
+        assertEquals("ANNOUNCE from unknown peer should be accepted (key extracted from payload)", PacketValidationResult.ACCEPT, result)
         // Verify we used the correct key
         assertTrue("Should have used extracted key for verification", 
             fakeEncryptionService.lastVerifyKey.contentEquals(otherSigningKey))
@@ -199,7 +199,7 @@ class SecurityManagerTest {
 
         val result = securityManager.validatePacket(packet, unknownPeerID)
         
-        assertFalse("ANNOUNCE with invalid signature should be rejected", result)
+        assertEquals("ANNOUNCE with invalid signature should be rejected", PacketValidationResult.DROP, result)
     }
     
     @Test
@@ -214,7 +214,7 @@ class SecurityManagerTest {
 
         val result = securityManager.validatePacket(packet, unknownPeerID)
         
-        assertFalse("ANNOUNCE with malformed payload should be rejected (cannot extract key)", result)
+        assertEquals("ANNOUNCE with malformed payload should be rejected (cannot extract key)", PacketValidationResult.DROP, result)
     }
 
     @Test
@@ -229,7 +229,7 @@ class SecurityManagerTest {
 
         val result = securityManager.validatePacket(packet, myPeerID)
         
-        assertFalse("Own packets should return false (skipped)", result)
+        assertEquals("Own packets should be dropped", PacketValidationResult.DROP, result)
     }
     
     @Test
@@ -245,10 +245,10 @@ class SecurityManagerTest {
         packet.signature = validSignature
 
         val result1 = securityManager.validatePacket(packet, otherPeerID)
-        assertTrue("First packet should be accepted", result1)
+        assertEquals("First packet should be accepted", PacketValidationResult.ACCEPT, result1)
 
         val result2 = securityManager.validatePacket(packet, otherPeerID)
-        assertFalse("Duplicate packet should be rejected", result2)
+        assertEquals("Duplicate packet should be rejected", PacketValidationResult.DROP, result2)
     }
 
     /**
@@ -274,9 +274,10 @@ class SecurityManagerTest {
             ttl = 7u
         )
 
-        assertTrue("First packet must be accepted", securityManager.validatePacket(packet(1), otherPeerID))
-        assertTrue(
+        assertEquals("First packet must be accepted", PacketValidationResult.ACCEPT, securityManager.validatePacket(packet(1), otherPeerID))
+        assertEquals(
             "Second packet differing only past byte 64 must be accepted",
+            PacketValidationResult.ACCEPT,
             securityManager.validatePacket(packet(2), otherPeerID)
         )
     }
@@ -296,8 +297,8 @@ class SecurityManagerTest {
             ttl = 7u
         )
 
-        assertTrue(securityManager.validatePacket(packet(), otherPeerID))
-        assertFalse("Byte-identical replay must be dropped", securityManager.validatePacket(packet(), otherPeerID))
+        assertEquals(PacketValidationResult.ACCEPT, securityManager.validatePacket(packet(), otherPeerID))
+        assertEquals("Byte-identical replay must be dropped", PacketValidationResult.DROP, securityManager.validatePacket(packet(), otherPeerID))
     }
 
     @Test
@@ -320,15 +321,75 @@ class SecurityManagerTest {
         
         whenever(mockDelegate.getPeerInfo(unknownPeerID)).thenReturn(null)
 
-        assertTrue("First ANNOUNCE should be accepted", securityManager.validatePacket(packet1, unknownPeerID))
+        assertEquals("First ANNOUNCE should be accepted", PacketValidationResult.ACCEPT, securityManager.validatePacket(packet1, unknownPeerID))
         
         // 2. Relayed Duplicate (Lower TTL)
         val packet2 = packet1.copy(ttl = (com.app.transport.MeshConstants.MESSAGE_TTL_HOPS - 1u).toUByte())
-        assertFalse("Relayed duplicate ANNOUNCE should be rejected", securityManager.validatePacket(packet2, unknownPeerID))
+        assertEquals("Relayed duplicate ANNOUNCE should be rejected", PacketValidationResult.DROP, securityManager.validatePacket(packet2, unknownPeerID))
         
         // 3. Direct Duplicate (Max TTL)
         val packet3 = packet1.copy(ttl = com.app.transport.MeshConstants.MESSAGE_TTL_HOPS)
-        assertTrue("Fresh duplicate ANNOUNCE should be accepted", securityManager.validatePacket(packet3, unknownPeerID))
+        assertEquals("Direct duplicate ANNOUNCE must be liveness-only, never a full accept", PacketValidationResult.DUPLICATE_ANNOUNCE_LIVENESS, securityManager.validatePacket(packet3, unknownPeerID))
+    }
+
+    /**
+     * Pins the storm fix: a byte-identical direct-neighbor ANNOUNCE replayed many times
+     * (a peer resending its cached announce via gossip sync) must stay liveness-only on
+     * every repeat — it must never escalate back to a full ACCEPT that would re-relay
+     * and re-schedule sync.
+     */
+    @Test
+    fun `validatePacket - repeated direct duplicate ANNOUNCE stays liveness-only`() {
+        val announcement = IdentityAnnouncement(
+            nickname = "New User",
+            noisePublicKey = otherNoiseKey,
+            signingPublicKey = otherSigningKey
+        )
+        val packet = BitchatPacket(
+            type = MessageType.ANNOUNCE.value,
+            ttl = com.app.transport.MeshConstants.MESSAGE_TTL_HOPS,
+            senderID = unknownPeerID,
+            payload = announcement.encode()!!
+        )
+        packet.signature = validSignature
+        whenever(mockDelegate.getPeerInfo(unknownPeerID)).thenReturn(null)
+
+        assertEquals(PacketValidationResult.ACCEPT, securityManager.validatePacket(packet, unknownPeerID))
+        repeat(10) {
+            assertEquals(
+                "Replay #$it must be liveness-only",
+                PacketValidationResult.DUPLICATE_ANNOUNCE_LIVENESS,
+                securityManager.validatePacket(packet.copy(), unknownPeerID)
+            )
+        }
+    }
+
+    /**
+     * The messageID is recorded before signature verification, so a forged announce that
+     * failed verification must NOT gain liveness treatment when replayed.
+     */
+    @Test
+    fun `validatePacket - duplicate ANNOUNCE with invalid signature is dropped, not liveness`() {
+        val announcement = IdentityAnnouncement(
+            nickname = "Forger",
+            noisePublicKey = otherNoiseKey,
+            signingPublicKey = otherSigningKey
+        )
+        val packet = BitchatPacket(
+            type = MessageType.ANNOUNCE.value,
+            ttl = com.app.transport.MeshConstants.MESSAGE_TTL_HOPS,
+            senderID = unknownPeerID,
+            payload = announcement.encode()!!
+        )
+        packet.signature = invalidSignature
+        whenever(mockDelegate.getPeerInfo(unknownPeerID)).thenReturn(null)
+
+        assertEquals(PacketValidationResult.DROP, securityManager.validatePacket(packet, unknownPeerID))
+        assertEquals(
+            "Replayed forgery must stay dropped",
+            PacketValidationResult.DROP,
+            securityManager.validatePacket(packet.copy(), unknownPeerID)
+        )
     }
 
     private fun setupKnownPeer(peerID: String, signingKey: ByteArray) {

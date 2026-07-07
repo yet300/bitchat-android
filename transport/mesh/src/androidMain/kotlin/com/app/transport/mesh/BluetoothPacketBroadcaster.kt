@@ -103,8 +103,31 @@ internal class BluetoothPacketBroadcaster(
     private fun notifyDevice(device: BluetoothDevice, data: ByteArray): Boolean {
         return try {
             val characteristic = characteristicProvider() ?: return false
-            characteristic.value = data
-            gattServerProvider()?.notifyCharacteristicChanged(device, characteristic, false) ?: false
+            val server = gattServerProvider() ?: return false
+            // The stack silently truncates a notification to the central's ATT MTU − 3:
+            // at the default MTU 23 a frame goes out as its first 20 bytes and the peer
+            // logs an unparseable packet. Chunk oversized frames instead — receivers
+            // (iOS NotificationStreamAssembler, our BleFrameAssembler) reassemble by the
+            // frame length declared in the header.
+            val maxChunk = (connectionTracker.getNegotiatedMtu(device.address) - 3).coerceAtLeast(1)
+            if (data.size <= maxChunk) {
+                characteristic.value = data
+                return server.notifyCharacteristicChanged(device, characteristic, false)
+            }
+            Log.d(TAG, "Chunking ${data.size}B notification to ${device.address} by $maxChunk bytes")
+            var offset = 0
+            while (offset < data.size) {
+                val end = minOf(offset + maxChunk, data.size)
+                characteristic.value = data.copyOfRange(offset, end)
+                if (!server.notifyCharacteristicChanged(device, characteristic, false)) {
+                    // A dropped middle chunk would corrupt the stream; the receiver's
+                    // stall reset recovers it, but this frame is lost — report failure.
+                    Log.w(TAG, "Notify chunk failed at $offset/${data.size} for ${device.address}")
+                    return false
+                }
+                offset = end
+            }
+            true
         } catch (e: Exception) {
             Log.w(TAG, "Error sending to server connection ${device.address}: ${e.message}")
             connectionScope.launch {

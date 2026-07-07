@@ -348,8 +348,20 @@ internal class MeshComponentWiring(
 
     private fun wirePacketProcessor() {
         packetProcessor.delegate = object : PacketProcessorDelegate {
-            override fun validatePacketSecurity(packet: BitchatPacket, peerID: String): Boolean {
+            override fun validatePacketSecurity(packet: BitchatPacket, peerID: String): PacketValidationResult {
                 return securityManager.validatePacket(packet, peerID)
+            }
+
+            override fun handleDuplicateAnnounceLiveness(routed: RoutedPacket) {
+                val pid = routed.peerID ?: return
+                // Refresh the link→peer binding on the receiving link (a reconnect may have
+                // moved the peer to a new address) and bump last-seen. Nothing else: the
+                // announce content was already processed on its first delivery.
+                val deviceAddress = routed.relayAddress
+                if (deviceAddress != null && routed.packet.ttl == MeshConstants.MESSAGE_TTL_HOPS) {
+                    meshNetwork.bindPeer(pid, deviceAddress)
+                }
+                peerManager.updatePeerLastSeen(pid)
             }
 
             override fun updatePeerLastSeen(peerID: String) {

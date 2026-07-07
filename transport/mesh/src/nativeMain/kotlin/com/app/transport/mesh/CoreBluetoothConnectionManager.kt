@@ -90,6 +90,11 @@ internal class CoreBluetoothConnectionManager(
     // Server (peripheral) state, keyed by CBCentral.identifier.UUIDString.
     private val subscribedCentrals = ConcurrentMutableMap<String, CBCentral>()
 
+    // Per-link reassembly of chunked inbound values: peers write/notify frames split to
+    // their link's usable MTU, and the receiver reassembles by the header-declared frame
+    // length (iOS reference client parity: NotificationStreamAssembler/BLEInboundWriteBuffer).
+    private val frameAssemblers = ConcurrentMutableMap<String, BleFrameAssembler>()
+
     /** linkAddress -> logical peerID, owned by the bearer via [BleBearer.bindPeer]. */
     override val addressPeerMap = ConcurrentMutableMap<String, String>()
 
@@ -129,6 +134,7 @@ internal class CoreBluetoothConnectionManager(
         peripheralCharacteristics.clear()
         pendingPeripherals.clear()
         subscribedCentrals.clear()
+        frameAssemblers.clear()
     }
 
     fun shutdown() {
@@ -224,7 +230,27 @@ internal class CoreBluetoothConnectionManager(
     private fun notifyCentral(central: CBCentral, data: ByteArray): Boolean {
         val char = mutableCharacteristic ?: return false
         return try {
-            peripheralManager.updateValue(data.toNSData(), char, listOf(central))
+            // CoreBluetooth truncates an update larger than the central's negotiated
+            // maximumUpdateValueLength — chunk instead; receivers reassemble by the
+            // frame length declared in the header.
+            val maxChunk = central.maximumUpdateValueLength.toInt().coerceAtLeast(1)
+            if (data.size <= maxChunk) {
+                return peripheralManager.updateValue(data.toNSData(), char, listOf(central))
+            }
+            Log.d(TAG, "Chunking ${data.size}B notification by $maxChunk bytes")
+            var offset = 0
+            while (offset < data.size) {
+                val end = minOf(offset + maxChunk, data.size)
+                val chunk = data.copyOfRange(offset, end)
+                if (!peripheralManager.updateValue(chunk.toNSData(), char, listOf(central))) {
+                    // Transmit queue full mid-frame: the frame is lost; the receiver's
+                    // stall reset cleans the stream.
+                    Log.w(TAG, "notifyCentral chunk failed at $offset/${data.size}")
+                    return false
+                }
+                offset = end
+            }
+            true
         } catch (e: Exception) {
             Log.w(TAG, "notifyCentral failed: ${e.message}")
             false
@@ -234,7 +260,22 @@ internal class CoreBluetoothConnectionManager(
     private fun writeToPeripheral(addr: String, peripheral: CBPeripheral, data: ByteArray): Boolean {
         val char = peripheralCharacteristics.get(addr) ?: return false
         return try {
-            peripheral.writeValue(data.toNSData(), char, CBCharacteristicWriteWithoutResponse)
+            // Writes above maximumWriteValueLengthForType are dropped/truncated by the
+            // stack — chunk to the link's usable size (ATT MTU − 3 for withoutResponse).
+            val maxChunk = peripheral
+                .maximumWriteValueLengthForType(CBCharacteristicWriteWithoutResponse)
+                .toInt()
+                .coerceAtLeast(1)
+            var offset = 0
+            while (offset < data.size) {
+                val end = minOf(offset + maxChunk, data.size)
+                peripheral.writeValue(
+                    data.copyOfRange(offset, end).toNSData(),
+                    char,
+                    CBCharacteristicWriteWithoutResponse,
+                )
+                offset = end
+            }
             true
         } catch (e: Exception) {
             Log.w(TAG, "writeToPeripheral failed: ${e.message}")
@@ -247,13 +288,19 @@ internal class CoreBluetoothConnectionManager(
     // -----------------------------------------------------------------
 
     private fun handleIncoming(value: ByteArray, linkAddress: String) {
-        val packet = BitchatPacket.fromBinaryData(value) ?: run {
-            Log.w(TAG, "Failed to parse packet from $linkAddress (${value.size} bytes)")
-            return
+        // A value may be a complete frame or an MTU-sized chunk of a larger frame
+        // (e.g. a 20-byte slice at the default ATT MTU 23) — reassemble either way.
+        val assembler = frameAssemblers.getOrPut(linkAddress) { BleFrameAssembler() }
+        for (frame in assembler.append(value)) {
+            val packet = BitchatPacket.fromBinaryData(frame)
+            if (packet == null) {
+                Log.w(TAG, "Failed to parse packet from $linkAddress (${frame.size} bytes)")
+                continue
+            }
+            val peerID = packet.senderID.take(8).toByteArray().toHexString()
+            if (peerID == myPeerID) continue
+            delegate?.onPacketReceived(packet, peerID, linkAddress)
         }
-        val peerID = packet.senderID.take(8).toByteArray().toHexString()
-        if (peerID == myPeerID) return
-        delegate?.onPacketReceived(packet, peerID, linkAddress)
     }
 
     // -----------------------------------------------------------------
@@ -294,6 +341,7 @@ internal class CoreBluetoothConnectionManager(
             peripheralCharacteristics.remove(addr)
             pendingPeripherals.remove(addr)
             addressPeerMap.remove(addr)
+            frameAssemblers.remove(addr)
             delegate?.onDeviceDisconnected(addr)
         }
 
@@ -380,6 +428,7 @@ internal class CoreBluetoothConnectionManager(
             val addr = central.identifier.UUIDString
             subscribedCentrals.remove(addr)
             addressPeerMap.remove(addr)
+            frameAssemblers.remove(addr)
             delegate?.onDeviceDisconnected(addr)
         }
     }

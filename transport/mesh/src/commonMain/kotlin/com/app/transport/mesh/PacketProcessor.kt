@@ -146,12 +146,22 @@ internal class PacketProcessor(
         val packet = routed.packet
         val peerID = routed.peerID ?: "unknown"
 
-        // Basic validation and security checks. A null delegate (teardown/rebuild window) or a
-        // false result drops the packet — never NPE inside the per-peer consumer coroutine, which
-        // would permanently kill that peer's actor.
-        if (delegate?.validatePacketSecurity(packet, peerID) != true) {
-            Log.d(TAG, "Packet failed security validation from ${formatPeerForLog(peerID)}")
-            return
+        // Basic validation and security checks. A null delegate (teardown/rebuild window)
+        // drops the packet — never NPE inside the per-peer consumer coroutine, which would
+        // permanently kill that peer's actor.
+        when (delegate?.validatePacketSecurity(packet, peerID)) {
+            PacketValidationResult.ACCEPT -> Unit
+            PacketValidationResult.DUPLICATE_ANNOUNCE_LIVENESS -> {
+                // Byte-identical ANNOUNCE from a direct neighbor: refresh link binding and
+                // last-seen only. No reprocessing, no relay, no sync scheduling — a peer
+                // resending its cached announce (gossip sync) must not amplify.
+                delegate?.handleDuplicateAnnounceLiveness(routed)
+                return
+            }
+            PacketValidationResult.DROP, null -> {
+                Log.d(TAG, "Packet failed security validation from ${formatPeerForLog(peerID)}")
+                return
+            }
         }
 
         var validPacket = true
@@ -326,8 +336,12 @@ internal class PacketProcessor(
  */
 internal interface PacketProcessorDelegate {
     // Security validation
-    fun validatePacketSecurity(packet: BitchatPacket, peerID: String): Boolean
-    
+    fun validatePacketSecurity(packet: BitchatPacket, peerID: String): PacketValidationResult
+
+    // Liveness-only path for duplicate direct-neighbor announces: refresh the
+    // link→peer binding and last-seen without reprocessing, relaying or sync scheduling.
+    fun handleDuplicateAnnounceLiveness(routed: RoutedPacket)
+
     // Peer management
     fun updatePeerLastSeen(peerID: String)
     fun getPeerNickname(peerID: String): String?

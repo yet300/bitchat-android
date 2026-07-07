@@ -21,6 +21,20 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.ExperimentalTime
 
 /**
+ * Outcome of inbound packet validation.
+ *
+ * [DUPLICATE_ANNOUNCE_LIVENESS] is the narrow exception for a byte-identical ANNOUNCE
+ * re-received at max TTL from a direct neighbor: the packet must NOT be reprocessed,
+ * relayed or trigger sync scheduling (iOS drops such duplicates outright), but the
+ * link→peer binding may still be refreshed so a reconnect on a new link binds correctly.
+ */
+internal enum class PacketValidationResult {
+    ACCEPT,
+    DUPLICATE_ANNOUNCE_LIVENESS,
+    DROP,
+}
+
+/**
  * Manages security aspects of the mesh network including duplicate detection,
  * replay attack protection, and key exchange handling
  * Extracted from BluetoothMeshService for better separation of concerns
@@ -57,46 +71,56 @@ internal class SecurityManager(
     /**
      * Validate packet security (timestamp, replay attacks, duplicates, signatures)
      */
-    fun validatePacket(packet: BitchatPacket, peerID: String): Boolean {
+    fun validatePacket(packet: BitchatPacket, peerID: String): PacketValidationResult {
         // Skip validation for our own packets
         if (peerID == myPeerID) {
             Log.d(TAG, "Skipping validation for our own packet")
-            return false
+            return PacketValidationResult.DROP
         }
-        
+
         // Replay attack protection (same 5-minute window as iOS)
         val currentTime = Clock.System.now().toEpochMilliseconds()
         val messageType = MessageType.fromValue(packet.type)
 
         // Duplicate detection
         val messageID = generateMessageID(packet, peerID)
-        
+
         if (processedMessages.contains(messageID)) {
-            // Check for ANNOUNCE exception: allow if it looks like a direct neighbor (max TTL)
-            // This ensures we catch the "first announce" on a new connection for binding,
-            // while still dropping looped/relayed duplicates.
-            val isFreshAnnounce = messageType == MessageType.ANNOUNCE &&
+            // ANNOUNCE exception: a byte-identical announce re-received at max TTL still
+            // proves the direct link is alive (e.g. after a reconnect on a new link), so
+            // report it as liveness-only. It must never be reprocessed or relayed again —
+            // gossip-sync peers resend cached announces verbatim, and treating those as
+            // fresh amplified every resend into a full announce+relay+sync cycle.
+            val isDirectAnnounce = messageType == MessageType.ANNOUNCE &&
                     packet.ttl >= MeshConstants.MESSAGE_TTL_HOPS
 
-            if (!isFreshAnnounce) {
+            if (!isDirectAnnounce) {
                 Log.d(TAG, "Dropping duplicate packet: $messageID")
-                return false
+                return PacketValidationResult.DROP
             }
-            Log.d(TAG, "Allowing duplicate ANNOUNCE from direct neighbor: $messageID")
+            // Signature must still hold before the duplicate may refresh liveness:
+            // the messageID is recorded before signature verification, so a replayed
+            // forgery would otherwise slip through on its second delivery.
+            if (!verifyPacketSignature(packet, peerID)) {
+                Log.w(TAG, "Dropping duplicate ANNOUNCE from $peerID: signature verification failed")
+                return PacketValidationResult.DROP
+            }
+            Log.d(TAG, "Duplicate ANNOUNCE from direct neighbor (liveness only): $messageID")
+            return PacketValidationResult.DUPLICATE_ANNOUNCE_LIVENESS
         }
 
         // Add to processed messages
         processedMessages.add(messageID)
         messageTimestamps[messageID] = currentTime
-        
+
         // Enforce mandatory signature verification
         if (!verifyPacketSignature(packet, peerID)) {
             Log.w(TAG, "Dropping packet from $peerID due to signature verification failure")
-            return false
+            return PacketValidationResult.DROP
         }
-        
+
         Log.d(TAG, "Packet validation passed for $peerID, messageID: $messageID")
-        return true
+        return PacketValidationResult.ACCEPT
     }
     
     /**
