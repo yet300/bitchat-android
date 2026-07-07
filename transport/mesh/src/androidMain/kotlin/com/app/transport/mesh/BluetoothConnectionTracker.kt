@@ -33,6 +33,10 @@ internal class BluetoothConnectionTracker(
     val addressPeerMap = ConcurrentHashMap<String, String>()
     // RSSI tracking from scan results (for devices we discover but may connect as servers)
     private val scanRSSI = ConcurrentHashMap<String, Int>()
+
+    // Negotiated ATT MTU per link (server role: reported by onMtuChanged). Notifications
+    // larger than MTU−3 are silently truncated by the stack, so senders must chunk by it.
+    private val negotiatedMtu = ConcurrentHashMap<String, Int>()
     
     // Connection attempt tracking with automatic cleanup
     private val pendingConnections = ConcurrentHashMap<String, ConnectionAttempt>()
@@ -147,6 +151,19 @@ internal class BluetoothConnectionTracker(
         return scanRSSI[deviceAddress]
     }
     
+    /**
+     * Record the ATT MTU negotiated on a link
+     */
+    fun updateNegotiatedMtu(deviceAddress: String, mtu: Int) {
+        negotiatedMtu[deviceAddress] = mtu
+    }
+
+    /**
+     * Negotiated ATT MTU for a link, or the BLE default (23) when no exchange happened
+     */
+    fun getNegotiatedMtu(deviceAddress: String): Int =
+        negotiatedMtu[deviceAddress] ?: MeshConstants.Mesh.DEFAULT_ATT_MTU
+
     /**
      * Add a subscribed device
      */
@@ -302,6 +319,7 @@ internal class BluetoothConnectionTracker(
             subscribedDevices.removeAll { it.address == deviceAddress }
             addressPeerMap.remove(deviceAddress)
         }
+        negotiatedMtu.remove(deviceAddress)
         Log.d(TAG, "Cleaned up device connection for $deviceAddress")
     }
     
@@ -335,6 +353,7 @@ internal class BluetoothConnectionTracker(
         addressPeerMap.clear()
         pendingConnections.clear()
         scanRSSI.clear()
+        negotiatedMtu.clear()
     }
 
     /**

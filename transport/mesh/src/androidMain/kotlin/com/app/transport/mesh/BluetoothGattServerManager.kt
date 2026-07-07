@@ -18,6 +18,7 @@ import com.app.transport.MeshConstants
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Manages GATT server operations, advertising, and server-side connections
@@ -50,6 +51,11 @@ internal class BluetoothGattServerManager(
     
     // State management
     private var isActive = false
+
+    // Per-central reassembly of chunked writes: iOS centrals write frames split to
+    // maximumWriteValueLength (ATT MTU − 3, 20 bytes at the default MTU) and expect the
+    // peripheral to reassemble — mirrors the iOS BLEInboundWriteBuffer.
+    private val writeAssemblers = ConcurrentHashMap<String, BleFrameAssembler>()
 
     /**
      * Disconnect a specific device (used by ConnectionManager to enforce overall limits)
@@ -188,6 +194,7 @@ internal class BluetoothGattServerManager(
                     }
                     BluetoothProfile.STATE_DISCONNECTED -> {
                         Log.i(TAG, "Server: Device disconnected ${device.address}")
+                        writeAssemblers.remove(device.address)
                         connectionTracker.cleanupDeviceConnection(device.address)
                         // Notify delegate about device disconnection so higher layers can update direct flags
                         delegate?.onDeviceDisconnected(device)
@@ -225,24 +232,36 @@ internal class BluetoothGattServerManager(
                 }
                 
                 if (characteristic.uuid == MeshConstants.Mesh.Gatt.CHARACTERISTIC_UUID.toJavaUuid()) {
-                    Log.i(TAG, "Server: Received packet from ${device.address}, size: ${value.size} bytes")
-                    val packet = BitchatPacket.fromBinaryData(value)
-                    if (packet != null) {
-                        val peerID = packet.senderID.take(8).toByteArray().joinToString("") { "%02x".format(it) }
-                        Log.d(TAG, "Server: Parsed packet type ${packet.type} from $peerID")
-                        delegate?.onPacketReceived(packet, peerID, device)
-                    } else {
-                        // Do not dump raw frame bytes: a malformed frame can still carry another
-                        // peer's ciphertext / routing metadata (traffic-analysis leak). Length only.
-                        Log.w(TAG, "Server: Failed to parse packet from ${device.address}, size: ${value.size} bytes")
+                    Log.i(TAG, "Server: Received write from ${device.address}, size: ${value.size} bytes")
+                    // A write may be a complete frame (fast path) or an MTU-sized chunk of a
+                    // larger frame — feed the assembler either way and process every frame it
+                    // completes. iOS centrals chunk writes to maximumWriteValueLength.
+                    val assembler = writeAssemblers.getOrPut(device.address) { BleFrameAssembler() }
+                    for (frame in assembler.append(value)) {
+                        val packet = BitchatPacket.fromBinaryData(frame)
+                        if (packet != null) {
+                            val peerID = packet.senderID.take(8).toByteArray().joinToString("") { "%02x".format(it) }
+                            Log.d(TAG, "Server: Parsed packet type ${packet.type} from $peerID")
+                            delegate?.onPacketReceived(packet, peerID, device)
+                        } else {
+                            // Do not dump raw frame bytes: a malformed frame can still carry another
+                            // peer's ciphertext / routing metadata (traffic-analysis leak). Length only.
+                            Log.w(TAG, "Server: Failed to parse packet from ${device.address}, size: ${frame.size} bytes")
+                        }
                     }
-                    
+
                     if (responseNeeded) {
                         gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
                     }
                 }
             }
             
+            override fun onMtuChanged(device: BluetoothDevice, mtu: Int) {
+                if (!isActive) return
+                Log.i(TAG, "Server: MTU changed for ${device.address} to $mtu")
+                connectionTracker.updateNegotiatedMtu(device.address, mtu)
+            }
+
             override fun onDescriptorWriteRequest(
                 device: BluetoothDevice,
                 requestId: Int,

@@ -15,6 +15,7 @@ import com.app.transport.protocol.MessageType
 import com.app.transport.protocol.SpecialRecipients
 import kotlinx.coroutines.*
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.ExperimentalTime
 
 /**
@@ -27,6 +28,7 @@ internal class GossipSyncManager(
     private val scope: CoroutineScope,
     private val configProvider: ConfigProvider,
     private val dispatchers: AppDispatchers = AppDispatchers(),
+    private val nowMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) {
     interface Delegate {
         fun sendPacket(packet: BitchatPacket)
@@ -46,6 +48,11 @@ internal class GossipSyncManager(
         // Ignore ANNOUNCE packets older than this (matches the mesh stale-peer timeout, 3 minutes).
         // Inlined to keep sync independent of the mesh layer's AppConstants.
         private const val STALE_ANNOUNCE_MAX_AGE_MS: Long = 180_000L
+
+        // Minimum gap between two REQUEST_SYNCs SENT to the same peer. Every direct
+        // announce schedules a per-peer sync, and peers resend cached announces via sync
+        // responses — without this floor the two feed each other into a request storm.
+        internal const val MIN_PEER_SYNC_INTERVAL_MS: Long = 30_000L
     }
 
     var delegate: Delegate? = null
@@ -60,6 +67,12 @@ internal class GossipSyncManager(
     private val messagesLock = Lock()
     // - announcements: only keep latest per sender peerID
     private val latestAnnouncementByPeer = ConcurrentMutableMap<String, Pair<String, BitchatPacket>>()
+
+    // Per-peer rate limiting keyed on the last SENT request time, plus a guard against
+    // stacking multiple delayed jobs while one is already queued for the peer.
+    private val lastSyncRequestSentAt = ConcurrentMutableMap<String, Long>()
+    private val pendingPeerSyncs = mutableSetOf<String>()
+    private val pendingPeerSyncsLock = Lock()
 
     private var periodicJob: Job? = null
     private var cleanupJob: Job? = null
@@ -80,7 +93,7 @@ internal class GossipSyncManager(
         cleanupJob = scope.launch(dispatchers.io) {
             while (isActive) {
                 try {
-                    delay(SyncDefaults.CLEANUP_INTERVAL_MS)
+                    delay(SyncDefaults.CLEANUP_INTERVAL_MS.milliseconds)
                     pruneStaleAnnouncements()
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) { Log.e(TAG, "Periodic cleanup error: ${e.message}") }
@@ -101,9 +114,19 @@ internal class GossipSyncManager(
     }
 
     fun scheduleInitialSyncToPeer(peerID: String, delayMs: Long = 5_000L) {
+        // No-op while a request to this peer is younger than the interval or a delayed
+        // job is already queued — callers invoke this on every direct announce.
+        val last = lastSyncRequestSentAt[peerID]
+        if (last != null && nowMillis() - last < MIN_PEER_SYNC_INTERVAL_MS) return
+        val queued = pendingPeerSyncsLock.withLock { pendingPeerSyncs.add(peerID) }
+        if (!queued) return
         scope.launch(dispatchers.io) {
-            delay(delayMs)
-            sendRequestSyncToPeer(peerID)
+            try {
+                delay(delayMs.milliseconds)
+                sendRequestSyncToPeer(peerID)
+            } finally {
+                pendingPeerSyncsLock.withLock { pendingPeerSyncs.remove(peerID) }
+            }
         }
     }
 
@@ -163,6 +186,16 @@ internal class GossipSyncManager(
     }
 
     private fun sendRequestSyncToPeer(peerID: String) {
+        // Re-check at send time: the delayed job may fire after another path (or a
+        // previous job) already sent a request to this peer within the interval.
+        val now = nowMillis()
+        val last = lastSyncRequestSentAt[peerID]
+        if (last != null && now - last < MIN_PEER_SYNC_INTERVAL_MS) {
+            Log.d(TAG, "Skipping sync request to $peerID (rate-limited, last sent ${now - last}ms ago)")
+            return
+        }
+        lastSyncRequestSentAt[peerID] = now
+
         val payload = buildGcsPayload()
 
         val packet = BitchatPacket(
@@ -292,6 +325,10 @@ internal class GossipSyncManager(
     // Explicitly remove stored announcement for a given peer (hex ID)
     fun removeAnnouncementForPeer(peerID: String) {
         val key = peerID.lowercase()
+        // Forget rate-limit state so a peer that leaves and reconnects gets its
+        // initial sync without waiting out the interval.
+        lastSyncRequestSentAt.remove(peerID)
+        lastSyncRequestSentAt.remove(key)
         if (latestAnnouncementByPeer.remove(key) != null) {
             Log.d(TAG, "Removed stored announcement for peer $peerID")
         }

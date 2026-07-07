@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import com.app.transport.MeshTelemetry
 import com.app.transport.debug.DebugScanResult
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Manages GATT client operations, scanning, and client-side connections
@@ -72,9 +73,13 @@ internal class BluetoothGattClientManager(
     
     // RSSI monitoring state
     private var rssiMonitoringJob: Job? = null
-    
+
     // State management
     private var isActive = false
+
+    // Per-peripheral reassembly of chunked notifications: iOS peripherals stream frames
+    // split to the central's MTU − 3 and expect the central to reassemble.
+    private val notificationAssemblers = ConcurrentHashMap<String, BleFrameAssembler>()
     
     /**
      * Start client manager
@@ -426,6 +431,7 @@ internal class BluetoothGattClientManager(
                         gatt.requestMtu(517)
                     }
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                    notificationAssemblers.remove(deviceAddress)
                     if (status != BluetoothGatt.GATT_SUCCESS) {
                         Log.w(TAG, "Client: Disconnected from $deviceAddress with error status $status")
                         if (status == 147) {
@@ -519,16 +525,21 @@ internal class BluetoothGattClientManager(
             
             override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
                 val value = characteristic.value
-                Log.i(TAG, "Client: Received packet from ${gatt.device.address}, size: ${value.size} bytes")
-                val packet = BitchatPacket.fromBinaryData(value)
-                if (packet != null) {
-                    val peerID = packet.senderID.take(8).toByteArray().joinToString("") { "%02x".format(it) }
-                    Log.d(TAG, "Client: Parsed packet type ${packet.type} from $peerID")
-                    delegate?.onPacketReceived(packet, peerID, gatt.device)
-                } else {
-                    // Do not dump raw frame bytes: a malformed frame can still carry another peer's
-                    // ciphertext / routing metadata (traffic-analysis leak). Log the length only.
-                    Log.w(TAG, "Client: Failed to parse packet from ${gatt.device.address}, size: ${value.size} bytes")
+                Log.i(TAG, "Client: Received notification from ${gatt.device.address}, size: ${value.size} bytes")
+                // A notification may be a complete frame or an MTU-sized chunk of a larger
+                // frame (iOS peripherals stream frames split to the central's MTU − 3).
+                val assembler = notificationAssemblers.getOrPut(gatt.device.address) { BleFrameAssembler() }
+                for (frame in assembler.append(value)) {
+                    val packet = BitchatPacket.fromBinaryData(frame)
+                    if (packet != null) {
+                        val peerID = packet.senderID.take(8).toByteArray().joinToString("") { "%02x".format(it) }
+                        Log.d(TAG, "Client: Parsed packet type ${packet.type} from $peerID")
+                        delegate?.onPacketReceived(packet, peerID, gatt.device)
+                    } else {
+                        // Do not dump raw frame bytes: a malformed frame can still carry another peer's
+                        // ciphertext / routing metadata (traffic-analysis leak). Log the length only.
+                        Log.w(TAG, "Client: Failed to parse packet from ${gatt.device.address}, size: ${frame.size} bytes")
+                    }
                 }
             }
             

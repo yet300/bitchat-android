@@ -167,6 +167,9 @@ class BleSendPathGoldenTest {
         val dev: BluetoothDevice = mock()
         whenever(dev.address).thenReturn(address)
         tracker.addSubscribedDevice(dev)
+        // Golden topology models a properly negotiated link: notifications go out as one
+        // frame. MTU-23 chunking behavior is covered by BleFrameAssembler/notify tests.
+        tracker.updateNegotiatedMtu(address, 517)
         if (peerID != null) tracker.addressPeerMap[address] = peerID
         return dev
     }
