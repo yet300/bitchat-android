@@ -197,6 +197,7 @@ mvikotlin-extensions-coroutines = { group = "com.arkivanov.mvikotlin", name = "m
 # Testing
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlin-test-annotations = { module = "org.jetbrains.kotlin:kotlin-test-annotations-common", version.ref = "kotlin" }
+kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 
 junit = { module = "junit:junit", version.ref = "junit" }

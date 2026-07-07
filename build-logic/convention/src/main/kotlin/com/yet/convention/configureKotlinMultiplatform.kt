@@ -41,5 +41,11 @@ internal fun Project.configureKotlinMultiplatform(
         commonTest.dependencies {
             implementation(libs.findBundle("testing").get())
         }
+
+        named("androidHostTest").configure {
+            dependencies {
+                implementation(libs.findLibrary("kotlin-test-junit").get())
+            }
+        }
     }
 }
