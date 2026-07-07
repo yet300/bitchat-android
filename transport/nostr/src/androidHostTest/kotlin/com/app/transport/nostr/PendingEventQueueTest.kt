@@ -71,6 +71,21 @@ class PendingEventQueueTest {
     }
 
     @Test
+    fun isConnectedCallbackMayReenterTheQueue() {
+        // submit() must not hold the internal lock while running the caller's callback;
+        // a callback that reads queue state must complete without deadlocking.
+        val queue = PendingEventQueue<String>()
+        queue.submit("e1", listOf(relayA)) { false }
+
+        val result = queue.submit("e2", listOf(relayA, relayB)) { relay ->
+            queue.size() >= 1 && relay == relayB
+        }
+
+        assertEquals(listOf(relayB), result.sendNow)
+        assertEquals(listOf(relayA), queue.pendingRelaysOf("e2"))
+    }
+
+    @Test
     fun clearEmptiesQueue() {
         val queue = PendingEventQueue<String>()
         queue.submit("e1", listOf(relayA)) { false }

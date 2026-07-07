@@ -16,7 +16,8 @@ class MeshGraphService {
     data class GraphEdge(val a: String, val b: String, val isConfirmed: Boolean, val confirmedBy: String? = null)
     data class GraphSnapshot(val nodes: List<GraphNode>, val edges: List<GraphEdge>)
 
-    // Reentrant lock replacing lock.withLock for commonMain.
+    // Guards graph mutation + publishSnapshot as one unit so a stale snapshot can never
+    // overwrite a newer one in _graphState. Non-suspending, bounded work only.
     private val lock = Lock()
     // Map peerID -> nickname (may be null if unknown)
     private val nicknames = ConcurrentMutableMap<String, String?>()
@@ -59,8 +60,10 @@ class MeshGraphService {
 
     fun updateNickname(peerID: String, nickname: String?) {
         if (nickname == null) return
-        nicknames[peerID] = nickname
-        publishSnapshot()
+        lock.withLock {
+            nicknames[peerID] = nickname
+            publishSnapshot()
+        }
     }
 
     /**

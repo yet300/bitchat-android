@@ -115,4 +115,16 @@ class MeshGraphServiceTest {
         assertFalse(snapshot.edges.isEmpty())
         assertNotNull(snapshot.edges.find { (it.a == "PeerA" && it.b == "PeerB") || (it.a == "PeerB" && it.b == "PeerA") })
     }
+
+    @Test
+    fun testUpdateNickname_PublishesSnapshotWithNewNickname() {
+        service.updateFromAnnouncement("PeerA", "Alice", listOf("PeerB"), 100UL)
+
+        service.updateNickname("PeerA", "Alicia")
+
+        val snapshot = service.graphState.value
+        assertEquals("Alicia", snapshot.nodes.first { it.peerID == "PeerA" }.nickname)
+        // Edge state from the announcement must survive a nickname-only update
+        assertNotNull(snapshot.edges.find { (it.a == "PeerA" && it.b == "PeerB") || (it.a == "PeerB" && it.b == "PeerA") })
+    }
 }

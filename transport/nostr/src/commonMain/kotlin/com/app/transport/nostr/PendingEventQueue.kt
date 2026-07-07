@@ -33,17 +33,18 @@ internal class PendingEventQueue<E>(private val maxEntries: Int = DEFAULT_MAX_EN
      * queued until their relay reconnects.
      */
     fun submit(event: E, targetRelays: List<String>, isConnected: (String) -> Boolean): SubmitResult<E> {
+        // Caller-supplied callback runs before the lock is taken — delegate code must
+        // never execute under it.
+        val (connected, pending) = targetRelays.partition(isConnected)
+        if (pending.isEmpty()) return SubmitResult(connected, emptyList())
+        val dropped = mutableListOf<E>()
         lock.withLock {
-            val (connected, pending) = targetRelays.partition(isConnected)
-            val dropped = mutableListOf<E>()
-            if (pending.isNotEmpty()) {
-                entries.add(event to pending.toMutableList())
-                while (entries.size > maxEntries) {
-                    dropped.add(entries.removeAt(0).first)
-                }
+            entries.add(event to pending.toMutableList())
+            while (entries.size > maxEntries) {
+                dropped.add(entries.removeAt(0).first)
             }
-            return SubmitResult(connected, dropped)
         }
+        return SubmitResult(connected, dropped)
     }
 
     /**
