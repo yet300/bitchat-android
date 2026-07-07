@@ -16,7 +16,7 @@ import java.io.File
  * Android-only transport-wiring providers: the app data dirs, the OkHttp ktor engine and the
  * asset-backed relay storage. The platform-free bridge providers (AppStateStore sink, favorites
  * link, routing sources) live in the commonMain [TransportDataBindings]; the app-resource-touching
- * providers (ServiceNotifier, NicknameSource) stay in the app-resident `AndroidAppBindings`.
+ * provider (ServiceNotifier) stays in the app-resident `AndroidAppBindings`.
  */
 @ContributesTo(AppScope::class)
 @BindingContainer

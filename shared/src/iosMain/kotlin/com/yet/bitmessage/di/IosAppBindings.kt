@@ -1,13 +1,10 @@
 package com.yet.bitmessage.di
 
-import com.app.data.DataManager
 import com.app.domain.model.TransportKind
 import com.app.domain.model.TransportState
 import com.app.domain.model.TransportStatus
 import com.app.domain.repository.BatteryOptimizationRepository
 import com.app.domain.repository.ConnectivityRepository
-import com.app.common.settings.SettingsStore
-import com.app.transport.NicknameSource
 import com.app.transport.mesh.MeshLifecycleController
 import com.app.transport.notification.ServiceNotifier
 import dev.zacsweers.metro.AppScope
@@ -82,18 +79,4 @@ object IosAppBindings {
                 messageContent: String,
             ) = Unit
         }
-
-    /** Saved nickname for mesh announcements — same settings-backed source as Android. */
-    @Provides
-    @SingleIn(AppScope::class)
-    fun provideNicknameSource(settings: SettingsStore): NicknameSource {
-        val dataManager = DataManager(settings)
-        return NicknameSource { fallback ->
-            try {
-                dataManager.loadNickname().ifBlank { fallback }
-            } catch (_: Exception) {
-                fallback
-            }
-        }
-    }
 }

@@ -6,7 +6,6 @@ import com.app.common.settings.SettingsStore
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.SetSerializer
 import kotlinx.serialization.builtins.serializer
-import kotlin.random.Random
 
 /**
  * Handles data persistence operations for the chat system.
@@ -41,23 +40,6 @@ class DataManager(private val settings: SettingsStore) {
 
     private fun putStringSet(key: String, values: Set<String>) {
         settings.putString(key, JsonConfig.json.encodeToString(SetSerializer(String.serializer()), values))
-    }
-
-    // MARK: - Nickname Management
-
-    fun loadNickname(): String {
-        val savedNickname = settings.getStringOrNull("nickname")
-        return if (savedNickname != null) {
-            savedNickname
-        } else {
-            val randomNickname = "anon${Random.nextInt(1000, 9999)}"
-            saveNickname(randomNickname)
-            randomNickname
-        }
-    }
-
-    fun saveNickname(nickname: String) {
-        settings.putString("nickname", nickname)
     }
 
     // MARK: - Geohash Channel Persistence
