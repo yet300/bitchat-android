@@ -1,7 +1,6 @@
 package com.app.transport.nostr
 
 import com.app.common.serialization.JsonConfig
-import com.app.common.settings.SettingsStore
 import co.touchlab.stately.collections.ConcurrentMutableMap
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
@@ -10,12 +9,12 @@ import kotlinx.serialization.builtins.serializer
  * GeohashConversationRegistry
  * - Global, thread-safe registry of conversationKey (e.g., "nostr_<pub16>") -> source geohash
  * - Enables routing geohash DMs from anywhere by providing the correct geohash identity
- * - Persisted as a single JSON map under [KEY] through the [SettingsStore] port.
+ * - Persisted as a single JSON map through the [NostrConfigStore] port.
  *
  * App-scoped singleton: the in-memory map is loaded once on construction and persisted on writes.
  */
 class GeohashConversationRegistry(
-    private val settings: SettingsStore,
+    private val store: NostrConfigStore,
 ) {
     private val map = ConcurrentMutableMap<String, String>()
     private val serializer = MapSerializer(String.serializer(), String.serializer())
@@ -25,13 +24,13 @@ class GeohashConversationRegistry(
     }
 
     private fun load() {
-        val json = settings.getStringOrNull(KEY) ?: return
+        val json = store.getConversationRegistryJson() ?: return
         runCatching { JsonConfig.json.decodeFromString(serializer, json) }
             .getOrNull()?.let { map.putAll(it) }
     }
 
     private fun persist() {
-        settings.putString(KEY, JsonConfig.json.encodeToString(serializer, HashMap(map)))
+        store.setConversationRegistryJson(JsonConfig.json.encodeToString(serializer, HashMap(map)))
     }
 
     fun set(convKey: String, geohash: String) {
@@ -47,10 +46,6 @@ class GeohashConversationRegistry(
 
     fun clear() {
         map.clear()
-        settings.remove(KEY)
-    }
-
-    private companion object {
-        const val KEY = "geohash_conversation_registry"
+        store.clearConversationRegistryJson()
     }
 }

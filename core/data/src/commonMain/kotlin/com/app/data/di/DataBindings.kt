@@ -3,6 +3,12 @@ package com.app.data.di
 import com.app.common.AppDispatchers
 import com.app.common.encoding.hexEncodedString
 import com.app.common.settings.SettingsStore
+import com.app.data.transportconfig.SettingsDebugConfigStore
+import com.app.data.transportconfig.SettingsNostrConfigStore
+import com.app.data.transportconfig.SettingsTorConfigStore
+import com.app.transport.debug.DebugConfigStore
+import com.app.transport.net.TorConfigStore
+import com.app.transport.nostr.NostrConfigStore
 import com.app.crypto.EncryptionService
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.identity.SecureIdentityStateManager
@@ -104,6 +110,16 @@ import kotlinx.coroutines.withContext
 abstract class DataBindings {
     @Binds
     internal abstract val SettingsStoreImpl.bindSettingsStore: SettingsStore
+
+    // Transport config ports — settings-backed, same keys as the pre-port managers (no migration).
+    @Binds
+    internal abstract val SettingsTorConfigStore.bindTorConfigStore: TorConfigStore
+
+    @Binds
+    internal abstract val SettingsNostrConfigStore.bindNostrConfigStore: NostrConfigStore
+
+    @Binds
+    internal abstract val SettingsDebugConfigStore.bindDebugConfigStore: DebugConfigStore
 
     @Binds
     internal abstract val SettingsRepositoryImpl.bindSettings: SettingsRepository

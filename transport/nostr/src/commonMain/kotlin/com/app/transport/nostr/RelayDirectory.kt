@@ -5,7 +5,6 @@ package com.app.transport.nostr
 import com.app.common.AppDispatchers
 import com.app.common.utils.Log
 import com.app.common.geohash.Geohash
-import com.app.common.settings.SettingsStore
 import com.app.transport.net.HttpClientProvider
 import co.touchlab.stately.concurrency.Lock
 import co.touchlab.stately.concurrency.withLock
@@ -35,13 +34,13 @@ import kotlin.time.ExperimentalTime
 /**
  * Loads relay coordinates and provides nearest-relay lookup by geohash.
  *
- * App-scoped singleton: the last-update timestamp is persisted through the domain [SettingsStore]
+ * App-scoped singleton: the last-update timestamp is persisted through the [NostrConfigStore]
  * port; the relay list lives in memory and is (re)loaded by [initialize]. File access goes through
  * kotlinx-io's [SystemFileSystem]; the bundled CSV and the cache path come from the platform
  * [RelayDirectoryStorage] seam, so this stays platform-free.
  */
 class RelayDirectory(
-    private val settings: SettingsStore,
+    private val store: NostrConfigStore,
     private val httpClientProvider: HttpClientProvider,
     private val storage: RelayDirectoryStorage,
     private val dispatchers: AppDispatchers = AppDispatchers(),
@@ -49,7 +48,6 @@ class RelayDirectory(
 
     private val tag = "RelayDirectory"
     private val assetFileUrl = "https://raw.githubusercontent.com/permissionlesstech/georelays/refs/heads/main/nostr_relays.csv"
-    private val keyLastUpdateMs = "last_update_ms"
     private val oneDayMs = 24L * 60 * 60 * 1000
     private val oneMinuteMs = 60L * 1000
 
@@ -143,7 +141,7 @@ class RelayDirectory(
     // ===== Implementation details =====
 
     private fun isStale(): Boolean {
-        val last = settings.getLong(keyLastUpdateMs, 0L)
+        val last = store.getRelayLastUpdateMs(0L)
         val now = Clock.System.now().toEpochMilliseconds()
         return now - last >= oneDayMs
     }
@@ -187,7 +185,7 @@ class RelayDirectory(
                 relays.addAll(parsed)
             }
 
-            settings.putLong(keyLastUpdateMs, Clock.System.now().toEpochMilliseconds())
+            store.setRelayLastUpdateMs(Clock.System.now().toEpochMilliseconds())
             Log.i(tag, "✅ Using downloaded relay list ($dest), entries=${parsed.size}")
         } catch (e: Exception) {
             Log.w(tag, "Failed to fetch and swap relay list: ${e.message}")

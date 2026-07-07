@@ -1,12 +1,12 @@
 package com.app.transport
 
 import com.app.common.AppDispatchers
-import com.app.common.settings.SettingsStore
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.transport.net.HttpClientProvider
 import com.app.transport.nostr.GeohashAliasRegistry
 import com.app.transport.nostr.GeohashConversationRegistry
 import com.app.transport.nostr.LocationNotesManager
+import com.app.transport.nostr.NostrConfigStore
 import com.app.transport.nostr.NostrEventDeduplicator
 import com.app.transport.nostr.NostrIdentityBridge
 import com.app.transport.nostr.NostrRelayManager
@@ -20,8 +20,8 @@ import kotlinx.coroutines.CoroutineScope
  * Configuration for [NostrClient.create]. Groups the app seams the Nostr stack needs; everything
  * except [dispatchers] and [eventCacheCapacity] is required.
  *
- * @property settings persistent key-value store used by the relay directory, geohash registries and
- *   PoW preferences.
+ * @property configStore persistence port used by the relay directory, geohash registries and
+ *   PoW preferences. The app owns the storage backend.
  * @property http the Tor-aware HTTP client provider — pass `TorClient.httpClientProvider`. It backs
  *   both the relay directory (HTTP) and the relay manager (WebSocket).
  * @property relayStorage platform relay-CSV storage: `AndroidRelayDirectoryStorage(context)` on
@@ -35,7 +35,7 @@ import kotlinx.coroutines.CoroutineScope
  * ```
  * val nostr = NostrClient.create(
  *     NostrConfig(
- *         settings = appSettings,
+ *         configStore = appNostrConfigStore,
  *         http = tor.httpClientProvider,
  *         relayStorage = AndroidRelayDirectoryStorage(context),
  *         stateManager = secureIdentityStateManager,
@@ -45,7 +45,7 @@ import kotlinx.coroutines.CoroutineScope
  * ```
  */
 class NostrConfig(
-    val settings: SettingsStore,
+    val configStore: NostrConfigStore,
     val http: HttpClientProvider,
     val relayStorage: RelayDirectoryStorage,
     val stateManager: SecureIdentityStateManager,
@@ -76,7 +76,7 @@ class NostrClient private constructor(
                 ?: NostrEventDeduplicator()
             val relayManager = NostrRelayManager(deduplicator, config.http, config.dispatchers)
             val relayDirectory = RelayDirectory(
-                settings = config.settings,
+                store = config.configStore,
                 httpClientProvider = config.http,
                 storage = config.relayStorage,
                 dispatchers = config.dispatchers,
@@ -86,9 +86,9 @@ class NostrClient private constructor(
                 relayManager = relayManager,
                 relayDirectory = relayDirectory,
                 subscriptionManager = subscriptionManager,
-                aliasRegistry = GeohashAliasRegistry(config.settings),
-                conversationRegistry = GeohashConversationRegistry(config.settings),
-                powPreferenceManager = PoWPreferenceManager(config.settings),
+                aliasRegistry = GeohashAliasRegistry(config.configStore),
+                conversationRegistry = GeohashConversationRegistry(config.configStore),
+                powPreferenceManager = PoWPreferenceManager(config.configStore),
                 locationNotesManager = LocationNotesManager(config.dispatchers),
                 identityBridge = NostrIdentityBridge(config.stateManager),
             )

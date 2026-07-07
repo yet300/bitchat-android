@@ -8,6 +8,7 @@ import com.app.data.AppStateStore
 import com.app.domain.app.AppForegroundState
 import com.app.domain.model.ConversationId
 import com.app.data.FakeContactRepository
+import com.app.data.transportconfig.SettingsNostrConfigStore
 import com.app.domain.model.GeohashChannel
 import com.app.domain.model.GeohashLevel
 import com.app.transport.SeenMessageStore
@@ -47,7 +48,7 @@ class GeohashRepositoryImplTest {
         val GEO = ConversationId.Geohash(GeohashChannel(GeohashLevel.CITY, GEOHASH))
     }
 
-    /** In-memory SettingsStore covering the string ops the registries + block list exercise. */
+    /** In-memory SettingsStore backing the registries via the real SettingsNostrConfigStore. */
     private class FakeSettingsStore : SettingsStore {
         private val strings = MutableStateFlow<Map<String, String>>(emptyMap())
         override fun getStringOrNull(key: String): String? = strings.value[key]
@@ -87,7 +88,7 @@ class GeohashRepositoryImplTest {
         whenever(pow.getCurrentSettings()).thenReturn(PoWPreferenceManager.PoWSettings(enabled = false, difficulty = 0))
         val bridge = mock<NostrIdentityBridge>()
         whenever(bridge.deriveIdentity(any())).thenReturn(NostrIdentity(MY_HEX, MY_HEX, "npub", 0L))
-        val settings = FakeSettingsStore()
+        val nostrConfigStore = SettingsNostrConfigStore(FakeSettingsStore())
 
         repo = GeohashRepositoryImpl(
             appStateStore = appStateStore,
@@ -95,8 +96,8 @@ class GeohashRepositoryImplTest {
             relayDirectory = relayDirectory,
             nostrIdentityBridge = bridge,
             powPreferenceManager = pow,
-            aliasRegistry = GeohashAliasRegistry(settings),
-            conversationRegistry = GeohashConversationRegistry(settings),
+            aliasRegistry = GeohashAliasRegistry(nostrConfigStore),
+            conversationRegistry = GeohashConversationRegistry(nostrConfigStore),
             geohashDao = InMemoryDatabase().geohashDao,
             appForegroundState = object : AppForegroundState {
                 override val isForeground = MutableStateFlow(true)

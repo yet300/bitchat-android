@@ -1,10 +1,10 @@
 package com.app.transport
 
 import com.app.common.AppDispatchers
-import com.app.common.settings.SettingsStore
 import com.app.transport.TorClient.Companion.create
 import com.app.transport.net.ArtiTorManager
 import com.app.transport.net.HttpClientProvider
+import com.app.transport.net.TorConfigStore
 import com.app.transport.net.TorDataDirProvider
 import com.app.transport.net.TorPreferenceManager
 import com.app.transport.net.WebSocketClientProvider
@@ -14,8 +14,8 @@ import io.ktor.client.engine.HttpClientEngineFactory
  * Configuration for [TorClient.create]. Group the platform seams the Tor stack needs; everything
  * except [dispatchers] is required.
  *
- * @property settings persistent key-value store the [TorPreferenceManager] reads/writes the saved
- *   [com.app.transport.net.TorMode] from. Supply your app's [SettingsStore].
+ * @property configStore persistence port the [TorPreferenceManager] reads/writes the saved
+ *   [com.app.transport.net.TorMode] through. The app owns the storage backend.
  * @property dataDir absolute path of the Arti data directory (created on demand). On Android use
  *   `File(context.filesDir, "arti").absolutePath`; on Apple use `nativeArtiDataDir()`.
  * @property engineFactory the ktor HTTP engine. Pass `androidHttpClientEngineFactory()` on Android
@@ -26,7 +26,7 @@ import io.ktor.client.engine.HttpClientEngineFactory
  * ```
  * val tor = TorClient.create(
  *     TorConfig(
- *         settings = appSettings,
+ *         configStore = appTorConfigStore,
  *         dataDir = { File(context.filesDir, "arti").apply { mkdirs() }.absolutePath },
  *         engineFactory = androidHttpClientEngineFactory(),
  *     ),
@@ -36,7 +36,7 @@ import io.ktor.client.engine.HttpClientEngineFactory
  * ```
  */
 class TorConfig(
-    val settings: SettingsStore,
+    val configStore: TorConfigStore,
     val dataDir: TorDataDirProvider,
     val engineFactory: HttpClientEngineFactory<*>,
     val dispatchers: AppDispatchers = AppDispatchers(),
@@ -60,7 +60,7 @@ class TorClient private constructor(
 
     companion object {
         fun create(config: TorConfig): TorClient {
-            val preferences = TorPreferenceManager(config.settings)
+            val preferences = TorPreferenceManager(config.configStore)
             // Late binding reproduces the graph's Lazy cycle break: the SOCKS address is read
             // per connection (by which time the manager exists), and the reset callback only
             // fires on circuit changes (after both objects are constructed).
