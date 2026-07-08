@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A100000151C1BAE000000001 /* SQLCipher in Frameworks */ = {isa = PBXBuildFile; productRef = A100000251C1BAE000000002 /* SQLCipher */; };
 		A100000451C1BAE000000004 /* MapLibre in Frameworks */ = {isa = PBXBuildFile; productRef = A100000551C1BAE000000005 /* MapLibre */; };
 /* End PBXBuildFile section */
 
@@ -46,7 +45,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A100000151C1BAE000000001 /* SQLCipher in Frameworks */,
 				A100000451C1BAE000000004 /* MapLibre in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -92,7 +90,6 @@
 			);
 			name = iosApp;
 			packageProductDependencies = (
-				A100000251C1BAE000000002 /* SQLCipher */,
 				A100000551C1BAE000000005 /* MapLibre */,
 			);
 			productName = iosApp;
@@ -124,7 +121,6 @@
 			mainGroup = 9E69B6D43B29CA2B2FC1E2B5;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				A100000351C1BAE000000003 /* XCRemoteSwiftPackageReference "SQLCipher" */,
 				A100000651C1BAE000000006 /* XCRemoteSwiftPackageReference "maplibre-gl-native-distribution" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -401,14 +397,6 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		A100000351C1BAE000000003 /* XCRemoteSwiftPackageReference "SQLCipher" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/sqlcipher/SQLCipher.swift";
-			requirement = {
-				kind = exactVersion;
-				version = 4.16.0;
-			};
-		};
 		A100000651C1BAE000000006 /* XCRemoteSwiftPackageReference "maplibre-gl-native-distribution" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/maplibre/maplibre-gl-native-distribution.git";
@@ -420,11 +408,6 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		A100000251C1BAE000000002 /* SQLCipher */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = A100000351C1BAE000000003 /* XCRemoteSwiftPackageReference "SQLCipher" */;
-			productName = SQLCipher;
-		};
 		A100000551C1BAE000000005 /* MapLibre */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A100000651C1BAE000000006 /* XCRemoteSwiftPackageReference "maplibre-gl-native-distribution" */;
