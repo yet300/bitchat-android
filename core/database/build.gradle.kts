@@ -1,6 +1,4 @@
 import app.cash.sqldelight.gradle.SqlDelightExtension
-import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
-import org.jetbrains.kotlin.konan.target.KonanTarget
 
 plugins {
     alias(libs.plugins.local.kotlin.multiplatform)
@@ -9,37 +7,12 @@ plugins {
 }
 
 kotlin {
-    // Link iOS binaries against the vendored SQLCipher.xcframework (see libs/README.md) instead of
-    // the system SQLite: SQLCipher exports the same sqlite3_* symbols SQLiter binds, so no cinterop
-    // is needed — only this link-time substitution (plus linkSqlite=false below, which drops the
-    // competing `-lsqlite3` SQLDelight would otherwise add).
-    targets.withType<KotlinNativeTarget>().configureEach {
-        val slice = when (konanTarget) {
-            KonanTarget.IOS_ARM64 -> "ios-arm64"
-            KonanTarget.IOS_SIMULATOR_ARM64, KonanTarget.IOS_X64 -> "ios-arm64_x86_64-simulator"
-            else -> null
-        }
-        if (slice != null) {
-            val frameworkDir = file("libs/SQLCipher.xcframework/$slice").absolutePath
-            binaries.configureEach {
-                linkerOpts("-F$frameworkDir", "-framework", "SQLCipher", "-rpath", frameworkDir)
-            }
-        }
-    }
-
     sourceSets {
         commonMain.dependencies {
             implementation(projects.core.domain)
             implementation(projects.core.common)
             implementation(libs.sqldelight.coroutines)
-        }
-        androidMain.dependencies {
-            implementation(libs.sqldelight.android.driver)
-            implementation(libs.sqlcipher.android)
-            implementation(libs.androidx.sqlite)
-        }
-        nativeMain.dependencies {
-            implementation(libs.sqldelight.native.driver)
+            implementation(libs.sqlcipher.driver)
         }
         nativeTest.dependencies {
             implementation(libs.kotlin.test)
@@ -64,9 +37,10 @@ kotlin {
 // SQLDelight schema/queries live in commonMain; the generated multiplatform Database API is consumed
 // by the platform driver factories (SQLCipher on both Android and iOS).
 extensions.configure<SqlDelightExtension> {
-    // Do NOT auto-link the system sqlite3 into native binaries: iOS links the vendored SQLCipher
-    // instead (see the KotlinNativeTarget block above). With both linked, the two-level-namespace
-    // linker could silently bind sqlite3_* to the unencrypted system library.
+    // Do NOT auto-link the system sqlite3 into native binaries: sqlcipher-driver's klib bundles a
+    // static SQLCipher that must stay the sole sqlite3_* exporter in the final link. With both
+    // linked, the two-level-namespace linker could silently bind sqlite3_* to the unencrypted
+    // system library.
     linkSqlite.set(false)
     databases {
         create("BitMessageDatabase") {

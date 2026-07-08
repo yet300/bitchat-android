@@ -36,8 +36,7 @@ filekit = "0.14.2" # vinceglb/FileKit — KMP file picker (Kotlin 2.4.0 compatib
 
 # Persistence (encrypted messenger DB) — pinned via throwaway spike against Kotlin 2.4.0 / AGP 9.2.1
 sqldelight = "2.3.2"              # app.cash.sqldelight (KMP DB; android-driver now, native later)
-sqlcipher = "4.16.0"             # net.zetetic:sqlcipher-android (at-rest encryption)
-androidxSqlite = "2.6.2"         # androidx.sqlite:sqlite (SupportSQLiteOpenHelper for the SQLCipher factory)
+sqlcipherDriver = "0.1.0"        # io.github.yet300:sqlcipher-driver — SQLCipher SQLDelight drivers (Android AAR + static cipher in the iOS klib)
 
 
 # JSON
@@ -175,8 +174,7 @@ sqldelight-android-driver = { module = "app.cash.sqldelight:android-driver", ver
 sqldelight-native-driver = { module = "app.cash.sqldelight:native-driver", version.ref = "sqldelight" }
 sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" } # JVM in-memory driver for host tests
 
-sqlcipher-android = { module = "net.zetetic:sqlcipher-android", version.ref = "sqlcipher" }
-androidx-sqlite = { module = "androidx.sqlite:sqlite", version.ref = "androidxSqlite" }
+sqlcipher-driver = { module = "io.github.yet300:sqlcipher-driver", version.ref = "sqlcipherDriver" }
 
 #decompose
 decompose = { module = "com.arkivanov.decompose:decompose", version.ref = "decompose" }
