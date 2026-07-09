@@ -143,4 +143,22 @@ class MessageDao(
     suspend fun deleteAll() = withContext(dispatchers.io) {
         databaseManager.getDb().messageQueries.deleteAll()
     }
+
+    /** Retention: delete every message with a timestamp strictly older than [cutoffMillis]. */
+    suspend fun deleteOlderThan(cutoffMillis: Long) = withContext(dispatchers.io) {
+        databaseManager.getDb().messageQueries.deleteOlderThan(cutoffMillis)
+    }
+
+    /**
+     * Retention: for each conversation, keep only the newest [keepPerConversation] messages and delete
+     * the older tail. Runs one transaction over all conversations so the whole sweep is a single fsync.
+     */
+    suspend fun enforcePerConversationCap(keepPerConversation: Long) = withContext(dispatchers.io) {
+        val queries = databaseManager.getDb().messageQueries
+        queries.transaction {
+            queries.selectConversationIds().executeAsList().forEach { conversationId ->
+                queries.deleteBeyondCapForConversation(conversationId, keepPerConversation)
+            }
+        }
+    }
 }
