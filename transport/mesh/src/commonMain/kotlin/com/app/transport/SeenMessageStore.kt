@@ -2,20 +2,37 @@ package com.app.transport
 
 import co.touchlab.stately.concurrency.Lock
 import co.touchlab.stately.concurrency.withLock
+import com.app.common.AppDispatchers
 import com.app.common.utils.Log
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.common.serialization.JsonConfig
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
 /**
  * Persistent store for message IDs we've already acknowledged (DELIVERED) or READ.
  * Limits to last MAX_IDS entries per set to avoid memory bloat.
  */
-class SeenMessageStore(private val secure: SecureIdentityStateManager) {
+class SeenMessageStore(
+    private val secure: SecureIdentityStateManager,
+    dispatchers: AppDispatchers = AppDispatchers(),
+) {
     companion object {
         private const val TAG = "SeenMessageStore"
         private const val STORAGE_KEY = "seen_message_store_v1"
         private const val MAX_IDS = 10_000
+
+        // Debounce window for coalescing receipt-ACK writes. Each markDelivered/markRead only
+        // updates the in-memory set synchronously and signals; the actual ~0.5 MB JSON encode +
+        // Keystore-encrypted write happens at most once per window. Losing the last window on a
+        // hard process kill is acceptable (this is a dedup cache for receipts, not source data);
+        // flush() forces a synchronous write on graceful shutdown.
+        private const val PERSIST_DEBOUNCE_MS = 3_000L
     }
 
     // Guards only the in-memory sets; JSON encoding and the secure-storage write happen
@@ -31,7 +48,40 @@ class SeenMessageStore(private val secure: SecureIdentityStateManager) {
     private val persistLock = Lock()
     private var persistedVersion = 0L
 
-    init { load() }
+    // Debounced persistence: a mutation signals here; a single worker coroutine coalesces a burst
+    // of receipt ACKs (CONFLATED → N signals collapse to one) and writes the latest snapshot at
+    // most once per PERSIST_DEBOUNCE_MS. Crucially this moves the encode+write off the caller's
+    // thread — markReadAll runs under AppStateStore's ingest monitor (audit A9), and doing the
+    // heavy write inline there stalled all message ingest.
+    private val scope = CoroutineScope(dispatchers.io + SupervisorJob())
+    private val persistSignal = Channel<Unit>(Channel.CONFLATED)
+
+    init {
+        load()
+        scope.launch {
+            for (signal in persistSignal) {
+                delay(PERSIST_DEBOUNCE_MS)
+                persist()
+            }
+        }
+    }
+
+    private fun schedulePersist() {
+        persistSignal.trySend(Unit)
+    }
+
+    /**
+     * Force a synchronous write of the latest snapshot, bypassing the debounce. Wire this into the
+     * graceful-shutdown hook (AppShutdownCoordinator) so the last window of receipts is not lost.
+     */
+    fun flush() = persist()
+
+    /** Flush and stop the debounce worker. */
+    fun close() {
+        flush()
+        persistSignal.close()
+        scope.cancel()
+    }
 
     fun hasDelivered(id: String) = lock.withLock { delivered.contains(id) }
     fun hasRead(id: String) = lock.withLock { read.contains(id) }
@@ -44,7 +94,7 @@ class SeenMessageStore(private val secure: SecureIdentityStateManager) {
             }
             version++
         }
-        persist()
+        schedulePersist()
     }
 
     fun markRead(id: String) {
@@ -55,7 +105,7 @@ class SeenMessageStore(private val secure: SecureIdentityStateManager) {
             }
             version++
         }
-        persist()
+        schedulePersist()
     }
 
     /** Marks many ids read with a single persist (conversation-level mark-read). */
@@ -69,7 +119,7 @@ class SeenMessageStore(private val secure: SecureIdentityStateManager) {
             trim(read)
             version++
         }
-        persist()
+        schedulePersist()
     }
 
     fun clear() {
@@ -78,6 +128,8 @@ class SeenMessageStore(private val secure: SecureIdentityStateManager) {
             read.clear()
             version++
         }
+        // Security-sensitive wipe (panic/reset): persist the cleared state immediately rather
+        // than waiting on the debounce, so a crash right after can't resurrect the old ids.
         persist()
     }
 

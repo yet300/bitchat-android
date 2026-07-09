@@ -1,6 +1,7 @@
 package com.app.transport
 
 import com.app.transport.debug.DebugScanResult
+import com.app.transport.mesh.BearerId
 import com.app.transport.protocol.BitchatPacket
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -75,6 +76,14 @@ interface MeshTrafficLog {
     fun logPeerDisconnection(peerID: String, nickname: String, deviceID: String)
 
     fun addScanResult(scanResult: DebugScanResult)
+
+    /**
+     * A received frame was dropped at a bearer's bounded ingress buffer because the packet
+     * pipeline could not drain it in time (e.g. a burst of Noise handshakes on entry to a
+     * dense zone). Default no-op; the debug telemetry counts these per bearer so silent loss
+     * of inbound frames — including NOISE_ENCRYPTED addressed to us — becomes observable.
+     */
+    fun onIncomingDropped(bearerId: BearerId) {}
 }
 
 /**

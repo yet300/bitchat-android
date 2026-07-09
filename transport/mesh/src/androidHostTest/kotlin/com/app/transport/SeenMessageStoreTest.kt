@@ -36,6 +36,7 @@ class SeenMessageStoreTest {
         store.markDelivered("d1")
         store.markRead("r1")
         store.markReadAll(listOf("r2", "r3"))
+        store.flush() // writes are now debounced; force the synchronous write for read-back
 
         val reloaded = SeenMessageStore(SecureIdentityStateManager(backing))
         assertTrue(reloaded.hasDelivered("d1"))
@@ -52,12 +53,33 @@ class SeenMessageStoreTest {
         val store = SeenMessageStore(SecureIdentityStateManager(backing))
 
         val before = backing.putCount
+        // Debounced: the mark itself does NOT write inline (that is the S15 fix — it must not
+        // stall the caller's ingest monitor). flush() then produces a single write.
         store.markReadAll(listOf("a", "b", "c"))
-        assertEquals(before + 1, backing.putCount)
+        assertEquals("mark must not write synchronously", before, backing.putCount)
+        store.flush()
+        assertEquals("flush writes the coalesced snapshot once", before + 1, backing.putCount)
 
-        // Empty batch must not touch storage at all
+        // Empty batch bumps no version, so a subsequent flush is a no-op (version check).
         store.markReadAll(emptyList())
+        store.flush()
         assertEquals(before + 1, backing.putCount)
+    }
+
+    @Test
+    fun debouncedWritesCoalesceManyMarksIntoOneWrite() {
+        val backing = newBacking()
+        val store = SeenMessageStore(SecureIdentityStateManager(backing))
+
+        val before = backing.putCount
+        repeat(50) { store.markDelivered("d$it") }
+        assertEquals("a burst of 50 ACKs must not produce 50 inline writes", before, backing.putCount)
+
+        store.flush()
+        assertEquals("the coalesced burst flushes as a single write", before + 1, backing.putCount)
+
+        val reloaded = SeenMessageStore(SecureIdentityStateManager(backing))
+        repeat(50) { assertTrue("d$it must be persisted", reloaded.hasDelivered("d$it")) }
     }
 
     @Test

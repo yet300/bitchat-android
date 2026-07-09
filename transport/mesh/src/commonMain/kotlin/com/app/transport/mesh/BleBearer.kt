@@ -3,12 +3,15 @@ package com.app.transport.mesh
 import com.app.transport.MeshTelemetry
 import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 
 /**
@@ -35,6 +38,12 @@ class BleBearer(
     private val ownsLinkAddress: (String) -> Boolean = { true },
 ) : MeshBearer, BleDebugHandle {
 
+    private companion object {
+        // Headroom over the old 64-slot SharedFlow buffer: absorbs a handshake burst on entry
+        // to a dense zone before DROP_OLDEST starts shedding the stalest frames.
+        const val INCOMING_BUFFER_CAPACITY = 256
+    }
+
     private var myPeerID: String = myPeerID
     private var nicknameResolver: ((String) -> String?)? = null
 
@@ -49,8 +58,20 @@ class BleBearer(
 
     override val id: BearerId = BearerId.BLE
 
-    private val _incoming = MutableSharedFlow<RoutedPacket>(extraBufferCapacity = 64)
-    override val incoming: Flow<RoutedPacket> = _incoming.asSharedFlow()
+    // Bounded ingress buffer. Under load the single downstream consumer
+    // (MeshCoordinator → PacketProcessor) can stall — e.g. a burst of Noise handshakes on
+    // entry to a dense zone — so instead of the old fire-and-forget SharedFlow.tryEmit (which
+    // silently discarded the *newest* frame once its 64-slot buffer filled), we DROP_OLDEST:
+    // stale frames have usually already been relayed by neighbors, whereas the newest frame may
+    // be a handshake response we cannot afford to lose. Every dropped frame is counted in
+    // telemetry so the loss is no longer silent. Single-consumer (verified: only the merged
+    // MeshNetwork.incoming collects this), so a Channel is safe.
+    private val _incoming = Channel<RoutedPacket>(
+        capacity = INCOMING_BUFFER_CAPACITY,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+        onUndeliveredElement = { debugSettingsManager.onIncomingDropped(id) },
+    )
+    override val incoming: Flow<RoutedPacket> = _incoming.receiveAsFlow()
 
     private val _neighbors = MutableStateFlow<Set<PeerLink>>(emptySet())
     override val neighbors: StateFlow<Set<PeerLink>> = _neighbors.asStateFlow()
@@ -96,7 +117,7 @@ class BleBearer(
                         myPeerID = myPeerID,
                     )
                 } catch (_: Exception) {}
-                _incoming.tryEmit(RoutedPacket(packet, peerID, deviceAddress))
+                _incoming.trySend(RoutedPacket(packet, peerID, deviceAddress))
             }
 
             override fun onDeviceConnected(deviceAddress: String) {

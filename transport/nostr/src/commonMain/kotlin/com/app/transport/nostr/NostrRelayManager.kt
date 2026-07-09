@@ -4,6 +4,8 @@ package com.app.transport.nostr
 
 import co.touchlab.stately.collections.ConcurrentMutableMap
 import co.touchlab.stately.collections.ConcurrentMutableSet
+import co.touchlab.stately.concurrency.Lock
+import co.touchlab.stately.concurrency.withLock
 import com.app.common.AppDispatchers
 import com.app.common.utils.Log
 import com.app.common.serialization.JsonConfig
@@ -52,6 +54,12 @@ class NostrRelayManager internal constructor(
         private const val MAX_BACKOFF_INTERVAL = NostrConstants.MAX_BACKOFF_INTERVAL_MS    // 5 minutes
         private const val BACKOFF_MULTIPLIER = NostrConstants.BACKOFF_MULTIPLIER
         private const val MAX_RECONNECT_ATTEMPTS = NostrConstants.MAX_RECONNECT_ATTEMPTS
+
+        // Per-relay traffic counters (messagesSent/Received) are volatile under load: a busy geo
+        // channel's EOSE backlog would otherwise re-emit the whole relay list to every StateFlow
+        // subscriber on every frame. They are coalesced and published at most once per interval;
+        // connect/disconnect status changes still publish immediately.
+        private const val RELAY_STATS_PUBLISH_INTERVAL_MS = 1_000L
         
         // Track gift-wraps we initiated for logging. Entries are removed when a relay
         // answers OK; relays that never answer would otherwise leak entries for the
@@ -89,9 +97,22 @@ class NostrRelayManager internal constructor(
     private val _isConnected = MutableStateFlow<Boolean>(false)
     val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
     
-    // Internal state
-    private val relaysList = mutableListOf<Relay>()
+    // Internal state.
+    // relaysByUrl is thread-safe (mutated from geo subscriptions, handleMessage and reconnect
+    // coroutines, read via snapshot). Keyed by url for O(1) lookup instead of the former O(N)
+    // list scans. Relay's own mutable stat fields are still non-atomic, but they are cosmetic
+    // counters — the structural map operations are what must be safe.
+    private val relaysByUrl = ConcurrentMutableMap<String, Relay>()
     private val connections = ConcurrentMutableMap<String, DefaultClientWebSocketSession>()
+
+    // Idempotent connect guard: holds urls whose WebSocket session is being opened. Prevents two
+    // concurrent connectToRelay calls from opening two sessions for the same relay (the loser
+    // would leak). Cleared once the session is registered in [connections] (or the attempt fails).
+    private val connectingUrls = ConcurrentMutableSet<String>()
+
+    // Coalesced relay-stats publishing (see RELAY_STATS_PUBLISH_INTERVAL_MS).
+    private var relaysStatsDirty = false
+    private val relaysStatsLock = Lock()
 
     // Events waiting for disconnected relays; drained per relay on reconnect.
     private val pendingEvents = PendingEventQueue<NostrEvent>()
@@ -196,12 +217,8 @@ class NostrRelayManager internal constructor(
 
     private fun ensureConnectionsFor(relayUrls: Set<String>) {
         // Ensure relays are tracked for UI/status
-        relayUrls.forEach { url ->
-            if (relaysList.none { it.url == url }) {
-                relaysList.add(Relay(url))
-            }
-        }
-        updateRelaysList()
+        relayUrls.forEach { url -> relaysByUrl.getOrPut(url) { Relay(url) } }
+        publishRelays()
 
         scope.launch {
             relayUrls.forEach { relayUrl ->
@@ -217,21 +234,24 @@ class NostrRelayManager internal constructor(
     init {
         // Initialize with default relays - avoid static initialization order issues
         try {
-            val defaultRelayUrls = listOf(
-                "wss://relay.damus.io",
-                "wss://relay.primal.net",
-                "wss://offchain.pub",
-                "wss://nostr21.com"
-            )
-            relaysList.addAll(defaultRelayUrls.map { Relay(it) })
-            _relays.value = relaysList.toList()
+            DEFAULT_RELAYS.forEach { url -> relaysByUrl.getOrPut(url) { Relay(url) } }
+            publishRelays()
             updateConnectionStatus()
-            Log.d(TAG, "✅ NostrRelayManager initialized with ${relaysList.size} default relays")
+            Log.d(TAG, "✅ NostrRelayManager initialized with ${relaysByUrl.size} default relays")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize NostrRelayManager: ${e.message}", e)
             // Initialize with empty list as fallback
             _relays.value = emptyList()
             _isConnected.value = false
+        }
+
+        // Coalesce volatile per-relay traffic stats into at most one StateFlow emission per
+        // interval (connect/disconnect status still publishes immediately via publishRelays()).
+        scope.launch {
+            while (isActive) {
+                delay(RELAY_STATS_PUBLISH_INTERVAL_MS)
+                if (takeRelaysStatsDirty()) publishRelays()
+            }
         }
     }
     
@@ -239,12 +259,12 @@ class NostrRelayManager internal constructor(
      * Connect to all configured relays
      */
     fun connect() {
-        Log.d(TAG, "🌐 Connecting to ${relaysList.size} Nostr relays")
-        
+        Log.d(TAG, "🌐 Connecting to ${relaysByUrl.size} Nostr relays")
+
         scope.launch {
-            relaysList.forEach { relay ->
+            relaysByUrl.keys.toList().forEach { url ->
                 launch {
-                    connectToRelay(relay.url)
+                    connectToRelay(url)
                 }
             }
         }
@@ -277,7 +297,7 @@ class NostrRelayManager internal constructor(
      * Send an event to specified relays (or all if none specified)
      */
     fun sendEvent(event: NostrEvent, relayUrls: List<String>? = null) {
-        val targetRelays = relayUrls ?: relaysList.map { it.url }
+        val targetRelays = relayUrls ?: relaysByUrl.keys.toList()
 
         // Connected relays get the event immediately and are never queued; only relays
         // without a live connection wait in the queue until they reconnect.
@@ -315,7 +335,7 @@ class NostrRelayManager internal constructor(
      * Manually retry connection to a specific relay
      */
     fun retryConnection(relayUrl: String) {
-        val relay = relaysList.find { it.url == relayUrl } ?: return
+        val relay = relaysByUrl[relayUrl] ?: return
         
         // Reset reconnection attempts
         relay.reconnectAttempts = 0
@@ -339,7 +359,7 @@ class NostrRelayManager internal constructor(
         disconnect()
         
         // Reset all relay states
-        relaysList.forEach { relay ->
+        relaysByUrl.values.forEach { relay ->
             relay.reconnectAttempts = 0
             relay.nextReconnectTime = null
             relay.lastError = null
@@ -380,7 +400,7 @@ class NostrRelayManager internal constructor(
      * Get detailed status for all relays
      */
     fun getRelayStatuses(): List<Relay> {
-        return relaysList.toList()
+        return relaysByUrl.values.toList()
     }
     
     /**
@@ -418,14 +438,27 @@ class NostrRelayManager internal constructor(
     
     // MARK: - Private Methods
     
+    /**
+     * Atomically reserve the connect slot for [url]. Returns false if a live connection already
+     * exists or another attempt already holds the slot — the caller must then skip. Paired with
+     * [endConnectAttempt]. `connectingUrls.add` is the atomic decision point (only one concurrent
+     * caller wins), giving connectToRelay putIfAbsent semantics without opening duplicate sessions.
+     */
+    internal fun beginConnectAttempt(url: String): Boolean =
+        !connections.containsKey(url) && connectingUrls.add(url)
+
+    internal fun endConnectAttempt(url: String) {
+        connectingUrls.remove(url)
+    }
+
     private suspend fun connectToRelay(urlString: String) {
-        // Skip if we already have a connection
-        if (connections.containsKey(urlString)) {
+        // Idempotent guard: skip if already connected or a concurrent attempt is in flight.
+        if (!beginConnectAttempt(urlString)) {
             return
         }
-        
+
         Log.v(TAG, "Attempting to connect to Nostr relay: $urlString")
-        
+
         try {
             val session = httpClient.webSocketSession(urlString)
             connections[urlString] = session
@@ -451,6 +484,8 @@ class NostrRelayManager internal constructor(
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to create WebSocket connection to $urlString: ${e.message}")
             handleDisconnection(urlString, e)
+        } finally {
+            endConnectAttempt(urlString)
         }
     }
     
@@ -463,10 +498,9 @@ class NostrRelayManager internal constructor(
             
             val success = webSocket.trySendText(message)
             if (success) {
-                // Update relay stats
-                val relay = relaysList.find { it.url == relayUrl }
-                relay?.messagesSent = (relay?.messagesSent ?: 0) + 1
-                updateRelaysList()
+                // Update relay stats (coalesced publish — see markRelaysStatsDirty)
+                relaysByUrl[relayUrl]?.let { it.messagesSent += 1 }
+                markRelaysStatsDirty()
             } else {
                 Log.e(TAG, "❌ Failed to send event to $relayUrl: WebSocket send failed")
             }
@@ -487,10 +521,10 @@ class NostrRelayManager internal constructor(
             
             when (response) {
                 is NostrResponse.Event -> {
-                    // Update relay stats
-                    val relay = relaysList.find { it.url == relayUrl }
-                    relay?.messagesReceived = (relay?.messagesReceived ?: 0) + 1
-                    updateRelaysList()
+                    // Update relay stats (coalesced publish — a geo EOSE backlog can be hundreds
+                    // of events; publishing the full relay list per frame would storm the UI).
+                    relaysByUrl[relayUrl]?.let { it.messagesReceived += 1 }
+                    markRelaysStatsDirty()
                     
                     // CLIENT-SIDE FILTER ENFORCEMENT: Ensure this event matches the subscription's filter
                     registry.subscriptionFor(response.subscriptionId)?.let { subInfo ->
@@ -514,10 +548,14 @@ class NostrRelayManager internal constructor(
                             }
                         }
                         
-                        // Call handler for new events only
+                        // Call handler for new events only, off the main thread. A geo EOSE
+                        // backlog is hundreds of events and DM handlers do NIP-44 gift-wrap
+                        // decryption; running that on main janked/ANR'd. Every registered handler
+                        // feeds a thread-safe repository/store or re-launches on its own scope, so
+                        // UI marshaling happens downstream — none require main here.
                         val handler = registry.handlerFor(response.subscriptionId)
                         if (handler != null) {
-                            scope.launch(dispatchers.main) {
+                            scope.launch(dispatchers.default) {
                                 handler(event)
                             }
                         } else {
@@ -571,7 +609,7 @@ class NostrRelayManager internal constructor(
             errorMessage.contains("dns") ||
             errorMessage.contains("unable to resolve host")) {
             
-            val relay = relaysList.find { it.url == relayUrl }
+            val relay = relaysByUrl[relayUrl]
             if (relay?.lastError == null) {
                 Log.w(TAG, "Nostr relay DNS failure for $relayUrl - not retrying")
             }
@@ -579,7 +617,7 @@ class NostrRelayManager internal constructor(
         }
         
         // Implement exponential backoff for non-DNS errors
-        val relay = relaysList.find { it.url == relayUrl } ?: return
+        val relay = relaysByUrl[relayUrl] ?: return
         relay.reconnectAttempts++
         
         // Stop attempting after max attempts
@@ -606,8 +644,8 @@ class NostrRelayManager internal constructor(
     }
     
     private fun updateRelayStatus(url: String, isConnected: Boolean, error: Throwable? = null) {
-        val relay = relaysList.find { it.url == url } ?: return
-        
+        val relay = relaysByUrl[url] ?: return
+
         relay.isConnected = isConnected
         relay.lastError = error
         
@@ -618,17 +656,29 @@ class NostrRelayManager internal constructor(
         } else {
             relay.lastDisconnectedAt = Clock.System.now().toEpochMilliseconds()
         }
-        
-        updateRelaysList()
+
+        // Connect/disconnect is a status change users must see immediately — publish now.
+        publishRelays()
         updateConnectionStatus()
     }
-    
-    private fun updateRelaysList() {
-        _relays.value = relaysList.toList()
+
+    /** Immediately publish the current relay snapshot to the StateFlow. */
+    private fun publishRelays() {
+        _relays.value = relaysByUrl.values.toList()
     }
-    
+
+    /** Flag that only cosmetic traffic counters changed; the ticker publishes within the interval. */
+    internal fun markRelaysStatsDirty() = relaysStatsLock.withLock { relaysStatsDirty = true }
+
+    /** Consume the dirty flag: returns true at most once per burst of marks (coalescing). */
+    internal fun takeRelaysStatsDirty(): Boolean = relaysStatsLock.withLock {
+        val dirty = relaysStatsDirty
+        relaysStatsDirty = false
+        dirty
+    }
+
     private fun updateConnectionStatus() {
-        val connected = relaysList.any { it.isConnected }
+        val connected = relaysByUrl.values.any { it.isConnected }
         _isConnected.value = connected
     }
     

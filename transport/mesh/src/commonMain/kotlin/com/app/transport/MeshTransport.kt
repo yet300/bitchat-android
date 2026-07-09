@@ -81,7 +81,8 @@ fun interface MeshBearerBuilder {
  *   it.telemetry, it.fragmentManager, it.transferProgressManager), setOf(wifiAwareBearer))`.
  *   On Apple: `MeshBearers(createNativeBleBearer(it.myPeerID, it.telemetry, it.fragmentManager,
  *   it.transferProgressManager))`.
- * @property meshGraphService route-graph service; defaults to a fresh instance.
+ * @property meshGraphService route-graph service; required — must be the graph's singleton so a
+ *   stray caller cannot silently spin up a second topology graph (audit A1/§2.1).
  * @property dispatchers coroutine dispatchers; defaults to a fresh [AppDispatchers].
  */
 class MeshTransportConfig(
@@ -90,7 +91,7 @@ class MeshTransportConfig(
     val callbacks: MeshCallbacks,
     val stores: MeshStores,
     val bearers: (MeshBearerScope) -> MeshBearers,
-    val meshGraphService: MeshGraphService = MeshGraphService(),
+    val meshGraphService: MeshGraphService,
     val dispatchers: AppDispatchers = AppDispatchers(),
 )
 

@@ -138,6 +138,7 @@ class MeshForegroundService : Service() {
                     },
                     stopService = { stopSelf() },
                     appStateStore = appGraph.appStateStore,
+                    seenMessageStore = appGraph.seenMessageStore,
                 )
                 return START_NOT_STICKY
             }

@@ -557,7 +557,7 @@ internal class WifiAwareDataPath(private val bearer: WifiAwareBearer) {
                     myPeerID = bearer.myPeerID,
                 )
             } catch (_: Exception) { }
-            bearer.incomingFlow.tryEmit(RoutedPacket(pkt, senderPeerHex, bearer.linkAddressFor(logicalPeerId)))
+            bearer.incomingFlow.trySend(RoutedPacket(pkt, senderPeerHex, bearer.linkAddressFor(logicalPeerId)))
         }
 
         // Breaking out of the loop means the socket is dead or service is stopping.

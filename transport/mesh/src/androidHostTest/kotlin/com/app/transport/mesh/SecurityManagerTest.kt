@@ -392,6 +392,43 @@ class SecurityManagerTest {
         )
     }
 
+    /**
+     * S3 fix: the processedMessages cap must hold at every insertion (LRU eviction of the
+     * eldest), not only in the 5-minute cleanup pass. Feeding more than the cap of distinct
+     * packets in one burst previously let the set grow to the burst size between cleanups.
+     */
+    @Test
+    fun `validatePacket - processed message set is capped at insertion, not only cleanup`() {
+        setupKnownPeer(otherPeerID, otherSigningKey)
+        val cap = com.app.transport.MeshConstants.Security.MAX_PROCESSED_MESSAGES
+        val overCap = cap + 50
+
+        repeat(overCap) { i ->
+            val packet = BitchatPacket(
+                type = MessageType.MESSAGE.value,
+                ttl = 7u,
+                senderID = ByteArray(8) { 0xAB.toByte() },
+                timestamp = i.toULong(),
+                payload = "m$i".encodeToByteArray(),
+                signature = validSignature,
+            )
+            assertEquals(
+                "Distinct packet #$i must be accepted",
+                PacketValidationResult.ACCEPT,
+                securityManager.validatePacket(packet, otherPeerID),
+            )
+        }
+
+        val processed = Regex("Processed Messages: (\\d+)")
+            .find(securityManager.getDebugInfo())!!
+            .groupValues[1].toInt()
+        assertEquals(
+            "Cap must be enforced at insertion — set must not grow to the burst size ($overCap)",
+            cap,
+            processed,
+        )
+    }
+
     private fun setupKnownPeer(peerID: String, signingKey: ByteArray) {
         val info = PeerInfo(
             id = peerID,

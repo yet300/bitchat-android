@@ -35,6 +35,13 @@ internal class PacketProcessor(
         // whose actor was evicted simply gets a fresh one on its next packet (the actor holds no
         // per-peer state — it only serializes processing).
         private const val MAX_PEER_ACTORS = 256
+
+        // Per-peer serialization channel capacity. Bounded (was UNLIMITED) as a second anti-DoS
+        // bound alongside MAX_PEER_ACTORS: peerID is derived from the attacker-controlled senderID
+        // before signature validation, so a single flooding peer must not be able to grow one
+        // actor's queue without limit. On overflow the newest frame is dropped with a log (never
+        // reordered), which the mesh dedup/relay layer tolerates far better than lost ordering.
+        private const val ACTOR_CHANNEL_CAPACITY = 128
     }
     
     // Delegate for callbacks
@@ -57,7 +64,7 @@ internal class PacketProcessor(
     // This prevents race conditions in session management. (Replaces the obsolete
     // coroutine `actor` builder, which is JVM-only, so this can live in commonMain.)
     private fun getOrCreateActorForPeer(peerID: String): SendChannel<RoutedPacket> {
-        val channel = Channel<RoutedPacket>(Channel.UNLIMITED)
+        val channel = Channel<RoutedPacket>(ACTOR_CHANNEL_CAPACITY)
         processorScope.launch {
             Log.d(TAG, "🎭 Created packet actor for peer: ${formatPeerForLog(peerID)}")
             try {
@@ -105,15 +112,20 @@ internal class PacketProcessor(
             }
         }
 
-        // Send packet to peer's dedicated actor for serialized processing
-        processorScope.launch {
-            try {
-                actor.send(routed)
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to send packet to actor for ${formatPeerForLog(peerID)}: ${e.message}")
-                // Fallback to direct processing if actor fails
-                handleReceivedPacket(routed)
-            }
+        // Enqueue on the peer's serialization channel directly — no launch. processPacket is
+        // invoked only from the single MeshNetwork.incoming collector, so a direct trySend
+        // preserves strict per-peer arrival order. The old `launch { actor.send(...) }` spawned
+        // one coroutine per packet on a multi-thread dispatcher, so two packets from the same
+        // peer could reach the channel out of order — fatal for Noise, where a reordered
+        // handshake message forces a re-handshake. trySend never suspends (bounded channel) and
+        // returns a result we can act on without a coroutine.
+        val result = actor.trySend(routed)
+        if (result.isFailure) {
+            // Full or closed: drop the newest frame with a log. We deliberately do NOT fall back
+            // to direct handleReceivedPacket() — that bypassed the per-peer actor and reintroduced
+            // the very out-of-order processing the actors exist to prevent.
+            val reason = if (result.isClosed) "closed" else "full (cap $ACTOR_CHANNEL_CAPACITY)"
+            Log.w(TAG, "Dropped packet for ${formatPeerForLog(peerID)}: actor channel $reason")
         }
     }
     

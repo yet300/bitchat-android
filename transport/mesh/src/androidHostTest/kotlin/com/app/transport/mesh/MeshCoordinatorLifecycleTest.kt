@@ -19,17 +19,13 @@ import com.app.transport.notification.ServiceNotifier
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
 import java.util.concurrent.ConcurrentHashMap
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -43,6 +39,7 @@ import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
 import org.mockito.kotlin.timeout
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
@@ -357,29 +354,29 @@ class BluetoothMeshServiceLifecycleTest {
         h.bleBearer.bindPeer(REMOTE_PEER, "AA:BB:CC:DD:EE:FF")
         val neighborsAfterRebind = h.bleBearer.neighbors.value
 
-        val received = mutableListOf<RoutedPacket>()
-        val collectScope = CoroutineScope(UnconfinedTestDispatcher(h.scheduler))
-        collectScope.launch { h.bleBearer.incoming.collect { received.add(it) } }
-
         // Late asynchronous GATT callbacks on the OLD stack: production code always goes
-        // through `delegate?.…`, which reset() nulled — so nothing may be invoked.
+        // through `delegate?.…`, which reset() nulled — so nothing may be invoked. The bearer's
+        // incoming flow is single-consumer (owned by the coordinator's merge), so engine
+        // traversal is observed at logIncomingPacket — the suite's canonical probe — rather than
+        // a second competing collector on the flow.
         h.delegates[oldCm]?.onPacketReceived(h.leavePacket(9_000u), "stalePeer", null)
         h.delegates[oldCm]?.onDeviceDisconnected("AA:BB:CC:DD:EE:FF")
         h.scheduler.runCurrent()
 
-        assertTrue("stale packet must not reach the new generation's incoming", received.isEmpty())
+        verify(h.telemetry, never())
+            .logIncomingPacket(eq("stalePeer"), anyOrNull(), any(), anyOrNull())
         assertEquals(
             "stale disconnect must not evict the new generation's neighbor",
             neighborsAfterRebind,
             h.bleBearer.neighbors.value,
         )
 
-        // Sanity: the NEW stack's delegate is live and feeds the bearer flow.
+        // Sanity: the NEW stack's delegate is live and its packets traverse the current
+        // generation's collector → PacketProcessor pipeline.
         assertNotNull(h.delegates[newCm])
         h.delegates[newCm]?.onPacketReceived(h.leavePacket(9_001u), REMOTE_PEER, null)
         h.scheduler.runCurrent()
-        assertEquals(1, received.size)
-
-        collectScope.cancel()
+        verify(h.telemetry, timeout(5_000).times(1))
+            .logIncomingPacket(eq(REMOTE_PEER), anyOrNull(), eq("LEAVE"), anyOrNull())
     }
 }

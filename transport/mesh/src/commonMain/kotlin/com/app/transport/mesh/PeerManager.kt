@@ -2,13 +2,14 @@
 
 package com.app.transport.mesh
 
-import co.touchlab.stately.collections.ConcurrentMutableList
 import co.touchlab.stately.collections.ConcurrentMutableMap
+import co.touchlab.stately.collections.ConcurrentMutableSet
 import com.app.common.AppDispatchers
 import com.app.common.utils.Log
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.transport.MeshConstants
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -77,6 +78,11 @@ internal class PeerManager(
 
     companion object {
         private const val TAG = "PeerManager"
+
+        // Coalesce peer-list fan-out: entering a dense zone triggers a burst of addOrUpdatePeer
+        // calls, each of which sorts the full peer list and fans out to the delegate/UI. Debounce
+        // so a burst collapses into one update (iOS does the same via BLEPeerPublishCoalescer).
+        private const val PEER_LIST_DEBOUNCE_MS = 300L
     }
 
     // Centralized timeout from MeshConstants
@@ -85,9 +91,11 @@ internal class PeerManager(
     // Peer tracking data - enhanced with verification status
     private val peers = ConcurrentMutableMap<String, PeerInfo>() // peerID -> PeerInfo
     private val peerRSSI = ConcurrentMutableMap<String, Int>()
-    private val announcedPeers = ConcurrentMutableList<String>()
-    private val announcedToPeers = ConcurrentMutableList<String>()
-    
+    // Sets (not lists): membership is checked on every announce (isFirstAnnounce / hasAnnouncedTo),
+    // which was O(N) on the former ConcurrentMutableList.
+    private val announcedPeers = ConcurrentMutableSet<String>()
+    private val announcedToPeers = ConcurrentMutableSet<String>()
+
     // Delegate for callbacks
     var delegate: PeerManagerDelegate? = null
     
@@ -96,9 +104,23 @@ internal class PeerManager(
 
     // Coroutines
     private val managerScope = CoroutineScope(dispatchers.io + SupervisorJob())
-    
+
+    // Debounced peer-list fan-out: notifyPeerListUpdate only signals here (CONFLATED → a burst
+    // collapses to one), and a worker emits the sorted list at most once per PEER_LIST_DEBOUNCE_MS.
+    private val peerListUpdateSignal = Channel<Unit>(Channel.CONFLATED)
+
     init {
         startPeriodicCleanup()
+        startPeerListCoalescer()
+    }
+
+    private fun startPeerListCoalescer() {
+        managerScope.launch {
+            for (signal in peerListUpdateSignal) {
+                delay(PEER_LIST_DEBOUNCE_MS)
+                emitPeerListNow()
+            }
+        }
     }
 
     // MARK: - New PeerInfo-based methods
@@ -298,9 +320,7 @@ internal class PeerManager(
      * Mark peer as announced to
      */
     fun markPeerAsAnnouncedTo(peerID: String) {
-        if (!announcedToPeers.contains(peerID)) {
-            announcedToPeers.add(peerID)
-        }
+        announcedToPeers.add(peerID) // Set: idempotent, no pre-check needed
     }
     
     /**
@@ -413,9 +433,13 @@ internal class PeerManager(
     }
     
     /**
-     * Notify delegate of peer list updates
+     * Notify delegate of peer list updates (coalesced — see [peerListUpdateSignal]).
      */
     private fun notifyPeerListUpdate() {
+        peerListUpdateSignal.trySend(Unit)
+    }
+
+    private fun emitPeerListNow() {
         val peerList = getActivePeerIDs()
         delegate?.onPeerListUpdated(peerList)
     }

@@ -30,6 +30,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -37,6 +39,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.IOException
@@ -92,6 +95,9 @@ class WifiAwareBearer(
 
         /** Pseudo link-address namespace owned by this bearer. */
         const val LINK_PREFIX = "aware:"
+
+        // Bounded ingress buffer capacity (see [incomingFlow]); mirrors BleBearer.
+        private const val INCOMING_BUFFER_CAPACITY = 256
     }
 
     override val id: BearerId = BearerId.WIFI_AWARE
@@ -100,8 +106,14 @@ class WifiAwareBearer(
     // MeshBearer surface
     // -----------------------------------------------------------------
 
-    internal val incomingFlow = MutableSharedFlow<RoutedPacket>(extraBufferCapacity = 64)
-    override val incoming: Flow<RoutedPacket> = incomingFlow.asSharedFlow()
+    // Bounded ingress buffer with DROP_OLDEST + drop telemetry — mirrors BleBearer (see there):
+    // avoids silently discarding the newest frame when the single downstream consumer stalls.
+    internal val incomingFlow = Channel<RoutedPacket>(
+        capacity = INCOMING_BUFFER_CAPACITY,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+        onUndeliveredElement = { telemetry.onIncomingDropped(BearerId.WIFI_AWARE) },
+    )
+    override val incoming: Flow<RoutedPacket> = incomingFlow.receiveAsFlow()
 
     internal val neighborsState = MutableStateFlow<Set<PeerLink>>(emptySet())
     override val neighbors: StateFlow<Set<PeerLink>> = neighborsState.asStateFlow()

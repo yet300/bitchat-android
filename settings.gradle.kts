@@ -33,7 +33,6 @@ include(":transport:tor")
 include(":transport:nostr")
 include(":transport:mesh")
 include(":transport:di")
-include(":transport:sdk")
 
 include(":feature")
 include(":feature:root")
