@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalForeignApi::class, ExperimentalUuidApi::class)
+@file:OptIn(ExperimentalForeignApi::class, ExperimentalUuidApi::class, ExperimentalTime::class)
 
 package com.app.transport.mesh
 
@@ -16,12 +16,15 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import platform.CoreBluetooth.CBATTErrorSuccess
 import platform.CoreBluetooth.CBATTRequest
+import platform.CoreBluetooth.CBAdvertisementDataIsConnectable
 import platform.CoreBluetooth.CBAdvertisementDataServiceUUIDsKey
 import platform.CoreBluetooth.CBAttributePermissionsReadable
 import platform.CoreBluetooth.CBAttributePermissionsWriteable
 import platform.CoreBluetooth.CBCentral
 import platform.CoreBluetooth.CBCentralManager
 import platform.CoreBluetooth.CBCentralManagerDelegateProtocol
+import platform.CoreBluetooth.CBCentralManagerOptionRestoreIdentifierKey
+import platform.CoreBluetooth.CBCentralManagerRestoredStatePeripheralsKey
 import platform.CoreBluetooth.CBCharacteristic
 import platform.CoreBluetooth.CBCharacteristicProperties
 import platform.CoreBluetooth.CBCharacteristicPropertyNotify
@@ -36,11 +39,15 @@ import platform.CoreBluetooth.CBPeripheral
 import platform.CoreBluetooth.CBPeripheralDelegateProtocol
 import platform.CoreBluetooth.CBPeripheralManager
 import platform.CoreBluetooth.CBPeripheralManagerDelegateProtocol
+import platform.CoreBluetooth.CBPeripheralManagerOptionRestoreIdentifierKey
+import platform.CoreBluetooth.CBPeripheralManagerRestoredStateServicesKey
 import platform.CoreBluetooth.CBService
 import platform.CoreBluetooth.CBUUID
 import platform.Foundation.NSError
 import platform.Foundation.NSNumber
 import platform.darwin.NSObject
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 
 /**
@@ -74,6 +81,12 @@ internal class CoreBluetoothConnectionManager(
 
     private companion object {
         const val TAG = "CoreBluetoothConnectionManager"
+        const val RECENT_TRAFFIC_WINDOW_MS = 10_000L
+        // State-restoration identifiers: let iOS relaunch the app into the background to hand back the
+        // same central/peripheral managers (with their connections) after the process was killed. Also
+        // requires the app's Info.plist UIBackgroundModes (bluetooth-central/peripheral) — app-side.
+        const val CENTRAL_RESTORE_ID = "chat.bitchat.mesh.central"
+        const val PERIPHERAL_RESTORE_ID = "chat.bitchat.mesh.peripheral"
         // CoreBluetooth has no MTU-request API: the central learns the negotiated ATT MTU and
         // exposes it via maximumWriteValueLengthForType; fragmentation uses the commonMain cap.
     }
@@ -89,6 +102,12 @@ internal class CoreBluetoothConnectionManager(
     private val connectedPeripherals = ConcurrentMutableMap<String, CBPeripheral>()
     private val peripheralCharacteristics = ConcurrentMutableMap<String, CBCharacteristic>()
     private val pendingPeripherals = ConcurrentMutableMap<String, CBPeripheral>()
+    // Discovered-but-not-yet-connected peripherals retained so the connection scheduler can connect a
+    // queued candidate later (the scheduler works with id strings; the CBPeripheral lives here).
+    private val discoveredPeripherals = ConcurrentMutableMap<String, CBPeripheral>()
+
+    // Last time we received any frame — feeds the scan-duty policy's "recent traffic" input.
+    private var lastTrafficMs: Long = 0L
 
     // Server (peripheral) state, keyed by CBCentral.identifier.UUIDString.
     private val subscribedCentrals = ConcurrentMutableMap<String, CBCentral>()
@@ -114,10 +133,53 @@ internal class CoreBluetoothConnectionManager(
     private val centralDelegate = CentralDelegate()
     private val peripheralDelegate = PeripheralManagerDelegate()
 
-    private val centralManager = CBCentralManager(centralDelegate, null)
-    private val peripheralManager = CBPeripheralManager(peripheralDelegate, null)
+    private val centralManager = CBCentralManager(
+        centralDelegate, null,
+        mapOf<Any?, Any?>(CBCentralManagerOptionRestoreIdentifierKey to CENTRAL_RESTORE_ID),
+    )
+    private val peripheralManager = CBPeripheralManager(
+        peripheralDelegate, null,
+        mapOf<Any?, Any?>(CBPeripheralManagerOptionRestoreIdentifierKey to PERIPHERAL_RESTORE_ID),
+    )
 
     private var active = false
+
+    // Connection-storm policy: caps central links, RSSI-gates/rate-limits/backs-off connects,
+    // periodically reads RSSI (unblinding PeerManager on iOS), and drives the scan duty cycle. The
+    // decision logic is the host-tested commonMain BleConnectionScheduler; only these raw ops are here.
+    private val centralOps = object : CentralConnectionOps {
+        override fun connect(peripheralID: String) {
+            val peripheral = discoveredPeripherals.get(peripheralID) ?: return
+            pendingPeripherals.put(peripheralID, peripheral) // retain during connection
+            centralManager.connectPeripheral(peripheral, null)
+        }
+
+        override fun cancelStale(peripheralID: String) {
+            val peripheral = connectedPeripherals.get(peripheralID) ?: pendingPeripherals.get(peripheralID) ?: return
+            try { centralManager.cancelPeripheralConnection(peripheral) } catch (_: Exception) {}
+        }
+
+        override fun connectedOrConnectingCount(): Int = connectedPeripherals.size + pendingPeripherals.size
+        override fun connectedCount(): Int = connectedPeripherals.size
+        override fun isConnectingOrConnected(peripheralID: String): Boolean =
+            connectedPeripherals.get(peripheralID) != null || pendingPeripherals.get(peripheralID) != null
+
+        override fun readRssiForConnected() {
+            connectedPeripherals.values.forEach { try { it.readRSSI() } catch (_: Exception) {} }
+        }
+
+        override fun setScanning(active: Boolean) {
+            if (active) startScan() else try { centralManager.stopScan() } catch (_: Exception) {}
+        }
+
+        // The mesh runs under a foreground service; treat the process as active for duty decisions.
+        override fun appIsActive(): Boolean = true
+        override fun hasRecentTraffic(): Boolean = nowMs() - lastTrafficMs < RECENT_TRAFFIC_WINDOW_MS
+    }
+
+    private val centralPolicy = CoreBluetoothCentralPolicy(scope, centralOps, config)
+
+    private fun nowMs(): Long = Clock.System.now().toEpochMilliseconds()
 
     // -----------------------------------------------------------------
     // Lifecycle
@@ -125,6 +187,7 @@ internal class CoreBluetoothConnectionManager(
 
     override fun startServices(): Boolean {
         active = true
+        centralPolicy.start()
         // CoreBluetooth only allows scan/advertise once the managers report poweredOn; the
         // delegates kick those off (or do so now if the managers are already powered on).
         if (centralManager.state == CBManagerStatePoweredOn) startScan()
@@ -134,6 +197,7 @@ internal class CoreBluetoothConnectionManager(
 
     override fun stopServices() {
         active = false
+        centralPolicy.stop()
         try {
             centralManager.stopScan()
         } catch (_: Exception) {
@@ -155,6 +219,7 @@ internal class CoreBluetoothConnectionManager(
         connectedPeripherals.clear()
         peripheralCharacteristics.clear()
         pendingPeripherals.clear()
+        discoveredPeripherals.clear()
         subscribedCentrals.clear()
         frameAssemblers.clear()
     }
@@ -300,6 +365,7 @@ internal class CoreBluetoothConnectionManager(
     // -----------------------------------------------------------------
 
     private fun handleIncoming(value: ByteArray, linkAddress: String) {
+        lastTrafficMs = nowMs() // feeds the scan-duty "recent traffic" input
         // A value may be a complete frame or an MTU-sized chunk of a larger frame
         // (e.g. a 20-byte slice at the default ATT MTU 23) — reassemble either way.
         val assembler = frameAssemblers.getOrPut(linkAddress) { BleFrameAssembler() }
@@ -326,6 +392,20 @@ internal class CoreBluetoothConnectionManager(
             if (central.state == CBManagerStatePoweredOn && active) startScan()
         }
 
+        override fun centralManager(central: CBCentralManager, willRestoreState: Map<Any?, *>) {
+            // Re-adopt peripherals iOS handed back after relaunching us: rebind our delegate and
+            // rediscover the mesh service so the links resume. On-device-only behavior.
+            @Suppress("UNCHECKED_CAST")
+            val restored = willRestoreState[CBCentralManagerRestoredStatePeripheralsKey] as? List<CBPeripheral> ?: return
+            restored.forEach { peripheral ->
+                val addr = peripheral.identifier.UUIDString
+                peripheral.delegate = this
+                discoveredPeripherals.put(addr, peripheral)
+                pendingPeripherals.put(addr, peripheral)
+                peripheral.discoverServices(listOf(serviceCbUuid))
+            }
+        }
+
         override fun centralManager(
             central: CBCentralManager,
             didDiscoverPeripheral: CBPeripheral,
@@ -334,8 +414,12 @@ internal class CoreBluetoothConnectionManager(
         ) {
             val addr = didDiscoverPeripheral.identifier.UUIDString
             if (connectedPeripherals.get(addr) != null || pendingPeripherals.get(addr) != null) return
-            pendingPeripherals.put(addr, didDiscoverPeripheral) // retain during connection
-            central.connectPeripheral(didDiscoverPeripheral, null)
+            // Retain the peripheral so the scheduler can connect it now or later; the policy — not this
+            // callback — decides whether to connect (cap / RSSI gate / rate-limit / back-off), replacing
+            // the old "connect to every discovered peripheral" storm.
+            discoveredPeripherals.put(addr, didDiscoverPeripheral)
+            val connectable = (advertisementData[CBAdvertisementDataIsConnectable] as? NSNumber)?.boolValue ?: true
+            centralPolicy.onDiscovered(addr, RSSI.intValue, connectable)
         }
 
         override fun centralManager(central: CBCentralManager, didConnectPeripheral: CBPeripheral) {
@@ -353,9 +437,11 @@ internal class CoreBluetoothConnectionManager(
             connectedPeripherals.remove(addr)
             peripheralCharacteristics.remove(addr)
             pendingPeripherals.remove(addr)
+            discoveredPeripherals.remove(addr)
             addressPeerMap.remove(addr)
             frameAssemblers.remove(addr)
             outbound.dropLink(addr)
+            centralPolicy.onDisconnected(addr)
             delegate?.onDeviceDisconnected(addr)
         }
 
@@ -373,7 +459,10 @@ internal class CoreBluetoothConnectionManager(
             didFailToConnectPeripheral: CBPeripheral,
             error: NSError?,
         ) {
-            pendingPeripherals.remove(didFailToConnectPeripheral.identifier.UUIDString)
+            val addr = didFailToConnectPeripheral.identifier.UUIDString
+            pendingPeripherals.remove(addr)
+            discoveredPeripherals.remove(addr)
+            centralPolicy.onConnectFailed(addr)
         }
 
         override fun peripheral(peripheral: CBPeripheral, didDiscoverServices: NSError?) {
@@ -395,7 +484,9 @@ internal class CoreBluetoothConnectionManager(
             connectedPeripherals.put(addr, peripheral)
             peripheralCharacteristics.put(addr, char)
             pendingPeripherals.remove(addr)
+            discoveredPeripherals.remove(addr)
             peripheral.setNotifyValue(true, char)
+            centralPolicy.onConnected(addr)
             delegate?.onDeviceConnected(addr)
         }
 
@@ -406,6 +497,12 @@ internal class CoreBluetoothConnectionManager(
         ) {
             val data = didUpdateValueForCharacteristic.value ?: return
             handleIncoming(data.toByteArray(), peripheral.identifier.UUIDString)
+        }
+
+        @ObjCSignatureOverride
+        override fun peripheral(peripheral: CBPeripheral, didReadRSSI: NSNumber, error: NSError?) {
+            // Emit RssiChanged so PeerManager gets live signal strength on iOS (previously never read).
+            if (error == null) delegate?.onRSSIUpdated(peripheral.identifier.UUIDString, didReadRSSI.intValue)
         }
     }
 
@@ -418,6 +515,18 @@ internal class CoreBluetoothConnectionManager(
 
         override fun peripheralManagerDidUpdateState(peripheral: CBPeripheralManager) {
             if (peripheral.state == CBManagerStatePoweredOn && active) startAdvertising()
+        }
+
+        override fun peripheralManager(peripheral: CBPeripheralManager, willRestoreState: Map<Any?, *>) {
+            // iOS restored our advertised service after relaunch; re-adopt the characteristic if it
+            // came back so notifies resume, otherwise didUpdateState rebuilds it. On-device-only.
+            @Suppress("UNCHECKED_CAST")
+            val services = willRestoreState[CBPeripheralManagerRestoredStateServicesKey]
+                as? List<CBMutableService> ?: return
+            services.firstNotNullOfOrNull { svc ->
+                svc.characteristics?.filterIsInstance<CBMutableCharacteristic>()
+                    ?.firstOrNull { it.UUID == characteristicCbUuid }
+            }?.let { mutableCharacteristic = it }
         }
 
         override fun peripheralManager(
