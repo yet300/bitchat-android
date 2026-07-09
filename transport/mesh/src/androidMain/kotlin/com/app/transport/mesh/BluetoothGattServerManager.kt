@@ -262,6 +262,13 @@ internal class BluetoothGattServerManager(
                 connectionTracker.updateNegotiatedMtu(device.address, mtu)
             }
 
+            override fun onNotificationSent(device: BluetoothDevice, status: Int) {
+                // The stack drained one notification; resume the link's queued chunk run. Without
+                // this the notify buffer only retried on the periodic backup tick.
+                if (!isActive) return
+                delegate?.onNotificationSent(device.address)
+            }
+
             override fun onDescriptorWriteRequest(
                 device: BluetoothDevice,
                 requestId: Int,
