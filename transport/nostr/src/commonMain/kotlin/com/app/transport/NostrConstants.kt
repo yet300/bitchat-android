@@ -14,6 +14,22 @@ object NostrConstants {
     const val BACKOFF_MULTIPLIER: Double = 2.0
     const val MAX_RECONNECT_ATTEMPTS: Int = 10
 
+    // ±20% jitter on each backoff so relays that dropped together don't reconnect in lockstep
+    // (iOS TransportConfig.nostrRelayBackoffJitterRatio).
+    const val BACKOFF_JITTER_RATIO: Double = 0.2
+
+    // DNS failures are transient on mobile (airplane mode / lift / tunnel), not a dead host: retry
+    // them with a large floor instead of giving up. Divergence from iOS, which marks DNS permanent.
+    const val DNS_MIN_BACKOFF_MS: Long = 60_000L
+
+    // Once a relay exhausts MAX_RECONNECT_ATTEMPTS it is "exhausted", but the failure decays: after
+    // this cooldown the background re-probe gives it a fresh chance (iOS nostrRelayFailureCooldownSeconds).
+    const val FAILURE_COOLDOWN_MS: Long = 600_000L
+
+    // How often the background loop re-probes exhausted-but-cooled-down relays. iOS has no dedicated
+    // timer (it piggybacks on foreground/activity); the transport layer can't see those, so we poll.
+    const val RELAY_REPROBE_INTERVAL_MS: Long = 120_000L
+
     // Transport
     const val READ_ACK_INTERVAL_MS: Long = 350L
 
