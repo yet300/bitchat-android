@@ -3,8 +3,6 @@
 package com.app.transport.mesh
 
 import co.touchlab.stately.collections.ConcurrentMutableMap
-import co.touchlab.stately.concurrency.Lock
-import co.touchlab.stately.concurrency.withLock
 import com.app.common.AppDispatchers
 import com.app.common.utils.Log
 import com.app.common.encoding.toHexString
@@ -69,6 +67,7 @@ internal class CoreBluetoothConnectionManager(
     private val fragmentManager: FragmentManager?,
     private val transferProgressManager: TransferProgressManager,
     dispatchers: AppDispatchers = AppDispatchers(),
+    private val config: BleRadioConfig = BleRadioConfig(),
 ) : BearerTransport {
 
     override var delegate: BearerTransportDelegate? = null
@@ -99,13 +98,12 @@ internal class CoreBluetoothConnectionManager(
     // length (iOS reference client parity: NotificationStreamAssembler/BLEInboundWriteBuffer).
     private val frameAssemblers = ConcurrentMutableMap<String, BleFrameAssembler>()
 
-    // Serializes frame emission per link: a frame chunked to the link's usable MTU must
-    // hit the wire as one contiguous chunk run — interleaved chunks from concurrent
-    // callers (queued broadcast consumer vs. synchronous sendToPeer) desynchronize the
-    // receiver's stream assembler into garbage frames.
-    private val emissionLocks = ConcurrentMutableMap<String, Lock>()
-
-    private fun emissionLock(linkAddress: String) = emissionLocks.getOrPut(linkAddress) { Lock() }
+    // Per-link outbound back-pressure now lives in the shared [BleOutboundDispatcher]: it chunks a
+    // frame to the link's usable MTU, keeps each frame's chunk run contiguous (replacing the old
+    // per-address emissionLocks), and — instead of dropping a chunk when CoreBluetooth reports its
+    // transmit queue full — stashes it and drains on the readiness delegates
+    // (peripheralManagerIsReadyToUpdateSubscribers / peripheralIsReadyToSendWriteWithoutResponse).
+    private val outbound = BleOutboundDispatcher(scope = scope, config = config)
 
     /** linkAddress -> logical peerID, owned by the bearer via [BleBearer.bindPeer]. */
     override val addressPeerMap = ConcurrentMutableMap<String, String>()
@@ -164,6 +162,7 @@ internal class CoreBluetoothConnectionManager(
     fun shutdown() {
         stopServices()
         sendCore.shutdown()
+        outbound.shutdown()
         scope.cancel()
     }
 
@@ -217,6 +216,7 @@ internal class CoreBluetoothConnectionManager(
         trafficLog = null,
         sourceRoutingEnabled = false,
         logTag = TAG,
+        config = config,
     )
 
     override fun broadcastPacket(routed: RoutedPacket) {
@@ -241,77 +241,57 @@ internal class CoreBluetoothConnectionManager(
 
         override fun peerForAddress(linkAddress: String): String? = addressPeerMap.get(linkAddress)
 
-        override fun writeToNeighbor(neighbor: BleNeighbor, frame: ByteArray): Boolean =
-            if (neighbor.isClient) {
-                val peripheral = connectedPeripherals.get(neighbor.linkAddress) ?: return false
-                writeToPeripheral(neighbor.linkAddress, peripheral, frame)
+        override fun writeToNeighbor(neighbor: BleNeighbor, frame: ByteArray): Boolean {
+            val addr = neighbor.linkAddress
+            return if (neighbor.isClient) {
+                val peripheral = connectedPeripherals.get(addr) ?: return false
+                val maxChunk = peripheral
+                    .maximumWriteValueLengthForType(CBCharacteristicWriteWithoutResponse)
+                    .toInt().coerceAtLeast(1)
+                outbound.submit(addr, frame, maxChunk, writeWriter(addr), BleOutboundPriority.RELAY_HIGH, config.clientLinkCapBytes)
             } else {
-                val central = subscribedCentrals.get(neighbor.linkAddress) ?: return false
-                notifyCentral(central, frame)
-            }
-    }
-
-    private fun notifyCentral(central: CBCentral, data: ByteArray): Boolean {
-        val char = mutableCharacteristic ?: return false
-        return emissionLock(central.identifier.UUIDString).withLock {
-            try {
-                // CoreBluetooth truncates an update larger than the central's negotiated
-                // maximumUpdateValueLength — chunk instead; receivers reassemble by the
-                // frame length declared in the header.
+                val central = subscribedCentrals.get(addr) ?: return false
                 val maxChunk = central.maximumUpdateValueLength.toInt().coerceAtLeast(1)
-                if (data.size <= maxChunk) {
-                    return peripheralManager.updateValue(data.toNSData(), char, listOf(central))
-                }
-                Log.d(TAG, "Chunking ${data.size}B notification by $maxChunk bytes")
-                var offset = 0
-                while (offset < data.size) {
-                    val end = minOf(offset + maxChunk, data.size)
-                    val chunk = data.copyOfRange(offset, end)
-                    if (!peripheralManager.updateValue(chunk.toNSData(), char, listOf(central))) {
-                        // Transmit queue full mid-frame: the frame is lost; the receiver's
-                        // stall reset cleans the stream.
-                        Log.w(TAG, "notifyCentral chunk failed at $offset/${data.size}")
-                        return false
-                    }
-                    offset = end
-                }
-                true
-            } catch (e: Exception) {
-                Log.w(TAG, "notifyCentral failed: ${e.message}")
-                false
+                outbound.submit(addr, frame, maxChunk, notifyWriter(addr), BleOutboundPriority.RELAY_HIGH, config.serverLinkCapBytes)
             }
         }
     }
 
-    private fun writeToPeripheral(
-        addr: String,
-        peripheral: CBPeripheral,
-        data: ByteArray
-    ): Boolean {
-        val char = peripheralCharacteristics.get(addr) ?: return false
-        return emissionLock(addr).withLock {
-            try {
-                // Writes above maximumWriteValueLengthForType are dropped/truncated by the
-                // stack — chunk to the link's usable size (ATT MTU − 3 for withoutResponse).
-                val maxChunk = peripheral
-                    .maximumWriteValueLengthForType(CBCharacteristicWriteWithoutResponse)
-                    .toInt()
-                    .coerceAtLeast(1)
-                var offset = 0
-                while (offset < data.size) {
-                    val end = minOf(offset + maxChunk, data.size)
-                    peripheral.writeValue(
-                        data.copyOfRange(offset, end).toNSData(),
-                        char,
-                        CBCharacteristicWriteWithoutResponse,
-                    )
-                    offset = end
-                }
-                true
-            } catch (e: Exception) {
-                Log.w(TAG, "writeToPeripheral failed: ${e.message}")
-                false
+    /**
+     * Peripheral role: notify one central with a single MTU-sized chunk. `updateValue` returning
+     * false means CoreBluetooth's transmit queue is full — surface [ChunkWriteResult.BUSY] so the
+     * dispatcher retries on `peripheralManagerIsReadyToUpdateSubscribers` instead of losing the frame.
+     */
+    private fun notifyWriter(addr: String): BleChunkWriter = BleChunkWriter { chunk ->
+        val central = subscribedCentrals.get(addr) ?: return@BleChunkWriter ChunkWriteResult.GONE
+        val char = mutableCharacteristic ?: return@BleChunkWriter ChunkWriteResult.GONE
+        try {
+            if (peripheralManager.updateValue(chunk.toNSData(), char, listOf(central))) {
+                ChunkWriteResult.SENT
+            } else {
+                ChunkWriteResult.BUSY
             }
+        } catch (e: Exception) {
+            Log.w(TAG, "notifyWriter failed for $addr: ${e.message}")
+            ChunkWriteResult.GONE
+        }
+    }
+
+    /**
+     * Central role: write one chunk to a peripheral, gated by `canSendWriteWithoutResponse`.
+     * CoreBluetooth silently drops writes issued while the buffer is full, so we return
+     * [ChunkWriteResult.BUSY] and drain on `peripheralIsReadyToSendWriteWithoutResponse`.
+     */
+    private fun writeWriter(addr: String): BleChunkWriter = BleChunkWriter { chunk ->
+        val peripheral = connectedPeripherals.get(addr) ?: return@BleChunkWriter ChunkWriteResult.GONE
+        val char = peripheralCharacteristics.get(addr) ?: return@BleChunkWriter ChunkWriteResult.GONE
+        if (!peripheral.canSendWriteWithoutResponse) return@BleChunkWriter ChunkWriteResult.BUSY
+        try {
+            peripheral.writeValue(chunk.toNSData(), char, CBCharacteristicWriteWithoutResponse)
+            ChunkWriteResult.SENT
+        } catch (e: Exception) {
+            Log.w(TAG, "writeWriter failed for $addr: ${e.message}")
+            ChunkWriteResult.GONE
         }
     }
 
@@ -375,7 +355,16 @@ internal class CoreBluetoothConnectionManager(
             pendingPeripherals.remove(addr)
             addressPeerMap.remove(addr)
             frameAssemblers.remove(addr)
+            outbound.dropLink(addr)
             delegate?.onDeviceDisconnected(addr)
+        }
+
+        /**
+         * CoreBluetooth is ready for more writes-without-response to this peripheral: drain the
+         * link's queued chunks. Without this the central write path only retried on the backup tick.
+         */
+        override fun peripheralIsReadyToSendWriteWithoutResponse(peripheral: CBPeripheral) {
+            outbound.onReady(peripheral.identifier.UUIDString)
         }
 
         @ObjCSignatureOverride
@@ -466,7 +455,17 @@ internal class CoreBluetoothConnectionManager(
             subscribedCentrals.remove(addr)
             addressPeerMap.remove(addr)
             frameAssemblers.remove(addr)
+            outbound.dropLink(addr)
             delegate?.onDeviceDisconnected(addr)
+        }
+
+        /**
+         * The peripheral manager's transmit queue drained: resume every server link's queued notify
+         * chunks. This is the delegate the audit flagged as never implemented — its absence meant a
+         * notify that returned false was simply lost.
+         */
+        override fun peripheralManagerIsReadyToUpdateSubscribers(peripheral: CBPeripheralManager) {
+            subscribedCentrals.keys.forEach { outbound.onReady(it) }
         }
     }
 
