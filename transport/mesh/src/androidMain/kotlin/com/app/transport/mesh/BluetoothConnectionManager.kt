@@ -40,7 +40,7 @@ internal class BluetoothConnectionManager(
     // Component managers
     private val permissionManager = BluetoothPermissionManager(context)
     private val connectionTracker = BluetoothConnectionTracker(connectionScope, powerManager)
-    private val packetBroadcaster = BluetoothPacketBroadcaster(
+    private val packetBroadcaster: BluetoothPacketBroadcaster = BluetoothPacketBroadcaster(
         connectionScope, connectionTracker, fragmentManager, myPeerID, debugSettingsManager,
         transferProgressManager,
         gattServerProvider = { serverManager.getGattServer() },
@@ -71,11 +71,21 @@ internal class BluetoothConnectionManager(
         }
 
         override fun onDeviceDisconnected(device: BluetoothDevice) {
+            // Drop the link's outbound buffer so it neither retries onto a dead link nor leaks.
+            packetBroadcaster.onLinkDropped(device.address)
             delegate?.onDeviceDisconnected(device.address)
         }
-        
+
         override fun onRSSIUpdated(deviceAddress: String, rssi: Int) {
             delegate?.onRSSIUpdated(deviceAddress, rssi)
+        }
+
+        override fun onNotificationSent(deviceAddress: String) {
+            packetBroadcaster.onReady(deviceAddress)
+        }
+
+        override fun onCharacteristicWriteCompleted(deviceAddress: String) {
+            packetBroadcaster.onWriteCompleted(deviceAddress)
         }
     }
     
@@ -430,4 +440,10 @@ internal interface BluetoothConnectionManagerDelegate {
     fun onDeviceConnected(device: BluetoothDevice)
     fun onDeviceDisconnected(device: BluetoothDevice)
     fun onRSSIUpdated(deviceAddress: String, rssi: Int)
+
+    /** Server role: the stack finished sending a queued notification — drain the next chunk. */
+    fun onNotificationSent(deviceAddress: String) {}
+
+    /** Client role: a characteristic write completed — the single outstanding-write slot is free. */
+    fun onCharacteristicWriteCompleted(deviceAddress: String) {}
 }

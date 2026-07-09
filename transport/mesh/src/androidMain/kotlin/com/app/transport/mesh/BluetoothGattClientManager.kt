@@ -543,6 +543,16 @@ internal class BluetoothGattClientManager(
                 }
             }
             
+            override fun onCharacteristicWrite(
+                gatt: BluetoothGatt,
+                characteristic: BluetoothGattCharacteristic,
+                status: Int,
+            ) {
+                // Android allows a single outstanding write-without-response per GATT; this
+                // completion frees the slot so the outbound dispatcher can issue the next frame.
+                delegate?.onCharacteristicWriteCompleted(gatt.device.address)
+            }
+
             override fun onReadRemoteRssi(gatt: BluetoothGatt, rssi: Int, status: Int) {
                 val deviceAddress = gatt.device.address
                 if (status == BluetoothGatt.GATT_SUCCESS) {

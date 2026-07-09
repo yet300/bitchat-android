@@ -1,6 +1,5 @@
 package com.app.transport.mesh
 
-import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattServer
 import com.app.common.AppDispatchers
@@ -40,6 +39,7 @@ internal class BluetoothPacketBroadcaster(
     private val gattServerProvider: () -> BluetoothGattServer?,
     private val characteristicProvider: () -> BluetoothGattCharacteristic?,
     dispatchers: AppDispatchers = AppDispatchers(),
+    private val config: BleRadioConfig = BleRadioConfig(),
 ) : BleRadioLink {
 
     companion object {
@@ -49,11 +49,20 @@ internal class BluetoothPacketBroadcaster(
 
     private val broadcasterScope = CoroutineScope(dispatchers.io + SupervisorJob())
 
-    // Serializes frame emission per link: notifyDevice is reached both from the queued
-    // broadcast consumer and from synchronous sendToPeer callers. A frame chunked to
-    // MTU−3 must hit the link as one contiguous chunk run — interleaving chunks of two
-    // frames desynchronizes the receiver's stream assembler into garbage frames.
-    private val emissionLocks = ConcurrentHashMap<String, Any>()
+    // Per-link outbound back-pressure now lives in the shared [BleOutboundDispatcher]: it chunks a
+    // frame to the link's usable MTU, keeps each frame's chunk run contiguous (replacing the old
+    // per-address emissionLocks), and — instead of dropping a chunk when the stack reports busy —
+    // stashes it and drains on the readiness signal (onNotificationSent / onCharacteristicWrite).
+    private val outbound = BleOutboundDispatcher(
+        scope = broadcasterScope,
+        config = config,
+        onOutboundDropped = { debugSettingsManager.onOutboundDropped(BearerId.BLE) },
+    )
+
+    // Client role only: Android permits a single outstanding write-without-response per GATT. A frame
+    // is written whole (its bytes are pinned by BleSendPathGoldenTest); the next frame waits here
+    // until onCharacteristicWrite frees the slot.
+    private val outstandingWrites = ConcurrentHashMap.newKeySet<String>()
 
     private val sendCore = BleSendCore(
         scope = broadcasterScope,
@@ -64,6 +73,7 @@ internal class BluetoothPacketBroadcaster(
         trafficLog = debugSettingsManager,
         sourceRoutingEnabled = true,
         logTag = TAG,
+        config = config,
     )
 
     fun setNicknameResolver(resolver: (String) -> String?) = sendCore.setNicknameResolver(resolver)
@@ -96,81 +106,95 @@ internal class BluetoothPacketBroadcaster(
         connectionTracker.addressPeerMap[linkAddress]
 
     override fun writeToNeighbor(neighbor: BleNeighbor, frame: ByteArray): Boolean {
+        val addr = neighbor.linkAddress
         return if (neighbor.isClient) {
-            val conn = connectionTracker.getDeviceConnection(neighbor.linkAddress) ?: return false
-            writeToDeviceConn(conn, frame)
+            if (connectionTracker.getDeviceConnection(addr) == null) return false
+            // Client writes stay whole-frame (their bytes are golden-pinned): pass a max chunk large
+            // enough that the frame is never split, and pace whole frames via the single-outstanding
+            // slot. maxChunk = frame.size guarantees a single chunk.
+            outbound.submit(
+                linkAddress = addr,
+                frame = frame,
+                maxChunkBytes = frame.size.coerceAtLeast(1),
+                writer = clientWriter(addr),
+                priority = BleOutboundPriority.RELAY_HIGH,
+                capBytes = config.clientLinkCapBytes,
+            )
         } else {
-            val device = connectionTracker.getSubscribedDevices()
-                .firstOrNull { it.address == neighbor.linkAddress } ?: return false
-            notifyDevice(device, frame)
+            if (connectionTracker.getSubscribedDevices().none { it.address == addr }) return false
+            outbound.submit(
+                linkAddress = addr,
+                frame = frame,
+                maxChunkBytes = (connectionTracker.getNegotiatedMtu(addr) - 3).coerceAtLeast(1),
+                writer = notifyWriter(addr),
+                priority = BleOutboundPriority.RELAY_HIGH,
+                capBytes = config.serverLinkCapBytes,
+            )
         }
     }
 
-    /** Server -> client push via characteristic notify. */
-    private fun notifyDevice(device: BluetoothDevice, data: ByteArray): Boolean {
-        val lock = emissionLocks.getOrPut(device.address) { Any() }
-        return synchronized(lock) {
-            try {
-                doNotifyDevice(device, data)
-            } catch (e: Exception) {
-                Log.w(TAG, "Error sending to server connection ${device.address}: ${e.message}")
-                connectionScope.launch {
-                    delay(CLEANUP_DELAY)
-                    connectionTracker.removeSubscribedDevice(device)
-                    connectionTracker.addressPeerMap.remove(device.address)
-                }
-                false
+    /** Server -> client push via characteristic notify (one MTU-sized chunk). */
+    private fun notifyWriter(address: String): BleChunkWriter = BleChunkWriter { chunk ->
+        val device = connectionTracker.getSubscribedDevices().firstOrNull { it.address == address }
+            ?: return@BleChunkWriter ChunkWriteResult.GONE
+        try {
+            val characteristic = characteristicProvider() ?: return@BleChunkWriter ChunkWriteResult.GONE
+            val server = gattServerProvider() ?: return@BleChunkWriter ChunkWriteResult.GONE
+            characteristic.value = chunk
+            // false = the stack's notify queue is full right now → BUSY; retry on onNotificationSent.
+            if (server.notifyCharacteristicChanged(device, characteristic, false)) {
+                ChunkWriteResult.SENT
+            } else {
+                ChunkWriteResult.BUSY
             }
-        }
-    }
-
-    private fun doNotifyDevice(device: BluetoothDevice, data: ByteArray): Boolean {
-        val characteristic = characteristicProvider() ?: return false
-        val server = gattServerProvider() ?: return false
-        // The stack silently truncates a notification to the central's ATT MTU − 3:
-        // at the default MTU 23 a frame goes out as its first 20 bytes and the peer
-        // logs an unparseable packet. Chunk oversized frames instead — receivers
-        // (iOS NotificationStreamAssembler, our BleFrameAssembler) reassemble by the
-        // frame length declared in the header.
-        val maxChunk = (connectionTracker.getNegotiatedMtu(device.address) - 3).coerceAtLeast(1)
-        if (data.size <= maxChunk) {
-            characteristic.value = data
-            return server.notifyCharacteristicChanged(device, characteristic, false)
-        }
-        Log.d(TAG, "Chunking ${data.size}B notification to ${device.address} by $maxChunk bytes")
-        var offset = 0
-        while (offset < data.size) {
-            val end = minOf(offset + maxChunk, data.size)
-            characteristic.value = data.copyOfRange(offset, end)
-            if (!server.notifyCharacteristicChanged(device, characteristic, false)) {
-                // A dropped middle chunk would corrupt the stream; the receiver's
-                // stall reset recovers it, but this frame is lost — report failure.
-                Log.w(TAG, "Notify chunk failed at $offset/${data.size} for ${device.address}")
-                return false
-            }
-            offset = end
-        }
-        return true
-    }
-
-    /** Client -> server push via characteristic write. */
-    private fun writeToDeviceConn(
-        deviceConn: BluetoothConnectionTracker.DeviceConnection,
-        data: ByteArray,
-    ): Boolean {
-        return try {
-            deviceConn.characteristic?.let { char ->
-                char.value = data
-                deviceConn.gatt?.writeCharacteristic(char) ?: false
-            } ?: false
         } catch (e: Exception) {
-            Log.w(TAG, "Error sending to client connection ${deviceConn.device.address}: ${e.message}")
+            Log.w(TAG, "Error sending to server connection $address: ${e.message}")
             connectionScope.launch {
                 delay(CLEANUP_DELAY)
-                connectionTracker.cleanupDeviceConnection(deviceConn.device.address)
+                connectionTracker.removeSubscribedDevice(device)
+                connectionTracker.addressPeerMap.remove(address)
             }
-            false
+            ChunkWriteResult.GONE
         }
+    }
+
+    /** Client -> server push via characteristic write, single outstanding write per GATT. */
+    private fun clientWriter(address: String): BleChunkWriter = BleChunkWriter { chunk ->
+        if (address in outstandingWrites) return@BleChunkWriter ChunkWriteResult.BUSY
+        val conn = connectionTracker.getDeviceConnection(address) ?: return@BleChunkWriter ChunkWriteResult.GONE
+        try {
+            val char = conn.characteristic ?: return@BleChunkWriter ChunkWriteResult.GONE
+            val gatt = conn.gatt ?: return@BleChunkWriter ChunkWriteResult.GONE
+            char.value = chunk
+            if (gatt.writeCharacteristic(char)) {
+                outstandingWrites.add(address)
+                ChunkWriteResult.SENT
+            } else {
+                ChunkWriteResult.BUSY
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error sending to client connection $address: ${e.message}")
+            connectionScope.launch {
+                delay(CLEANUP_DELAY)
+                connectionTracker.cleanupDeviceConnection(address)
+            }
+            ChunkWriteResult.GONE
+        }
+    }
+
+    /** Server role: the stack finished a notification — drain the link's queued chunks. */
+    fun onReady(address: String) = outbound.onReady(address)
+
+    /** Client role: a write completed — free the single-outstanding slot and drain the next frame. */
+    fun onWriteCompleted(address: String) {
+        outstandingWrites.remove(address)
+        outbound.onReady(address)
+    }
+
+    /** A link disconnected — drop its outbound buffer and any stale outstanding-write flag. */
+    fun onLinkDropped(address: String) {
+        outstandingWrites.remove(address)
+        outbound.dropLink(address)
     }
 
     fun getDebugInfo(): String = buildString {
@@ -182,6 +206,7 @@ internal class BluetoothPacketBroadcaster(
     fun shutdown() {
         Log.d(TAG, "Shutting down BluetoothPacketBroadcaster")
         sendCore.shutdown()
+        outbound.shutdown()
         broadcasterScope.cancel()
         Log.d(TAG, "BluetoothPacketBroadcaster shutdown complete")
     }
