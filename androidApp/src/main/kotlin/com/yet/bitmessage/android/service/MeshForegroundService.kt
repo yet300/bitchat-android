@@ -99,7 +99,9 @@ class MeshForegroundService : Service() {
         super.onCreate()
         notificationManager = NotificationManagerCompat.from(this)
         createChannel()
-
+        // The foreground service owns background lifecycle; kick off the on-disk message retention
+        // sweep here so the `message` table is capped even though the timelines are capped in memory.
+        appGraph.messageRetentionJob.start()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

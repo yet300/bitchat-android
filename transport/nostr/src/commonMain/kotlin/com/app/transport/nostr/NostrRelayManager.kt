@@ -23,9 +23,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.JsonArray
 import kotlinx.coroutines.*
-import kotlin.math.min
-import kotlin.math.pow
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.ExperimentalTime
 
 /**
@@ -116,6 +115,9 @@ class NostrRelayManager internal constructor(
 
     // Events waiting for disconnected relays; drained per relay on reconnect.
     private val pendingEvents = PendingEventQueue<NostrEvent>()
+
+    // Pure reconnect/backoff + failure-decay policy (DNS-transient, cooldown revival).
+    private val reconnectPolicy = RelayReconnectPolicy()
     
     // Coroutine scope for background operations
     private val scope = CoroutineScope(dispatchers.io + SupervisorJob())
@@ -249,12 +251,42 @@ class NostrRelayManager internal constructor(
         // interval (connect/disconnect status still publishes immediately via publishRelays()).
         scope.launch {
             while (isActive) {
-                delay(RELAY_STATS_PUBLISH_INTERVAL_MS)
+                delay(RELAY_STATS_PUBLISH_INTERVAL_MS.milliseconds)
                 if (takeRelaysStatsDirty()) publishRelays()
             }
         }
+
+        // Slow background re-probe: a 20-minute outage exhausts every relay's reconnect attempts, after
+        // which nothing but a manual resetAllConnections used to revive them. This loop gives exhausted
+        // relays a fresh attempt once their failure cooldown decays, so Nostr recovers on its own.
+        scope.launch {
+            while (isActive) {
+                delay(NostrConstants.RELAY_REPROBE_INTERVAL_MS.milliseconds)
+                try {
+                    reprobeStaleRelays(force = false)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e(TAG, "Relay re-probe failed: ${e.message}")
+                }
+            }
+        }
+
+        // Retry events requeued because a connected relay's send buffer was full (the trySend hole).
+        scope.launch {
+            while (isActive) {
+                delay(NostrConstants.PENDING_FLUSH_INTERVAL_MS.milliseconds)
+                try {
+                    flushPendingToConnectedRelays()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e(TAG, "Pending-event flush failed: ${e.message}")
+                }
+            }
+        }
     }
-    
+
     /**
      * Connect to all configured relays
      */
@@ -308,8 +340,33 @@ class NostrRelayManager internal constructor(
 
         scope.launch {
             sendNow.forEach { relayUrl ->
-                connections[relayUrl]?.let { webSocket ->
-                    sendToRelay(event, webSocket, relayUrl)
+                val webSocket = connections[relayUrl]
+                val sent = webSocket != null && sendToRelay(event, webSocket, relayUrl)
+                if (!sent) {
+                    // Connected-but-busy (ktor outgoing buffer full) or the connection vanished
+                    // mid-send: requeue for retry instead of silently dropping the event (the old
+                    // trySend hole). submit with isConnected={false} forces it into the pending queue;
+                    // the flush loop / next reconnect drains it via drainFor exactly once (no dupes).
+                    val (_, dropped) = pendingEvents.submit(event, listOf(relayUrl)) { false }
+                    dropped.forEach {
+                        Log.w(TAG, "⚠️ Pending event queue full: dropped ${it.id.take(16)}…")
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Retry events that were requeued because a *connected* relay's send buffer was momentarily full.
+     * Those never trigger onRelayConnected (the relay stays up), so without this tick they would wait
+     * until the next disconnect/reconnect. drainFor removes atomically, so an event is re-sent once.
+     */
+    private fun flushPendingToConnectedRelays() {
+        connections.keys.toList().forEach { relayUrl ->
+            val webSocket = connections[relayUrl] ?: return@forEach
+            pendingEvents.drainFor(relayUrl).forEach { event ->
+                if (!sendToRelay(event, webSocket, relayUrl)) {
+                    pendingEvents.submit(event, listOf(relayUrl)) { false }
                 }
             }
         }
@@ -489,23 +546,26 @@ class NostrRelayManager internal constructor(
         }
     }
     
-    private fun sendToRelay(event: NostrEvent, webSocket: DefaultClientWebSocketSession, relayUrl: String) {
-        try {
+    /** @return true if the frame was accepted by the socket; false if it was busy/failed (requeue). */
+    private fun sendToRelay(event: NostrEvent, webSocket: DefaultClientWebSocketSession, relayUrl: String): Boolean {
+        return try {
             val request = NostrRequest.Event(event)
             val message = NostrRequest.toJson(request)
-            
+
             Log.v(TAG, "📤 Sending Nostr event (kind: ${event.kind}) to relay: $relayUrl")
-            
+
             val success = webSocket.trySendText(message)
             if (success) {
                 // Update relay stats (coalesced publish — see markRelaysStatsDirty)
                 relaysByUrl[relayUrl]?.let { it.messagesSent += 1 }
                 markRelaysStatsDirty()
             } else {
-                Log.e(TAG, "❌ Failed to send event to $relayUrl: WebSocket send failed")
+                Log.w(TAG, "⚠️ Send buffer full for $relayUrl — requeueing event ${event.id.take(16)}…")
             }
+            success
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to send event to $relayUrl: ${e.message}")
+            false
         }
     }
     
@@ -600,47 +660,62 @@ class NostrRelayManager internal constructor(
         connections.remove(relayUrl)
         // NOTE: Don't remove subscriptions here - keep them for restoration on reconnection
         // subscriptions.remove(relayUrl)  // REMOVED - this was causing subscription loss
-        
+
         updateRelayStatus(relayUrl, false, error)
-        
-        // Check if this is a DNS error
-        val errorMessage = error.message?.lowercase() ?: ""
-        if (errorMessage.contains("hostname could not be found") || 
-            errorMessage.contains("dns") ||
-            errorMessage.contains("unable to resolve host")) {
-            
-            val relay = relaysByUrl[relayUrl]
-            if (relay?.lastError == null) {
-                Log.w(TAG, "Nostr relay DNS failure for $relayUrl - not retrying")
-            }
-            return
-        }
-        
-        // Implement exponential backoff for non-DNS errors
+
         val relay = relaysByUrl[relayUrl] ?: return
-        relay.reconnectAttempts++
-        
-        // Stop attempting after max attempts
-        if (relay.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            Log.w(TAG, "Max reconnection attempts ($MAX_RECONNECT_ATTEMPTS) reached for $relayUrl")
-            return
+        val isDns = reconnectPolicy.isDnsError(error.message)
+
+        // DNS failures are transient on mobile — retry them (with a large floor) instead of the old
+        // "not retrying" dead end. Once attempts are used up the relay goes quiet but is NOT abandoned:
+        // the background re-probe loop revives it after the failure cooldown decays.
+        when (val decision = reconnectPolicy.onFailure(relay.reconnectAttempts, isDns)) {
+            is RelayReconnectPolicy.Decision.Retry -> {
+                relay.reconnectAttempts = decision.attempt
+                relay.nextReconnectTime = Clock.System.now().toEpochMilliseconds() + decision.delayMs
+                Log.d(TAG, "Scheduling reconnection to $relayUrl in ${decision.delayMs / 1000}s " +
+                    "(attempt ${decision.attempt}${if (isDns) ", dns" else ""})")
+                scope.launch {
+                    delay(decision.delayMs.milliseconds)
+                    connectToRelay(relayUrl)
+                }
+            }
+            RelayReconnectPolicy.Decision.Exhausted -> {
+                relay.reconnectAttempts = MAX_RECONNECT_ATTEMPTS
+                Log.w(TAG, "Max reconnection attempts ($MAX_RECONNECT_ATTEMPTS) reached for $relayUrl " +
+                    "— background re-probe will retry after the failure cooldown")
+            }
         }
-        
-        // Calculate backoff interval
-        val backoffInterval = min(
-            INITIAL_BACKOFF_INTERVAL * BACKOFF_MULTIPLIER.pow(relay.reconnectAttempts - 1.0),
-            MAX_BACKOFF_INTERVAL.toDouble()
-        ).toLong()
-        
-        relay.nextReconnectTime = Clock.System.now().toEpochMilliseconds() + backoffInterval
-        
-        Log.d(TAG, "Scheduling reconnection to $relayUrl in ${backoffInterval / 1000}s (attempt ${relay.reconnectAttempts})")
-        
-        // Schedule reconnection
-        scope.launch {
-            delay(backoffInterval)
-            connectToRelay(relayUrl)
+    }
+
+    /**
+     * Revive relays that used up their reconnect attempts once the failure cooldown has decayed
+     * ([force] skips the cooldown — e.g. the network just came back). Driven by the periodic re-probe
+     * loop and [onNetworkAvailable]; the transport layer has no foreground hook to lean on like iOS.
+     */
+    private fun reprobeStaleRelays(force: Boolean) {
+        val now = Clock.System.now().toEpochMilliseconds()
+        relaysByUrl.values.forEach { relay ->
+            if (connections.containsKey(relay.url)) return@forEach
+            if (!reconnectPolicy.shouldReprobe(relay.reconnectAttempts, relay.lastDisconnectedAt, now, force)) {
+                return@forEach
+            }
+            Log.i(TAG, "🔁 Re-probing exhausted relay ${relay.url}")
+            relay.reconnectAttempts = 0
+            relay.nextReconnectTime = null
+            relay.lastError = null
+            scope.launch { connectToRelay(relay.url) }
         }
+    }
+
+    /**
+     * Optional hook for the app to signal "network is back" (e.g. Android ConnectivityRepository) so
+     * exhausted relays retry immediately instead of waiting for the next re-probe tick. No platform API
+     * is pulled into transport — the app calls this when it observes connectivity.
+     */
+    fun onNetworkAvailable() {
+        Log.i(TAG, "📶 Network available — re-probing relays")
+        reprobeStaleRelays(force = true)
     }
     
     private fun updateRelayStatus(url: String, isConnected: Boolean, error: Throwable? = null) {
@@ -698,7 +773,10 @@ class NostrRelayManager internal constructor(
         // reconnect — same eventual-delivery guarantee as before, now without re-sending
         // already-delivered events.
         pendingEvents.drainFor(relayUrl).forEach { event ->
-            sendToRelay(event, session, relayUrl)
+            if (!sendToRelay(event, session, relayUrl)) {
+                // Busy immediately after connect — keep it queued for the flush tick.
+                pendingEvents.submit(event, listOf(relayUrl)) { false }
+            }
         }
     }
 

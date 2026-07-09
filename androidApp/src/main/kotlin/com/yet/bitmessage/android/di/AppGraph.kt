@@ -13,6 +13,7 @@ import com.app.domain.repository.SearchRepository
 import com.app.domain.repository.SettingsRepository
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.data.AppStateStore
+import com.app.data.MessageRetentionJob
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.data.routing.MessageRouter
 import com.app.data.routing.PeerAddressResolver
@@ -70,6 +71,7 @@ interface AppGraph : SharedAppGraph {
     val relayDirectory: RelayDirectory
     val torPreferenceManager: TorPreferenceManager
     val appStateStore: AppStateStore
+    val messageRetentionJob: MessageRetentionJob
     // temporary Phase-D/DI-core bridge, retires Phase C
     val seenMessageStore: SeenMessageStore
     val meshGraphService: MeshGraphService

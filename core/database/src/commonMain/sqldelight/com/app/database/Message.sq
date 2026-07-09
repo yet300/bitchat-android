@@ -58,3 +58,17 @@ DELETE FROM message WHERE conversation_id = ?;
 
 deleteAll:
 DELETE FROM message;
+
+-- Retention: drop everything older than a cutoff (age-based sweep).
+deleteOlderThan:
+DELETE FROM message WHERE timestamp < ?;
+
+-- Retention: keep only the newest :keep rows of a conversation, delete the rest.
+-- LIMIT -1 OFFSET :keep skips the newest :keep rows and returns the older tail to delete.
+deleteBeyondCapForConversation:
+DELETE FROM message WHERE id IN (
+    SELECT id FROM message
+    WHERE conversation_id = :conversationId
+    ORDER BY timestamp DESC
+    LIMIT -1 OFFSET :keep
+);

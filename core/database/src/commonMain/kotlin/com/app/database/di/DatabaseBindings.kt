@@ -7,6 +7,7 @@ import com.app.database.dao.ConversationDao
 import com.app.database.dao.ConversationPrefDao
 import com.app.database.dao.GeohashDao
 import com.app.database.dao.MessageDao
+import com.app.database.dao.OutboxDao
 import com.app.database.dao.SecureSettingDao
 import com.app.database.db.DatabaseDriverFactory
 import com.app.database.db.DatabaseManager
@@ -66,4 +67,9 @@ object DatabaseBindings {
     @Provides
     fun provideSecureSettingDao(manager: DatabaseManager, dispatchers: AppDispatchers): SecureSettingDao =
         SecureSettingDao(manager, dispatchers)
+
+    @SingleIn(AppScope::class)
+    @Provides
+    fun provideOutboxDao(manager: DatabaseManager, dispatchers: AppDispatchers): OutboxDao =
+        OutboxDao(manager, dispatchers)
 }
