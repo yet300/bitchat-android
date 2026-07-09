@@ -3,12 +3,14 @@
 package com.app.transport.debug
 
 import com.app.transport.MeshTelemetry
+import com.app.transport.mesh.BearerId
 
 import co.touchlab.stately.collections.ConcurrentMutableMap
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.update
 import com.app.transport.protocol.BitchatPacket
 import com.app.common.encoding.toHexString
 import kotlin.math.round
@@ -78,6 +80,11 @@ class DebugSettingsManager(
     // Packet relay statistics
     private val _relayStats = MutableStateFlow(PacketRelayStats())
     val relayStats: StateFlow<PacketRelayStats> = _relayStats.asStateFlow()
+
+    // Frames dropped at each bearer's bounded ingress buffer (overflow under load), keyed by
+    // BearerId.id. Makes the previously-silent inbound frame loss observable in the debug sheet.
+    private val _droppedIncomingByBearer = MutableStateFlow<Map<String, Long>>(emptyMap())
+    val droppedIncomingByBearer: StateFlow<Map<String, Long>> = _droppedIncomingByBearer.asStateFlow()
 
     // Timestamps to compute rolling window stats
     private val relayTimestamps = ConcurrentFifoQueue<Long>()
@@ -319,7 +326,15 @@ class DebugSettingsManager(
 
         _scanResults.value = scanResultsQueue.toList()
     }
-    
+
+    // Called from a bearer's onUndeliveredElement (arbitrary radio thread) — StateFlow.update
+    // is a lock-free CAS loop, so the per-bearer tally stays consistent under concurrency.
+    override fun onIncomingDropped(bearerId: BearerId) {
+        _droppedIncomingByBearer.update { current ->
+            current + (bearerId.id to ((current[bearerId.id] ?: 0L) + 1L))
+        }
+    }
+
     fun updateConnectedDevices(devices: List<ConnectedDevice>) {
         _connectedDevices.value = devices
     }

@@ -15,6 +15,8 @@ import com.app.transport.MeshConstants
 import com.app.transport.crypto.Sha256
 import co.touchlab.stately.collections.ConcurrentMutableMap
 import co.touchlab.stately.collections.ConcurrentMutableSet
+import co.touchlab.stately.concurrency.Lock
+import co.touchlab.stately.concurrency.withLock
 import kotlinx.coroutines.*
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
@@ -53,10 +55,34 @@ internal class SecurityManager(
         private const val MAX_PROCESSED_KEY_EXCHANGES = MeshConstants.Security.MAX_PROCESSED_KEY_EXCHANGES
     }
     
-    // Security tracking
-    private val processedMessages = ConcurrentMutableSet<String>()
+    // Security tracking.
+    // processedMessages is an insertion-ordered LRU guarded by [processedLock]: the size cap is
+    // now enforced at every insertion (evict eldest), not only in the 5-minute cleanup pass, so
+    // the set can no longer grow unbounded between cleanups under a packet storm. All access must
+    // hold processedLock (a plain LinkedHashSet is not thread-safe and validatePacket runs from
+    // multiple per-peer actor coroutines).
+    private val processedMessages = LinkedHashSet<String>()
+    private val processedLock = Lock()
     private val processedKeyExchanges = ConcurrentMutableSet<String>()
     private val messageTimestamps = ConcurrentMutableMap<String, Long>()
+
+    /** True if [messageID] was already recorded. */
+    private fun isProcessed(messageID: String): Boolean =
+        processedLock.withLock { processedMessages.contains(messageID) }
+
+    /**
+     * Record [messageID] as processed, enforcing [MAX_PROCESSED_MESSAGES] with LRU eviction of the
+     * eldest entries at insertion time. Keeps [messageTimestamps] in sync with evictions.
+     */
+    private fun recordProcessedMessage(messageID: String): Unit = processedLock.withLock {
+        if (!processedMessages.add(messageID)) return@withLock
+        while (processedMessages.size > MAX_PROCESSED_MESSAGES) {
+            val iterator = processedMessages.iterator()
+            val eldest = iterator.next()
+            iterator.remove()
+            messageTimestamps.remove(eldest)
+        }
+    }
 
     // Delegate for callbacks
     var delegate: SecurityManagerDelegate? = null
@@ -85,7 +111,7 @@ internal class SecurityManager(
         // Duplicate detection
         val messageID = generateMessageID(packet, peerID)
 
-        if (processedMessages.contains(messageID)) {
+        if (isProcessed(messageID)) {
             // ANNOUNCE exception: a byte-identical announce re-received at max TTL still
             // proves the direct link is alive (e.g. after a reconnect on a new link), so
             // report it as liveness-only. It must never be reprocessed or relayed again —
@@ -109,8 +135,8 @@ internal class SecurityManager(
             return PacketValidationResult.DUPLICATE_ANNOUNCE_LIVENESS
         }
 
-        // Add to processed messages
-        processedMessages.add(messageID)
+        // Add to processed messages (cap enforced at insertion — see [recordProcessedMessage])
+        recordProcessedMessage(messageID)
         messageTimestamps[messageID] = currentTime
 
         // Enforce mandatory signature verification
@@ -352,7 +378,7 @@ internal class SecurityManager(
     fun getDebugInfo(): String {
         return buildString {
             appendLine("=== Security Manager Debug Info ===")
-            appendLine("Processed Messages: ${processedMessages.size}")
+            appendLine("Processed Messages: ${processedLock.withLock { processedMessages.size }}")
             appendLine("Processed Key Exchanges: ${processedKeyExchanges.size}")
             appendLine("Message Timestamps: ${messageTimestamps.size}")
             
@@ -391,23 +417,18 @@ internal class SecurityManager(
         val messagesToRemove = messageTimestamps.entries.filter { (_, timestamp) ->
             timestamp < cutoffTime
         }.map { it.key }
-        
-        messagesToRemove.forEach { messageId ->
-            messageTimestamps.remove(messageId)
-            if (processedMessages.remove(messageId)) {
-                removedCount++
+
+        processedLock.withLock {
+            messagesToRemove.forEach { messageId ->
+                messageTimestamps.remove(messageId)
+                if (processedMessages.remove(messageId)) {
+                    removedCount++
+                }
             }
         }
-        
-        // Limit the size of processed messages set
-        if (processedMessages.size > MAX_PROCESSED_MESSAGES) {
-            val excess = processedMessages.size - MAX_PROCESSED_MESSAGES
-            val toRemove = processedMessages.take(excess)
-            processedMessages.removeAll(toRemove.toSet())
-            removeFromMessageTimestamps(toRemove)
-            removedCount += excess
-        }
-        
+        // The size cap is now enforced at insertion (see [recordProcessedMessage]); cleanup only
+        // needs to expire entries older than the replay window.
+
         // Limit the size of processed key exchanges set
         if (processedKeyExchanges.size > MAX_PROCESSED_KEY_EXCHANGES) {
             val excess = processedKeyExchanges.size - MAX_PROCESSED_KEY_EXCHANGES
@@ -421,19 +442,10 @@ internal class SecurityManager(
     }
     
     /**
-     * Helper to remove entries from messageTimestamps
-     */
-    private fun removeFromMessageTimestamps(messageIds: List<String>) {
-        messageIds.forEach { messageId ->
-            messageTimestamps.remove(messageId)
-        }
-    }
-    
-    /**
      * Clear all security data
      */
     fun clearAllData() {
-        processedMessages.clear()
+        processedLock.withLock { processedMessages.clear() }
         processedKeyExchanges.clear()
         messageTimestamps.clear()
     }
