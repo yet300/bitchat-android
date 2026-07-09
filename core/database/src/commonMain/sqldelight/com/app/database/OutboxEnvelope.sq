@@ -1,0 +1,59 @@
+-- Persistent send-outbox: private-message envelopes that could not be routed immediately survive an
+-- app kill instead of evaporating from the in-memory queue (audit: Outbox durability).
+--
+-- Schema is deliberately courier-forward-compatible (0x04, a later iteration): the recipient_tag /
+-- ciphertext / copies / prekey_id columns mirror CourierEnvelope so the courier store can grow out of
+-- this table without a second migration. They are unused (NULL) until courier lands.
+CREATE TABLE outbox_envelope (
+    id            INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    -- Routing key the RouteSelector queues under (peerID or Noise-key hex). Matches the old map key.
+    peer_id       TEXT    NOT NULL,
+    -- OutgoingEnvelope discriminator: private | receipt | ack | favorite (future: courier).
+    kind          TEXT    NOT NULL,
+    -- Lossless serialized OutgoingEnvelope (JSON). The columns below are its projection.
+    payload_json  TEXT    NOT NULL,
+    -- Correlation id (Private/Ack messageId, Receipt originalMessageId); null for favorite.
+    message_id    TEXT,
+    -- ms since epoch; FIFO tiebreak lives in `id`, this is for age/expiry reasoning.
+    created_at    INTEGER NOT NULL,
+    -- ms since epoch after which the envelope is discarded undelivered; null = no expiry.
+    expiry_at     INTEGER,
+    -- Delivery attempt counter (iOS QueuedMessage.sendAttempts).
+    attempts      INTEGER NOT NULL DEFAULT 0,
+    -- Courier forward-compat (CourierEnvelope.swift), unused until 0x04:
+    recipient_tag BLOB,
+    ciphertext    BLOB,
+    copies        INTEGER,
+    prekey_id     INTEGER
+);
+
+CREATE INDEX outbox_peer   ON outbox_envelope(peer_id, id);
+CREATE INDEX outbox_expiry ON outbox_envelope(expiry_at);
+
+insert:
+INSERT INTO outbox_envelope(
+    peer_id, kind, payload_json, message_id, created_at, expiry_at, attempts,
+    recipient_tag, ciphertext, copies, prekey_id
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectByPeer:
+SELECT * FROM outbox_envelope WHERE peer_id = ? ORDER BY id ASC;
+
+deleteByPeer:
+DELETE FROM outbox_envelope WHERE peer_id = ?;
+
+selectPeers:
+SELECT DISTINCT peer_id FROM outbox_envelope;
+
+countAll:
+SELECT COUNT(*) FROM outbox_envelope;
+
+-- Drop envelopes whose expiry has passed (expiry_at NULL entries never expire).
+deleteExpired:
+DELETE FROM outbox_envelope WHERE expiry_at IS NOT NULL AND expiry_at <= ?;
+
+-- Cap: keep only the newest :keep envelopes overall, delete the oldest tail.
+deleteOldestBeyondCap:
+DELETE FROM outbox_envelope WHERE id IN (
+    SELECT id FROM outbox_envelope ORDER BY id DESC LIMIT -1 OFFSET :keep
+);

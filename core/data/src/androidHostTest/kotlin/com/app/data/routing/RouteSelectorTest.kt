@@ -1,6 +1,7 @@
 package com.app.data.routing
 
 import com.app.data.favorites.FavoritesPersistenceService
+import com.app.data.repository.InMemoryDatabase
 import com.app.transport.routing.OutgoingEnvelope
 import com.app.transport.routing.PeerKeyResolver
 import com.app.transport.routing.Reachability
@@ -47,7 +48,7 @@ class RouteSelectorTest {
     private val peer = "aabbccdd11223344"
     private val privateEnvelope = OutgoingEnvelope.Private(peer, "hi", "nick", "msg-1")
 
-    private fun outbox() = Outbox(mock<FavoritesPersistenceService>())
+    private fun outbox() = Outbox(mock<FavoritesPersistenceService>(), InMemoryDatabase().outboxDao)
 
     private fun selector(
         strategies: Set<RouteStrategy>,

@@ -11,6 +11,7 @@ import com.app.database.dao.ConversationDao
 import com.app.database.dao.ConversationPrefDao
 import com.app.database.dao.GeohashDao
 import com.app.database.dao.MessageDao
+import com.app.database.dao.OutboxDao
 import com.app.database.dao.SecureSettingDao
 import com.app.database.db.DatabaseDriverFactory
 import com.app.database.db.DatabaseManager
@@ -47,6 +48,7 @@ internal class InMemoryDatabase(dispatcher: CoroutineDispatcher = UnconfinedTest
     val geohashDao = GeohashDao(manager, dispatchers)
     val secureSettingDao = SecureSettingDao(manager, dispatchers)
     val conversationPrefDao = ConversationPrefDao(manager, dispatchers)
+    val outboxDao = OutboxDao(manager, dispatchers)
 }
 
 /** Minimal in-memory [SettingsStore] for repo tests; records every key written so tests can assert
