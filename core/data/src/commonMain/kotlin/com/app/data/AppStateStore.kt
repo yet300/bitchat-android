@@ -134,9 +134,11 @@ class AppStateStore(
 
     /**
      * Reset the unread counter of a conversation. [persistReadIds] (the repository's
-     * SeenMessageStore write) runs under the same monitor the add*Message paths take, so a
-     * message cannot slip between the persist snapshot and the counter reset and end up
-     * neither counted nor persisted as read (audit finding A9).
+     * SeenMessageStore mark) runs under the same monitor the add*Message paths take, so a
+     * message cannot slip between the read-set update and the counter reset and end up
+     * neither counted nor marked read (audit finding A9). SeenMessageStore updates its in-memory
+     * read set synchronously here but debounces the actual encrypted disk write off this monitor,
+     * so the write no longer stalls ingest (audit S15).
      */
     fun markRead(conversationKey: String, persistReadIds: ((List<String>) -> Unit)? = null) {
         lock.withLock {

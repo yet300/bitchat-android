@@ -157,8 +157,10 @@ object TransportFactoryBindings {
 
     @Provides
     @SingleIn(AppScope::class)
-    fun provideSeenMessageStore(secure: SecureIdentityStateManager): SeenMessageStore =
-        SeenMessageStore(secure)
+    fun provideSeenMessageStore(
+        secure: SecureIdentityStateManager,
+        dispatchers: AppDispatchers,
+    ): SeenMessageStore = SeenMessageStore(secure, dispatchers)
 
     @Provides
     @SingleIn(AppScope::class)

@@ -4,6 +4,7 @@ import android.app.Application
 import android.os.Process
 import androidx.core.app.NotificationManagerCompat
 import com.app.data.AppStateStore
+import com.app.transport.SeenMessageStore
 import com.app.transport.mesh.MeshLifecycleController
 import com.app.transport.net.TorMode
 import kotlinx.coroutines.CoroutineScope
@@ -16,6 +17,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Coordinates a full application shutdown:
@@ -44,6 +46,7 @@ object AppShutdownCoordinator {
         stopForeground: () -> Unit,
         stopService: () -> Unit,
         appStateStore: AppStateStore,
+        seenMessageStore: SeenMessageStore,
     ) {
         val token = shutdownToken.incrementAndGet()
         shutdownJob?.cancel()
@@ -54,6 +57,10 @@ object AppShutdownCoordinator {
                     .setPackage(app.packageName)
                 app.sendBroadcast(intent, com.yet.bitmessage.android.util.AppConstants.UI.PERMISSION_FORCE_FINISH)
             } catch (_: Exception) { }
+
+            // Flush the debounced seen-receipt store synchronously before we kill the process,
+            // so the last debounce window of delivery/read ACKs is not lost.
+            try { seenMessageStore.flush() } catch (_: Exception) { }
 
             // Stop mesh (best-effort)
             try { mesh?.stop() } catch (_: Exception) { }
@@ -72,7 +79,7 @@ object AppShutdownCoordinator {
             try { notificationManager.cancel(10001) } catch (_: Exception) { }
 
             // Wait up to 5 seconds for shutdown tasks
-            withTimeoutOrNull(5000) {
+            withTimeoutOrNull(5000.milliseconds) {
                 try { torStop.await() } catch (_: Exception) { }
                 delay(100)
             }

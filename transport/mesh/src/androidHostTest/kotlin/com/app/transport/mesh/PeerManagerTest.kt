@@ -1,8 +1,13 @@
 package com.app.transport.mesh
 
+import com.app.common.AppDispatchers
 import com.app.crypto.identity.PeerFingerprintManager
 import junit.framework.TestCase.assertEquals
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicInteger
 
 
 class PeerManagerTest {
@@ -256,5 +261,37 @@ class PeerManagerTest {
         val actualLine2 = debugLines[1]
 
         assertEquals(expectedLine2, actualLine2)
+    }
+
+    /**
+     * S5 fix: a burst of first-announce peers (entering a dense zone) must collapse into a single
+     * coalesced delegate fan-out rather than one sorted full-list emission per peer.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun peer_list_updates_are_debounced_into_one_emission() {
+        val scheduler = TestCoroutineScheduler()
+        val pm = PeerManager(
+            PeerFingerprintManager(),
+            AppDispatchers(io = StandardTestDispatcher(scheduler)),
+        )
+        val updates = AtomicInteger(0)
+        pm.delegate = object : PeerManagerDelegate {
+            override fun onPeerListUpdated(peerIDs: List<String>) { updates.incrementAndGet() }
+            override fun onPeerRemoved(peerID: String) {}
+        }
+
+        repeat(50) { pm.addOrUpdatePeer("peer$it", "n$it") }
+
+        // The debounce worker has not fired yet: the burst produced no fan-out.
+        scheduler.runCurrent()
+        assertEquals(0, updates.get())
+
+        // After the debounce window, the whole burst collapses into a single delegate update.
+        scheduler.advanceTimeBy(400)
+        scheduler.runCurrent()
+        assertEquals(1, updates.get())
+
+        pm.shutdown()
     }
 }
