@@ -271,8 +271,22 @@ class NostrRelayManager internal constructor(
                 }
             }
         }
+
+        // Retry events requeued because a connected relay's send buffer was full (the trySend hole).
+        scope.launch {
+            while (isActive) {
+                delay(NostrConstants.PENDING_FLUSH_INTERVAL_MS.milliseconds)
+                try {
+                    flushPendingToConnectedRelays()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e(TAG, "Pending-event flush failed: ${e.message}")
+                }
+            }
+        }
     }
-    
+
     /**
      * Connect to all configured relays
      */
@@ -326,8 +340,33 @@ class NostrRelayManager internal constructor(
 
         scope.launch {
             sendNow.forEach { relayUrl ->
-                connections[relayUrl]?.let { webSocket ->
-                    sendToRelay(event, webSocket, relayUrl)
+                val webSocket = connections[relayUrl]
+                val sent = webSocket != null && sendToRelay(event, webSocket, relayUrl)
+                if (!sent) {
+                    // Connected-but-busy (ktor outgoing buffer full) or the connection vanished
+                    // mid-send: requeue for retry instead of silently dropping the event (the old
+                    // trySend hole). submit with isConnected={false} forces it into the pending queue;
+                    // the flush loop / next reconnect drains it via drainFor exactly once (no dupes).
+                    val (_, dropped) = pendingEvents.submit(event, listOf(relayUrl)) { false }
+                    dropped.forEach {
+                        Log.w(TAG, "⚠️ Pending event queue full: dropped ${it.id.take(16)}…")
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Retry events that were requeued because a *connected* relay's send buffer was momentarily full.
+     * Those never trigger onRelayConnected (the relay stays up), so without this tick they would wait
+     * until the next disconnect/reconnect. drainFor removes atomically, so an event is re-sent once.
+     */
+    private fun flushPendingToConnectedRelays() {
+        connections.keys.toList().forEach { relayUrl ->
+            val webSocket = connections[relayUrl] ?: return@forEach
+            pendingEvents.drainFor(relayUrl).forEach { event ->
+                if (!sendToRelay(event, webSocket, relayUrl)) {
+                    pendingEvents.submit(event, listOf(relayUrl)) { false }
                 }
             }
         }
@@ -507,23 +546,26 @@ class NostrRelayManager internal constructor(
         }
     }
     
-    private fun sendToRelay(event: NostrEvent, webSocket: DefaultClientWebSocketSession, relayUrl: String) {
-        try {
+    /** @return true if the frame was accepted by the socket; false if it was busy/failed (requeue). */
+    private fun sendToRelay(event: NostrEvent, webSocket: DefaultClientWebSocketSession, relayUrl: String): Boolean {
+        return try {
             val request = NostrRequest.Event(event)
             val message = NostrRequest.toJson(request)
-            
+
             Log.v(TAG, "📤 Sending Nostr event (kind: ${event.kind}) to relay: $relayUrl")
-            
+
             val success = webSocket.trySendText(message)
             if (success) {
                 // Update relay stats (coalesced publish — see markRelaysStatsDirty)
                 relaysByUrl[relayUrl]?.let { it.messagesSent += 1 }
                 markRelaysStatsDirty()
             } else {
-                Log.e(TAG, "❌ Failed to send event to $relayUrl: WebSocket send failed")
+                Log.w(TAG, "⚠️ Send buffer full for $relayUrl — requeueing event ${event.id.take(16)}…")
             }
+            success
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to send event to $relayUrl: ${e.message}")
+            false
         }
     }
     
@@ -731,7 +773,10 @@ class NostrRelayManager internal constructor(
         // reconnect — same eventual-delivery guarantee as before, now without re-sending
         // already-delivered events.
         pendingEvents.drainFor(relayUrl).forEach { event ->
-            sendToRelay(event, session, relayUrl)
+            if (!sendToRelay(event, session, relayUrl)) {
+                // Busy immediately after connect — keep it queued for the flush tick.
+                pendingEvents.submit(event, listOf(relayUrl)) { false }
+            }
         }
     }
 

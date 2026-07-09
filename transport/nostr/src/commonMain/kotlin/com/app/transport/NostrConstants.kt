@@ -30,6 +30,10 @@ object NostrConstants {
     // timer (it piggybacks on foreground/activity); the transport layer can't see those, so we poll.
     const val RELAY_REPROBE_INTERVAL_MS: Long = 120_000L
 
+    // How often to retry events that were requeued because a connected relay's send buffer was full
+    // (the "connected but busy" trySend hole). Short, since the buffer usually clears in moments.
+    const val PENDING_FLUSH_INTERVAL_MS: Long = 3_000L
+
     // Transport
     const val READ_ACK_INTERVAL_MS: Long = 350L
 

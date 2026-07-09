@@ -85,6 +85,29 @@ class PendingEventQueueTest {
         assertEquals(listOf(relayA), queue.pendingRelaysOf("e2"))
     }
 
+    /**
+     * Phase 5 (trySend hole): an event to a *connected* relay whose send buffer was full is requeued
+     * via submit(..) { false } and must then drain exactly once — never lost, never double-sent.
+     */
+    @Test
+    fun requeuedBusyEventDrainsExactlyOnce() {
+        val queue = PendingEventQueue<String>()
+
+        // Initially the relay is connected → not queued.
+        assertEquals(listOf(relayA), queue.submit("e1", listOf(relayA)) { true }.sendNow)
+        assertEquals(0, queue.size())
+
+        // Send failed (buffer full) → requeue for that relay.
+        queue.submit("e1", listOf(relayA)) { false }
+        assertEquals(1, queue.size())
+
+        // Flush tick drains it once…
+        assertEquals(listOf("e1"), queue.drainFor(relayA))
+        // …and a second flush does not re-send it.
+        assertTrue(queue.drainFor(relayA).isEmpty())
+        assertEquals(0, queue.size())
+    }
+
     @Test
     fun clearEmptiesQueue() {
         val queue = PendingEventQueue<String>()
