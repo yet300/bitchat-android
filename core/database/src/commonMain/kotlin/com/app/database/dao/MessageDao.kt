@@ -11,6 +11,20 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 
 /**
+ * Synchronous write/read primitives usable *inside* a single [MessageDao.runInTransaction] block.
+ * All calls run on the transaction's own connection, so a read observes writes made earlier in the
+ * same block — this is what lets a batched insert→status-update pair stay consistent (the status
+ * update sees the row its own batch just inserted).
+ */
+interface MessageTransaction {
+    fun upsert(message: Message)
+    fun selectById(id: String): Message?
+    fun deleteById(id: String)
+    fun deleteByConversation(conversationId: String)
+    fun deleteAll()
+}
+
+/**
  * Message timeline access. Returns the generated [Message] entity; mapping to the domain `BitMessage`
  * stays in the data layer. `conversationId` uses the AppStateStore key scheme
  * (public / private:<peer> / channel:<tag> / geo:<gh>).
@@ -19,6 +33,54 @@ class MessageDao(
     private val databaseManager: DatabaseManager,
     private val dispatchers: AppDispatchers,
 ) {
+
+    /**
+     * Run [block] against a single SQLDelight transaction (one fsync for the whole batch instead of
+     * one per statement). The generated [MessageQueries] stays hidden behind [MessageTransaction] so
+     * callers never depend on generated types.
+     */
+    suspend fun runInTransaction(block: (MessageTransaction) -> Unit) = withContext(dispatchers.io) {
+        val queries = databaseManager.getDb().messageQueries
+        queries.transaction {
+            block(object : MessageTransaction {
+                override fun upsert(message: Message) {
+                    queries.upsert(
+                        id = message.id,
+                        conversation_id = message.conversation_id,
+                        sender_peer_id = message.sender_peer_id,
+                        sender_name = message.sender_name,
+                        content = message.content,
+                        timestamp = message.timestamp,
+                        type = message.type,
+                        is_mine = message.is_mine,
+                        is_relay = message.is_relay,
+                        mentions = message.mentions,
+                        delivery_status = message.delivery_status,
+                        attachment_path = message.attachment_path,
+                        attachment_type = message.attachment_type,
+                        pow_difficulty = message.pow_difficulty,
+                        channel = message.channel,
+                        wire_json = message.wire_json,
+                    )
+                }
+
+                override fun selectById(id: String): Message? =
+                    queries.selectById(id).executeAsOneOrNull()
+
+                override fun deleteById(id: String) {
+                    queries.deleteById(id)
+                }
+
+                override fun deleteByConversation(conversationId: String) {
+                    queries.deleteByConversation(conversationId)
+                }
+
+                override fun deleteAll() {
+                    queries.deleteAll()
+                }
+            })
+        }
+    }
 
     suspend fun upsert(message: Message) = withContext(dispatchers.io) {
         databaseManager.getDb().messageQueries.upsert(
