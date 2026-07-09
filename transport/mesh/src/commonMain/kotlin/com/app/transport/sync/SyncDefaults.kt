@@ -13,5 +13,11 @@ internal object SyncDefaults {
 
     // Periodic cleanup interval for the gossip sync caches
     const val CLEANUP_INTERVAL_MS: Long = 60_000L
+
+    // Safety ceiling for the announce store (latest announce per peer). Announces are
+    // bounded by the 180s liveness prune, NOT by seenCapacity (iOS has no cap at all);
+    // this fixed ceiling only guards against hostile peer-ID spoofing. 2000 covers the
+    // 1000-peer design target with 2x headroom at ~0.6 MB worst case (~300 B/announce).
+    const val DEFAULT_ANNOUNCE_CAPACITY: Int = 2000
 }
 

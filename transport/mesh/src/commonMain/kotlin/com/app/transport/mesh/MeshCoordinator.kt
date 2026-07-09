@@ -147,9 +147,11 @@ class MeshCoordinator(
             myPeerID = myPeerID,
             scope = serviceScope,
             configProvider = object : GossipSyncManager.ConfigProvider {
+                // 1000 matches iOS Config.seenCapacity (messages + GCS filter cap only;
+                // the announce store is bounded separately by announceCapacity()).
                 override fun seenCapacity(): Int = try {
-                    debugPreferenceManager.getSeenPacketCapacity(500)
-                } catch (_: Exception) { 500 }
+                    debugPreferenceManager.getSeenPacketCapacity(1000)
+                } catch (_: Exception) { 1000 }
 
                 override fun gcsMaxBytes(): Int = try {
                     debugPreferenceManager.getGcsMaxFilterBytes(400)

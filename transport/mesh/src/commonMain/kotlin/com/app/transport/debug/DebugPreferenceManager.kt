@@ -38,7 +38,7 @@ class DebugPreferenceManager(
     fun setMaxConnectionsClient(value: Int) = store.setMaxConnectionsClient(value)
 
     // Sync/GCS settings
-    fun getSeenPacketCapacity(default: Int = 500): Int = store.getSeenPacketCapacity(default)
+    fun getSeenPacketCapacity(default: Int = 1000): Int = store.getSeenPacketCapacity(default)
 
     fun setSeenPacketCapacity(value: Int) = store.setSeenPacketCapacity(value)
 
