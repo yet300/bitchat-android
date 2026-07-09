@@ -13,6 +13,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
 
 /**
  * Shared transport send wrapper that applies bitchat packet fragmentation and
@@ -26,9 +27,13 @@ class FragmentingPacketSender(
     private val fragmentManager: FragmentManager?,
     private val transferProgressManager: TransferProgressManager,
     private val logTag: String,
-    private val interFragmentDelayMs: Long = 20L
+    private val interFragmentDelayMs: Long = 20L,
+    // Simultaneous large media transfers (iOS bleMaxConcurrentTransfers). A file transfer beyond the
+    // limit waits for a slot instead of flooding the radio and starving interactive traffic.
+    maxConcurrentTransfers: Int = 2,
 ) {
     private val transferJobs = ConcurrentMutableMap<String, Job>()
+    private val transferSlots = Semaphore(maxConcurrentTransfers.coerceAtLeast(1))
 
     fun send(
         routed: RoutedPacket,
@@ -56,36 +61,44 @@ class FragmentingPacketSender(
             transferProgressManager.start(transferId, total)
         }
 
+        // Only bulk media (file transfers) is slot-gated; interactive fragmented frames are not, so
+        // a running large transfer never blocks a message from going out.
+        val gated = routed.packet.type == MessageType.FILE_TRANSFER.value
         val job = scope.launch(start = CoroutineStart.LAZY) {
-            var sent = 0
-            for (packet in packets) {
-                if (!isActive) return@launch
-                if (transferId != null && transferJobs[transferId]?.isCancelled == true) return@launch
+            if (gated) transferSlots.acquire()
+            try {
+                var sent = 0
+                for (packet in packets) {
+                    if (!isActive) return@launch
+                    if (transferId != null && transferJobs[transferId]?.isCancelled == true) return@launch
 
-                val fragment = routed.copy(packet = packet, transferId = transferId)
-                val delivered = try {
-                    sendSingle(fragment)
-                } catch (e: Exception) {
-                    Log.e(logTag, "Fragment send failed for $description: ${e.message}", e)
-                    false
+                    val fragment = routed.copy(packet = packet, transferId = transferId)
+                    val delivered = try {
+                        sendSingle(fragment)
+                    } catch (e: Exception) {
+                        Log.e(logTag, "Fragment send failed for $description: ${e.message}", e)
+                        false
+                    }
+
+                    if (!delivered) {
+                        Log.w(logTag, "Stopping fragmented send for $description after $sent/$total fragments")
+                        return@launch
+                    }
+
+                    sent += 1
+                    if (transferId != null) {
+                        transferProgressManager.progress(transferId, sent, total)
+                    }
+                    if (sent < total) {
+                        delay(interFragmentDelayMs)
+                    }
                 }
 
-                if (!delivered) {
-                    Log.w(logTag, "Stopping fragmented send for $description after $sent/$total fragments")
-                    return@launch
-                }
-
-                sent += 1
                 if (transferId != null) {
-                    transferProgressManager.progress(transferId, sent, total)
+                    transferProgressManager.complete(transferId, total)
                 }
-                if (sent < total) {
-                    delay(interFragmentDelayMs)
-                }
-            }
-
-            if (transferId != null) {
-                transferProgressManager.complete(transferId, total)
+            } finally {
+                if (gated) transferSlots.release()
             }
         }
 

@@ -7,7 +7,7 @@ import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.MessageType
 import com.app.transport.protocol.SpecialRecipients
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -52,10 +52,11 @@ interface BleRadioLink {
  *  - broadcast with relay/sender anti-loop,
  *  - per-target relay telemetry through the [MeshTrafficLog] port (null = silent, Apple today).
  *
- * Broadcast sends are serialized through an unbounded [Channel] with a single consumer — the same
- * model as the JVM `actor` the Android broadcaster used (an actor IS a channel plus a consumer
- * coroutine), so FIFO order and single-writer discipline are preserved. [sendToPeer] stays
- * synchronous on the caller, exactly as before on both platforms.
+ * Broadcast sends are serialized through a bounded, priority-ordered [BleOutboundFrameQueue] with a
+ * single consumer — the same single-writer / FIFO-per-priority discipline as the JVM `actor` the
+ * Android broadcaster used, but now capped (a message storm can no longer grow it without bound) and
+ * priority-aware (own traffic dequeues before relay; on overflow the relay/media tail is shed first
+ * with telemetry). [sendToPeer] stays synchronous on the caller, exactly as before on both platforms.
  */
 class BleSendCore(
     private val scope: CoroutineScope,
@@ -66,17 +67,29 @@ class BleSendCore(
     private val trafficLog: MeshTrafficLog?,
     private val sourceRoutingEnabled: Boolean,
     private val logTag: String,
+    private val config: BleRadioConfig = BleRadioConfig(),
 ) {
     private var nicknameResolver: ((String) -> String?)? = null
 
     private val fragmentingSender =
-        FragmentingPacketSender(scope, fragmentManager, transferProgressManager, logTag)
+        FragmentingPacketSender(
+            scope, fragmentManager, transferProgressManager, logTag,
+            interFragmentDelayMs = config.fragmentSpacingMs,
+            maxConcurrentTransfers = config.maxConcurrentTransfers,
+        )
 
-    private val sendQueue = Channel<RoutedPacket>(Channel.UNLIMITED)
+    private val sendQueue = BleOutboundFrameQueue(config.sendQueueCapacity) {
+        trafficLog?.onOutboundDropped(BearerId.BLE)
+    }
 
     init {
         scope.launch {
-            for (routed in sendQueue) sendSinglePacketInternal(routed)
+            try {
+                while (isActive) sendSinglePacketInternal(sendQueue.receive())
+            } catch (_: ClosedReceiveChannelException) {
+                // shutdown() closed the queue — end the consumer cleanly, as the old `for (x in
+                // channel)` loop did.
+            }
         }
     }
 
@@ -115,20 +128,16 @@ class BleSendCore(
         sendQueue.close()
     }
 
-    @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
     fun getDebugInfo(): String = buildString {
         appendLine("=== BLE Send Core Debug Info ===")
         appendLine("Scope Active: ${scope.isActive}")
-        appendLine("Queue Closed: ${sendQueue.isClosedForSend}")
         appendLine("Source Routing: $sourceRoutingEnabled")
     }
 
     private fun enqueue(routed: RoutedPacket): Boolean {
-        val result = sendQueue.trySend(routed)
-        if (result.isFailure) {
-            Log.w(logTag, "Send queue rejected packet, processing directly")
-            scope.launch { sendSinglePacketInternal(routed) }
-        }
+        // Bounded priority queue: never rejects — sheds the lowest-priority (relay/bulk) tail on
+        // overflow with telemetry, so our own interactive frames are the last to be dropped.
+        sendQueue.offer(routed, BleOutboundPriority.of(routed))
         return true
     }
 

@@ -84,6 +84,14 @@ interface MeshTrafficLog {
      * of inbound frames — including NOISE_ENCRYPTED addressed to us — becomes observable.
      */
     fun onIncomingDropped(bearerId: BearerId) {}
+
+    /**
+     * An outbound frame (or its queued chunk tail) was shed under back-pressure: the shared send
+     * queue or a per-link outbound buffer overflowed while the radio stack stayed busy. Default
+     * no-op; the debug telemetry counts these per bearer so outbound loss — relay/media tails first,
+     * never our own interactive packets — is observable instead of silent.
+     */
+    fun onOutboundDropped(bearerId: BearerId) {}
 }
 
 /**
