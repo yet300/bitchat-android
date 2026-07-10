@@ -8,6 +8,7 @@ import com.app.common.utils.Log
 import com.app.database.dao.GeohashDao
 import com.app.data.AppStateStore
 import com.app.data.nostr.CurrentGeohashSource
+import com.app.data.nostr.GeohashPresencePublisher
 import com.app.domain.app.AppForegroundState
 import com.app.domain.model.ConversationId
 import com.app.domain.model.GeoPerson
@@ -58,6 +59,7 @@ internal class GeohashRepositoryImpl(
     private val conversationRegistry: GeohashConversationRegistry,
     private val geohashDao: GeohashDao,
     private val appForegroundState: AppForegroundState,
+    private val presencePublisher: GeohashPresencePublisher,
     private val scope: CoroutineScope,
 ) : GeohashRepository, CurrentGeohashSource {
 
@@ -179,6 +181,8 @@ internal class GeohashRepositoryImpl(
         }.onFailure { Log.e(TAG, "subscribe messages($geohash) failed: ${it.message}") }
         // High-volume presence firehose (kind 20001): only while foreground (#706).
         if (appForegroundState.isForeground.value) subscribePresence(geohash)
+        // Publish our own heartbeat on the same lifecycle, so other clients count us as present.
+        presencePublisher.start(geohash)
     }
 
     /** Subscribe to the geohash presence firehose (kind 20001) — paused while backgrounded. */
@@ -202,6 +206,7 @@ internal class GeohashRepositoryImpl(
             current = activeGeohash
             activeGeohash = null
         }
+        presencePublisher.stop()
         current?.let {
             relayManager.unsubscribe(messagesSubId(it))
             relayManager.unsubscribe(presenceSubId(it))
