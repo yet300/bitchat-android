@@ -6,6 +6,8 @@ import com.app.common.utils.Log
 import com.app.transport.MeshTelemetry
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
+import com.app.transport.protocol.SpecialRecipients
+import com.app.transport.crypto.Sha256
 import com.app.transport.model.RoutedPacket
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -22,6 +24,10 @@ internal class PacketProcessor(
     private val myPeerID: String,
     private val debugSettingsManager: MeshTelemetry,
     dispatchers: AppDispatchers = AppDispatchers(),
+    // Public broadcast MESSAGE intake budget (iOS ChatViewModel.publicRateLimiter parity):
+    // per-sender + per-content token buckets, checked before store/relay. Mesh has no
+    // PoW, so powBits stays 0 and the sender bucket always applies. Injectable for tests.
+    private val publicMessageRateLimiter: MessageRateLimiter = MessageRateLimiter(),
 ) {
     private val debugManager = debugSettingsManager
     
@@ -195,7 +201,14 @@ internal class PacketProcessor(
         // Handle public packet types (no address check needed)
         when (messageType) {
             MessageType.ANNOUNCE -> handleAnnounce(routed)
-            MessageType.MESSAGE -> handleMessage(routed)
+            MessageType.MESSAGE -> {
+                // Public broadcast MESSAGE intake budget, BEFORE store and relay: a
+                // flooding sender (or a replayed content burst) is dropped here and
+                // never amplified. Directed messages are not gated (iOS parity: the
+                // limiter guards the public intake).
+                if (isBroadcast(packet) && !allowPublicMessage(routed, peerID)) return
+                handleMessage(routed)
+            }
             MessageType.FILE_TRANSFER -> handleMessage(routed) // treat same routing path; parsing happens in handler
             MessageType.LEAVE -> handleLeave(routed)
             MessageType.FRAGMENT -> handleFragment(routed)
@@ -227,6 +240,24 @@ internal class PacketProcessor(
         }
     }
     
+    private fun isBroadcast(packet: BitchatPacket): Boolean {
+        val recipientID = packet.recipientID ?: return true
+        return recipientID.contentEquals(SpecialRecipients.BROADCAST)
+    }
+
+    /** Both buckets must pass; drop is logged + counted, never relayed. */
+    private fun allowPublicMessage(routed: RoutedPacket, peerID: String): Boolean {
+        val contentKey = try {
+            Sha256.digest(routed.packet.payload).copyOf(8).hexEncodedString()
+        } catch (_: Exception) {
+            routed.packet.payload.size.toString()
+        }
+        if (publicMessageRateLimiter.allow(senderKey = peerID, contentKey = contentKey)) return true
+        Log.w(TAG, "Rate-limited public MESSAGE from ${formatPeerForLog(peerID)}")
+        try { debugManager.onRateLimitDrop("publicMessage") } catch (_: Exception) { }
+        return false
+    }
+
     /**
      * Handle Noise handshake message - SIMPLIFIED iOS-compatible version
      */

@@ -53,7 +53,9 @@ class PacketProcessorFifoOrderTest {
         val packet = BitchatPacket(
             type = MessageType.MESSAGE.value,
             senderID = ByteArray(8),
-            recipientID = null,
+            // Directed (non-broadcast) so the P5 public-intake rate limiter does not
+            // gate the burst — this test samples pure per-peer ordering, not policy.
+            recipientID = ByteArray(8) { 0x42 },
             timestamp = marker.toULong(),
             payload = "m$marker".encodeToByteArray(),
             ttl = 1u,

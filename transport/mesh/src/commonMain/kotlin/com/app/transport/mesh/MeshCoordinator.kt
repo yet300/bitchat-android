@@ -93,7 +93,7 @@ class MeshCoordinator(
     // Engine components. Rebuilt in place by reset()/revival — the BMS object itself keeps
     // its graph identity, so  consumers never hold a stale reference.
     private var peerManager = PeerManager(peerFingerprintManager)
-    private var securityManager = SecurityManager(encryptionService, myPeerID)
+    private var securityManager = SecurityManager(encryptionService, myPeerID, trafficLog = debugSettingsManager)
     private var storeForwardManager = StoreForwardManager()
     private var messageHandler = MessageHandler(myPeerID, incomingFileStore, meshGraphService, dispatchers)
 
@@ -286,7 +286,7 @@ class MeshCoordinator(
         myPeerID = encryptionService.getIdentityFingerprint().take(16)
         peerManager = PeerManager(peerFingerprintManager)
         fragmentManager.clearAllFragments()
-        securityManager = SecurityManager(encryptionService, myPeerID)
+        securityManager = SecurityManager(encryptionService, myPeerID, trafficLog = debugSettingsManager)
         storeForwardManager = StoreForwardManager()
         messageHandler = MessageHandler(myPeerID, incomingFileStore, meshGraphService, dispatchers)
         packetProcessor = PacketProcessor(myPeerID, debugSettingsManager)
