@@ -377,6 +377,12 @@ internal class MeshComponentWiring(
                 return peerManager.getActivePeerCount()
             }
 
+            override fun getLocalDegree(): Int {
+                // Directly connected links across all bearers — the iOS RelayController
+                // degree. Deliberately NOT getActivePeerCount() (total multi-hop peers).
+                return try { meshNetwork.allNeighbors.size } catch (_: Exception) { 0 }
+            }
+
             override fun getBroadcastRecipient(): ByteArray {
                 return SpecialRecipients.BROADCAST
             }

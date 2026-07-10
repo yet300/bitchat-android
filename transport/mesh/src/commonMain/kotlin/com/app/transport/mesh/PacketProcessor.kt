@@ -137,7 +137,11 @@ internal class PacketProcessor(
             override fun getNetworkSize(): Int {
                 return delegate?.getNetworkSize() ?: 1
             }
-            
+
+            override fun getLocalDegree(): Int {
+                return delegate?.getLocalDegree() ?: 0
+            }
+
             override fun getBroadcastRecipient(): ByteArray {
                 return delegate?.getBroadcastRecipient() ?: ByteArray(0)
             }
@@ -184,7 +188,7 @@ internal class PacketProcessor(
             val mt = messageType?.name ?: packet.type.toString()
             val routeDevice = routed.relayAddress
             val nick = delegate?.getPeerNickname(peerID)
-            debugManager?.logIncomingPacket(peerID, nick, mt, routeDevice)
+            debugManager.logIncomingPacket(peerID, nick, mt, routeDevice)
         } catch (_: Exception) { }
         
         
@@ -360,6 +364,9 @@ internal interface PacketProcessorDelegate {
     
     // Network information
     fun getNetworkSize(): Int
+
+    /** LOCAL degree = directly connected links; the relay TTL clamp keys on this. */
+    fun getLocalDegree(): Int
     fun getBroadcastRecipient(): ByteArray
     
     // Message type handlers

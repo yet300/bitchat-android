@@ -19,6 +19,10 @@ import kotlin.test.assertTrue
  * (CoreBluetooth) target set, which cannot be exercised on the iOS simulator (no BLE radio); the
  * `= true` cases pin the Android set. Must match the platform behavior frozen in
  * BleSendPathGoldenTest — do not update expectations, fix the code.
+ *
+ * SYNC_SCALE P4 (owner-approved): frame BYTES stay frozen, but non-exempt broadcasts now
+ * target the deterministic BLEFanoutSelector subset instead of all links. Target-set
+ * expectations were updated deliberately for that policy; byte vectors were not.
  */
 class BleSendCoreGoldenTest {
 
@@ -89,15 +93,60 @@ class BleSendCoreGoldenTest {
     private fun expectedFrame(p: BitchatPacket): ByteArray =
         p.toBinaryData(padding = BLEPacketPaddingPolicy.shouldPadForBLE(p.type))!!
 
+    /**
+     * SYNC_SCALE P4: non-exempt broadcasts go to a deterministic per-message fanout
+     * SUBSET of the eligible links (iOS BLEFanoutSelector), not all of them. Frame
+     * BYTES are unchanged — only the target-link selection is a local relay policy.
+     * Expected targets are computed with the same deterministic selector.
+     */
+    private fun expectedBroadcastTargets(
+        p: BitchatPacket,
+        eligible: List<String>,
+    ): List<String> {
+        if (!BleFanoutSelector.shouldSubset(p.type)) return eligible
+        val chosen = BleFanoutSelector.selectSubset(
+            linkIds = eligible,
+            k = BleFanoutSelector.subsetSize(eligible.size),
+            seed = com.app.transport.sync.PacketIdUtil.computeIdHex(p),
+        )
+        return eligible.filter { it in chosen }
+    }
+
     @Test
-    fun `broadcast hits all links in order - servers first - exact bytes`() = runTest {
+    fun `broadcast MESSAGE hits the deterministic fanout subset - servers-first order - exact bytes`() = runTest {
         val core = core(sourceRouting = false)
         val p = packet()
         core.broadcastPacket(RoutedPacket(p))
         advanceUntilIdle()
 
+        val allLinks = listOf(ADDR_SRV_1, ADDR_SRV_2, ADDR_CLI_1, ADDR_CLI_2)
+        val expected = expectedBroadcastTargets(p, allLinks)
+        assertEquals(3, expected.size) // subsetSize(4) = 3
+        assertEquals(expected, radio.emissions.map { it.first })
+        radio.emissions.forEach { assertContentEquals(expectedFrame(p), it.second) }
+        core.shutdown()
+    }
+
+    @Test
+    fun `broadcast ANNOUNCE bypasses the subset and hits ALL links in order`() = runTest {
+        val core = core(sourceRouting = false)
+        val p = packet(type = MessageType.ANNOUNCE.value)
+        core.broadcastPacket(RoutedPacket(p))
+        advanceUntilIdle()
+
         assertEquals(listOf(ADDR_SRV_1, ADDR_SRV_2, ADDR_CLI_1, ADDR_CLI_2), radio.emissions.map { it.first })
         radio.emissions.forEach { assertContentEquals(expectedFrame(p), it.second) }
+        core.shutdown()
+    }
+
+    @Test
+    fun `broadcast REQUEST_SYNC bypasses the subset and hits ALL links`() = runTest {
+        val core = core(sourceRouting = false)
+        val p = packet(type = MessageType.REQUEST_SYNC.value)
+        core.broadcastPacket(RoutedPacket(p))
+        advanceUntilIdle()
+
+        assertEquals(listOf(ADDR_SRV_1, ADDR_SRV_2, ADDR_CLI_1, ADDR_CLI_2), radio.emissions.map { it.first })
         core.shutdown()
     }
 
@@ -131,8 +180,11 @@ class BleSendCoreGoldenTest {
         core.broadcastPacket(RoutedPacket(p))
         advanceUntilIdle()
 
-        // Recipient link write failed -> historical fallback: broadcast to the remaining links.
-        assertEquals(listOf(ADDR_SRV_1, ADDR_CLI_1, ADDR_CLI_2), radio.emissions.map { it.first })
+        // Recipient link write failed -> historical fallback: broadcast, now through the
+        // P4 fanout subset; a chosen link whose write fails emits nothing.
+        val allLinks = listOf(ADDR_SRV_1, ADDR_SRV_2, ADDR_CLI_1, ADDR_CLI_2)
+        val expected = expectedBroadcastTargets(p, allLinks).filter { it != ADDR_SRV_2 }
+        assertEquals(expected, radio.emissions.map { it.first })
         core.shutdown()
     }
 
@@ -147,8 +199,10 @@ class BleSendCoreGoldenTest {
         core.broadcastPacket(RoutedPacket(p))
         advanceUntilIdle()
 
-        // Pre-C1 CoreBluetooth behavior: no source routing -> unknown recipient -> full broadcast.
-        assertEquals(listOf(ADDR_SRV_1, ADDR_SRV_2, ADDR_CLI_1, ADDR_CLI_2), radio.emissions.map { it.first })
+        // Pre-C1 CoreBluetooth behavior: no source routing -> unknown recipient -> broadcast
+        // (P4: through the deterministic fanout subset for MESSAGE).
+        val expected = expectedBroadcastTargets(p, listOf(ADDR_SRV_1, ADDR_SRV_2, ADDR_CLI_1, ADDR_CLI_2))
+        assertEquals(expected, radio.emissions.map { it.first })
         core.shutdown()
     }
 

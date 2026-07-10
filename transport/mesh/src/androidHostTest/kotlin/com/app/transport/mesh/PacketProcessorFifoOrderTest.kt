@@ -32,6 +32,7 @@ class PacketProcessorFifoOrderTest {
         override fun updatePeerLastSeen(peerID: String) {}
         override fun getPeerNickname(peerID: String): String? = null
         override fun getNetworkSize(): Int = 1
+        override fun getLocalDegree(): Int = 1
         override fun getBroadcastRecipient(): ByteArray = ByteArray(0)
         override suspend fun handleNoiseHandshake(routed: RoutedPacket): Boolean = true
         override fun handleNoiseEncrypted(routed: RoutedPacket) {}

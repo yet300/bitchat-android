@@ -43,6 +43,10 @@ import java.util.Collections
  * These assertions MUST NOT change across the refactor: the unification changes WHERE the logic
  * lives, not the bytes, not the targets. If a case fails after refactoring, fix the code — do not
  * update the expectations.
+ *
+ * SYNC_SCALE P4 (owner-approved): frame BYTES stay frozen, but non-exempt broadcasts now
+ * target the deterministic BLEFanoutSelector subset instead of all links. Target-set
+ * expectations were updated deliberately for that policy; byte vectors were not.
  */
 @RunWith(RobolectricTestRunner::class)
 class BleSendPathGoldenTest {
@@ -232,6 +236,17 @@ class BleSendPathGoldenTest {
     private fun expectedFrame(p: BitchatPacket): ByteArray =
         p.toBinaryData(padding = BLEPacketPaddingPolicy.shouldPadForBLE(p.type))!!
 
+    /** P4 fanout: expected broadcast target set for the default 4-link topology. */
+    private fun expectedBroadcastSet(p: BitchatPacket): Set<String> {
+        val all = listOf(ADDR_SRV_1, ADDR_SRV_2, ADDR_CLI_1, ADDR_CLI_2)
+        if (!BleFanoutSelector.shouldSubset(p.type)) return all.toSet()
+        return BleFanoutSelector.selectSubset(
+            linkIds = all,
+            k = BleFanoutSelector.subsetSize(all.size),
+            seed = com.app.transport.sync.PacketIdUtil.computeIdHex(p),
+        )
+    }
+
     private fun awaitEmissions(count: Int) {
         val deadline = System.currentTimeMillis() + TIMEOUT_MS
         while (emissions.size < count && System.currentTimeMillis() < deadline) Thread.sleep(5)
@@ -248,9 +263,27 @@ class BleSendPathGoldenTest {
     // ------------------------------------------------------------------
 
     @Test
-    fun `broadcast goes to all neighbors, servers first, exact bytes, no padding for MESSAGE`() {
+    fun `broadcast MESSAGE goes to the deterministic fanout subset, exact bytes, no padding`() {
         defaultTopology()
         val p = packet()
+        val expected = expectedFrame(p)
+        val expectedTargets = expectedBroadcastSet(p) // subsetSize(4) = 3
+
+        broadcast(RoutedPacket(p))
+        awaitEmissions(3)
+
+        val snapshot = emissions.toList()
+        assertEquals(expectedTargets, snapshot.map { it.address }.toSet())
+        // Every frame is byte-identical to the unpadded BinaryProtocol encoding.
+        snapshot.forEach { assertArrayEquals(expected, it.frame) }
+        // Telemetry logged one outgoing entry per delivered frame, same addresses.
+        assertEquals(snapshot.map { it.address }, telemetryTargets.toList())
+    }
+
+    @Test
+    fun `broadcast ANNOUNCE bypasses the subset - all neighbors, servers first`() {
+        defaultTopology()
+        val p = packet(type = MessageType.ANNOUNCE.value)
         val expected = expectedFrame(p)
 
         broadcast(RoutedPacket(p))
@@ -261,10 +294,7 @@ class BleSendPathGoldenTest {
         assertEquals(listOf(ADDR_SRV_1, ADDR_SRV_2), snapshot.take(2).map { it.address })
         // Then client neighbors (map order not guaranteed — compare as a set).
         assertEquals(setOf(ADDR_CLI_1, ADDR_CLI_2), snapshot.drop(2).map { it.address }.toSet())
-        // Every frame is byte-identical to the unpadded BinaryProtocol encoding.
         snapshot.forEach { assertArrayEquals(expected, it.frame) }
-        // Telemetry logged one outgoing entry per delivered frame, same addresses.
-        assertEquals(snapshot.map { it.address }, telemetryTargets.toList())
     }
 
     @Test
@@ -290,16 +320,14 @@ class BleSendPathGoldenTest {
     }
 
     @Test
-    fun `directed packet to unknown recipient falls back to full broadcast`() {
+    fun `directed packet to unknown recipient falls back to broadcast fanout subset`() {
         defaultTopology()
         val p = packet(recipient = hexToBytes("9999999999999999"))
+        val expectedTargets = expectedBroadcastSet(p)
         broadcast(RoutedPacket(p))
-        awaitEmissions(4)
+        awaitEmissions(expectedTargets.size)
 
-        assertEquals(
-            setOf(ADDR_SRV_1, ADDR_SRV_2, ADDR_CLI_1, ADDR_CLI_2),
-            emissions.map { it.address }.toSet(),
-        )
+        assertEquals(expectedTargets, emissions.map { it.address }.toSet())
     }
 
     @Test
@@ -318,20 +346,18 @@ class BleSendPathGoldenTest {
     }
 
     @Test
-    fun `source-routed own packet with unreachable first hop falls back to broadcast`() {
+    fun `source-routed own packet with unreachable first hop falls back to broadcast subset`() {
         defaultTopology()
         val p = packet(
             sender = MY_PEER,
             recipient = hexToBytes("9999999999999999"),
             route = listOf(hexToBytes("7777777777777777")),
         )
+        val expectedTargets = expectedBroadcastSet(p)
         broadcast(RoutedPacket(p))
-        awaitEmissions(4)
+        awaitEmissions(expectedTargets.size)
 
-        assertEquals(
-            setOf(ADDR_SRV_1, ADDR_SRV_2, ADDR_CLI_1, ADDR_CLI_2),
-            emissions.map { it.address }.toSet(),
-        )
+        assertEquals(expectedTargets, emissions.map { it.address }.toSet())
     }
 
     @Test

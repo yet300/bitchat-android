@@ -6,6 +6,7 @@ import com.app.transport.MeshTrafficLog
 import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.MessageType
 import com.app.transport.protocol.SpecialRecipients
+import com.app.transport.sync.PacketIdUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.isActive
@@ -190,10 +191,24 @@ class BleSendCore(
             }
         }
 
-        // Broadcast to every neighbor except the relayer and the original sender (loop avoidance).
-        neighbors.forEach { neighbor ->
-            if (neighbor.linkAddress == routed.relayAddress) return@forEach
-            if (neighbor.peerID == senderID) return@forEach
+        // Broadcast with loop avoidance (skip the relayer link and the original sender),
+        // then a deterministic per-message fanout subset for eligible types (iOS
+        // BLEFanoutSelector): non-exempt broadcasts go to ~log2(count)+1 links chosen by
+        // SHA256(messageID + "::" + linkID); fragment/announce/requestSync go to ALL.
+        val eligible = neighbors.filter {
+            it.linkAddress != routed.relayAddress && it.peerID != senderID
+        }
+        val targets = if (BleFanoutSelector.shouldSubset(packet.type)) {
+            val chosen = BleFanoutSelector.selectSubset(
+                linkIds = eligible.map { it.linkAddress },
+                k = BleFanoutSelector.subsetSize(eligible.size),
+                seed = PacketIdUtil.computeIdHex(packet), // the packet's dedup key
+            )
+            eligible.filter { it.linkAddress in chosen }
+        } else {
+            eligible
+        }
+        targets.forEach { neighbor ->
             if (radio.writeToNeighbor(neighbor, data)) {
                 logPacketRelay(routed, neighbor.peerID, neighbor.linkAddress, packet.version, routeInfo)
             }
