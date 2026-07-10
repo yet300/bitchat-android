@@ -4,6 +4,7 @@ import com.app.common.utils.Log
 import com.app.data.nostr.NostrDirectMessageIngest
 import com.app.data.repository.NicknameSync
 import com.app.data.tor.TorActivationController
+import com.app.data.vouch.VouchCoordinator
 import com.app.transport.net.ArtiTorManager
 import com.app.transport.nostr.LocationNotesInitializer
 import com.app.transport.nostr.LocationNotesManager
@@ -40,6 +41,9 @@ class AppNetworkBootstrapper(
     private val nostrIdentityBridge: NostrIdentityBridge,
     private val nostrDirectMessageIngest: NostrDirectMessageIngest,
     private val torActivationController: TorActivationController,
+    // Injected only to force eager creation: its init attaches the mesh vouch-event listener and
+    // starts observing the verified set. Without a reference here nothing constructs it (no UI does).
+    private val vouchCoordinator: VouchCoordinator,
 ) {
     private companion object {
         private const val TAG = "AppNetworkBootstrapper"
@@ -93,6 +97,10 @@ class AppNetworkBootstrapper(
             nostrDirectMessageIngest.start()
         } catch (_: Exception) {
         }
+
+        // Touch the vouch coordinator so it is constructed (its init wires the mesh listener). The
+        // reference alone forces creation; this keeps the dependency from reading as unused.
+        vouchCoordinator.hashCode()
 
         Log.i(TAG, "Network bootstrap complete")
     }

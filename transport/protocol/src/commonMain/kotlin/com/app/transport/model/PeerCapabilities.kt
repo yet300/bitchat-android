@@ -55,16 +55,17 @@ value class PeerCapabilities(val rawValue: ULong) {
         val BRIDGE = PeerCapabilities(1uL shl 7)
 
         /**
-         * What this client advertises. Empty: every bit above names a wire feature we do not
-         * implement (prekey bundles 0x24, group messages 0x25, board posts 0x23, vouch payloads,
-         * gateway/bridge carriers, Wi-Fi bulk transfer). Advertising a bit we cannot honour would
-         * make peers route work to us that we silently drop.
+         * What this client advertises. Only [VOUCH]: transitive verification (vouch payload 0x12)
+         * is fully implemented — we emit and accept batches under the reference's gates. Every other
+         * bit still names a wire feature we do not implement (prekey bundles 0x24, group messages
+         * 0x25, board posts 0x23, gateway/bridge carriers, Wi-Fi bulk transfer), and advertising a
+         * bit we cannot honour would make peers route work to us that we silently drop.
          *
          * [MESH_DIAGNOSTICS] is deliberately withheld even though ping/pong now work: the reference
          * client implements them too and still leaves the bit out of its own `localSupported`, so
          * the bit's exact contract is unsettled. Turn bits on here as each feature lands.
          */
-        val LOCAL_SUPPORTED = NONE
+        val LOCAL_SUPPORTED = VOUCH
 
         /** Accepts any length; bytes beyond the low 64 bits are ignored for forward compatibility. */
         fun decode(data: ByteArray): PeerCapabilities {

@@ -188,21 +188,22 @@ class AnnounceCapabilitiesGoldenTest {
     }
 
     /**
-     * Reverse tolerance: the reference decoder treats a missing 0x05 as `capabilities = nil` and
-     * its registry collapses that to the empty set, so our current announces (which emit no 0x05)
-     * are read by the reference exactly as they were before the TLV existed. This asserts the
-     * bytes we actually put on the radio contain no 0x05 TLV.
+     * The bytes we actually put on the radio now carry a 0x05 capabilities TLV of `[.vouch]` = 0x20,
+     * appended after the identity TLVs. A reference peer reads the bit and knows we accept vouch
+     * batches; a pre-capabilities peer skips the unknown TLV. `05 01 20` is the whole addition.
      */
     @Test
-    fun `our production announce still emits no capabilities TLV`() {
+    fun `our production announce advertises the vouch capability`() {
         val advertised = PeerCapabilities.LOCAL_SUPPORTED.takeIf { !it.isEmpty() }
         val encoded = IdentityAnnouncement("ivan", noiseKey, signingKey, advertised).encode()
 
         assertNotNull(encoded)
-        assertNull(advertised)
-        assertTrue(
-            IdentityAnnouncement.decode(encoded)?.capabilities == null,
-            "no 0x05 TLV while LOCAL_SUPPORTED is empty",
-        )
+        assertEquals(PeerCapabilities.VOUCH, advertised)
+        val expected = tlv(0x01, "ivan".encodeToByteArray()) +
+            tlv(0x02, noiseKey) +
+            tlv(0x03, signingKey) +
+            byteArrayOf(0x05, 0x01, 0x20)
+        assertEquals(expected.hex(), encoded.hex())
+        assertEquals(PeerCapabilities.VOUCH, IdentityAnnouncement.decode(encoded)?.capabilities)
     }
 }

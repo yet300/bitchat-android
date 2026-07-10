@@ -25,6 +25,7 @@ import com.app.transport.SeenMessageStore
 import com.app.transport.features.file.IncomingFileStore
 import com.app.transport.meshgraph.MeshGraphService
 import com.app.transport.verification.VerifyEventListener
+import com.app.transport.vouch.VouchEventListener
 import kotlin.concurrent.Volatile
 import kotlinx.coroutines.*
 import kotlin.time.Clock
@@ -125,6 +126,9 @@ class MeshCoordinator(
     // Narrow SPI for the Phase C app to own QR-verification orchestration without the full
     // delegate. Additive to [delegate]; both (if set) receive the verify events.
     override var verifyEventListener: VerifyEventListener? = null
+
+    // Sink for inbound vouch batches (0x12); the platform-free coordinator attaches itself.
+    override var vouchEventListener: VouchEventListener? = null
 
     // Coroutines
     private var serviceScope = CoroutineScope(dispatchers.io + SupervisorJob())
@@ -227,6 +231,7 @@ class MeshCoordinator(
             pingService = pingService,
             uiDelegate = { delegate },
             verifyListener = { verifyEventListener },
+            vouchListener = { vouchEventListener },
         ).wire()
         messageHandler.packetProcessor = packetProcessor
         messageHandler.favoriteNostrLink = favoriteNostrLink
@@ -494,6 +499,12 @@ class MeshCoordinator(
 
     override fun sendVerifyResponse(peerID: String, noiseKeyHex: String, nonceA: ByteArray) =
         outbound.sendVerifyResponse(peerID, noiseKeyHex, nonceA)
+
+    override fun sendVouchAttestations(batchPayload: ByteArray, peerID: String) =
+        outbound.sendVouchAttestations(batchPayload, peerID)
+
+    override fun connectedPeerIDs(): List<String> =
+        try { peerManager.getActivePeerIDs() } catch (_: Exception) { emptyList() }
 
     override fun sendBroadcastAnnounce() = outbound.sendBroadcastAnnounce()
 

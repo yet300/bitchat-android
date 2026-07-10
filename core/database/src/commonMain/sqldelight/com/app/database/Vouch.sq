@@ -1,0 +1,48 @@
+-- Accepted vouch attestations (transitive verification): a peer I verified (the voucher) attested
+-- that they verified the vouchee.
+--
+-- Validity is deliberately NOT maintained by cascade deletes. A record only counts while its voucher
+-- is still in the verified set and its timestamp is within VouchAttestation.MAX_AGE_MS, so
+-- un-verifying a voucher silently invalidates every vouch they gave. Readers recompute.
+--
+-- The derived `vouched` trust tier is never persisted, only recomputed from these rows.
+CREATE TABLE vouch (
+    -- SHA-256 of the vouchee's Noise static key (64 lowercase hex chars).
+    vouchee_fingerprint TEXT    NOT NULL,
+    -- Fingerprint of the peer who signed the attestation.
+    voucher_fingerprint TEXT    NOT NULL,
+    -- Attestation timestamp, ms since epoch, as signed by the voucher.
+    timestamp_ms        INTEGER NOT NULL,
+    PRIMARY KEY (vouchee_fingerprint, voucher_fingerprint)
+);
+
+CREATE INDEX vouch_vouchee ON vouch(vouchee_fingerprint);
+
+selectByVouchee:
+SELECT * FROM vouch WHERE vouchee_fingerprint = ? ORDER BY timestamp_ms DESC;
+
+selectAll:
+SELECT * FROM vouch;
+
+selectOne:
+SELECT * FROM vouch WHERE vouchee_fingerprint = ? AND voucher_fingerprint = ?;
+
+countByVouchee:
+SELECT COUNT(*) FROM vouch WHERE vouchee_fingerprint = ?;
+
+-- Oldest retained voucher for a vouchee: the eviction candidate when the per-vouchee cap is full.
+selectOldestByVouchee:
+SELECT * FROM vouch WHERE vouchee_fingerprint = ? ORDER BY timestamp_ms ASC LIMIT 1;
+
+upsert:
+INSERT OR REPLACE INTO vouch(vouchee_fingerprint, voucher_fingerprint, timestamp_ms)
+VALUES (?, ?, ?);
+
+deleteOne:
+DELETE FROM vouch WHERE vouchee_fingerprint = ? AND voucher_fingerprint = ?;
+
+deleteByVouchee:
+DELETE FROM vouch WHERE vouchee_fingerprint = ?;
+
+deleteAll:
+DELETE FROM vouch;

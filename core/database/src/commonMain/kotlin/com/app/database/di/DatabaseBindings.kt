@@ -4,6 +4,7 @@ import com.app.common.AppDispatchers
 import com.app.database.dao.ChannelDao
 import com.app.database.dao.ContactDao
 import com.app.database.dao.ConversationDao
+import com.app.database.dao.VouchDao
 import com.app.database.dao.ConversationPrefDao
 import com.app.database.dao.GeohashDao
 import com.app.database.dao.MessageDao
@@ -72,4 +73,9 @@ object DatabaseBindings {
     @Provides
     fun provideOutboxDao(manager: DatabaseManager, dispatchers: AppDispatchers): OutboxDao =
         OutboxDao(manager, dispatchers)
+
+    @SingleIn(AppScope::class)
+    @Provides
+    fun provideVouchDao(manager: DatabaseManager, dispatchers: AppDispatchers): VouchDao =
+        VouchDao(manager, dispatchers)
 }

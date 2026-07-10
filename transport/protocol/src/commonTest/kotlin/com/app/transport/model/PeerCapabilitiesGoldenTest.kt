@@ -124,14 +124,15 @@ class PeerCapabilitiesGoldenTest {
     }
 
     /**
-     * We advertise nothing yet: every reference bit names a feature this client does not implement
-     * (prekeys/groups/board/vouch/gateway/bridge/wifiBulk). meshDiagnostics is deliberately not
-     * claimed either — the reference implements ping/pong and still leaves it out of its own
-     * `localSupported`, so its exact contract is not settled. An empty set emits no TLV at all,
-     * which is what the reference's decoder collapses an empty value to anyway.
+     * We advertise exactly [PeerCapabilities.VOUCH] now that transitive verification is complete.
+     * Bit 5 = 32 = 0x20, which fits in one byte (0x20 >> 8 == 0, so the encoder's do/while stops
+     * after the first byte). Every other reference bit names a feature this client does not yet
+     * implement; meshDiagnostics stays withheld because the reference leaves it out of its own
+     * `localSupported` too.
      */
     @Test
-    fun `we advertise no capabilities yet`() {
-        assertTrue(PeerCapabilities.LOCAL_SUPPORTED.isEmpty())
+    fun `we advertise exactly the vouch capability`() {
+        assertEquals(PeerCapabilities.VOUCH, PeerCapabilities.LOCAL_SUPPORTED)
+        assertEquals("20", PeerCapabilities.LOCAL_SUPPORTED.encoded().hex())
     }
 }

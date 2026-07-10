@@ -2,6 +2,7 @@ package com.app.transport.mesh
 
 import com.app.transport.model.BitchatFilePacket
 import com.app.transport.verification.VerifyEventListener
+import com.app.transport.vouch.VouchEventListener
 
 /**
  * commonMain contract for the mesh operations the data layer drives (peer directory, Noise session
@@ -69,4 +70,15 @@ interface MeshService {
     fun sendVerifyChallenge(peerID: String, noiseKeyHex: String, nonceA: ByteArray)
 
     fun sendVerifyResponse(peerID: String, noiseKeyHex: String, nonceA: ByteArray)
+
+    // --- Transitive verification (vouch, Noise payload 0x12) ---
+
+    /** The vouch-event sink; the platform-free vouch coordinator attaches itself here. */
+    var vouchEventListener: VouchEventListener?
+
+    /** Peer IDs currently connected, used to run a vouch pass when the user verifies someone. */
+    fun connectedPeerIDs(): List<String>
+
+    /** Sends an encoded `VouchAttestation` batch body to [peerID] over its Noise session. */
+    fun sendVouchAttestations(batchPayload: ByteArray, peerID: String)
 }

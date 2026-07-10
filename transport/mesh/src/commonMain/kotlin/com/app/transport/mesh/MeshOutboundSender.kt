@@ -324,6 +324,17 @@ internal class MeshOutboundSender(
         sendNoisePayloadToPeer(payload, peerID, "verify response")
     }
 
+    // MARK: Transitive Verification (vouch)
+
+    /** [batchPayload] is an already-encoded `VouchAttestation.encodeList` body. */
+    fun sendVouchAttestations(batchPayload: ByteArray, peerID: String) {
+        val payload = NoisePayload(
+            type = NoisePayloadType.VOUCH,
+            data = batchPayload
+        )
+        sendNoisePayloadToPeer(payload, peerID, "vouch attestations")
+    }
+
     private fun sendNoisePayloadToPeer(payload: NoisePayload, recipientPeerID: String, label: String) {
         scope.launch {
             try {

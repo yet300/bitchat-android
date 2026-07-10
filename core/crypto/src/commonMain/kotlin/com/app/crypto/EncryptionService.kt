@@ -7,6 +7,7 @@ import co.touchlab.stately.collections.ConcurrentMutableMap
 import com.app.common.utils.Log
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.secure.SecureKeyValueStore
+import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.crypto.noise.NoiseEncryptionService
 import com.app.crypto.sign.Ed25519
 
@@ -42,6 +43,16 @@ open class EncryptionService(
     var onSessionLost: ((String) -> Unit)? = null // peerID
     var onHandshakeRequired: ((String) -> Unit)? = null // peerID
 
+    /**
+     * Session established, with the peer's fingerprint resolved. Additive to [onSessionEstablished],
+     * which only carries the peerID; transitive verification needs the fingerprint to decide whether
+     * a vouch batch is due.
+     */
+    var onPeerAuthenticated: ((String, String) -> Unit)? = null // (peerID, fingerprint)
+
+    /** Persistent identity/trust state, shared with [noiseService] through the same secure store. */
+    private val identityState: SecureIdentityStateManager by lazy { SecureIdentityStateManager(store) }
+
     init {
         initialize()
     }
@@ -62,6 +73,7 @@ open class EncryptionService(
             Log.d(TAG, "✅ Noise session established with $peerID, fingerprint: ${fingerprint.take(16)}...")
             establishedSessions[peerID] = fingerprint
             onSessionEstablished?.invoke(peerID)
+            onPeerAuthenticated?.invoke(peerID, fingerprint)
         }
         
         noiseService.onHandshakeRequired = { peerID ->
@@ -108,6 +120,21 @@ open class EncryptionService(
         }
     }
     
+    // MARK: - Announce-bound Peer Signing Keys
+
+    /**
+     * Remembers the Ed25519 signing key a peer announced, keyed by the fingerprint of its Noise
+     * static key. Persisted because we must be able to anchor a vouch to a vouchee who is offline.
+     * Call only for announces whose signature already verified.
+     */
+    fun cacheAnnouncedSigningKey(noisePublicKey: ByteArray, signingPublicKey: ByteArray) {
+        val fingerprint = identityState.generateFingerprint(noisePublicKey)
+        identityState.cacheSigningPublicKey(fingerprint, signingPublicKey)
+    }
+
+    /** The announce-bound Ed25519 signing key for [fingerprint], if we ever saw its announce. */
+    fun announcedSigningKey(fingerprint: String): ByteArray? = identityState.getSigningPublicKey(fingerprint)
+
     /**
      * Add peer's public key and start handshake if needed
      * For backward compatibility with old key exchange packets
