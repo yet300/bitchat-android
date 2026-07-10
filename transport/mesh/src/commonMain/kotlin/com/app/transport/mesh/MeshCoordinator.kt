@@ -8,6 +8,7 @@ import com.app.common.utils.Log
 import com.app.crypto.EncryptionService
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.transport.model.BitchatMessage
+import com.app.transport.model.PeerCapabilities
 import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.sync.GossipSyncManager
@@ -561,9 +562,10 @@ class MeshCoordinator(
         nickname: String,
         noisePublicKey: ByteArray,
         signingPublicKey: ByteArray,
-        isVerified: Boolean
+        isVerified: Boolean,
+        capabilities: PeerCapabilities = PeerCapabilities.NONE,
     ): Boolean {
-        return peerManager.updatePeerInfo(peerID, nickname, noisePublicKey, signingPublicKey, isVerified)
+        return peerManager.updatePeerInfo(peerID, nickname, noisePublicKey, signingPublicKey, isVerified, capabilities)
     }
     
     /**

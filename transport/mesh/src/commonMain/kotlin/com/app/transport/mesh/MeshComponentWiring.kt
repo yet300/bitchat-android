@@ -7,6 +7,7 @@ import com.app.transport.IncomingMessageSink
 import com.app.transport.MeshConstants
 import com.app.transport.meshgraph.MeshGraphService
 import com.app.transport.model.BitchatMessage
+import com.app.transport.model.PeerCapabilities
 import com.app.transport.model.RequestSyncPacket
 import com.app.transport.model.RoutedPacket
 import com.app.transport.notification.NotificationTextUtils
@@ -173,8 +174,15 @@ internal class MeshComponentWiring(
                 return peerManager.getPeerInfo(peerID)
             }
 
-            override fun updatePeerInfo(peerID: String, nickname: String, noisePublicKey: ByteArray, signingPublicKey: ByteArray, isVerified: Boolean): Boolean {
-                return peerManager.updatePeerInfo(peerID, nickname, noisePublicKey, signingPublicKey, isVerified)
+            override fun updatePeerInfo(
+                peerID: String,
+                nickname: String,
+                noisePublicKey: ByteArray,
+                signingPublicKey: ByteArray,
+                isVerified: Boolean,
+                capabilities: PeerCapabilities,
+            ): Boolean {
+                return peerManager.updatePeerInfo(peerID, nickname, noisePublicKey, signingPublicKey, isVerified, capabilities)
             }
 
             // Packet operations

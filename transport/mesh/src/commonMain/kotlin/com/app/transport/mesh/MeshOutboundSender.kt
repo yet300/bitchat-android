@@ -15,6 +15,7 @@ import com.app.transport.meshgraph.MeshGraphService
 import com.app.transport.meshgraph.RoutePlanner
 import com.app.transport.model.BitchatFilePacket
 import com.app.transport.model.IdentityAnnouncement
+import com.app.transport.model.PeerCapabilities
 import com.app.transport.model.NoisePayload
 import com.app.transport.model.NoisePayloadType
 import com.app.transport.model.PrivateMessagePacket
@@ -424,8 +425,11 @@ internal class MeshOutboundSender(
             return null
         }
 
-        // Create iOS-compatible IdentityAnnouncement with TLV encoding
-        val announcement = IdentityAnnouncement(nickname, staticKey, signingKey)
+        // Create iOS-compatible IdentityAnnouncement with TLV encoding. We advertise only what we
+        // actually implement; while that set is empty the 0x05 TLV is omitted entirely, leaving the
+        // announce bytes unchanged from before capabilities existed.
+        val advertised = PeerCapabilities.LOCAL_SUPPORTED.takeIf { !it.isEmpty() }
+        val announcement = IdentityAnnouncement(nickname, staticKey, signingKey, advertised)
         val encoded = announcement.encode()
         if (encoded == null) {
             Log.e(TAG, "Failed to encode announcement as TLV")

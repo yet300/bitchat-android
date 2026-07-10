@@ -8,6 +8,7 @@ import com.app.common.AppDispatchers
 import com.app.common.utils.Log
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.transport.MeshConstants
+import com.app.transport.model.PeerCapabilities
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlin.time.Clock
@@ -25,7 +26,13 @@ data class PeerInfo(
     var noisePublicKey: ByteArray?,
     var signingPublicKey: ByteArray?,      // NEW: Ed25519 public key for verification
     var isVerifiedNickname: Boolean,       // NEW: Verification status flag
-    var lastSeen: Long  // Using Long instead of Date for simplicity
+    var lastSeen: Long,  // Using Long instead of Date for simplicity
+    /**
+     * Feature bits from the peer's last announce. Empty both for peers that predate the 0x05 TLV
+     * and for peers that advertise nothing — the reference collapses the two the same way, and each
+     * announce replaces the set rather than merging into it.
+     */
+    var capabilities: PeerCapabilities = PeerCapabilities.NONE,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -47,10 +54,11 @@ data class PeerInfo(
         } else if (other.signingPublicKey != null) return false
         if (isVerifiedNickname != other.isVerifiedNickname) return false
         if (lastSeen != other.lastSeen) return false
-        
+        if (capabilities != other.capabilities) return false
+
         return true
     }
-    
+
     override fun hashCode(): Int {
         var result = id.hashCode()
         result = 31 * result + nickname.hashCode()
@@ -60,6 +68,7 @@ data class PeerInfo(
         result = 31 * result + (signingPublicKey?.contentHashCode() ?: 0)
         result = 31 * result + isVerifiedNickname.hashCode()
         result = 31 * result + lastSeen.hashCode()
+        result = 31 * result + capabilities.hashCode()
         return result
     }
 }
@@ -134,14 +143,15 @@ internal class PeerManager(
         nickname: String,
         noisePublicKey: ByteArray,
         signingPublicKey: ByteArray,
-        isVerified: Boolean
+        isVerified: Boolean,
+        capabilities: PeerCapabilities = PeerCapabilities.NONE,
     ): Boolean {
         if (peerID == "unknown") return false
-        
+
         val now = Clock.System.now().toEpochMilliseconds()
         val existingPeer = peers[peerID]
         val isNewPeer = existingPeer == null
-        
+
         // Update or create peer info
         val peerInfo = PeerInfo(
             id = peerID,
@@ -151,7 +161,8 @@ internal class PeerManager(
             noisePublicKey = noisePublicKey,
             signingPublicKey = signingPublicKey,
             isVerifiedNickname = isVerified,
-            lastSeen = now
+            lastSeen = now,
+            capabilities = capabilities,
         )
         
         peers[peerID] = peerInfo
