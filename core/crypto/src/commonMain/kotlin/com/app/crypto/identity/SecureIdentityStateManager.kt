@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
+@file:OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class, kotlin.time.ExperimentalTime::class)
 
 package com.app.crypto.identity
 
@@ -7,6 +7,7 @@ import com.app.crypto.hash.Sha256
 import co.touchlab.stately.concurrency.Lock
 import co.touchlab.stately.concurrency.withLock
 import kotlin.io.encoding.Base64
+import kotlin.time.Clock
 import com.app.common.utils.Log
 import com.app.common.encoding.hexEncodedString
 
@@ -31,6 +32,11 @@ class SecureIdentityStateManager(private val store: SecureKeyValueStore) {
         private const val KEY_CACHED_PEER_NOISE_KEYS = "cached_peer_noise_keys"
         private const val KEY_CACHED_NOISE_FINGERPRINTS = "cached_noise_fingerprints"
         private const val KEY_CACHED_FINGERPRINT_NICKNAMES = "cached_fingerprint_nicknames"
+        private const val KEY_CACHED_FINGERPRINT_SIGNING_KEYS = "cached_fingerprint_signing_keys"
+        private const val KEY_VERIFIED_AT = "verified_at"
+        private const val KEY_VOUCH_BATCH_SENT_AT = "vouch_batch_sent_at"
+
+        private val HEX_32_BYTES = Regex("^[a-fA-F0-9]{64}$")
     }
     
     private val lock = Lock()
@@ -176,6 +182,14 @@ class SecureIdentityStateManager(private val store: SecureKeyValueStore) {
     }
 
     fun setVerifiedFingerprint(fingerprint: String, verified: Boolean) {
+        setVerifiedFingerprint(fingerprint, verified, nowMs = Clock.System.now().toEpochMilliseconds())
+    }
+
+    /**
+     * Records (or clears) verification of [fingerprint], stamping [nowMs] as the verification time.
+     * The stamp orders outgoing vouch batches — see [mostRecentlyVerifiedFingerprints].
+     */
+    fun setVerifiedFingerprint(fingerprint: String, verified: Boolean, nowMs: Long) {
         if (!isValidFingerprint(fingerprint)) return
         lock.withLock {
             val current = store.getStringSet(KEY_VERIFIED_FINGERPRINTS)?.toMutableSet() ?: mutableSetOf()
@@ -185,7 +199,82 @@ class SecureIdentityStateManager(private val store: SecureKeyValueStore) {
                 current.remove(fingerprint)
             }
             store.putStringSet(KEY_VERIFIED_FINGERPRINTS, current)
+            putTimestampLocked(KEY_VERIFIED_AT, fingerprint, if (verified) nowMs else null)
         }
+    }
+
+    /**
+     * Verified fingerprints ordered most recently verified first, excluding [excluding]. Entries with
+     * no recorded verification time sort last (they predate the stamp).
+     */
+    fun mostRecentlyVerifiedFingerprints(limit: Int, excluding: String? = null): List<String> {
+        if (limit <= 0) return emptyList()
+        val stamps = readTimestamps(KEY_VERIFIED_AT)
+        return getVerifiedFingerprints()
+            .asSequence()
+            .filter { it != excluding }
+            .sortedWith(compareByDescending<String> { stamps[it] ?: Long.MIN_VALUE }.thenBy { it })
+            .take(limit)
+            .toList()
+    }
+
+    // MARK: - Announce-bound Signing Keys (fingerprint -> Ed25519 public key)
+
+    /**
+     * The peer's announce-bound Ed25519 signing key. Required to verify anything that peer signed
+     * (vouch attestations); persisted because a vouchee may be offline when we vouch for them.
+     */
+    fun getSigningPublicKey(fingerprint: String): ByteArray? {
+        if (!isValidFingerprint(fingerprint)) return null
+        val entries = store.getStringSet(KEY_CACHED_FINGERPRINT_SIGNING_KEYS) ?: return null
+        val key = fingerprint.lowercase()
+        val entry = entries.firstOrNull { it.startsWith("$key=") } ?: return null
+        return entry.substringAfter('=').takeIf { it.matches(HEX_32_BYTES) }?.let { hex ->
+            ByteArray(32) { i -> hex.substring(i * 2, i * 2 + 2).toInt(16).toByte() }
+        }
+    }
+
+    fun cacheSigningPublicKey(fingerprint: String, signingPublicKey: ByteArray) {
+        if (!isValidFingerprint(fingerprint) || signingPublicKey.size != 32) return
+        val key = fingerprint.lowercase()
+        val hex = signingPublicKey.hexEncodedString()
+        lock.withLock {
+            val current = store.getStringSet(KEY_CACHED_FINGERPRINT_SIGNING_KEYS)?.toMutableSet() ?: mutableSetOf()
+            current.removeAll { it.startsWith("$key=") }
+            current.add("$key=$hex")
+            store.putStringSet(KEY_CACHED_FINGERPRINT_SIGNING_KEYS, current)
+        }
+    }
+
+    // MARK: - Vouch Batch Rate Limiting
+
+    /** When we last sent [fingerprint] a vouch batch, or null. Persisted across restarts. */
+    fun lastVouchBatchSentAt(fingerprint: String): Long? =
+        readTimestamps(KEY_VOUCH_BATCH_SENT_AT)[fingerprint.lowercase()]
+
+    fun markVouchBatchSent(fingerprint: String, atMs: Long) {
+        if (!isValidFingerprint(fingerprint)) return
+        lock.withLock { putTimestampLocked(KEY_VOUCH_BATCH_SENT_AT, fingerprint, atMs) }
+    }
+
+    // MARK: - Timestamp Map Helpers
+
+    private fun readTimestamps(storeKey: String): Map<String, Long> {
+        val entries = store.getStringSet(storeKey) ?: return emptyMap()
+        return entries.mapNotNull { entry ->
+            val name = entry.substringBefore('=', missingDelimiterValue = "")
+            val millis = entry.substringAfter('=', missingDelimiterValue = "").toLongOrNull()
+            if (name.isEmpty() || millis == null) null else name to millis
+        }.toMap()
+    }
+
+    /** Requires [lock]. A null [millis] removes the entry. */
+    private fun putTimestampLocked(storeKey: String, fingerprint: String, millis: Long?) {
+        val key = fingerprint.lowercase()
+        val current = store.getStringSet(storeKey)?.toMutableSet() ?: mutableSetOf()
+        current.removeAll { it.startsWith("$key=") }
+        if (millis != null) current.add("$key=$millis")
+        store.putStringSet(storeKey, current)
     }
 
     fun getCachedPeerFingerprint(peerID: String): String? {
@@ -370,6 +459,9 @@ class SecureIdentityStateManager(private val store: SecureKeyValueStore) {
             KEY_CACHED_PEER_NOISE_KEYS,
             KEY_CACHED_NOISE_FINGERPRINTS,
             KEY_CACHED_FINGERPRINT_NICKNAMES,
+            KEY_CACHED_FINGERPRINT_SIGNING_KEYS,
+            KEY_VERIFIED_AT,
+            KEY_VOUCH_BATCH_SENT_AT,
         )
         Log.w(TAG, "Identity keys cleared (immediate)")
     }

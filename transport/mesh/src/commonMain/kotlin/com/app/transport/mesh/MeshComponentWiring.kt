@@ -18,6 +18,7 @@ import com.app.transport.protocol.MessageType
 import com.app.transport.protocol.SpecialRecipients
 import com.app.transport.sync.GossipSyncManager
 import com.app.transport.verification.VerifyEventListener
+import com.app.transport.vouch.VouchEventListener
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -48,6 +49,7 @@ internal class MeshComponentWiring(
     private val pingService: MeshPingService,
     private val uiDelegate: () -> BluetoothMeshDelegate?,
     private val verifyListener: () -> VerifyEventListener?,
+    private val vouchListener: () -> VouchEventListener?,
 ) {
 
     companion object {
@@ -61,6 +63,16 @@ internal class MeshComponentWiring(
         wireStoreForwardManager()
         wireMessageHandler()
         wirePacketProcessor()
+        wireEncryptionCallbacks()
+    }
+
+    private fun wireEncryptionCallbacks() {
+        // Session-established trigger for transitive verification: on a Noise session coming up with a
+        // peer (fingerprint resolved), the vouch coordinator may send a batch. Additive — nothing
+        // else consumes this callback. Each generation re-registers, so the latest wins.
+        encryptionService.onPeerAuthenticated = { peerID, fingerprint ->
+            vouchListener()?.onPeerAuthenticated(peerID, fingerprint)
+        }
     }
 
     private fun wirePeerManager() {
@@ -182,6 +194,15 @@ internal class MeshComponentWiring(
                 isVerified: Boolean,
                 capabilities: PeerCapabilities,
             ): Boolean {
+                // Persist the announce-bound signing key so a vouch for this identity can still be
+                // built (and its own vouches verified) once the peer goes offline.
+                if (isVerified) {
+                    try {
+                        encryptionService.cacheAnnouncedSigningKey(noisePublicKey, signingPublicKey)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to cache announced signing key for ${peerID.take(8)}: ${e.message}")
+                    }
+                }
                 return peerManager.updatePeerInfo(peerID, nickname, noisePublicKey, signingPublicKey, isVerified, capabilities)
             }
 
@@ -352,6 +373,10 @@ internal class MeshComponentWiring(
             override fun onVerifyResponseReceived(peerID: String, payload: ByteArray, timestampMs: Long) {
                 uiDelegate()?.didReceiveVerifyResponse(peerID, payload, timestampMs)
                 verifyListener()?.onVerifyResponse(peerID, payload, timestampMs)
+            }
+
+            override fun onVouchAttestationsReceived(peerID: String, payload: ByteArray, timestampMs: Long) {
+                vouchListener()?.onVouchAttestations(peerID, payload, timestampMs)
             }
         }
     }

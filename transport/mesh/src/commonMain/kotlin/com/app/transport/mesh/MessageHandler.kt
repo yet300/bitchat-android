@@ -194,6 +194,10 @@ internal class MessageHandler(
                     Log.d(TAG, "🔐 Verify response received from $peerID (${noisePayload.data.size} bytes)")
                     delegate?.onVerifyResponseReceived(peerID, noisePayload.data, packet.timestamp.toLong())
                 }
+                NoisePayloadType.VOUCH -> {
+                    Log.d(TAG, "🪪 Vouch batch received from $peerID (${noisePayload.data.size} bytes)")
+                    delegate?.onVouchAttestationsReceived(peerID, noisePayload.data, packet.timestamp.toLong())
+                }
             }
             
         } catch (e: Exception) {
@@ -649,4 +653,5 @@ internal interface MessageHandlerDelegate {
     fun onReadReceiptReceived(messageID: String, peerID: String)
     fun onVerifyChallengeReceived(peerID: String, payload: ByteArray, timestampMs: Long)
     fun onVerifyResponseReceived(peerID: String, payload: ByteArray, timestampMs: Long)
+    fun onVouchAttestationsReceived(peerID: String, payload: ByteArray, timestampMs: Long)
 }

@@ -50,6 +50,7 @@ import com.app.data.routing.RoutingCore
 import com.app.data.routing.RoutingMessageTransport
 import com.app.data.session.MeshNoiseSessionPort
 import com.app.data.verification.VerificationCoordinator
+import com.app.data.vouch.VouchCoordinator
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationPrefsRepository
@@ -77,6 +78,7 @@ import com.app.domain.repository.SettingsRepository
 import com.app.domain.repository.ThemeRepository
 import com.app.domain.repository.TorRepository
 import com.app.domain.repository.VerificationRepository
+import com.app.domain.repository.VouchRepository
 import com.app.transport.NicknameHolder
 import com.app.transport.NicknameSource
 import com.app.transport.mesh.MeshCoordinator
@@ -209,6 +211,14 @@ abstract class DataBindings {
      */
     @Binds
     internal abstract val VerificationCoordinator.bindPeerVerificationRepository: PeerVerificationRepository
+
+    /**
+     * Transitive verification (vouch) coordinator — platform-free; it is the [VouchRepository] read
+     * port and attaches itself as the mesh vouch-event listener. Instantiated eagerly at launch by
+     * [AppNetworkBootstrapper] so inbound 0x12 batches are handled without a UI touch first.
+     */
+    @Binds
+    internal abstract val VouchCoordinator.bindVouchRepository: VouchRepository
 
     /**
      * The mesh reads the nickname from the transport-owned in-memory [NicknameHolder]; the data

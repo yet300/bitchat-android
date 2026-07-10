@@ -1,0 +1,11 @@
+-- Migration v2 -> v3: add the accepted-vouch table (transitive verification).
+-- Existing installs keep their data; this only adds the new table. Fresh installs get it from
+-- Vouch.sq via Schema.create instead. The two definitions must stay identical.
+CREATE TABLE vouch (
+    vouchee_fingerprint TEXT    NOT NULL,
+    voucher_fingerprint TEXT    NOT NULL,
+    timestamp_ms        INTEGER NOT NULL,
+    PRIMARY KEY (vouchee_fingerprint, voucher_fingerprint)
+);
+
+CREATE INDEX vouch_vouchee ON vouch(vouchee_fingerprint);
