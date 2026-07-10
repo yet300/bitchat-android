@@ -19,9 +19,15 @@ import kotlin.math.ln
  */
 object GCSFilter {
     data class Params(
-        val p: Int,         // Golomb-Rice parameter (>= 1)
-        val m: Long,        // Range M = N * 2^P
-        val data: ByteArray // Encoded GR bitstream
+        val p: Int,          // Golomb-Rice parameter (>= 1)
+        val m: Long,         // Range M = N * 2^P
+        val data: ByteArray, // Encoded GR bitstream
+        // How many of the input ids (in input order) the encoded filter covers.
+        // Callers pass ids newest-first, so trimming drops the oldest tail and the
+        // covered set stays a contiguous newest-prefix — this is what makes the
+        // since-cursor exact (iOS GCSFilter.Params.includedCount parity).
+        // Internal bookkeeping only; never serialized to the wire.
+        val includedCount: Int = 0,
     )
 
     // Derive P from target FPR; FPR ~= 1 / 2^P
@@ -66,7 +72,12 @@ object GCSFilter {
             encoded = encode(mapped, p)
         }
 
-        return Params(p = p, m = finalM, data = encoded)
+        return Params(
+            p = p,
+            m = finalM,
+            data = encoded,
+            includedCount = if (encoded.isEmpty()) 0 else trimmedN,
+        )
     }
 
     fun decodeToSortedSet(p: Int, m: Long, data: ByteArray): LongArray {

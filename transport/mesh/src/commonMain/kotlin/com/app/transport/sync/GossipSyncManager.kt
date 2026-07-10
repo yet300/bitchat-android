@@ -10,6 +10,7 @@ import com.app.common.encoding.hexEncodedString
 import com.app.common.utils.Log
 import com.app.transport.MeshTrafficLog
 import com.app.transport.model.RequestSyncPacket
+import com.app.transport.model.SyncTypeFlags
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.peerIdToRoutingBytes
 import com.app.transport.protocol.MessageType
@@ -242,6 +243,13 @@ internal class GossipSyncManager(
             trafficLog?.onRateLimitDrop("syncResponse")
             return
         }
+        // iOS parity: an absent 0x04 TLV means announce+message (legacy 3-TLV requesters).
+        val requestedTypes = request.types ?: SyncTypeFlags.publicMessages
+        // The requester's filter only covers packets at or after this cursor; older
+        // packets are outside the filter but NOT missing — without the cursor we would
+        // re-send that entire tail every round.
+        val since = request.sinceTimestamp
+
         // Decode GCS into sorted set for membership checks
         val sorted = GCSFilter.decodeToSortedSet(request.p, request.m, request.data)
         fun mightContain(id: ByteArray): Boolean {
@@ -250,27 +258,34 @@ internal class GossipSyncManager(
             return GCSFilter.contains(sorted, nonZeroV)
         }
 
-        // 1) Announcements: send latest per peerID if remote doesn't have them
-        val announces = announcementsLock.withLock { latestAnnouncementByPeer.values.toList() }
-        for (pair in announces) {
-            val (id, pkt) = pair
-            val idBytes = hexToBytes(id)
-            if (!mightContain(idBytes)) {
-                // Send original packet unchanged to requester only (keep local TTL)
-                val toSend = pkt.copy(ttl = SyncDefaults.SYNC_TTL_HOPS)
-                delegate?.sendPacketToPeer(fromPeerID, toSend)
-                Log.d(TAG, "Sent sync announce: Type ${toSend.type} from ${toSend.senderID.hexEncodedString()} to $fromPeerID packet id ${idBytes.hexEncodedString()}")
+        // 1) Announcements: send latest per peerID if remote doesn't have them.
+        // Cursor-exempt (iOS parity): they carry the signing keys needed to verify
+        // everything else and there is at most one per peer, so resend cost is bounded.
+        if (requestedTypes.contains(SyncTypeFlags.announce)) {
+            val announces = announcementsLock.withLock { latestAnnouncementByPeer.values.toList() }
+            for (pair in announces) {
+                val (id, pkt) = pair
+                val idBytes = hexToBytes(id)
+                if (!mightContain(idBytes)) {
+                    // Send original packet unchanged to requester only (keep local TTL)
+                    val toSend = pkt.copy(ttl = SyncDefaults.SYNC_TTL_HOPS)
+                    delegate?.sendPacketToPeer(fromPeerID, toSend)
+                    Log.d(TAG, "Sent sync announce: Type ${toSend.type} from ${toSend.senderID.hexEncodedString()} to $fromPeerID packet id ${idBytes.hexEncodedString()}")
+                }
             }
         }
 
-        // 2) Broadcast messages: send all they lack
-        val toSendMsgs = messagesLock.withLock { messages.values.toList() }
-        for (pkt in toSendMsgs) {
-            val idBytes = PacketIdUtil.computeIdBytes(pkt)
-            if (!mightContain(idBytes)) {
-                val toSend = pkt.copy(ttl = SyncDefaults.SYNC_TTL_HOPS)
-                delegate?.sendPacketToPeer(fromPeerID, toSend)
-                Log.d(TAG, "Sent sync message: Type ${toSend.type} to $fromPeerID packet id ${idBytes.hexEncodedString()}")
+        // 2) Broadcast messages: send all they lack that the cursor says they cover
+        if (requestedTypes.contains(SyncTypeFlags.message)) {
+            val toSendMsgs = messagesLock.withLock { messages.values.toList() }
+            for (pkt in toSendMsgs) {
+                if (since != null && pkt.timestamp.toLong() < since) continue
+                val idBytes = PacketIdUtil.computeIdBytes(pkt)
+                if (!mightContain(idBytes)) {
+                    val toSend = pkt.copy(ttl = SyncDefaults.SYNC_TTL_HOPS)
+                    delegate?.sendPacketToPeer(fromPeerID, toSend)
+                    Log.d(TAG, "Sent sync message: Type ${toSend.type} to $fromPeerID packet id ${idBytes.hexEncodedString()}")
+                }
             }
         }
     }
@@ -310,12 +325,28 @@ internal class GossipSyncManager(
         val takeN = minOf(nMax, cap, list.size)
         if (takeN <= 0) {
             val p0 = GCSFilter.deriveP(fpr)
-            return RequestSyncPacket(p = p0, m = 1, data = ByteArray(0)).encode()
+            return RequestSyncPacket(
+                p = p0, m = 1, data = ByteArray(0),
+                types = SyncTypeFlags.publicMessages,
+            ).encode()
         }
-        val ids = list.take(takeN).map { pkt -> PacketIdUtil.computeIdBytes(pkt) }
+        val included = list.take(takeN)
+        val ids = included.map { pkt -> PacketIdUtil.computeIdBytes(pkt) }
         val params = GCSFilter.buildFilter(ids, maxBytes, fpr)
         val mVal = if (params.m <= 0L) 1 else params.m
-        return RequestSyncPacket(p = params.p, m = mVal, data = params.data).encode()
+        // Covered-prefix cursor (iOS GossipSyncManager.swift:558-595): when the filter
+        // can't represent every candidate — takeN < store size, or the encoder trimmed
+        // the tail to fit the byte budget — tell the responder how far back the filter
+        // actually reaches. Candidates are newest-first, so the covered set is a
+        // contiguous newest-prefix and the oldest included timestamp is an exact cursor.
+        val covered = params.includedCount
+        val sinceTimestamp: Long? =
+            if (covered < list.size && covered > 0) included[covered - 1].timestamp.toLong() else null
+        return RequestSyncPacket(
+            p = params.p, m = mVal, data = params.data,
+            types = SyncTypeFlags.publicMessages,
+            sinceTimestamp = sinceTimestamp,
+        ).encode()
     }
 
     // Periodically remove stale announcements and all their messages
