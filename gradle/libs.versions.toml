@@ -30,7 +30,7 @@ secp256k1 = "0.23.0"              # ACINQ secp256k1-kmp (Nostr secp256k1 + BIP-3
 stately = "2.1.0"                 # Touchlab Stately — KMP concurrent collections + locks
 
 ksafe = "2.1.3"
-grant = "2.2.3"
+grant = "2.3.0"
 compass = "3.0.2" # jordond/compass — KMP geocoding (mobile forward geocoder)
 filekit = "0.14.2" # vinceglb/FileKit — KMP file picker (Kotlin 2.4.0 compatible)
 
@@ -45,12 +45,12 @@ kotlinx-serialization = "1.11.0"
 # Coroutines
 kotlinx-coroutines = "1.11.0"
 kotlinxDatetime = "0.8.0"
-kotlinxIo = "0.9.0"
-kompress = "2.1.0"                # karmakrafts Kompress — pure-Kotlin KMP DEFLATE (RFC1951 raw), iOS-wire compatible
+kotlinxIo = "0.9.1"
+kompress = "2.3.1"                # karmakrafts Kompress — pure-Kotlin KMP DEFLATE (RFC1951 raw), iOS-wire compatible
 artitor = "0.1.2"                 # io.github.yet300:tor — KMP Arti/Tor wrapper; 0.1.2 renames bundled sqlite3_* symbols so they cannot shadow SQLCipher in the iOS static link
 
 # Ktor (HTTP + WebSocket client; OkHttp engine honors the Arti SOCKS proxy)
-ktor = "3.5.0"
+ktor = "3.5.1"
 
 
 # Google Play Services
@@ -67,7 +67,7 @@ coil = "3.5.0"
 camerax = "1.6.1"
 mlkit-barcode = "17.3.0"
 
-metro = "1.2.1"
+metro = "1.3.0"
 
 # Testing
 junit = "4.13.2"
