@@ -28,6 +28,8 @@ class BLEPacketPaddingPolicyTest {
             MessageType.REQUEST_SYNC to false,
             MessageType.FRAGMENT to false,
             MessageType.FILE_TRANSFER to false,
+            MessageType.PING to false,
+            MessageType.PONG to false,
             MessageType.NOISE_ENCRYPTED to true,
             MessageType.NOISE_HANDSHAKE to true
         )
@@ -54,7 +56,9 @@ class BLEPacketPaddingPolicyTest {
             MessageType.LEAVE,
             MessageType.REQUEST_SYNC,
             MessageType.FRAGMENT,
-            MessageType.FILE_TRANSFER
+            MessageType.FILE_TRANSFER,
+            MessageType.PING,
+            MessageType.PONG,
         )
 
         publicTypes.forEach { type ->

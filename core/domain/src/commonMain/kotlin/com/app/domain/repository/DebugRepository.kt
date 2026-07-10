@@ -1,5 +1,6 @@
 package com.app.domain.repository
 
+import com.app.domain.model.MeshPingProbe
 import com.app.domain.model.MeshTopology
 import com.app.domain.model.PacketLogEntry
 import kotlinx.coroutines.flow.Flow
@@ -37,4 +38,10 @@ interface DebugRepository {
 
     /** Live mesh neighbour graph from gossip announcements. */
     fun observeMeshTopology(): Flow<MeshTopology>
+
+    /**
+     * Sends one directed echo probe over the mesh and waits for the reply; null on timeout.
+     * Diagnostic only — the stack never probes on its own.
+     */
+    suspend fun pingPeer(peerId: String): MeshPingProbe?
 }

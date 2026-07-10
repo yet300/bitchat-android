@@ -51,6 +51,12 @@ interface MeshService {
 
     fun getDebugStatus(): String
 
+    /**
+     * Sends a directed echo probe (ping 0x26) to [peerID] and suspends until the pong (0x27) comes
+     * back, or null on timeout. Diagnostic only — nothing in the stack pings automatically.
+     */
+    suspend fun pingPeer(peerID: String): MeshPingResult?
+
     // --- Noise QR-verification surface (driven by the platform-free VerificationCoordinator) ---
 
     /** The verify-event sink; the coordinator attaches itself so inbound challenges/responses land. */

@@ -106,6 +106,8 @@ class MeshCoordinator(
     private lateinit var gossipSyncManager: GossipSyncManager
     // Outbound send path for the current generation; built by wireComponents()
     private lateinit var outbound: MeshOutboundSender
+    // Mesh diagnostics echo probes for the current generation; built by wireComponents()
+    private lateinit var pingService: MeshPingService
 
     // Single monitor for all lifecycle transitions (start/stop/reset/finishStop): the
     // delayed teardown runs on IO while callers arrive on main — without one lock the
@@ -180,6 +182,13 @@ class MeshCoordinator(
             initiateHandshake = { peerID -> messageHandler.delegate?.initiateNoiseHandshake(peerID) },
         )
 
+        // Mesh diagnostics probes. myPeerID is read live (panic reset rotates it) and the probe
+        // rides the normal flood path, so multi-hop peers answer.
+        pingService = MeshPingService(
+            myPeerID = { myPeerID },
+            sendPacket = { packet -> meshNetwork.broadcast(RoutedPacket(packet)) },
+        )
+
         // Wire sync manager delegate
         gossipSyncManager.delegate = object : GossipSyncManager.Delegate {
             override fun sendPacket(packet: BitchatPacket) {
@@ -214,6 +223,7 @@ class MeshCoordinator(
             serviceNotifier = serviceNotifier,
             favoriteNostrLink = favoriteNostrLink,
             outbound = outbound,
+            pingService = pingService,
             uiDelegate = { delegate },
             verifyListener = { verifyEventListener },
         ).wire()
@@ -595,6 +605,8 @@ class MeshCoordinator(
     fun printDeviceAddressesForPeers(): String {
         return peerManager.getDebugInfoWithDeviceAddresses(bleBearer.addressPeerSnapshot())
     }
+
+    override suspend fun pingPeer(peerID: String): MeshPingResult? = pingService.ping(peerID)
 
     /**
      * Get debug status information

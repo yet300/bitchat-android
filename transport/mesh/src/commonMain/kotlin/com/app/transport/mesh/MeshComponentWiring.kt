@@ -44,6 +44,7 @@ internal class MeshComponentWiring(
     private val serviceNotifier: ServiceNotifier,
     private val favoriteNostrLink: FavoriteNostrLink,
     private val outbound: MeshOutboundSender,
+    private val pingService: MeshPingService,
     private val uiDelegate: () -> BluetoothMeshDelegate?,
     private val verifyListener: () -> VerifyEventListener?,
 ) {
@@ -479,6 +480,14 @@ internal class MeshComponentWiring(
                 val fromPeer = routed.peerID ?: return
                 val req = RequestSyncPacket.decode(routed.packet.payload) ?: return
                 gossipSyncManager.handleRequestSync(fromPeer, req)
+            }
+
+            override fun handlePing(routed: RoutedPacket, linkKey: String) {
+                pingService.onPingReceived(routed, linkKey)
+            }
+
+            override fun handlePong(routed: RoutedPacket) {
+                pingService.onPongReceived(routed)
             }
         }
     }

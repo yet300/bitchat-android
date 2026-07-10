@@ -44,6 +44,8 @@ class PacketProcessorMessageRateLimitTest {
         override fun handleLeave(routed: RoutedPacket) {}
         override fun handleFragment(packet: BitchatPacket): BitchatPacket? = null
         override fun handleRequestSync(routed: RoutedPacket) {}
+        override fun handlePing(routed: RoutedPacket, linkKey: String) {}
+        override fun handlePong(routed: RoutedPacket) {}
         override fun sendAnnouncementToPeer(peerID: String) {}
         override fun sendCachedMessages(peerID: String) {}
         override fun relayPacket(routed: RoutedPacket) {

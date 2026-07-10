@@ -2,6 +2,7 @@
 
 package com.yet.bitmessage.feature.debug.store
 
+import com.app.domain.model.MeshPingProbe
 import com.app.domain.model.MeshTopology
 import com.app.domain.model.PacketLogEntry
 import com.app.domain.model.PacketLogKind
@@ -51,6 +52,7 @@ class DebugStoreFactoryTest {
         override fun observePacketLog(): Flow<List<PacketLogEntry>> = packetLog
         val topology = MutableStateFlow(MeshTopology(emptyList(), emptyList()))
         override fun observeMeshTopology(): Flow<MeshTopology> = topology
+        override suspend fun pingPeer(peerId: String): MeshPingProbe? = null
     }
 
     @Test
