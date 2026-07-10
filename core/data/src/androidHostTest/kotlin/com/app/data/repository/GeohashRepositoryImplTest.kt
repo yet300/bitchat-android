@@ -8,6 +8,7 @@ import com.app.data.AppStateStore
 import com.app.domain.app.AppForegroundState
 import com.app.domain.model.ConversationId
 import com.app.data.FakeContactRepository
+import com.app.data.nostr.GeohashPresencePublisher
 import com.app.data.transportconfig.SettingsNostrConfigStore
 import com.app.domain.model.GeohashChannel
 import com.app.domain.model.GeohashLevel
@@ -89,6 +90,10 @@ class GeohashRepositoryImplTest {
         val bridge = mock<NostrIdentityBridge>()
         whenever(bridge.deriveIdentity(any())).thenReturn(NostrIdentity(MY_HEX, MY_HEX, "npub", 0L))
         val nostrConfigStore = SettingsNostrConfigStore(FakeSettingsStore())
+        val foreground = object : AppForegroundState {
+            override val isForeground = MutableStateFlow(true)
+        }
+        val scope = CoroutineScope(UnconfinedTestDispatcher())
 
         repo = GeohashRepositoryImpl(
             appStateStore = appStateStore,
@@ -99,10 +104,9 @@ class GeohashRepositoryImplTest {
             aliasRegistry = GeohashAliasRegistry(nostrConfigStore),
             conversationRegistry = GeohashConversationRegistry(nostrConfigStore),
             geohashDao = InMemoryDatabase().geohashDao,
-            appForegroundState = object : AppForegroundState {
-                override val isForeground = MutableStateFlow(true)
-            },
-            scope = CoroutineScope(UnconfinedTestDispatcher()),
+            appForegroundState = foreground,
+            presencePublisher = GeohashPresencePublisher(relayManager, relayDirectory, bridge, foreground, scope),
+            scope = scope,
         )
     }
 

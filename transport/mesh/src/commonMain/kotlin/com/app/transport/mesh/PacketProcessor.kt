@@ -220,6 +220,11 @@ internal class PacketProcessor(
                         MessageType.NOISE_HANDSHAKE -> handleNoiseHandshake(routed)
                         MessageType.NOISE_ENCRYPTED -> handleNoiseEncrypted(routed)
                         MessageType.FILE_TRANSFER -> handleMessage(routed)
+                        // Diagnostics echo. The inbound ping budget keys on the ingress LINK
+                        // (relayAddress), not on peerID: pings are unsigned, so the claimed sender
+                        // is attacker-controlled and rotating it would reset the budget.
+                        MessageType.PING -> delegate?.handlePing(routed, routed.relayAddress ?: peerID)
+                        MessageType.PONG -> delegate?.handlePong(routed)
                         else -> {
                             validPacket = false
                             Log.w(TAG, "Unknown message type: ${packet.type}")
@@ -410,6 +415,12 @@ internal interface PacketProcessorDelegate {
     fun handleLeave(routed: RoutedPacket)
     fun handleFragment(packet: BitchatPacket): BitchatPacket?
     fun handleRequestSync(routed: RoutedPacket)
+
+    /** Directed echo request addressed to us. [linkKey] identifies the ingress link, not the sender. */
+    fun handlePing(routed: RoutedPacket, linkKey: String)
+
+    /** Directed echo reply addressed to us; resolves an outstanding local probe. */
+    fun handlePong(routed: RoutedPacket)
     
     // Communication
     fun sendAnnouncementToPeer(peerID: String)

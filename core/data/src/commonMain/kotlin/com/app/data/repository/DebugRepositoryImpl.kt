@@ -2,6 +2,7 @@ package com.app.data.repository
 
 import com.app.domain.model.MeshEdge
 import com.app.domain.model.MeshNode
+import com.app.domain.model.MeshPingProbe
 import com.app.domain.model.MeshTopology
 import com.app.domain.model.PacketLogEntry
 import com.app.domain.model.PacketLogKind
@@ -68,6 +69,11 @@ internal class DebugRepositoryImpl(
             edges = snapshot.edges.map { MeshEdge(it.a, it.b, it.isConfirmed) },
         )
     }
+
+    // No runCatching: the probe already reports failure as null, and wrapping a suspend call would
+    // swallow the caller's cancellation.
+    override suspend fun pingPeer(peerId: String): MeshPingProbe? =
+        mesh.pingPeer(peerId)?.let { MeshPingProbe(it.rttMs, it.hops) }
 
     private fun DebugMessage.toEntry(): PacketLogEntry = PacketLogEntry(
         kind = when (this) {

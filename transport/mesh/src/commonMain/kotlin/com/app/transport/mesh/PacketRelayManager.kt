@@ -128,11 +128,17 @@ internal class PacketRelayManager(
         val broadcastRecipient = delegate?.getBroadcastRecipient()
         val isDirected = recipientID != null &&
             !(broadcastRecipient != null && recipientID.contentEquals(broadcastRecipient))
+        // Directed ping/pong ride the same deterministic relay treatment as directed Noise
+        // traffic (always relay, no TTL clamp) so the RTT and hop count a probe reports reflect
+        // the real path — iOS BLEReceivePipeline folds them into `isDirectedEncrypted` too.
+        val ridesDirectedPath = mt == MessageType.NOISE_ENCRYPTED ||
+            mt == MessageType.PING ||
+            mt == MessageType.PONG
         return RelayController.decide(
             ttl = packet.ttl,
             senderIsSelf = false,
             recipientIsSelf = false,
-            isDirectedEncrypted = mt == MessageType.NOISE_ENCRYPTED && isDirected,
+            isDirectedEncrypted = ridesDirectedPath && isDirected,
             isFragment = mt == MessageType.FRAGMENT,
             isDirectedFragment = mt == MessageType.FRAGMENT && isDirected,
             isHandshake = mt == MessageType.NOISE_HANDSHAKE,

@@ -8,6 +8,7 @@ import com.app.transport.features.file.IncomingFileStore
 import com.app.transport.model.BitchatFilePacket
 import com.app.transport.model.BitchatMessage
 import com.app.transport.model.IdentityAnnouncement
+import com.app.transport.model.PeerCapabilities
 import com.app.transport.model.NoisePayload
 import com.app.transport.model.NoisePayloadType
 import com.app.transport.model.PrivateMessagePacket
@@ -297,13 +298,16 @@ internal class MessageHandler(
         val noisePublicKey = announcement.noisePublicKey
         val signingPublicKey = announcement.signingPublicKey
         
-        // Update peer info with verification status through new method
+        // Update peer info with verification status through new method. An announce without the
+        // capabilities TLV resets the peer to the empty set rather than keeping stale bits — a
+        // peer that stops advertising a feature has stopped offering it (reference parity).
         val isFirstAnnounce = delegate?.updatePeerInfo(
             peerID = peerID,
             nickname = nickname,
             noisePublicKey = noisePublicKey,
             signingPublicKey = signingPublicKey,
-            isVerified = true
+            isVerified = true,
+            capabilities = announcement.capabilities ?: PeerCapabilities.NONE,
         ) ?: false
 
         // Update peer ID binding with noise public key for identity management
@@ -608,7 +612,14 @@ internal interface MessageHandlerDelegate {
     fun getNetworkSize(): Int
     fun getMyNickname(): String?
     fun getPeerInfo(peerID: String): PeerInfo?
-    fun updatePeerInfo(peerID: String, nickname: String, noisePublicKey: ByteArray, signingPublicKey: ByteArray, isVerified: Boolean): Boolean
+    fun updatePeerInfo(
+        peerID: String,
+        nickname: String,
+        noisePublicKey: ByteArray,
+        signingPublicKey: ByteArray,
+        isVerified: Boolean,
+        capabilities: PeerCapabilities = PeerCapabilities.NONE,
+    ): Boolean
     
     // Packet operations
     fun sendPacket(packet: BitchatPacket)
