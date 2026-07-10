@@ -148,6 +148,31 @@ class MeshNetwork(
     }
 
     /**
+     * Queued directed send: like [sendToPeer], but the frame rides the bearer's bounded
+     * priority send queue (relay/bulk priority) instead of the direct synchronous write
+     * path. Used for solicited gossip-sync responses — a burst replaying the store must
+     * never outrank interactive frames or bypass back-pressure shedding.
+     */
+    fun sendToPeerQueued(peerID: String, packet: RoutedPacket): SendPath {
+        val active = startedBearers()
+        if (active.isEmpty()) {
+            Log.w(TAG, "No started bearers; cannot deliver queued send to $peerID")
+            return SendPath.NoRoute
+        }
+        val directed = packet.copy(directedPeerID = peerID)
+        val primary = active.firstOrNull { bearer ->
+            bearer.neighbors.value.any { it.peerID == peerID }
+        }
+        if (primary != null) {
+            primary.broadcast(directed) // queue consumer delivers to the bound link only
+            return SendPath.Direct
+        }
+        Log.d(TAG, "No direct link to $peerID; flooding queued send as fallback")
+        active.forEach { it.broadcast(directed) }
+        return SendPath.Flooded
+    }
+
+    /**
      * Bind [linkAddress] to [peerID] on whichever bearer tracks that link.
      * Bearers ignore addresses they do not own ([MeshBearer.bindPeer] contract).
      */

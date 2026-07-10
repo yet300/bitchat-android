@@ -146,6 +146,7 @@ class MeshCoordinator(
         gossipSyncManager = GossipSyncManager(
             myPeerID = myPeerID,
             scope = serviceScope,
+            trafficLog = debugSettingsManager,
             configProvider = object : GossipSyncManager.ConfigProvider {
                 // 1000 matches iOS Config.seenCapacity (messages + GCS filter cap only;
                 // the announce store is bounded separately by announceCapacity()).
@@ -185,7 +186,10 @@ class MeshCoordinator(
                 meshNetwork.broadcast(RoutedPacket(packet))
             }
             override fun sendPacketToPeer(peerID: String, packet: BitchatPacket) {
-                meshNetwork.sendToPeer(peerID, RoutedPacket(packet))
+                // Solicited sync traffic rides the bounded priority queue (relay/bulk),
+                // never the direct synchronous write path: a diff response replaying the
+                // store must not outrank interactive frames or dodge back-pressure.
+                meshNetwork.sendToPeerQueued(peerID, RoutedPacket(packet))
             }
             override fun signPacketForBroadcast(packet: BitchatPacket): BitchatPacket {
                 return outbound.signPacketBeforeBroadcast(packet)

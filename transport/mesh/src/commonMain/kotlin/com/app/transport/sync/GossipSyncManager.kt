@@ -8,6 +8,7 @@ import co.touchlab.stately.concurrency.withLock
 import com.app.common.AppDispatchers
 import com.app.common.encoding.hexEncodedString
 import com.app.common.utils.Log
+import com.app.transport.MeshTrafficLog
 import com.app.transport.model.RequestSyncPacket
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.peerIdToRoutingBytes
@@ -27,6 +28,7 @@ internal class GossipSyncManager(
     private val myPeerID: String,
     private val scope: CoroutineScope,
     private val configProvider: ConfigProvider,
+    private val trafficLog: MeshTrafficLog? = null,
     private val dispatchers: AppDispatchers = AppDispatchers(),
     private val nowMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) {
@@ -84,6 +86,11 @@ internal class GossipSyncManager(
     private val pendingPeerSyncs = mutableSetOf<String>()
     private val pendingPeerSyncsLock = Lock()
 
+    // Per-requester response budget (iOS parity: 8 responses / 30 s sliding window).
+    // A single response can replay the whole store; this bounds how often one peer
+    // can trigger a full diff pass, checked BEFORE any store scan.
+    private val responseRateLimiter = SyncResponseRateLimiter()
+
     private var periodicJob: Job? = null
     private var cleanupJob: Job? = null
     fun start() {
@@ -105,6 +112,7 @@ internal class GossipSyncManager(
                 try {
                     delay(SyncDefaults.CLEANUP_INTERVAL_MS.milliseconds)
                     pruneStaleAnnouncements()
+                    responseRateLimiter.prune(nowMillis())
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) { Log.e(TAG, "Periodic cleanup error: ${e.message}") }
             }
@@ -227,6 +235,13 @@ internal class GossipSyncManager(
     }
 
     fun handleRequestSync(fromPeerID: String, request: RequestSyncPacket) {
+        // Response budget gate FIRST — before any GCS decode or store scan, so a
+        // request flood costs the responder nothing but this check.
+        if (!responseRateLimiter.shouldRespond(fromPeerID, nowMillis())) {
+            Log.w(TAG, "Rate-limited REQUEST_SYNC from $fromPeerID (max ${SyncResponseRateLimiter.MAX_RESPONSES}/${SyncResponseRateLimiter.WINDOW_MILLIS}ms)")
+            trafficLog?.onRateLimitDrop("syncResponse")
+            return
+        }
         // Decode GCS into sorted set for membership checks
         val sorted = GCSFilter.decodeToSortedSet(request.p, request.m, request.data)
         fun mightContain(id: ByteArray): Boolean {

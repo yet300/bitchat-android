@@ -149,6 +149,20 @@ class BleSendCore(
         val routeInfo = packet.route?.takeIf { it.isNotEmpty() }?.let { "routed: ${it.size} hops" }
         val neighbors = radio.neighbors()
 
+        // Queued directed send (gossip-sync responses): deliver only to the target peer's
+        // link. If the link is gone, fall through to the broadcast fallback below — the
+        // same historical fallback MeshNetwork.sendToPeer uses on the direct path.
+        val directedTarget = routed.directedPeerID
+        if (directedTarget != null) {
+            for (neighbor in neighbors) {
+                if (neighbor.peerID != directedTarget) continue
+                if (radio.writeToNeighbor(neighbor, data)) {
+                    logPacketRelay(routed, neighbor.peerID, neighbor.linkAddress, packet.version, routeInfo)
+                    return
+                }
+            }
+        }
+
         // Source routing for originating packets: send ONLY to the first hop when we authored the
         // packet and it carries an explicit route; fall back to broadcast if the hop is gone.
         if (sourceRoutingEnabled && senderID == myPeerID && !packet.route.isNullOrEmpty()) {
