@@ -8,7 +8,9 @@ import co.touchlab.stately.concurrency.withLock
 import com.app.common.AppDispatchers
 import com.app.common.encoding.hexEncodedString
 import com.app.common.utils.Log
+import com.app.transport.MeshTrafficLog
 import com.app.transport.model.RequestSyncPacket
+import com.app.transport.model.SyncTypeFlags
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.peerIdToRoutingBytes
 import com.app.transport.protocol.MessageType
@@ -27,6 +29,7 @@ internal class GossipSyncManager(
     private val myPeerID: String,
     private val scope: CoroutineScope,
     private val configProvider: ConfigProvider,
+    private val trafficLog: MeshTrafficLog? = null,
     private val dispatchers: AppDispatchers = AppDispatchers(),
     private val nowMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) {
@@ -40,6 +43,13 @@ internal class GossipSyncManager(
         fun seenCapacity(): Int // max packets we sync per request (cap across types)
         fun gcsMaxBytes(): Int
         fun gcsTargetFpr(): Double // percent -> 0.0..1.0
+
+        /**
+         * Safety ceiling for the announce store, independent of [seenCapacity]. The store must
+         * hold ~one announce per live peer (iOS caps it only by the 180s liveness prune); this
+         * cap exists solely against hostile peer-ID spoofing, applied LRU.
+         */
+        fun announceCapacity(): Int = SyncDefaults.DEFAULT_ANNOUNCE_CAPACITY
     }
 
     companion object {
@@ -65,14 +75,22 @@ internal class GossipSyncManager(
     // - broadcast messages: keep up to seenCapacity() most recent, keyed by packetId
     private val messages = LinkedHashMap<String, BitchatPacket>()
     private val messagesLock = Lock()
-    // - announcements: only keep latest per sender peerID
-    private val latestAnnouncementByPeer = ConcurrentMutableMap<String, Pair<String, BitchatPacket>>()
+    // - announcements: only keep latest per sender peerID. Insertion-ordered so the
+    //   announceCapacity() safety cap can evict least-recently-announced first (LRU);
+    //   the real bound is the 180s pruneStaleAnnouncements liveness sweep.
+    private val latestAnnouncementByPeer = LinkedHashMap<String, Pair<String, BitchatPacket>>()
+    private val announcementsLock = Lock()
 
     // Per-peer rate limiting keyed on the last SENT request time, plus a guard against
     // stacking multiple delayed jobs while one is already queued for the peer.
     private val lastSyncRequestSentAt = ConcurrentMutableMap<String, Long>()
     private val pendingPeerSyncs = mutableSetOf<String>()
     private val pendingPeerSyncsLock = Lock()
+
+    // Per-requester response budget (iOS parity: 8 responses / 30 s sliding window).
+    // A single response can replay the whole store; this bounds how often one peer
+    // can trigger a full diff pass, checked BEFORE any store scan.
+    private val responseRateLimiter = SyncResponseRateLimiter()
 
     private var periodicJob: Job? = null
     private var cleanupJob: Job? = null
@@ -95,6 +113,7 @@ internal class GossipSyncManager(
                 try {
                     delay(SyncDefaults.CLEANUP_INTERVAL_MS.milliseconds)
                     pruneStaleAnnouncements()
+                    responseRateLimiter.prune(nowMillis())
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) { Log.e(TAG, "Periodic cleanup error: ${e.message}") }
             }
@@ -160,12 +179,16 @@ internal class GossipSyncManager(
             }
             // senderID is fixed-size 8 bytes; map to hex string for key
             val sender = packet.senderID.hexEncodedString()
-            latestAnnouncementByPeer[sender] = id to packet
-            // Enforce capacity (remove oldest when exceeded)
-            val cap = configProvider.seenCapacity().coerceAtLeast(1)
-            while (latestAnnouncementByPeer.size > cap) {
-                val it = latestAnnouncementByPeer.entries.iterator()
-                if (it.hasNext()) { it.next(); it.remove() } else break
+            announcementsLock.withLock {
+                // Refresh recency: a live announcing peer moves to the tail so the safety
+                // cap only ever evicts the least-recently-announced (spoofed/dead) entries.
+                latestAnnouncementByPeer.remove(sender)
+                latestAnnouncementByPeer[sender] = id to packet
+                val cap = configProvider.announceCapacity().coerceAtLeast(1)
+                while (latestAnnouncementByPeer.size > cap) {
+                    val it = latestAnnouncementByPeer.entries.iterator()
+                    if (it.hasNext()) { it.next(); it.remove() } else break
+                }
             }
         }
     }
@@ -213,6 +236,20 @@ internal class GossipSyncManager(
     }
 
     fun handleRequestSync(fromPeerID: String, request: RequestSyncPacket) {
+        // Response budget gate FIRST — before any GCS decode or store scan, so a
+        // request flood costs the responder nothing but this check.
+        if (!responseRateLimiter.shouldRespond(fromPeerID, nowMillis())) {
+            Log.w(TAG, "Rate-limited REQUEST_SYNC from $fromPeerID (max ${SyncResponseRateLimiter.MAX_RESPONSES}/${SyncResponseRateLimiter.WINDOW_MILLIS}ms)")
+            trafficLog?.onRateLimitDrop("syncResponse")
+            return
+        }
+        // iOS parity: an absent 0x04 TLV means announce+message (legacy 3-TLV requesters).
+        val requestedTypes = request.types ?: SyncTypeFlags.publicMessages
+        // The requester's filter only covers packets at or after this cursor; older
+        // packets are outside the filter but NOT missing — without the cursor we would
+        // re-send that entire tail every round.
+        val since = request.sinceTimestamp
+
         // Decode GCS into sorted set for membership checks
         val sorted = GCSFilter.decodeToSortedSet(request.p, request.m, request.data)
         fun mightContain(id: ByteArray): Boolean {
@@ -221,26 +258,34 @@ internal class GossipSyncManager(
             return GCSFilter.contains(sorted, nonZeroV)
         }
 
-        // 1) Announcements: send latest per peerID if remote doesn't have them
-        for ((_, pair) in latestAnnouncementByPeer.entries) {
-            val (id, pkt) = pair
-            val idBytes = hexToBytes(id)
-            if (!mightContain(idBytes)) {
-                // Send original packet unchanged to requester only (keep local TTL)
-                val toSend = pkt.copy(ttl = SyncDefaults.SYNC_TTL_HOPS)
-                delegate?.sendPacketToPeer(fromPeerID, toSend)
-                Log.d(TAG, "Sent sync announce: Type ${toSend.type} from ${toSend.senderID.hexEncodedString()} to $fromPeerID packet id ${idBytes.hexEncodedString()}")
+        // 1) Announcements: send latest per peerID if remote doesn't have them.
+        // Cursor-exempt (iOS parity): they carry the signing keys needed to verify
+        // everything else and there is at most one per peer, so resend cost is bounded.
+        if (requestedTypes.contains(SyncTypeFlags.announce)) {
+            val announces = announcementsLock.withLock { latestAnnouncementByPeer.values.toList() }
+            for (pair in announces) {
+                val (id, pkt) = pair
+                val idBytes = hexToBytes(id)
+                if (!mightContain(idBytes)) {
+                    // Send original packet unchanged to requester only (keep local TTL)
+                    val toSend = pkt.copy(ttl = SyncDefaults.SYNC_TTL_HOPS)
+                    delegate?.sendPacketToPeer(fromPeerID, toSend)
+                    Log.d(TAG, "Sent sync announce: Type ${toSend.type} from ${toSend.senderID.hexEncodedString()} to $fromPeerID packet id ${idBytes.hexEncodedString()}")
+                }
             }
         }
 
-        // 2) Broadcast messages: send all they lack
-        val toSendMsgs = messagesLock.withLock { messages.values.toList() }
-        for (pkt in toSendMsgs) {
-            val idBytes = PacketIdUtil.computeIdBytes(pkt)
-            if (!mightContain(idBytes)) {
-                val toSend = pkt.copy(ttl = SyncDefaults.SYNC_TTL_HOPS)
-                delegate?.sendPacketToPeer(fromPeerID, toSend)
-                Log.d(TAG, "Sent sync message: Type ${toSend.type} to $fromPeerID packet id ${idBytes.hexEncodedString()}")
+        // 2) Broadcast messages: send all they lack that the cursor says they cover
+        if (requestedTypes.contains(SyncTypeFlags.message)) {
+            val toSendMsgs = messagesLock.withLock { messages.values.toList() }
+            for (pkt in toSendMsgs) {
+                if (since != null && pkt.timestamp.toLong() < since) continue
+                val idBytes = PacketIdUtil.computeIdBytes(pkt)
+                if (!mightContain(idBytes)) {
+                    val toSend = pkt.copy(ttl = SyncDefaults.SYNC_TTL_HOPS)
+                    delegate?.sendPacketToPeer(fromPeerID, toSend)
+                    Log.d(TAG, "Sent sync message: Type ${toSend.type} to $fromPeerID packet id ${idBytes.hexEncodedString()}")
+                }
             }
         }
     }
@@ -260,8 +305,10 @@ internal class GossipSyncManager(
         // Collect candidates: latest announcement per peer + recent broadcast messages
         val list = ArrayList<BitchatPacket>()
         // announcements
-        for ((_, pair) in latestAnnouncementByPeer) {
-            list.add(pair.second)
+        announcementsLock.withLock {
+            for ((_, pair) in latestAnnouncementByPeer) {
+                list.add(pair.second)
+            }
         }
         // messages
         messagesLock.withLock {
@@ -278,12 +325,28 @@ internal class GossipSyncManager(
         val takeN = minOf(nMax, cap, list.size)
         if (takeN <= 0) {
             val p0 = GCSFilter.deriveP(fpr)
-            return RequestSyncPacket(p = p0, m = 1, data = ByteArray(0)).encode()
+            return RequestSyncPacket(
+                p = p0, m = 1, data = ByteArray(0),
+                types = SyncTypeFlags.publicMessages,
+            ).encode()
         }
-        val ids = list.take(takeN).map { pkt -> PacketIdUtil.computeIdBytes(pkt) }
+        val included = list.take(takeN)
+        val ids = included.map { pkt -> PacketIdUtil.computeIdBytes(pkt) }
         val params = GCSFilter.buildFilter(ids, maxBytes, fpr)
         val mVal = if (params.m <= 0L) 1 else params.m
-        return RequestSyncPacket(p = params.p, m = mVal, data = params.data).encode()
+        // Covered-prefix cursor (iOS GossipSyncManager.swift:558-595): when the filter
+        // can't represent every candidate — takeN < store size, or the encoder trimmed
+        // the tail to fit the byte budget — tell the responder how far back the filter
+        // actually reaches. Candidates are newest-first, so the covered set is a
+        // contiguous newest-prefix and the oldest included timestamp is an exact cursor.
+        val covered = params.includedCount
+        val sinceTimestamp: Long? =
+            if (covered < list.size && covered > 0) included[covered - 1].timestamp.toLong() else null
+        return RequestSyncPacket(
+            p = params.p, m = mVal, data = params.data,
+            types = SyncTypeFlags.publicMessages,
+            sinceTimestamp = sinceTimestamp,
+        ).encode()
     }
 
     // Periodically remove stale announcements and all their messages
@@ -291,8 +354,9 @@ internal class GossipSyncManager(
         val now = Clock.System.now().toEpochMilliseconds()
         val stalePeers = mutableListOf<String>()
 
-        // Identify stale announcements by age
-        for ((peerID, pair) in latestAnnouncementByPeer.entries) {
+        // Identify stale announcements by age (snapshot: removal below re-acquires the lock)
+        val entries = announcementsLock.withLock { latestAnnouncementByPeer.entries.map { it.key to it.value } }
+        for ((peerID, pair) in entries) {
             val pkt = pair.second
             val age = now - pkt.timestamp.toLong()
             if (age > STALE_ANNOUNCE_MAX_AGE_MS) {
@@ -322,6 +386,10 @@ internal class GossipSyncManager(
         Log.d(TAG, "Pruned ${stalePeers.size} stale announcements and $totalPrunedMsgs messages")
     }
 
+    // Test seam: current size of the announce store (convergence tests assert no eviction).
+    internal fun storedAnnouncementCount(): Int =
+        announcementsLock.withLock { latestAnnouncementByPeer.size }
+
     // Explicitly remove stored announcement for a given peer (hex ID)
     fun removeAnnouncementForPeer(peerID: String) {
         val key = peerID.lowercase()
@@ -329,7 +397,7 @@ internal class GossipSyncManager(
         // initial sync without waiting out the interval.
         lastSyncRequestSentAt.remove(peerID)
         lastSyncRequestSentAt.remove(key)
-        if (latestAnnouncementByPeer.remove(key) != null) {
+        if (announcementsLock.withLock { latestAnnouncementByPeer.remove(key) } != null) {
             Log.d(TAG, "Removed stored announcement for peer $peerID")
         }
 

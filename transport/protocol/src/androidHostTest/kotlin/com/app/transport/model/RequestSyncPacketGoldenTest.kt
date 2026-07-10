@@ -94,6 +94,85 @@ class RequestSyncPacketGoldenTest {
         assertArrayEquals(byteArrayOf(0xAB.toByte(), 0xCD.toByte()), decoded.data)
     }
 
+    // ── SYNC_SCALE P3 wire extension (owner-approved, Q1): we now EMIT the optional
+    // 0x04 types / 0x05 sinceTimestamp TLVs, appended after 0x03 in iOS encode order.
+    // Constructors that omit them keep producing the frozen 3-TLV bytes above.
+
+    @Test
+    fun `golden P3 - optional types TLV 0x04 (publicMessages = announce or message = 0x03)`() {
+        // iOS RequestSyncPacket(p:7, m:256, data:abcd, types:.publicMessages).encode():
+        // SyncTypeFlags.toData() = LE u64 trailing-zero-trimmed -> single byte 0x03.
+        val encoded = RequestSyncPacket(
+            p = 7,
+            m = 256,
+            data = byteArrayOf(0xAB.toByte(), 0xCD.toByte()),
+            types = SyncTypeFlags.publicMessages,
+        ).encode()
+        assertEquals(
+            "0100" + "0107" +          // TLV 0x01, len 1, P=7
+                "0200" + "0400000100" + // TLV 0x02, len 4, M=256 big-endian
+                "0300" + "02abcd" +     // TLV 0x03, len 2, data
+                "0400" + "0103",        // TLV 0x04, len 1, types=announce|message
+            encoded.hex(),
+        )
+    }
+
+    @Test
+    fun `golden P3 - types plus sinceTimestamp TLV 0x05 (u64 BE)`() {
+        // sinceTimestamp = 1_700_000_000_000 = 0x0000018bcfe56800, big-endian u64.
+        val encoded = RequestSyncPacket(
+            p = 7,
+            m = 256,
+            data = byteArrayOf(0xAB.toByte(), 0xCD.toByte()),
+            types = SyncTypeFlags.publicMessages,
+            sinceTimestamp = 1_700_000_000_000L,
+        ).encode()
+        assertEquals(
+            "0100" + "0107" +
+                "0200" + "0400000100" +
+                "0300" + "02abcd" +
+                "0400" + "0103" +
+                "0500" + "080000018bcfe56800", // TLV 0x05, len 8, since BE
+            encoded.hex(),
+        )
+    }
+
+    @Test
+    fun `golden P3 - omitted optionals stay byte-identical to the frozen 3-TLV form`() {
+        val legacy = RequestSyncPacket(p = 7, m = 256, data = byteArrayOf(0xAB.toByte(), 0xCD.toByte()))
+        assertEquals("0100" + "0107" + "0200" + "0400000100" + "0300" + "02abcd", legacy.encode().hex())
+    }
+
+    @Test
+    fun `decode P3 - populates types and sinceTimestamp from the iOS 6-TLV payload`() {
+        val iosPayload =
+            "0100" + "0107" +
+                "0200" + "0400000100" +
+                "0300" + "02abcd" +
+                "0400" + "0103" +               // types = announce|message
+                "0500" + "080000018bcfe56800" + // since = 1_700_000_000_000
+                "0600" + "0461626364"           // fragment filter: still skipped
+        val decoded = RequestSyncPacket.decode(iosPayload.unhex())
+        assertNotNull(decoded)
+        assertEquals(SyncTypeFlags.publicMessages, decoded!!.types)
+        assertEquals(1_700_000_000_000L, decoded.sinceTimestamp)
+    }
+
+    @Test
+    fun `decode P3 - multi-byte LE types field with unknown high bits masked`() {
+        // 2-byte LE flags 0xFF 0xFF = raw 0xFFFF; only bits 0..10 map to types -> 0x7FF.
+        val payload =
+            "0100" + "0107" +
+                "0200" + "0400000100" +
+                "0300" + "02abcd" +
+                "0400" + "02ffff"
+        val decoded = RequestSyncPacket.decode(payload.unhex())
+        assertNotNull(decoded)
+        assertEquals(SyncTypeFlags.fromRaw(0x7FFuL), decoded!!.types)
+        // And the trimmed re-encoding of the known mask is 2 bytes LE: ff 07.
+        assertEquals("ff07", SyncTypeFlags.fromRaw(0x7FFuL).toData()!!.hex())
+    }
+
     @Test
     fun `round trip through frame decode`() {
         val payload = RequestSyncPacket(p = 7, m = 1, data = ByteArray(0)).encode()

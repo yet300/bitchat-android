@@ -93,7 +93,7 @@ class MeshCoordinator(
     // Engine components. Rebuilt in place by reset()/revival — the BMS object itself keeps
     // its graph identity, so  consumers never hold a stale reference.
     private var peerManager = PeerManager(peerFingerprintManager)
-    private var securityManager = SecurityManager(encryptionService, myPeerID)
+    private var securityManager = SecurityManager(encryptionService, myPeerID, trafficLog = debugSettingsManager)
     private var storeForwardManager = StoreForwardManager()
     private var messageHandler = MessageHandler(myPeerID, incomingFileStore, meshGraphService, dispatchers)
 
@@ -146,10 +146,13 @@ class MeshCoordinator(
         gossipSyncManager = GossipSyncManager(
             myPeerID = myPeerID,
             scope = serviceScope,
+            trafficLog = debugSettingsManager,
             configProvider = object : GossipSyncManager.ConfigProvider {
+                // 1000 matches iOS Config.seenCapacity (messages + GCS filter cap only;
+                // the announce store is bounded separately by announceCapacity()).
                 override fun seenCapacity(): Int = try {
-                    debugPreferenceManager.getSeenPacketCapacity(500)
-                } catch (_: Exception) { 500 }
+                    debugPreferenceManager.getSeenPacketCapacity(1000)
+                } catch (_: Exception) { 1000 }
 
                 override fun gcsMaxBytes(): Int = try {
                     debugPreferenceManager.getGcsMaxFilterBytes(400)
@@ -183,7 +186,10 @@ class MeshCoordinator(
                 meshNetwork.broadcast(RoutedPacket(packet))
             }
             override fun sendPacketToPeer(peerID: String, packet: BitchatPacket) {
-                meshNetwork.sendToPeer(peerID, RoutedPacket(packet))
+                // Solicited sync traffic rides the bounded priority queue (relay/bulk),
+                // never the direct synchronous write path: a diff response replaying the
+                // store must not outrank interactive frames or dodge back-pressure.
+                meshNetwork.sendToPeerQueued(peerID, RoutedPacket(packet))
             }
             override fun signPacketForBroadcast(packet: BitchatPacket): BitchatPacket {
                 return outbound.signPacketBeforeBroadcast(packet)
@@ -280,7 +286,7 @@ class MeshCoordinator(
         myPeerID = encryptionService.getIdentityFingerprint().take(16)
         peerManager = PeerManager(peerFingerprintManager)
         fragmentManager.clearAllFragments()
-        securityManager = SecurityManager(encryptionService, myPeerID)
+        securityManager = SecurityManager(encryptionService, myPeerID, trafficLog = debugSettingsManager)
         storeForwardManager = StoreForwardManager()
         messageHandler = MessageHandler(myPeerID, incomingFileStore, meshGraphService, dispatchers)
         packetProcessor = PacketProcessor(myPeerID, debugSettingsManager)

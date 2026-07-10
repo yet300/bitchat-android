@@ -92,6 +92,13 @@ interface MeshTrafficLog {
      * never our own interactive packets — is observable instead of silent.
      */
     fun onOutboundDropped(bearerId: BearerId) {}
+
+    /**
+     * A rate limiter dropped inbound work. [limiter] identifies which budget was exceeded
+     * (e.g. "syncResponse", "noiseHandshake", "noiseMessage", "publicMessage"). Default
+     * no-op; debug telemetry can count these so hostile floods become observable.
+     */
+    fun onRateLimitDrop(limiter: String) {}
 }
 
 /**

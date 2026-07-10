@@ -12,6 +12,7 @@ import com.app.transport.model.RoutedPacket
 import com.app.common.encoding.hexEncodedString
 import com.app.common.encoding.toHexString
 import com.app.transport.MeshConstants
+import com.app.transport.MeshTrafficLog
 import com.app.transport.crypto.Sha256
 import co.touchlab.stately.collections.ConcurrentMutableMap
 import co.touchlab.stately.collections.ConcurrentMutableSet
@@ -44,7 +45,9 @@ internal enum class PacketValidationResult {
 internal class SecurityManager(
     private val encryptionService: EncryptionService,
     private val myPeerID: String,
+    private val trafficLog: MeshTrafficLog? = null,
     dispatchers: AppDispatchers = AppDispatchers(),
+    nowMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) {
     
     companion object {
@@ -83,6 +86,10 @@ internal class SecurityManager(
             messageTimestamps.remove(eldest)
         }
     }
+
+    // Noise DoS budgets (iOS NoiseEncryptionService.allowHandshake/allowMessage parity):
+    // per-peer + global sliding windows over the handshake intake and the decrypt path.
+    private val noiseRateLimiter = NoiseRateLimiter(nowMillis)
 
     // Delegate for callbacks
     var delegate: SecurityManagerDelegate? = null
@@ -165,6 +172,15 @@ internal class SecurityManager(
             
         // Skip our own handshake messages
         if (peerID == myPeerID) return false
+
+        // Rate limit BEFORE any session mutation or DH work (iOS: allowHandshake before
+        // processing the inbound handshake) — a handshake flood must not be able to force
+        // session drops or burn CPU. Per-peer 10/min, global 30/min.
+        if (!noiseRateLimiter.allowHandshake(peerID)) {
+            Log.w(TAG, "Rate-limited Noise handshake from $peerID")
+            trafficLog?.onRateLimitDrop("noiseHandshake")
+            return false
+        }
 
         // If we already have an established session but the peer is initiating a new handshake,
         // drop the existing session so we can re-establish cleanly.
@@ -264,6 +280,13 @@ internal class SecurityManager(
      * Decrypt payload from specific peer
      */
     fun decryptFromPeer(encryptedData: ByteArray, senderPeerID: String): ByteArray? {
+        // Rate limit BEFORE the decrypt work (iOS: allowMessage before decrypt).
+        // Per-peer 100/s, global 500/s.
+        if (!noiseRateLimiter.allowMessage(senderPeerID)) {
+            Log.w(TAG, "Rate-limited Noise message from $senderPeerID")
+            trafficLog?.onRateLimitDrop("noiseMessage")
+            return null
+        }
         return try {
             encryptionService.decrypt(encryptedData, senderPeerID)
         } catch (e: Exception) {
@@ -365,6 +388,9 @@ internal class SecurityManager(
         }
     }
     
+    /** Forget a peer's Noise budgets when its session is dropped (iOS reset(for:)). */
+    fun resetNoiseRateLimits(peerID: String) = noiseRateLimiter.reset(peerID)
+
     /**
      * Check if we have encryption keys for a peer
      */
@@ -448,6 +474,7 @@ internal class SecurityManager(
         processedLock.withLock { processedMessages.clear() }
         processedKeyExchanges.clear()
         messageTimestamps.clear()
+        noiseRateLimiter.resetAll() // panic parity with iOS resetAll
     }
     
     /**

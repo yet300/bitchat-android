@@ -32,6 +32,7 @@ class PacketProcessorFifoOrderTest {
         override fun updatePeerLastSeen(peerID: String) {}
         override fun getPeerNickname(peerID: String): String? = null
         override fun getNetworkSize(): Int = 1
+        override fun getLocalDegree(): Int = 1
         override fun getBroadcastRecipient(): ByteArray = ByteArray(0)
         override suspend fun handleNoiseHandshake(routed: RoutedPacket): Boolean = true
         override fun handleNoiseEncrypted(routed: RoutedPacket) {}
@@ -52,7 +53,9 @@ class PacketProcessorFifoOrderTest {
         val packet = BitchatPacket(
             type = MessageType.MESSAGE.value,
             senderID = ByteArray(8),
-            recipientID = null,
+            // Directed (non-broadcast) so the P5 public-intake rate limiter does not
+            // gate the burst — this test samples pure per-peer ordering, not policy.
+            recipientID = ByteArray(8) { 0x42 },
             timestamp = marker.toULong(),
             payload = "m$marker".encodeToByteArray(),
             ttl = 1u,

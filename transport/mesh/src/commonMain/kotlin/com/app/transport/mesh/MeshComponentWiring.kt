@@ -78,6 +78,7 @@ internal class MeshComponentWiring(
                 // Also drop any Noise session state for this peer when they go offline
                 try {
                     encryptionService.removePeer(peerID)
+                    securityManager.resetNoiseRateLimits(peerID)
                     Log.d(TAG, "Removed Noise session for offline peer $peerID")
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed to remove Noise session for $peerID: ${e.message}")
@@ -375,6 +376,12 @@ internal class MeshComponentWiring(
             // Network information for relay manager
             override fun getNetworkSize(): Int {
                 return peerManager.getActivePeerCount()
+            }
+
+            override fun getLocalDegree(): Int {
+                // Directly connected links across all bearers — the iOS RelayController
+                // degree. Deliberately NOT getActivePeerCount() (total multi-hop peers).
+                return try { meshNetwork.allNeighbors.size } catch (_: Exception) { 0 }
             }
 
             override fun getBroadcastRecipient(): ByteArray {

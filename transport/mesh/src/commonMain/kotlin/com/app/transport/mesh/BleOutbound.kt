@@ -40,6 +40,9 @@ enum class BleOutboundPriority {
     companion object {
         /** own > relay; within each, interactive frames beat fragmented/bulk media. */
         fun of(routed: RoutedPacket): BleOutboundPriority {
+            // Queued directed sends (gossip-sync responses) can replay large parts of the
+            // store; they must never outrank interactive traffic — always relay/bulk.
+            if (routed.directedPeerID != null) return RELAY_BULK
             val own = routed.relayAddress == null
             val bulk = when (routed.packet.type) {
                 MessageType.FRAGMENT.value, MessageType.FILE_TRANSFER.value -> true

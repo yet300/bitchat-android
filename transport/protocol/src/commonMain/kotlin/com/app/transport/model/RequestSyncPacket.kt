@@ -6,11 +6,18 @@ package com.app.transport.model
  *  - 0x01: P (uint8) — Golomb-Rice parameter
  *  - 0x02: M (uint32, big-endian) — hash range (N * 2^P)
  *  - 0x03: data (opaque) — GR bitstream bytes
+ *  - 0x04: types ([SyncTypeFlags], LE u64 trailing-zero-trimmed, 1-8 bytes) — OPTIONAL
+ *  - 0x05: sinceTimestamp (uint64, big-endian) — OPTIONAL filter coverage cursor
+ * Optional TLVs are appended AFTER 0x03, in ascending type order (iOS encode order).
+ * With both optionals null the encoding is byte-identical to the historical 3-TLV
+ * form — the frozen golden vectors stay unchanged.
  */
 data class RequestSyncPacket(
     val p: Int,
     val m: Long,
-    val data: ByteArray
+    val data: ByteArray,
+    val types: SyncTypeFlags? = null,
+    val sinceTimestamp: Long? = null,
 ) {
     fun encode(): ByteArray {
         val out = ArrayList<Byte>()
@@ -36,6 +43,23 @@ data class RequestSyncPacket(
         )
         // data
         putTLV(0x03, data)
+        // Optional TLVs, appended after 0x03 in this order (matches iOS encode()).
+        types?.toData()?.let { putTLV(0x04, it) }
+        sinceTimestamp?.let { ts ->
+            putTLV(
+                0x05,
+                byteArrayOf(
+                    ((ts ushr 56) and 0xFF).toByte(),
+                    ((ts ushr 48) and 0xFF).toByte(),
+                    ((ts ushr 40) and 0xFF).toByte(),
+                    ((ts ushr 32) and 0xFF).toByte(),
+                    ((ts ushr 24) and 0xFF).toByte(),
+                    ((ts ushr 16) and 0xFF).toByte(),
+                    ((ts ushr 8) and 0xFF).toByte(),
+                    (ts and 0xFF).toByte()
+                )
+            )
+        }
         return out.toByteArray()
     }
 
@@ -49,6 +73,8 @@ data class RequestSyncPacket(
             var p: Int? = null
             var m: Long? = null
             var payload: ByteArray? = null
+            var types: SyncTypeFlags? = null
+            var sinceTimestamp: Long? = null
 
             while (off + 3 <= data.size) {
                 val t = (data[off].toInt() and 0xFF); off += 1
@@ -68,6 +94,14 @@ data class RequestSyncPacket(
                         if (v.size > MAX_ACCEPT_FILTER_BYTES) return null
                         payload = v
                     }
+                    0x04 -> SyncTypeFlags.decode(v)?.let { types = it }
+                    0x05 -> if (len == 8) {
+                        var ts = 0L
+                        for (b in v) ts = (ts shl 8) or (b.toLong() and 0xFF)
+                        sinceTimestamp = ts
+                    }
+                    // No else branch: unknown TLVs (incl. 0x06 fragmentIdFilter) stay
+                    // length-parsed and skipped — forward compatible.
                 }
             }
 
@@ -75,7 +109,7 @@ data class RequestSyncPacket(
             val mm = m ?: return null
             val dd = payload ?: return null
             if (pp < 1 || mm <= 0L) return null
-            return RequestSyncPacket(pp, mm, dd)
+            return RequestSyncPacket(pp, mm, dd, types, sinceTimestamp)
         }
     }
 }

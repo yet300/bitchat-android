@@ -6,11 +6,11 @@ import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
 import com.app.common.encoding.toHexString
 import com.app.transport.MeshDebugToggles
+import com.app.transport.protocol.MessageType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
-import kotlin.random.Random
 
 /**
  * Centralized packet relay management
@@ -103,13 +103,43 @@ internal class PacketRelayManager(
             }
         }
 
-        // Apply relay logic based on packet type and debug switch
-        val shouldRelay = isRelayEnabled() && shouldRelayPacket(relayPacket, peerID)
-        if (shouldRelay) {
-            relayPacket(RoutedPacket(relayPacket, peerID, routed.relayAddress))
-        } else {
-            Log.d(TAG, "Relay decision: NOT relaying packet type ${packet.type}")
+        // Apply relay policy (RelayController port) based on packet type, LOCAL link
+        // degree and the debug switch. The decision consumes the ORIGINAL incoming TTL
+        // and produces the outgoing TTL itself (clamp-then-decrement, iOS parity).
+        if (!isRelayEnabled()) {
+            Log.d(TAG, "Relay decision: relay disabled, NOT relaying packet type ${packet.type}")
+            return
         }
+        val decision = decideRelay(packet)
+        if (decision.shouldRelay) {
+            relayPacket(RoutedPacket(packet.copy(ttl = decision.newTTL), peerID, routed.relayAddress))
+        } else {
+            Log.d(TAG, "Relay decision: NOT relaying packet type ${packet.type} (ttl=${packet.ttl}, degree=${delegate?.getLocalDegree()})")
+        }
+    }
+
+    /**
+     * iOS RelayController.decide() inputs derived from the packet. senderIsSelf and
+     * recipientIsSelf are already filtered by the caller, so they are passed false.
+     */
+    private fun decideRelay(packet: BitchatPacket): RelayDecision {
+        val mt = MessageType.fromValue(packet.type)
+        val recipientID = packet.recipientID
+        val broadcastRecipient = delegate?.getBroadcastRecipient()
+        val isDirected = recipientID != null &&
+            !(broadcastRecipient != null && recipientID.contentEquals(broadcastRecipient))
+        return RelayController.decide(
+            ttl = packet.ttl,
+            senderIsSelf = false,
+            recipientIsSelf = false,
+            isDirectedEncrypted = mt == MessageType.NOISE_ENCRYPTED && isDirected,
+            isFragment = mt == MessageType.FRAGMENT,
+            isDirectedFragment = mt == MessageType.FRAGMENT && isDirected,
+            isHandshake = mt == MessageType.NOISE_HANDSHAKE,
+            isAnnounce = mt == MessageType.ANNOUNCE,
+            isRequestSync = mt == MessageType.REQUEST_SYNC,
+            degree = delegate?.getLocalDegree() ?: 0,
+        )
     }
     
     /**
@@ -132,40 +162,6 @@ internal class PacketRelayManager(
         // Check if recipient matches our peer ID
         val recipientIDString = recipientID.toHexString()
         return recipientIDString == myPeerID
-    }
-    
-    /**
-     * Determine if we should relay this packet based on type and network conditions
-     */
-    private fun shouldRelayPacket(packet: BitchatPacket, fromPeerID: String): Boolean {
-        // Always relay if TTL is high enough (indicates important message)
-        if (packet.ttl >= 4u) {
-            Log.d(TAG, "High TTL (${packet.ttl}), relaying")
-            return true
-        }
-        
-        // Get network size for adaptive relay probability
-        val networkSize = delegate?.getNetworkSize() ?: 1
-        
-        // Small networks always relay to ensure connectivity
-        if (networkSize <= 3) {
-            Log.d(TAG, "Small network (${networkSize} peers), relaying")
-            return true
-        }
-        
-        // Apply adaptive relay probability based on network size
-        val relayProb = when {
-            networkSize <= 10 -> 1.0    // Always relay in small networks
-            networkSize <= 30 -> 0.85   // High probability for medium networks
-            networkSize <= 50 -> 0.7    // Moderate probability
-            networkSize <= 100 -> 0.55  // Lower probability for large networks
-            else -> 0.4                 // Lowest probability for very large networks
-        }
-        
-        val shouldRelay = Random.nextDouble() < relayProb
-        Log.d(TAG, "Network size: ${networkSize}, Relay probability: ${relayProb}, Decision: ${shouldRelay}")
-        
-        return shouldRelay
     }
     
     /**
@@ -203,6 +199,13 @@ internal class PacketRelayManager(
 internal interface PacketRelayManagerDelegate {
     // Network information
     fun getNetworkSize(): Int
+
+    /**
+     * LOCAL degree: number of directly connected links (radio neighbors). This is what
+     * the RelayController TTL clamp keys on — NOT getNetworkSize(), which counts total
+     * multi-hop peers (in a 1000-peer mesh a node has ~4-8 direct links).
+     */
+    fun getLocalDegree(): Int
     fun getBroadcastRecipient(): ByteArray
     
     // Packet operations
