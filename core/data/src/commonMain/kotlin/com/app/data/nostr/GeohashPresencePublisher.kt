@@ -9,6 +9,7 @@ import com.app.transport.nostr.RelayDirectory
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -89,6 +90,8 @@ class GeohashPresencePublisher(
         if (!appForegroundState.isForeground.value) return
         try {
             publishHeartbeat(geohash)
+        } catch (e: CancellationException) {
+            throw e  // leaving the geohash cancels us mid-publish; that is not a failure to log
         } catch (e: Exception) {
             Log.e(TAG, "Failed to publish presence for #$geohash: ${e.message}")
         }

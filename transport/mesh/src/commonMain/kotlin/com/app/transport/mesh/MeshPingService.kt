@@ -106,6 +106,10 @@ internal class MeshPingService(
             Log.d(TAG, "Malformed ping via ${linkKey.take(8)}")
             return
         }
+        // Drop history for links we no longer hear from. This is the limiter's only writer and it
+        // is itself budgeted, so pruning per inbound ping is cheap — and BLE addresses rotate, so
+        // an unpruned key map would grow for the life of the process.
+        inboundLimiter.prune(nowMillis())
         if (!inboundLimiter.shouldRespond(linkKey, nowMillis())) {
             Log.w(TAG, "Rate-limiting pings via link ${linkKey.take(8)}")
             return
@@ -148,7 +152,4 @@ internal class MeshPingService(
             )
         )
     }
-
-    /** Drops limiter history outside the window so departed links don't accumulate. */
-    fun prune() = inboundLimiter.prune(nowMillis())
 }

@@ -70,8 +70,10 @@ internal class DebugRepositoryImpl(
         )
     }
 
+    // No runCatching: the probe already reports failure as null, and wrapping a suspend call would
+    // swallow the caller's cancellation.
     override suspend fun pingPeer(peerId: String): MeshPingProbe? =
-        runCatching { mesh.pingPeer(peerId) }.getOrNull()?.let { MeshPingProbe(it.rttMs, it.hops) }
+        mesh.pingPeer(peerId)?.let { MeshPingProbe(it.rttMs, it.hops) }
 
     private fun DebugMessage.toEntry(): PacketLogEntry = PacketLogEntry(
         kind = when (this) {

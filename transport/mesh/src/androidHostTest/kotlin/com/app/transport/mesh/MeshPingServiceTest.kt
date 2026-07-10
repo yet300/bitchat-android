@@ -203,6 +203,25 @@ class MeshPingServiceTest {
         assertEquals(MeshPingService.INBOUND_MAX_PER_LINK, sent.size)
     }
 
+    /**
+     * The budget refills once the window slides, and stale link history is pruned rather than kept
+     * for the life of the process (BLE addresses rotate, so the key map would otherwise only grow).
+     */
+    @Test
+    fun `the per-link budget refills after the window slides`() {
+        val svc = service()
+
+        repeat(MeshPingService.INBOUND_MAX_PER_LINK + 2) {
+            svc.onPingReceived(pingTo(recipient = ME, sender = PEER), linkKey = "link-a")
+        }
+        assertEquals(MeshPingService.INBOUND_MAX_PER_LINK, sent.size)
+
+        now += MeshPingService.INBOUND_WINDOW_MS + 1
+        svc.onPingReceived(pingTo(recipient = ME, sender = PEER), linkKey = "link-a")
+
+        assertEquals(MeshPingService.INBOUND_MAX_PER_LINK + 1, sent.size)
+    }
+
     @Test
     fun `a different ingress link gets its own budget`() {
         val svc = service()
