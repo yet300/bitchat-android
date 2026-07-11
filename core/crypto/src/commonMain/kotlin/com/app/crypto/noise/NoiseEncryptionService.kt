@@ -7,6 +7,7 @@ import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.secure.SecureKeyValueStore
 import com.app.crypto.hash.Sha256
 import com.app.crypto.sign.Ed25519
+import com.app.crypto.noise.southernstorm.protocol.HandshakeState
 
 /**
  * Main Noise encryption service - 100% compatible with iOS implementation
@@ -28,6 +29,12 @@ internal class NoiseEncryptionService(
         // Session limits for performance and security
         private const val REKEY_TIME_LIMIT = NoiseConstants.REKEY_TIME_LIMIT_MS // 1 hour (same as iOS)
         private const val REKEY_MESSAGE_LIMIT = NoiseConstants.REKEY_MESSAGE_LIMIT_ENCRYPTION // 1k messages (matches iOS) (same as iOS)
+
+        // Courier envelopes: one-way Noise X, domain-separated from interactive XX handshakes.
+        private const val COURIER_PROTOCOL_NAME = "Noise_X_25519_ChaChaPoly_SHA256"
+        private val COURIER_PROLOGUE = "bitchat-courier-v1".encodeToByteArray()
+        // X message = e(32) + encrypted static s(32+16) + AEAD tag over payload(16); pad generously.
+        private const val COURIER_HANDSHAKE_OVERHEAD = 128
     }
     
     // Static identity key (persistent across app restarts) - loaded from secure storage
@@ -250,8 +257,61 @@ internal class NoiseEncryptionService(
         }
     }
     
+    // MARK: - Courier Envelopes (one-way Noise X)
+
+    /**
+     * Encrypt a payload to a peer's known static key without an interactive handshake
+     * (Noise X pattern), for store-and-forward courier envelopes carried while the recipient is
+     * offline. Byte-compatible with the reference iOS `sealCourierPayload`.
+     *
+     * One-way messages have NO forward secrecy: a later compromise of the recipient's static key
+     * exposes envelopes captured in transit. Use an established session whenever the peer is
+     * reachable. The initiator's static rides (encrypted) inside via the X `s` token, so the
+     * recipient authenticates the sender from the ciphertext alone.
+     */
+    fun sealCourierPayload(payload: ByteArray, recipientStaticKey: ByteArray): ByteArray {
+        val handshake = HandshakeState(COURIER_PROTOCOL_NAME, HandshakeState.INITIATOR)
+        try {
+            handshake.setPrologue(COURIER_PROLOGUE, 0, COURIER_PROLOGUE.size)
+            handshake.localKeyPair?.setPrivateKey(staticIdentityPrivateKey, 0)
+                ?: throw NoiseEncryptionError.InvalidMessage
+            handshake.remotePublicKey?.setPublicKey(recipientStaticKey, 0)
+                ?: throw NoiseEncryptionError.InvalidMessage
+            handshake.start()
+            val buffer = ByteArray(payload.size + COURIER_HANDSHAKE_OVERHEAD)
+            val length = handshake.writeMessage(buffer, 0, payload, 0, payload.size)
+            return buffer.copyOf(length)
+        } finally {
+            handshake.destroy()
+        }
+    }
+
+    /**
+     * Decrypt a courier envelope sealed to our static key. Returns the payload and the sender's
+     * authenticated static public key (the X `ss` DH binds the sender's identity to the ciphertext).
+     * Byte-compatible with the reference iOS `openCourierPayload`.
+     */
+    fun openCourierPayload(envelopeCiphertext: ByteArray): Pair<ByteArray, ByteArray> {
+        val handshake = HandshakeState(COURIER_PROTOCOL_NAME, HandshakeState.RESPONDER)
+        try {
+            handshake.setPrologue(COURIER_PROLOGUE, 0, COURIER_PROLOGUE.size)
+            handshake.localKeyPair?.setPrivateKey(staticIdentityPrivateKey, 0)
+                ?: throw NoiseEncryptionError.InvalidMessage
+            handshake.start()
+            val payloadBuffer = ByteArray(envelopeCiphertext.size)
+            val length = handshake.readMessage(envelopeCiphertext, 0, envelopeCiphertext.size, payloadBuffer, 0)
+            if (handshake.hasRemotePublicKey() != true) throw NoiseEncryptionError.InvalidMessage
+            val senderStaticKey = ByteArray(32)
+            handshake.remotePublicKey?.getPublicKey(senderStaticKey, 0)
+                ?: throw NoiseEncryptionError.InvalidMessage
+            return payloadBuffer.copyOf(length) to senderStaticKey
+        } finally {
+            handshake.destroy()
+        }
+    }
+
     // MARK: - Peer Management
-    
+
     /**
      * Get fingerprint for a peer (returns null if peer unknown)
      */

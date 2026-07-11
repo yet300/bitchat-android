@@ -120,6 +120,35 @@ open class EncryptionService(
         }
     }
     
+    // MARK: - Courier Envelopes (one-way Noise X)
+
+    /**
+     * Seal [payload] to [recipientStaticKey] as a one-way Noise X courier envelope ciphertext, for
+     * store-and-forward delivery while the recipient is offline. No forward secrecy; the sender's
+     * static identity rides (encrypted) inside. Returns null on failure.
+     */
+    fun sealCourierPayload(payload: ByteArray, recipientStaticKey: ByteArray): ByteArray? {
+        return try {
+            noiseService.sealCourierPayload(payload, recipientStaticKey)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to seal courier envelope: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * Open a courier envelope sealed to our static key. Returns the payload and the sender's
+     * authenticated static public key, or null if the ciphertext is not addressed to us / malformed.
+     */
+    fun openCourierPayload(ciphertext: ByteArray): Pair<ByteArray, ByteArray>? {
+        return try {
+            noiseService.openCourierPayload(ciphertext)
+        } catch (e: Exception) {
+            Log.d(TAG, "Courier envelope failed to open: ${e.message}")
+            null
+        }
+    }
+
     // MARK: - Announce-bound Peer Signing Keys
 
     /**
