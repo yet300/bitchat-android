@@ -12,6 +12,7 @@ import com.app.database.dao.ConversationPrefDao
 import com.app.database.dao.GeohashDao
 import com.app.database.dao.MessageDao
 import com.app.database.dao.OutboxDao
+import com.app.database.dao.PrekeyBundleDao
 import com.app.database.dao.SecureSettingDao
 import com.app.database.db.DatabaseDriverFactory
 import com.app.database.db.DatabaseManager
@@ -96,4 +97,9 @@ object DatabaseBindings {
     @Provides
     fun provideBoardDao(manager: DatabaseManager, dispatchers: AppDispatchers): BoardDao =
         BoardDao(manager, dispatchers)
+
+    @SingleIn(AppScope::class)
+    @Provides
+    fun providePrekeyBundleDao(manager: DatabaseManager, dispatchers: AppDispatchers): PrekeyBundleDao =
+        PrekeyBundleDao(manager, dispatchers)
 }

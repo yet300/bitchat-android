@@ -5,6 +5,7 @@ import com.app.data.board.BoardCoordinator
 import com.app.data.courier.CourierCoordinator
 import com.app.data.group.GroupCoordinator
 import com.app.data.nostr.NostrDirectMessageIngest
+import com.app.data.prekey.PrekeyCoordinator
 import com.app.data.repository.NicknameSync
 import com.app.data.tor.TorActivationController
 import com.app.data.vouch.VouchCoordinator
@@ -50,6 +51,7 @@ class AppNetworkBootstrapper(
     private val courierCoordinator: CourierCoordinator,
     private val groupCoordinator: GroupCoordinator,
     private val boardCoordinator: BoardCoordinator,
+    private val prekeyCoordinator: PrekeyCoordinator,
 ) {
     private companion object {
         private const val TAG = "AppNetworkBootstrapper"
@@ -110,6 +112,7 @@ class AppNetworkBootstrapper(
         courierCoordinator.hashCode()
         groupCoordinator.hashCode()
         boardCoordinator.hashCode()
+        prekeyCoordinator.hashCode()
 
         Log.i(TAG, "Network bootstrap complete")
     }

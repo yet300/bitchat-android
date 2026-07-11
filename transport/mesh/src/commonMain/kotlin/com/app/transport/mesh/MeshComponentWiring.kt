@@ -21,6 +21,7 @@ import com.app.transport.board.BoardEventListener
 import com.app.transport.courier.CourierEventListener
 import com.app.transport.group.GroupEventListener
 import com.app.transport.model.BoardWire
+import com.app.transport.prekey.PrekeyEventListener
 import com.app.transport.verification.VerifyEventListener
 import com.app.transport.vouch.VouchEventListener
 import kotlinx.coroutines.CoroutineScope
@@ -57,6 +58,7 @@ internal class MeshComponentWiring(
     private val courierListener: () -> CourierEventListener?,
     private val groupListener: () -> GroupEventListener?,
     private val boardListener: () -> BoardEventListener?,
+    private val prekeyListener: () -> PrekeyEventListener?,
 ) {
 
     companion object {
@@ -390,9 +392,15 @@ internal class MeshComponentWiring(
             override fun myNoiseStaticKey(): ByteArray? = encryptionService.getStaticPublicKey()
 
             override fun openCourierPayload(ciphertext: ByteArray, prekeyID: UInt?): Pair<ByteArray, ByteArray>? {
-                // v2 (prekey-sealed) envelopes need a one-time prekey we do not implement yet.
-                if (prekeyID != null) return null
-                return encryptionService.openCourierPayload(ciphertext)
+                // v1 (static-sealed) envelopes open to our identity static key.
+                if (prekeyID == null) return encryptionService.openCourierPayload(ciphertext)
+                // v2 (prekey-sealed) envelopes open to one of our one-time prekeys, consuming it.
+                val opened = encryptionService.openPrekeyPayload(ciphertext, prekeyID) ?: return null
+                if (opened.consumedPrekey) {
+                    // The published bundle shrank; let the coordinator replenish + re-gossip.
+                    prekeyListener()?.onLocalPrekeyConsumed()
+                }
+                return opened.payload to opened.senderStaticKey
             }
 
             override fun peerIDForNoiseKey(noiseKey: ByteArray): String? {
@@ -588,6 +596,14 @@ internal class MeshComponentWiring(
 
             override fun handleCourierEnvelope(routed: RoutedPacket) {
                 scope.launch { messageHandler.handleCourierEnvelope(routed) }
+            }
+
+            override fun handlePrekeyBundle(routed: RoutedPacket) {
+                // Hand the raw broadcast to the coordinator for attribution + signature verification
+                // and caching. The generic relay step runs regardless (bundles must spread even
+                // before this node can verify them). Gossip backfill is not tracked here: like board
+                // posts in this port, bundles propagate by broadcast + relay, not GCS diff.
+                prekeyListener()?.onPrekeyBundleReceived(routed.packet)
             }
         }
     }

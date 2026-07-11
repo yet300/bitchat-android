@@ -214,6 +214,13 @@ internal class PacketProcessor(
             MessageType.FRAGMENT -> handleFragment(routed)
             MessageType.REQUEST_SYNC -> handleRequestSync(routed)
             MessageType.GROUP_MESSAGE -> handleGroupMessage(routed)
+            MessageType.PREKEY_BUNDLE -> {
+                // Verify-then-cache happens in the delegate/coordinator (attribution + inner+outer
+                // signatures against the owner's announce-bound signing key). Relay is NOT gated on
+                // it: bundles race the announces that bind their signing keys, so a node that cannot
+                // verify one yet must still spread it. Falls through to the generic relay step.
+                delegate?.handlePrekeyBundle(routed)
+            }
             MessageType.BOARD_POST -> {
                 // Malformed or forged posts must not spread: the delegate decodes + verifies the inner
                 // author signature synchronously and returns false to skip the relay step below.
@@ -443,6 +450,13 @@ internal interface PacketProcessorDelegate {
 
     /** Group message broadcast (0x25): track for gossip backfill and hand up to the group coordinator. */
     fun handleGroupMessage(routed: RoutedPacket)
+
+    /**
+     * Prekey bundle broadcast (0x24): hand up to the prekey coordinator to verify + cache. Relay is
+     * ungated (returns nothing) — unlike board posts, an unverifiable bundle is still relayed so it
+     * can reach nodes that will bind its owner's signing key later.
+     */
+    fun handlePrekeyBundle(routed: RoutedPacket)
 
     /**
      * Board post/tombstone broadcast (0x23): decode + verify the inner author signature, track for

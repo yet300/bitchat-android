@@ -4,6 +4,7 @@ import com.app.transport.board.BoardEventListener
 import com.app.transport.courier.CourierEventListener
 import com.app.transport.group.GroupEventListener
 import com.app.transport.model.BitchatFilePacket
+import com.app.transport.prekey.PrekeyEventListener
 import com.app.transport.verification.VerifyEventListener
 import com.app.transport.vouch.VouchEventListener
 
@@ -126,4 +127,17 @@ interface MeshService {
      * nominal first-hop marker (receivers gate on the inner signature).
      */
     fun sendBoardPayload(payload: ByteArray)
+
+    // --- One-time prekey bundles (0x24 broadcast) ---
+
+    /** The prekey-event sink; the platform-free prekey coordinator attaches itself here. */
+    var prekeyEventListener: PrekeyEventListener?
+
+    /**
+     * Broadcasts an encoded [PrekeyBundle][com.app.transport.model.PrekeyBundle] as a signed 0x24
+     * packet. Signed so receivers can verify the outer packet against the owner's announce-bound
+     * signing key (defeating replay under a spoofed sender); the inner bundle signature is the
+     * primary authenticity gate and survives multi-hop relay + rebroadcast.
+     */
+    fun sendPrekeyBundle(payload: ByteArray)
 }

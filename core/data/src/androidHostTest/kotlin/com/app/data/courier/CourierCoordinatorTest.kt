@@ -271,6 +271,8 @@ class CourierCoordinatorTest {
         override fun sendGroupState(payload: ByteArray, toPeerID: String, isInvite: Boolean) = Unit
         override var boardEventListener: BoardEventListener? = null
         override fun sendBoardPayload(payload: ByteArray) = Unit
+        override var prekeyEventListener: com.app.transport.prekey.PrekeyEventListener? = null
+        override fun sendPrekeyBundle(payload: ByteArray) = Unit
         override fun sendCourierEnvelope(payload: ByteArray, toPeerID: String) {
             sent.add(toPeerID to payload)
         }
