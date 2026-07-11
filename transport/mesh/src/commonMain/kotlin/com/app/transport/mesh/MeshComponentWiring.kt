@@ -18,6 +18,7 @@ import com.app.transport.protocol.MessageType
 import com.app.transport.protocol.SpecialRecipients
 import com.app.transport.sync.GossipSyncManager
 import com.app.transport.courier.CourierEventListener
+import com.app.transport.group.GroupEventListener
 import com.app.transport.verification.VerifyEventListener
 import com.app.transport.vouch.VouchEventListener
 import kotlinx.coroutines.CoroutineScope
@@ -52,6 +53,7 @@ internal class MeshComponentWiring(
     private val verifyListener: () -> VerifyEventListener?,
     private val vouchListener: () -> VouchEventListener?,
     private val courierListener: () -> CourierEventListener?,
+    private val groupListener: () -> GroupEventListener?,
 ) {
 
     companion object {
@@ -401,6 +403,10 @@ internal class MeshComponentWiring(
             override fun onCourierDeposit(fromPeerID: String, packet: BitchatPacket) {
                 courierListener()?.onCourierDeposit(fromPeerID, packet)
             }
+
+            override fun onGroupStateReceived(fromPeerID: String, isInvite: Boolean, payload: ByteArray) {
+                groupListener()?.onGroupStateReceived(fromPeerID, isInvite, payload)
+            }
         }
     }
 
@@ -443,6 +449,14 @@ internal class MeshComponentWiring(
 
             override fun getBroadcastRecipient(): ByteArray {
                 return SpecialRecipients.BROADCAST
+            }
+
+            override fun handleGroupMessage(routed: RoutedPacket) {
+                // Opaque group broadcast: track for gossip backfill, then hand the payload to the group
+                // coordinator (which opens + authenticates against the roster). Relay happens on the
+                // generic broadcast path in PacketProcessor.
+                try { gossipSyncManager.onPublicPacketSeen(routed.packet) } catch (_: Exception) { }
+                groupListener()?.onGroupMessageReceived(routed.packet.payload, routed.packet.timestamp.toLong())
             }
 
             override suspend fun handleNoiseHandshake(routed: RoutedPacket): Boolean {

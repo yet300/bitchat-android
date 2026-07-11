@@ -26,6 +26,7 @@ import com.app.transport.features.file.IncomingFileStore
 import com.app.transport.meshgraph.MeshGraphService
 import com.app.transport.verification.VerifyEventListener
 import com.app.transport.courier.CourierEventListener
+import com.app.transport.group.GroupEventListener
 import com.app.transport.vouch.VouchEventListener
 import kotlin.concurrent.Volatile
 import kotlinx.coroutines.*
@@ -134,6 +135,9 @@ class MeshCoordinator(
     // Sink for courier events (0x04); the platform-free courier coordinator attaches itself.
     override var courierEventListener: CourierEventListener? = null
 
+    // Sink for group events (0x25 / 0x06 / 0x07); the platform-free group coordinator attaches itself.
+    override var groupEventListener: GroupEventListener? = null
+
     // Coroutines
     private var serviceScope = CoroutineScope(dispatchers.io + SupervisorJob())
     // Tracks whether the current component generation was terminated via stopServices()
@@ -237,6 +241,7 @@ class MeshCoordinator(
             verifyListener = { verifyEventListener },
             vouchListener = { vouchEventListener },
             courierListener = { courierEventListener },
+            groupListener = { groupEventListener },
         ).wire()
         messageHandler.packetProcessor = packetProcessor
         messageHandler.favoriteNostrLink = favoriteNostrLink
@@ -510,6 +515,12 @@ class MeshCoordinator(
 
     override fun sendCourierEnvelope(payload: ByteArray, toPeerID: String) =
         outbound.sendCourierEnvelope(payload, toPeerID)
+
+    override fun broadcastGroupMessage(payload: ByteArray) =
+        outbound.broadcastGroupMessage(payload)
+
+    override fun sendGroupState(payload: ByteArray, toPeerID: String, isInvite: Boolean) =
+        outbound.sendGroupState(payload, toPeerID, isInvite)
 
     override fun connectedPeerIDs(): List<String> =
         try { peerManager.getActivePeerIDs() } catch (_: Exception) { emptyList() }
