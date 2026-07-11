@@ -17,6 +17,7 @@ import com.app.database.db.DatabaseManager
 import com.app.domain.model.Fingerprint
 import com.app.domain.model.MyIdentity
 import com.app.domain.repository.IdentityRepository
+import com.app.transport.board.BoardEventListener
 import com.app.transport.courier.CourierEventListener
 import com.app.transport.group.GroupEventListener
 import kotlinx.serialization.builtins.SetSerializer
@@ -283,6 +284,8 @@ class VouchCoordinatorTest {
         override var groupEventListener: GroupEventListener? = null
         override fun broadcastGroupMessage(payload: ByteArray) = Unit
         override fun sendGroupState(payload: ByteArray, toPeerID: String, isInvite: Boolean) = Unit
+        override var boardEventListener: BoardEventListener? = null
+        override fun sendBoardPayload(payload: ByteArray) = Unit
 
         override fun sendVouchAttestations(batchPayload: ByteArray, peerID: String) {
             deliverVouchTo?.invoke(batchPayload)

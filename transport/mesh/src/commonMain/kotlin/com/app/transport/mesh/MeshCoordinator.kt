@@ -25,6 +25,7 @@ import com.app.transport.SeenMessageStore
 import com.app.transport.features.file.IncomingFileStore
 import com.app.transport.meshgraph.MeshGraphService
 import com.app.transport.verification.VerifyEventListener
+import com.app.transport.board.BoardEventListener
 import com.app.transport.courier.CourierEventListener
 import com.app.transport.group.GroupEventListener
 import com.app.transport.vouch.VouchEventListener
@@ -138,6 +139,9 @@ class MeshCoordinator(
     // Sink for group events (0x25 / 0x06 / 0x07); the platform-free group coordinator attaches itself.
     override var groupEventListener: GroupEventListener? = null
 
+    // Sink for board events (0x23); the platform-free board coordinator attaches itself.
+    override var boardEventListener: BoardEventListener? = null
+
     // Coroutines
     private var serviceScope = CoroutineScope(dispatchers.io + SupervisorJob())
     // Tracks whether the current component generation was terminated via stopServices()
@@ -242,6 +246,7 @@ class MeshCoordinator(
             vouchListener = { vouchEventListener },
             courierListener = { courierEventListener },
             groupListener = { groupEventListener },
+            boardListener = { boardEventListener },
         ).wire()
         messageHandler.packetProcessor = packetProcessor
         messageHandler.favoriteNostrLink = favoriteNostrLink
@@ -521,6 +526,9 @@ class MeshCoordinator(
 
     override fun sendGroupState(payload: ByteArray, toPeerID: String, isInvite: Boolean) =
         outbound.sendGroupState(payload, toPeerID, isInvite)
+
+    override fun sendBoardPayload(payload: ByteArray) =
+        outbound.sendBoardPayload(payload)
 
     override fun connectedPeerIDs(): List<String> =
         try { peerManager.getActivePeerIDs() } catch (_: Exception) { emptyList() }

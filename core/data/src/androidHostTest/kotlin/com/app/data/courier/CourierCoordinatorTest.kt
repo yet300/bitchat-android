@@ -16,6 +16,7 @@ import com.app.database.dao.CourierDao
 import com.app.database.db.DatabaseDriverFactory
 import com.app.database.db.DatabaseManager
 import com.app.transport.courier.CourierEventListener
+import com.app.transport.board.BoardEventListener
 import com.app.transport.group.GroupEventListener
 import com.app.transport.mesh.BleDebugHandle
 import com.app.transport.mesh.MeshPingResult
@@ -268,6 +269,8 @@ class CourierCoordinatorTest {
         override var groupEventListener: GroupEventListener? = null
         override fun broadcastGroupMessage(payload: ByteArray) = Unit
         override fun sendGroupState(payload: ByteArray, toPeerID: String, isInvite: Boolean) = Unit
+        override var boardEventListener: BoardEventListener? = null
+        override fun sendBoardPayload(payload: ByteArray) = Unit
         override fun sendCourierEnvelope(payload: ByteArray, toPeerID: String) {
             sent.add(toPeerID to payload)
         }

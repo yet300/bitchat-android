@@ -48,6 +48,7 @@ class PacketProcessorMessageRateLimitTest {
         override fun handlePong(routed: RoutedPacket) {}
         override fun handleCourierEnvelope(routed: RoutedPacket) {}
         override fun handleGroupMessage(routed: RoutedPacket) {}
+        override fun handleBoardPost(routed: RoutedPacket): Boolean = true
         override fun sendAnnouncementToPeer(peerID: String) {}
         override fun sendCachedMessages(peerID: String) {}
         override fun relayPacket(routed: RoutedPacket) {

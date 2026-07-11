@@ -214,6 +214,11 @@ internal class PacketProcessor(
             MessageType.FRAGMENT -> handleFragment(routed)
             MessageType.REQUEST_SYNC -> handleRequestSync(routed)
             MessageType.GROUP_MESSAGE -> handleGroupMessage(routed)
+            MessageType.BOARD_POST -> {
+                // Malformed or forged posts must not spread: the delegate decodes + verifies the inner
+                // author signature synchronously and returns false to skip the relay step below.
+                if (delegate?.handleBoardPost(routed) != true) return
+            }
             else -> {
                 // Handle private packet types (address check required)
                 if (packetRelayManager.isPacketAddressedToMe(packet)) {
@@ -438,6 +443,13 @@ internal interface PacketProcessorDelegate {
 
     /** Group message broadcast (0x25): track for gossip backfill and hand up to the group coordinator. */
     fun handleGroupMessage(routed: RoutedPacket)
+
+    /**
+     * Board post/tombstone broadcast (0x23): decode + verify the inner author signature, track for
+     * gossip backfill, and hand up for ingest. Returns whether the packet is worth relaying (false on
+     * malformed / bad-signature so forged posts do not spread).
+     */
+    fun handleBoardPost(routed: RoutedPacket): Boolean
 
     // Communication
     fun sendAnnouncementToPeer(peerID: String)

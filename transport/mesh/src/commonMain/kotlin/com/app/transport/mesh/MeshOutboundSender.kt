@@ -396,6 +396,33 @@ internal class MeshOutboundSender(
         sendNoisePayloadToPeer(NoisePayload(type, payload), toPeerID, "group state")
     }
 
+    // MARK: Geohash boards (0x23 broadcast)
+
+    /**
+     * Broadcast a signed board payload (post or tombstone) as a public 0x23 packet. Signed like the
+     * reference (outer sig is a nominal first-hop marker); authenticity is enforced by the inner
+     * author signature that survives multi-hop relay + gossip backfill.
+     */
+    fun sendBoardPayload(payload: ByteArray) {
+        if (payload.isEmpty()) return
+        scope.launch {
+            val packet = BitchatPacket(
+                version = 1u,
+                type = MessageType.BOARD_POST.value,
+                senderID = peerIdToRoutingBytes(myPeerID),
+                recipientID = SpecialRecipients.BROADCAST,
+                timestamp = epochMillis().toULong(),
+                payload = payload,
+                signature = null,
+                ttl = MAX_TTL,
+            )
+            val signed = signPacketBeforeBroadcast(packet)
+            meshNetwork.broadcast(RoutedPacket(signed))
+            try { gossipSyncManager.onPublicPacketSeen(signed) } catch (_: Exception) { }
+            Log.d(TAG, "📋 Broadcast board payload (${payload.size} bytes)")
+        }
+    }
+
     private fun sendNoisePayloadToPeer(payload: NoisePayload, recipientPeerID: String, label: String) {
         scope.launch {
             try {

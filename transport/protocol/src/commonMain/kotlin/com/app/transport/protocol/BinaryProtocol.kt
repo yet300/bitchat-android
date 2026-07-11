@@ -22,6 +22,7 @@ enum class MessageType(val value: UByte) {
     FRAGMENT(0x20u), // Fragmentation for large packets
     REQUEST_SYNC(0x21u), // GCS-based sync request
     FILE_TRANSFER(0x22u), // New: File transfer packet (BLE voice notes, etc.)
+    BOARD_POST(0x23u), // Signed geohash bulletin-board post or tombstone (BoardWire)
     GROUP_MESSAGE(0x25u), // Group-encrypted broadcast: cleartext group ID + ChaChaPoly body (GroupMessageEnvelope)
 
     // Mesh diagnostics: directed, unsigned, unencrypted echo probe/reply (MeshPingPayload).

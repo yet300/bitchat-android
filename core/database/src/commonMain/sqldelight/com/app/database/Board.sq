@@ -1,0 +1,53 @@
+-- Geohash bulletin board (BitchatPacket 0x23): signed public posts + author-only tombstones. Posts
+-- from ANY node in a geohash (no roster), so all anti-spam lives here: per-author + global caps with
+-- oldest-first eviction, orphan-tombstone caps, and expiry/retention pruning. Rows are the derived
+-- board state (the wire packet is reconstructable from these columns). Wiped on panic (DB crypto-erase).
+-- See docs/GROUPS_BOARDS_RESEARCH.md §3.3 for the complete anti-spam enumeration + residual risk.
+CREATE TABLE board_entry (
+    id            INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, -- receive order (FIFO orphan eviction)
+    kind          INTEGER NOT NULL,          -- 1 = post, 2 = tombstone
+    post_id       BLOB    NOT NULL,           -- 16-byte post id
+    author_key    BLOB    NOT NULL,           -- 32-byte Ed25519 author key
+    geohash       TEXT    NOT NULL DEFAULT '',-- post board ('' = mesh-local)
+    content       TEXT    NOT NULL DEFAULT '',-- post body (<=512 B)
+    nickname      TEXT    NOT NULL DEFAULT '',-- post author display name
+    created_at    INTEGER NOT NULL DEFAULT 0, -- post createdAt ms (eviction ordering)
+    expires_at    INTEGER NOT NULL DEFAULT 0, -- post expiry ms (pruning)
+    flags         INTEGER NOT NULL DEFAULT 0, -- post flags (bit0 = urgent)
+    signature     BLOB    NOT NULL,           -- 64-byte Ed25519 signature (post or tombstone)
+    deleted_at    INTEGER NOT NULL DEFAULT 0, -- tombstone deletedAt ms
+    retain_until  INTEGER NOT NULL DEFAULT 0, -- tombstone retention deadline ms
+    is_orphan     INTEGER NOT NULL DEFAULT 0  -- tombstone whose post we never saw (capped separately)
+);
+
+CREATE INDEX board_post_id ON board_entry(post_id);
+
+selectAll:
+SELECT * FROM board_entry ORDER BY id ASC;
+
+livePostsByGeohash:
+SELECT * FROM board_entry WHERE kind = 1 AND geohash = :geohash AND expires_at > :nowMs ORDER BY id ASC;
+
+livePosts:
+SELECT * FROM board_entry WHERE kind = 1 AND expires_at > :nowMs ORDER BY id ASC;
+
+liveTombstones:
+SELECT * FROM board_entry WHERE kind = 2 AND retain_until > :nowMs ORDER BY id ASC;
+
+insert:
+INSERT INTO board_entry(
+    kind, post_id, author_key, geohash, content, nickname, created_at, expires_at, flags,
+    signature, deleted_at, retain_until, is_orphan
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+deleteById:
+DELETE FROM board_entry WHERE id = ?;
+
+deleteExpiredPosts:
+DELETE FROM board_entry WHERE kind = 1 AND expires_at <= ?;
+
+deleteExpiredTombstones:
+DELETE FROM board_entry WHERE kind = 2 AND retain_until <= ?;
+
+deleteAll:
+DELETE FROM board_entry;

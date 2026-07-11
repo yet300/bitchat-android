@@ -4,6 +4,7 @@ import com.app.common.AppDispatchers
 import com.app.database.dao.ChannelDao
 import com.app.database.dao.ContactDao
 import com.app.database.dao.ConversationDao
+import com.app.database.dao.BoardDao
 import com.app.database.dao.CourierDao
 import com.app.database.dao.GroupDao
 import com.app.database.dao.VouchDao
@@ -90,4 +91,9 @@ object DatabaseBindings {
     @Provides
     fun provideGroupDao(manager: DatabaseManager, dispatchers: AppDispatchers): GroupDao =
         GroupDao(manager, dispatchers)
+
+    @SingleIn(AppScope::class)
+    @Provides
+    fun provideBoardDao(manager: DatabaseManager, dispatchers: AppDispatchers): BoardDao =
+        BoardDao(manager, dispatchers)
 }
