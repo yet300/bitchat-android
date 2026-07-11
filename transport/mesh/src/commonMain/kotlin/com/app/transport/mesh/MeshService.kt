@@ -1,5 +1,6 @@
 package com.app.transport.mesh
 
+import com.app.transport.board.BoardEventListener
 import com.app.transport.courier.CourierEventListener
 import com.app.transport.group.GroupEventListener
 import com.app.transport.model.BitchatFilePacket
@@ -113,4 +114,16 @@ interface MeshService {
      * the `GROUP_INVITE (0x06)` vs `GROUP_KEY_UPDATE (0x07)` payload type.
      */
     fun sendGroupState(payload: ByteArray, toPeerID: String, isInvite: Boolean)
+
+    // --- Geohash boards (0x23 broadcast) ---
+
+    /** The board-event sink; the platform-free board coordinator attaches itself here. */
+    var boardEventListener: BoardEventListener?
+
+    /**
+     * Broadcasts an encoded `BoardWire` payload (post or tombstone) as a signed 0x23 packet. The
+     * payload is self-authenticating (inner author Ed25519 signature); the outer packet signature is a
+     * nominal first-hop marker (receivers gate on the inner signature).
+     */
+    fun sendBoardPayload(payload: ByteArray)
 }

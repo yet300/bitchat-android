@@ -1,6 +1,7 @@
 package com.app.data
 
 import com.app.common.utils.Log
+import com.app.data.board.BoardCoordinator
 import com.app.data.courier.CourierCoordinator
 import com.app.data.group.GroupCoordinator
 import com.app.data.nostr.NostrDirectMessageIngest
@@ -48,6 +49,7 @@ class AppNetworkBootstrapper(
     private val vouchCoordinator: VouchCoordinator,
     private val courierCoordinator: CourierCoordinator,
     private val groupCoordinator: GroupCoordinator,
+    private val boardCoordinator: BoardCoordinator,
 ) {
     private companion object {
         private const val TAG = "AppNetworkBootstrapper"
@@ -107,6 +109,7 @@ class AppNetworkBootstrapper(
         vouchCoordinator.hashCode()
         courierCoordinator.hashCode()
         groupCoordinator.hashCode()
+        boardCoordinator.hashCode()
 
         Log.i(TAG, "Network bootstrap complete")
     }

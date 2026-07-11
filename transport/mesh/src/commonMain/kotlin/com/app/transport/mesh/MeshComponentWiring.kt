@@ -17,8 +17,10 @@ import com.app.transport.protocol.peerIdToRoutingBytes
 import com.app.transport.protocol.MessageType
 import com.app.transport.protocol.SpecialRecipients
 import com.app.transport.sync.GossipSyncManager
+import com.app.transport.board.BoardEventListener
 import com.app.transport.courier.CourierEventListener
 import com.app.transport.group.GroupEventListener
+import com.app.transport.model.BoardWire
 import com.app.transport.verification.VerifyEventListener
 import com.app.transport.vouch.VouchEventListener
 import kotlinx.coroutines.CoroutineScope
@@ -54,6 +56,7 @@ internal class MeshComponentWiring(
     private val vouchListener: () -> VouchEventListener?,
     private val courierListener: () -> CourierEventListener?,
     private val groupListener: () -> GroupEventListener?,
+    private val boardListener: () -> BoardEventListener?,
 ) {
 
     companion object {
@@ -457,6 +460,20 @@ internal class MeshComponentWiring(
                 // generic broadcast path in PacketProcessor.
                 try { gossipSyncManager.onPublicPacketSeen(routed.packet) } catch (_: Exception) { }
                 groupListener()?.onGroupMessageReceived(routed.packet.payload, routed.packet.timestamp.toLong())
+            }
+
+            override fun handleBoardPost(routed: RoutedPacket): Boolean {
+                // Self-authenticating: decode + verify the inner author Ed25519 signature synchronously
+                // so a malformed or forged post is dropped and NOT relayed. Valid posts are tracked for
+                // gossip backfill and handed to the board coordinator for (async) ingest.
+                val wire = BoardWire.decode(routed.packet.payload) ?: return false
+                val verified = wire.verifySignature { key, data, sig ->
+                    encryptionService.verifyEd25519Signature(sig, data, key)
+                }
+                if (!verified) return false
+                try { gossipSyncManager.onPublicPacketSeen(routed.packet) } catch (_: Exception) { }
+                boardListener()?.onBoardPacketReceived(routed.packet.payload)
+                return true
             }
 
             override suspend fun handleNoiseHandshake(routed: RoutedPacket): Boolean {

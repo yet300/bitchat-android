@@ -199,6 +199,8 @@ class GroupCoordinatorTest {
         override var vouchEventListener: VouchEventListener? = null
         override var verifyEventListener: VerifyEventListener? = null
         override var courierEventListener: CourierEventListener? = null
+        override var boardEventListener: com.app.transport.board.BoardEventListener? = null
+        override fun sendBoardPayload(payload: ByteArray) = Unit
         override fun sendVouchAttestations(batchPayload: ByteArray, peerID: String) = Unit
         override fun sendCourierEnvelope(payload: ByteArray, toPeerID: String) = Unit
         override val myPeerID: String get() = selfPeerId
