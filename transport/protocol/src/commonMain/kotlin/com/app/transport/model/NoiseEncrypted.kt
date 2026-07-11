@@ -21,6 +21,8 @@ enum class NoisePayloadType(val value: UByte) {
     PRIVATE_MESSAGE(0x01u),     // Private chat message with TLV encoding
     READ_RECEIPT(0x02u),        // Message was read
     DELIVERED(0x03u),           // Message was delivered
+    GROUP_INVITE(0x06u),        // Creator-signed group state carried 1:1 over Noise (invite)
+    GROUP_KEY_UPDATE(0x07u),    // Creator-signed group state (key rotation / roster update)
     VERIFY_CHALLENGE(0x10u),    // Verification challenge
     VERIFY_RESPONSE(0x11u),     // Verification response
     VOUCH(0x12u),               // Batch of vouch attestations (transitive verification)
