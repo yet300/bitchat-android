@@ -13,6 +13,7 @@ import com.app.transport.model.NoisePayload
 import com.app.transport.model.NoisePayloadType
 import com.app.transport.model.PrivateMessagePacket
 import com.app.transport.protocol.BitchatPacket
+import com.app.transport.routing.CourierDepositor
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -48,9 +49,13 @@ class CourierCoordinator(
     private val favoritesService: FavoritesPersistenceService,
     private val courierStore: CourierStore,
     dispatchers: AppDispatchers,
-) : CourierEventListener {
+) : CourierEventListener, CourierDepositor {
 
     private val scope = CoroutineScope(dispatchers.io + SupervisorJob())
+
+    // Message ids already handed to couriers, so a repeated outbox flush does not re-seal and
+    // re-deposit the same message (each seal is a fresh ciphertext the store cannot dedup). Bounded.
+    private val couriered = LinkedHashSet<String>()
 
     init {
         meshService.courierEventListener = this
@@ -142,6 +147,64 @@ class CourierCoordinator(
     }
 
     /**
+     * Last-resort deposit from the route selector: the recipient could not be routed, so seal the
+     * message and hand it to connected trusted couriers. Idempotent per message id (a repeated flush
+     * re-invokes this). Returns whether at least one courier took a copy.
+     */
+    override suspend fun attemptDeposit(messageID: String, content: String, recipientPeerID: String): Boolean {
+        if (messageID in couriered) return false
+        val recipientKey = recipientNoiseKey(recipientPeerID) ?: return false
+        val couriers = eligibleCouriers(recipientKey)
+        if (couriers.isEmpty()) return false
+        val ok = depositForRecipient(messageID, content, recipientKey, couriers)
+        if (ok) rememberCouriered(messageID)
+        return ok
+    }
+
+    /**
+     * Resolve a recipient's Noise static key while they are unreachable: prefer a peer we still see on
+     * the mesh, else the persisted favorite record, else a full 64-hex peerID that carries the key.
+     */
+    private fun recipientNoiseKey(recipientPeerID: String): ByteArray? {
+        meshService.getPeerInfo(recipientPeerID)?.noisePublicKey?.let { return it }
+        favoritesService.getFavoriteStatus(recipientPeerID)?.peerNoisePublicKey?.let { return it }
+        // A 64-hex peerID is itself the recipient's Noise static key (offline-favorite addressing).
+        if (recipientPeerID.length == 64) hexToBytes(recipientPeerID)?.let { return it }
+        return null
+    }
+
+    /**
+     * Connected couriers eligible to carry mail for [recipientKey]: verified/favorite peers other than
+     * the recipient, favorites preferred, capped at [MAX_COURIERS_PER_MESSAGE].
+     */
+    private fun eligibleCouriers(recipientKey: ByteArray): List<String> {
+        return meshService.connectedPeerIDs()
+            .mapNotNull { peerID -> meshService.getPeerInfo(peerID)?.let { peerID to it } }
+            .filter { (_, info) ->
+                val key = info.noisePublicKey ?: return@filter false
+                !key.contentEquals(recipientKey) && depositTier(key, info.isVerifiedNickname) != null
+            }
+            .sortedByDescending { (_, info) ->
+                info.noisePublicKey?.let { favoritesService.getFavoriteStatus(it)?.isMutual == true } ?: false
+            }
+            .take(MAX_COURIERS_PER_MESSAGE)
+            .map { it.first }
+    }
+
+    private fun rememberCouriered(messageID: String) {
+        if (couriered.add(messageID)) {
+            while (couriered.size > COURIERED_CAP) couriered.remove(couriered.iterator().next())
+        }
+    }
+
+    private fun hexToBytes(hex: String): ByteArray? {
+        if (hex.length % 2 != 0) return null
+        return ByteArray(hex.length / 2) { i ->
+            hex.substring(i * 2, i * 2 + 2).toIntOrNull(16)?.toByte() ?: return null
+        }
+    }
+
+    /**
      * The reference `courierDepositPolicy`: a mutual favorite is the preferred (favorite) tier; a
      * signature-verified non-favorite is the fallback (verified) tier; anyone else is rejected.
      */
@@ -155,5 +218,8 @@ class CourierCoordinator(
     companion object {
         /** Reference TransportConfig.courierInitialCopies = 4 (spray-and-wait budget). */
         val INITIAL_COPIES: UByte = 4u
+        /** Reference MessageRouter.maxCouriersPerMessage = 3. */
+        const val MAX_COURIERS_PER_MESSAGE = 3
+        private const val COURIERED_CAP = 512
     }
 }

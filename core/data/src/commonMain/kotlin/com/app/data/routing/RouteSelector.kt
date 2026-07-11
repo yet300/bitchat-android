@@ -2,6 +2,7 @@ package com.app.data.routing
 
 import co.touchlab.stately.collections.ConcurrentMutableMap
 import com.app.common.utils.Log
+import com.app.transport.routing.CourierDepositor
 import com.app.transport.routing.OutgoingEnvelope
 import com.app.transport.routing.PeerKeyResolver
 import com.app.transport.routing.Reachability
@@ -37,6 +38,7 @@ internal class RouteSelector(
     private val outbox: Outbox,
     private val sessionInitiator: SessionInitiator,
     private val peerKeyResolver: PeerKeyResolver,
+    private val courierDepositor: CourierDepositor,
     private val scope: CoroutineScope,
 ) : RoutingCore {
 
@@ -91,6 +93,14 @@ internal class RouteSelector(
             if (envelope is OutgoingEnvelope.Private) {
                 Log.d(TAG, "Initiating Noise handshake for ${envelope.peerID.take(8)}…")
                 sessionInitiator.initiateHandshake(envelope.peerID)
+                // Last resort: hand a sealed copy to connected trusted couriers so an offline
+                // recipient can still be reached through a common contact. The queued copy stays,
+                // so direct delivery still wins if the peer reappears (receivers dedup by message id).
+                try {
+                    courierDepositor.attemptDeposit(envelope.messageId, envelope.content, envelope.peerID)
+                } catch (e: Exception) {
+                    Log.d(TAG, "Courier deposit attempt failed: ${e.message}")
+                }
             }
         }
     }

@@ -55,8 +55,9 @@ class RouteSelectorTest {
         outbox: Outbox,
         initiator: SessionInitiator = RecordingInitiator(),
         keyResolver: PeerKeyResolver = PeerKeyResolver { null },
+        courierDepositor: com.app.transport.routing.CourierDepositor = com.app.transport.routing.CourierDepositor { _, _, _ -> false },
         scope: kotlinx.coroutines.CoroutineScope,
-    ) = RouteSelector(strategies, outbox, initiator, keyResolver, scope)
+    ) = RouteSelector(strategies, outbox, initiator, keyResolver, courierDepositor, scope)
 
     @Test
     fun higherPriorityStrategyWinsWhenBothReachable() = runTest {

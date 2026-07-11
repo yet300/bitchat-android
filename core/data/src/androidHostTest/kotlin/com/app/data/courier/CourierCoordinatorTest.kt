@@ -211,6 +211,37 @@ class CourierCoordinatorTest {
         assertEquals(1L, courier.courierStore.count(), "still carried (non-destructive spray)")
     }
 
+    @Test
+    fun attempt_deposit_selects_couriers_and_is_idempotent() = runTest {
+        val sender = Node("sendersender0001")
+        val courier = Node("couriercourier02")
+        val recipient = Node("recipientreci003")
+
+        // Sender can see the courier (verified, connected) but the recipient is unreachable.
+        sender.sees(courier)
+        // The recipient's key is resolvable via a full 64-hex peerID.
+        val recipientHex = recipient.noiseKey.joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
+
+        assertTrue(sender.coordinator.attemptDeposit("MSG-9", "yo", recipientHex))
+        assertEquals(1, sender.mesh.sentTo(courier.pid).size)
+        // Second attempt for the same message id deposits nothing more (idempotent per message).
+        assertFalse(sender.coordinator.attemptDeposit("MSG-9", "yo", recipientHex))
+        assertEquals(1, sender.mesh.sentTo(courier.pid).size)
+
+        // And the courier really can carry+deliver what was deposited.
+        courier.sees(sender)
+        courier.coordinator.onCourierDeposit(sender.pid, signedDeposit(sender, sender.mesh.sentTo(courier.pid).single(), courier.pid))
+        assertEquals(1L, courier.courierStore.count())
+    }
+
+    @Test
+    fun attempt_deposit_no_couriers_returns_false() = runTest {
+        val sender = Node("sendersender0001")
+        val recipient = Node("recipientreci003")
+        val recipientHex = recipient.noiseKey.joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
+        assertFalse(sender.coordinator.attemptDeposit("MSG-10", "yo", recipientHex))
+    }
+
     private class InMemoryStore : SecureKeyValueStore {
         private val map = LinkedHashMap<String, String>()
         @Synchronized override fun getString(key: String): String? = map[key]

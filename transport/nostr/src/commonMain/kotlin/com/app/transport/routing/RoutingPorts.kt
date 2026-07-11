@@ -18,6 +18,15 @@ fun interface PeerKeyResolver {
     fun noiseKeyHexFor(peerID: String): String?
 }
 
+/**
+ * Last-resort store-and-forward: seal a private message and hand it to connected trusted couriers to
+ * carry to a currently-unreachable recipient (BitchatPacket 0x04). Idempotent per message id, so a
+ * repeated flush does not re-deposit. Backed by the courier coordinator in :core:data.
+ */
+fun interface CourierDepositor {
+    suspend fun attemptDeposit(messageID: String, content: String, recipientPeerID: String): Boolean
+}
+
 /** Supplies the current Nostr identity (npub + signing keys), if one exists. */
 fun interface NostrIdentityProvider {
     fun current(): NostrIdentity?
