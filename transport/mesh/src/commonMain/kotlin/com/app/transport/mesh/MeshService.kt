@@ -1,5 +1,6 @@
 package com.app.transport.mesh
 
+import com.app.transport.courier.CourierEventListener
 import com.app.transport.model.BitchatFilePacket
 import com.app.transport.verification.VerifyEventListener
 import com.app.transport.vouch.VouchEventListener
@@ -81,4 +82,16 @@ interface MeshService {
 
     /** Sends an encoded `VouchAttestation` batch body to [peerID] over its Noise session. */
     fun sendVouchAttestations(batchPayload: ByteArray, peerID: String)
+
+    // --- Courier store-and-forward (BitchatPacket 0x04) ---
+
+    /** The courier-event sink; the platform-free courier coordinator attaches itself here. */
+    var courierEventListener: CourierEventListener?
+
+    /**
+     * Sends an encoded [CourierEnvelope][com.app.transport.model.CourierEnvelope] as a signed, directed
+     * 0x04 packet to [toPeerID] — a deposit to a courier, a handover to the recipient, a spray copy to
+     * another courier, or a speculative multi-hop flood toward a relayed recipient.
+     */
+    fun sendCourierEnvelope(payload: ByteArray, toPeerID: String)
 }

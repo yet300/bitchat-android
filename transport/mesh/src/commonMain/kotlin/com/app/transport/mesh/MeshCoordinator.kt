@@ -25,6 +25,7 @@ import com.app.transport.SeenMessageStore
 import com.app.transport.features.file.IncomingFileStore
 import com.app.transport.meshgraph.MeshGraphService
 import com.app.transport.verification.VerifyEventListener
+import com.app.transport.courier.CourierEventListener
 import com.app.transport.vouch.VouchEventListener
 import kotlin.concurrent.Volatile
 import kotlinx.coroutines.*
@@ -130,6 +131,9 @@ class MeshCoordinator(
     // Sink for inbound vouch batches (0x12); the platform-free coordinator attaches itself.
     override var vouchEventListener: VouchEventListener? = null
 
+    // Sink for courier events (0x04); the platform-free courier coordinator attaches itself.
+    override var courierEventListener: CourierEventListener? = null
+
     // Coroutines
     private var serviceScope = CoroutineScope(dispatchers.io + SupervisorJob())
     // Tracks whether the current component generation was terminated via stopServices()
@@ -232,6 +236,7 @@ class MeshCoordinator(
             uiDelegate = { delegate },
             verifyListener = { verifyEventListener },
             vouchListener = { vouchEventListener },
+            courierListener = { courierEventListener },
         ).wire()
         messageHandler.packetProcessor = packetProcessor
         messageHandler.favoriteNostrLink = favoriteNostrLink
@@ -502,6 +507,9 @@ class MeshCoordinator(
 
     override fun sendVouchAttestations(batchPayload: ByteArray, peerID: String) =
         outbound.sendVouchAttestations(batchPayload, peerID)
+
+    override fun sendCourierEnvelope(payload: ByteArray, toPeerID: String) =
+        outbound.sendCourierEnvelope(payload, toPeerID)
 
     override fun connectedPeerIDs(): List<String> =
         try { peerManager.getActivePeerIDs() } catch (_: Exception) { emptyList() }

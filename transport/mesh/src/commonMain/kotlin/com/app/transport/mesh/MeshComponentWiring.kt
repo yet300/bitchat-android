@@ -17,6 +17,7 @@ import com.app.transport.protocol.peerIdToRoutingBytes
 import com.app.transport.protocol.MessageType
 import com.app.transport.protocol.SpecialRecipients
 import com.app.transport.sync.GossipSyncManager
+import com.app.transport.courier.CourierEventListener
 import com.app.transport.verification.VerifyEventListener
 import com.app.transport.vouch.VouchEventListener
 import kotlinx.coroutines.CoroutineScope
@@ -50,6 +51,7 @@ internal class MeshComponentWiring(
     private val uiDelegate: () -> BluetoothMeshDelegate?,
     private val verifyListener: () -> VerifyEventListener?,
     private val vouchListener: () -> VouchEventListener?,
+    private val courierListener: () -> CourierEventListener?,
 ) {
 
     companion object {
@@ -378,6 +380,27 @@ internal class MeshComponentWiring(
             override fun onVouchAttestationsReceived(peerID: String, payload: ByteArray, timestampMs: Long) {
                 vouchListener()?.onVouchAttestations(peerID, payload, timestampMs)
             }
+
+            // Courier store-and-forward (0x04)
+            override fun myNoiseStaticKey(): ByteArray? = encryptionService.getStaticPublicKey()
+
+            override fun openCourierPayload(ciphertext: ByteArray, prekeyID: UInt?): Pair<ByteArray, ByteArray>? {
+                // v2 (prekey-sealed) envelopes need a one-time prekey we do not implement yet.
+                if (prekeyID != null) return null
+                return encryptionService.openCourierPayload(ciphertext)
+            }
+
+            override fun peerIDForNoiseKey(noiseKey: ByteArray): String? {
+                return try {
+                    peerManager.getActivePeerIDs().firstOrNull { id ->
+                        peerManager.getPeerInfo(id)?.noisePublicKey?.contentEquals(noiseKey) == true
+                    }
+                } catch (_: Exception) { null }
+            }
+
+            override fun onCourierDeposit(fromPeerID: String, packet: BitchatPacket) {
+                courierListener()?.onCourierDeposit(fromPeerID, packet)
+            }
         }
     }
 
@@ -457,6 +480,15 @@ internal class MeshComponentWiring(
                             try { gossipSyncManager.scheduleInitialSyncToPeer(pid, 1_000) } catch (_: Exception) { }
                         }
                     }
+                    // Courier handover: a verified announce is the moment we learn a peer's Noise
+                    // static key, so hand over any carried mail addressed to them (direct) or push a
+                    // speculative copy toward them (relayed). Verified announces only.
+                    try {
+                        if (pid != null && peerManager.getPeerInfo(pid)?.isVerifiedNickname == true) {
+                            courierListener()?.onCourierPeerAvailable(pid)
+                        }
+                    } catch (_: Exception) { }
+
                     // Track for sync
                     try { gossipSyncManager.onPublicPacketSeen(routed.packet) } catch (_: Exception) { }
                 }
@@ -521,6 +553,10 @@ internal class MeshComponentWiring(
 
             override fun handlePong(routed: RoutedPacket) {
                 pingService.onPongReceived(routed)
+            }
+
+            override fun handleCourierEnvelope(routed: RoutedPacket) {
+                scope.launch { messageHandler.handleCourierEnvelope(routed) }
             }
         }
     }
