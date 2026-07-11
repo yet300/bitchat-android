@@ -23,6 +23,7 @@ enum class MessageType(val value: UByte) {
     REQUEST_SYNC(0x21u), // GCS-based sync request
     FILE_TRANSFER(0x22u), // New: File transfer packet (BLE voice notes, etc.)
     BOARD_POST(0x23u), // Signed geohash bulletin-board post or tombstone (BoardWire)
+    PREKEY_BUNDLE(0x24u), // Signed one-time prekey bundle broadcast for forward-secret courier sealing (PrekeyBundle)
     GROUP_MESSAGE(0x25u), // Group-encrypted broadcast: cleartext group ID + ChaChaPoly body (GroupMessageEnvelope)
 
     // Mesh diagnostics: directed, unsigned, unencrypted echo probe/reply (MeshPingPayload).
