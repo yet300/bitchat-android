@@ -50,6 +50,7 @@ import com.app.data.routing.RoutingCore
 import com.app.data.routing.RoutingMessageTransport
 import com.app.data.session.MeshNoiseSessionPort
 import com.app.data.verification.VerificationCoordinator
+import com.app.data.group.GroupCoordinator
 import com.app.data.vouch.VouchCoordinator
 import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
@@ -78,6 +79,7 @@ import com.app.domain.repository.SettingsRepository
 import com.app.domain.repository.ThemeRepository
 import com.app.domain.repository.TorRepository
 import com.app.domain.repository.VerificationRepository
+import com.app.domain.repository.GroupRepository
 import com.app.domain.repository.VouchRepository
 import com.app.transport.NicknameHolder
 import com.app.transport.NicknameSource
@@ -221,6 +223,14 @@ abstract class DataBindings {
      */
     @Binds
     internal abstract val VouchCoordinator.bindVouchRepository: VouchRepository
+
+    /**
+     * Private-groups coordinator (0x25 / 0x06 / 0x07) — platform-free; it is the [GroupRepository]
+     * surface and attaches itself as the mesh group-event listener. Instantiated eagerly at launch by
+     * [AppNetworkBootstrapper] so inbound group state/messages are handled without a UI touch first.
+     */
+    @Binds
+    internal abstract val GroupCoordinator.bindGroupRepository: GroupRepository
 
     /**
      * Courier store-and-forward coordinator (0x04) as the route selector's last-resort

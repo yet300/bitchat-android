@@ -1,6 +1,7 @@
 package com.app.transport.mesh
 
 import com.app.transport.courier.CourierEventListener
+import com.app.transport.group.GroupEventListener
 import com.app.transport.model.BitchatFilePacket
 import com.app.transport.verification.VerifyEventListener
 import com.app.transport.vouch.VouchEventListener
@@ -94,4 +95,22 @@ interface MeshService {
      * another courier, or a speculative multi-hop flood toward a relayed recipient.
      */
     fun sendCourierEnvelope(payload: ByteArray, toPeerID: String)
+
+    // --- Private groups (0x25 broadcast; 0x06 / 0x07 state over Noise) ---
+
+    /** The group-event sink; the platform-free group coordinator attaches itself here. */
+    var groupEventListener: GroupEventListener?
+
+    /**
+     * Broadcasts an encoded [GroupMessageEnvelope][com.app.transport.model.GroupMessageEnvelope] as an
+     * unsigned 0x25 packet (like a public message): receivers authenticate the sender via the Ed25519
+     * signature inside the ciphertext, which still verifies for gossip-backfilled copies.
+     */
+    fun broadcastGroupMessage(payload: ByteArray)
+
+    /**
+     * Sends encoded creator-signed group state 1:1 over [toPeerID]'s Noise session; [isInvite] selects
+     * the `GROUP_INVITE (0x06)` vs `GROUP_KEY_UPDATE (0x07)` payload type.
+     */
+    fun sendGroupState(payload: ByteArray, toPeerID: String, isInvite: Boolean)
 }

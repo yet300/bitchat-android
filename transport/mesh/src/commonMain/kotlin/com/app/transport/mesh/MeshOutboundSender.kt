@@ -363,6 +363,39 @@ internal class MeshOutboundSender(
         }
     }
 
+    // MARK: Private groups (0x25 broadcast; 0x06 / 0x07 state over Noise)
+
+    /**
+     * Broadcast a sealed group message (0x25) like a public message. The outer packet is intentionally
+     * unsigned — receivers authenticate the sender's Ed25519 signature inside the ciphertext, which
+     * still verifies for gossip-backfilled copies after the sender's announce has expired. A relayed
+     * self-copy is dropped by the coordinator's own-signing-key check, so no packet-level self-dedup.
+     */
+    fun broadcastGroupMessage(payload: ByteArray) {
+        if (payload.isEmpty()) return
+        scope.launch {
+            val packet = BitchatPacket(
+                version = 1u,
+                type = MessageType.GROUP_MESSAGE.value,
+                senderID = peerIdToRoutingBytes(myPeerID),
+                recipientID = SpecialRecipients.BROADCAST,
+                timestamp = epochMillis().toULong(),
+                payload = payload,
+                signature = null,
+                ttl = MAX_TTL,
+            )
+            meshNetwork.broadcast(RoutedPacket(packet))
+            try { gossipSyncManager.onPublicPacketSeen(packet) } catch (_: Exception) { }
+            Log.d(TAG, "👥 Broadcast group message (${payload.size} bytes)")
+        }
+    }
+
+    /** Send creator-signed group state 1:1 over the peer's Noise session (0x06 invite / 0x07 update). */
+    fun sendGroupState(payload: ByteArray, toPeerID: String, isInvite: Boolean) {
+        val type = if (isInvite) NoisePayloadType.GROUP_INVITE else NoisePayloadType.GROUP_KEY_UPDATE
+        sendNoisePayloadToPeer(NoisePayload(type, payload), toPeerID, "group state")
+    }
+
     private fun sendNoisePayloadToPeer(payload: NoisePayload, recipientPeerID: String, label: String) {
         scope.launch {
             try {

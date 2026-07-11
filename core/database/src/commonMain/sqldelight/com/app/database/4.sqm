@@ -1,0 +1,12 @@
+-- Migration v4 -> v5: add the private-group store table (encrypted groups, 0x25 / 0x06 / 0x07).
+-- Existing installs keep their data; this only adds the new table. Fresh installs get it from
+-- PrivateGroup.sq via Schema.create instead. The two definitions must stay identical.
+CREATE TABLE private_group (
+    group_id            BLOB    NOT NULL PRIMARY KEY,
+    name                TEXT    NOT NULL,
+    epoch               INTEGER NOT NULL,
+    creator_fingerprint BLOB    NOT NULL,
+    roster              BLOB    NOT NULL,
+    group_key           BLOB    NOT NULL,
+    created_at          INTEGER NOT NULL
+);

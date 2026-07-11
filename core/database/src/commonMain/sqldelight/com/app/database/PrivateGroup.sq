@@ -1,0 +1,36 @@
+-- Private groups this device is a member of: creator-signed roster + the current-epoch symmetric
+-- key. The ChaCha20-Poly1305 group key lives here in the SQLCipher-encrypted DB (our equivalent of
+-- the reference iOS keychain); everything is dropped on panic wipe (DB crypto-erase). The roster is
+-- the GroupRosterCoding blob (decoded to members in the data layer). `epoch` bumps on every key
+-- rotation. See docs/GROUPS_BOARDS_RESEARCH.md.
+CREATE TABLE private_group (
+    group_id            BLOB    NOT NULL PRIMARY KEY,   -- 16 random bytes; cleartext on 0x25 packets
+    name                TEXT    NOT NULL,
+    epoch               INTEGER NOT NULL,               -- key-rotation counter (starts at 1)
+    creator_fingerprint BLOB    NOT NULL,               -- raw 32-byte fingerprint of the creator
+    roster              BLOB    NOT NULL,               -- GroupRosterCoding blob (count + members)
+    group_key           BLOB    NOT NULL,               -- 32-byte ChaCha20-Poly1305 key for `epoch`
+    created_at          INTEGER NOT NULL                -- ms; join/creation order
+);
+
+selectAll:
+SELECT * FROM private_group ORDER BY created_at ASC, group_id ASC;
+
+selectById:
+SELECT * FROM private_group WHERE group_id = ?;
+
+insert:
+INSERT INTO private_group(group_id, name, epoch, creator_fingerprint, roster, group_key, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+-- Roster/key/epoch/name update in place, preserving creator_fingerprint and created_at.
+updateState:
+UPDATE private_group
+SET name = :name, epoch = :epoch, roster = :roster, group_key = :groupKey
+WHERE group_id = :groupId;
+
+deleteById:
+DELETE FROM private_group WHERE group_id = ?;
+
+deleteAll:
+DELETE FROM private_group;

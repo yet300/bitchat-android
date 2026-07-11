@@ -213,6 +213,7 @@ internal class PacketProcessor(
             MessageType.LEAVE -> handleLeave(routed)
             MessageType.FRAGMENT -> handleFragment(routed)
             MessageType.REQUEST_SYNC -> handleRequestSync(routed)
+            MessageType.GROUP_MESSAGE -> handleGroupMessage(routed)
             else -> {
                 // Handle private packet types (address check required)
                 if (packetRelayManager.isPacketAddressedToMe(packet)) {
@@ -300,6 +301,15 @@ internal class PacketProcessor(
         delegate?.handleMessage(routed)
     }
     
+    /**
+     * Handle a group message broadcast (0x25). Opaque ciphertext here — the delegate tracks it for
+     * gossip backfill and hands the payload to the group coordinator, which opens and authenticates
+     * it against the roster. Non-members still relay via the generic broadcast path below.
+     */
+    private fun handleGroupMessage(routed: RoutedPacket) {
+        delegate?.handleGroupMessage(routed)
+    }
+
     /**
      * Handle leave message
      */
@@ -425,6 +435,9 @@ internal interface PacketProcessorDelegate {
 
     /** Directed courier envelope (0x04) addressed to us: open it (we're the recipient) or carry it. */
     fun handleCourierEnvelope(routed: RoutedPacket)
+
+    /** Group message broadcast (0x25): track for gossip backfill and hand up to the group coordinator. */
+    fun handleGroupMessage(routed: RoutedPacket)
 
     // Communication
     fun sendAnnouncementToPeer(peerID: String)

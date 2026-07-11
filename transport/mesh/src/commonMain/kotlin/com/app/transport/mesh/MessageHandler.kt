@@ -207,9 +207,12 @@ internal class MessageHandler(
                     delegate?.onVouchAttestationsReceived(peerID, noisePayload.data, packet.timestamp.toLong())
                 }
                 NoisePayloadType.GROUP_INVITE, NoisePayloadType.GROUP_KEY_UPDATE -> {
-                    // Creator-signed group state; accepted by the groups coordinator (wired in a
-                    // later phase). Dropped here for now — no group store exists yet to apply it to.
-                    Log.d(TAG, "👥 Group state (${noisePayload.type}) received from $peerID (${noisePayload.data.size} bytes) — not yet handled")
+                    // Creator-signed group state over the authenticated Noise session; the group
+                    // coordinator verifies the creator + applies it. The session peer IS the claimed
+                    // sender (Noise-authenticated), so the coordinator can require it to be the creator.
+                    val isInvite = noisePayload.type == NoisePayloadType.GROUP_INVITE
+                    Log.d(TAG, "👥 Group state (${noisePayload.type}) received from $peerID (${noisePayload.data.size} bytes)")
+                    delegate?.onGroupStateReceived(peerID, isInvite, noisePayload.data)
                 }
             }
             
@@ -756,4 +759,7 @@ internal interface MessageHandlerDelegate {
     fun peerIDForNoiseKey(noiseKey: ByteArray): String?
     /** A trusted peer deposited an envelope for a third party; carry it if policy allows. */
     fun onCourierDeposit(fromPeerID: String, packet: BitchatPacket)
+
+    /** Creator-signed group state (0x06 invite / 0x07 update) over [fromPeerID]'s Noise session. */
+    fun onGroupStateReceived(fromPeerID: String, isInvite: Boolean, payload: ByteArray)
 }
