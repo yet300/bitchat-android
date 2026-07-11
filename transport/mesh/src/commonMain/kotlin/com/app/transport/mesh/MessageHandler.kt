@@ -7,6 +7,7 @@ import com.app.common.utils.Log
 import com.app.transport.features.file.IncomingFileStore
 import com.app.transport.model.BitchatFilePacket
 import com.app.transport.model.BitchatMessage
+import com.app.transport.model.CourierEnvelope
 import com.app.transport.model.IdentityAnnouncement
 import com.app.transport.model.PeerCapabilities
 import com.app.transport.model.NoisePayload
@@ -46,6 +47,8 @@ internal class MessageHandler(
     
     companion object {
         private const val TAG = "MessageHandler"
+        // Receiver-side courier dedup window (reference TransportConfig.courierOpenedMessageIDCap).
+        private const val OPENED_COURIER_ID_CAP = 512
     }
     
     // Delegate for callbacks
@@ -59,7 +62,12 @@ internal class MessageHandler(
     
     // Coroutines
     private val handlerScope = CoroutineScope(dispatchers.io + SupervisorJob())
-    
+
+    // Receiver-side courier dedup: redundant copies of one message arrive as distinct envelopes
+    // (fresh seal per courier, spray forks), so dedup on the inner message ID before delivery/ack.
+    // Bounded, insertion-ordered LRU.
+    private val openedCourierMessageIDs = LinkedHashSet<String>()
+
     /**
      * Handle Noise encrypted transport message - SIMPLIFIED iOS-compatible version
      * Uses NoisePayloadType system exactly like iOS SimplifiedBluetoothService
@@ -205,6 +213,82 @@ internal class MessageHandler(
         }
     }
     
+    /**
+     * Handle a directed courier envelope (0x04) addressed to us. If the rotating tag matches our
+     * static key we are the recipient — open and deliver the private message like any other.
+     * Otherwise a trusted peer is depositing mail for a third party — hand it to the courier
+     * coordinator to carry. Envelopes addressed to *other* peers ride the generic relay path and
+     * never reach here (this runs only for packets addressed to us).
+     */
+    fun handleCourierEnvelope(routed: RoutedPacket) {
+        val packet = routed.packet
+        val peerID = routed.peerID ?: "unknown"
+        if (peerID == myPeerID) return
+
+        val envelope = CourierEnvelope.decode(packet.payload) ?: return
+        val now = Clock.System.now().toEpochMilliseconds()
+        if (envelope.isExpired(now)) return
+
+        val myKey = delegate?.myNoiseStaticKey() ?: return
+        val addressedToUs = CourierEnvelope.candidateTags(myKey, now)
+            .any { it.contentEquals(envelope.recipientTag) }
+        if (addressedToUs) {
+            openCourierEnvelope(envelope, packet)
+        } else {
+            // A deposit for someone else; the packet sender is the depositor (directed, direct send).
+            delegate?.onCourierDeposit(peerID, packet)
+        }
+    }
+
+    private fun openCourierEnvelope(envelope: CourierEnvelope, packet: BitchatPacket) {
+        // v2 (prekey-sealed) envelopes need a one-time prekey we do not hold; the delegate returns
+        // null and we drop quietly (we still carried it opaquely for others).
+        val opened = delegate?.openCourierPayload(envelope.ciphertext, envelope.prekeyID) ?: return
+        val (typedPayload, senderStaticKey) = opened
+        val noisePayload = NoisePayload.decode(typedPayload) ?: return
+        if (noisePayload.type != NoisePayloadType.PRIVATE_MESSAGE) {
+            Log.w(TAG, "⚠️ Courier envelope carried unsupported payload type ${noisePayload.type}")
+            return
+        }
+        val pm = PrivateMessagePacket.decode(noisePayload.data) ?: return
+
+        if (!rememberOpenedCourierMessage(pm.messageID)) {
+            Log.d(TAG, "📦 Dropping duplicate courier envelope for message ${pm.messageID.take(8)}…")
+            return
+        }
+
+        // The sender is usually absent (that is why the message was couriered): prefer a live peerID
+        // for their noise key, else address by the full noise-key hex so it lands on the stable
+        // favorite thread instead of an unresolvable short id.
+        val senderPeerID = delegate?.peerIDForNoiseKey(senderStaticKey) ?: senderStaticKey.toHexString()
+        val message = BitchatMessage(
+            id = pm.messageID,
+            sender = delegate?.getPeerNickname(senderPeerID) ?: senderPeerID.take(8),
+            content = pm.content,
+            timestamp = Instant.fromEpochMilliseconds(packet.timestamp.toLong()),
+            isRelay = false,
+            originalSender = null,
+            isPrivate = true,
+            recipientNickname = delegate?.getMyNickname(),
+            senderPeerID = senderPeerID,
+            mentions = null,
+        )
+        Log.d(TAG, "📦 Opened courier envelope from ${senderPeerID.take(8)}…")
+        delegate?.onMessageReceived(message)
+        // Best-effort ack: only lands if a Noise session with the sender exists (they may be absent),
+        // which is fine — the sender's outbox clears on any later delivered/read ack, dedup elsewhere.
+        sendDeliveryAck(pm.messageID, senderPeerID)
+    }
+
+    /** Records [messageID] as opened; false if already seen. Bounded insertion-ordered eviction. */
+    private fun rememberOpenedCourierMessage(messageID: String): Boolean {
+        if (!openedCourierMessageIDs.add(messageID)) return false
+        while (openedCourierMessageIDs.size > OPENED_COURIER_ID_CAP) {
+            openedCourierMessageIDs.remove(openedCourierMessageIDs.iterator().next())
+        }
+        return true
+    }
+
     /**
      * Send delivery ACK for a received private message - exactly like iOS
      */
@@ -654,4 +738,17 @@ internal interface MessageHandlerDelegate {
     fun onVerifyChallengeReceived(peerID: String, payload: ByteArray, timestampMs: Long)
     fun onVerifyResponseReceived(peerID: String, payload: ByteArray, timestampMs: Long)
     fun onVouchAttestationsReceived(peerID: String, payload: ByteArray, timestampMs: Long)
+
+    // Courier store-and-forward (0x04)
+    /** Our own Noise static public key, for computing our courier recipient tags. */
+    fun myNoiseStaticKey(): ByteArray?
+    /**
+     * Open a courier envelope sealed to our static key: returns (typed payload, sender static key), or
+     * null when it is not addressed to us / malformed / a v2 prekey seal we cannot open ([prekeyID] set).
+     */
+    fun openCourierPayload(ciphertext: ByteArray, prekeyID: UInt?): Pair<ByteArray, ByteArray>?
+    /** A currently-known peerID whose Noise static key is [noiseKey], or null if none is on the mesh. */
+    fun peerIDForNoiseKey(noiseKey: ByteArray): String?
+    /** A trusted peer deposited an envelope for a third party; carry it if policy allows. */
+    fun onCourierDeposit(fromPeerID: String, packet: BitchatPacket)
 }

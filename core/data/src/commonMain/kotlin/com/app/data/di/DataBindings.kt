@@ -84,6 +84,8 @@ import com.app.transport.NicknameSource
 import com.app.transport.mesh.MeshCoordinator
 import com.app.transport.mesh.MeshLifecycleController
 import com.app.transport.mesh.MeshService
+import com.app.data.courier.CourierCoordinator
+import com.app.transport.routing.CourierDepositor
 import com.app.transport.routing.PeerKeyResolver
 import com.app.transport.routing.RouteStrategy
 import com.app.transport.routing.SessionInitiator
@@ -219,6 +221,13 @@ abstract class DataBindings {
      */
     @Binds
     internal abstract val VouchCoordinator.bindVouchRepository: VouchRepository
+
+    /**
+     * Courier store-and-forward coordinator (0x04) as the route selector's last-resort
+     * [CourierDepositor]. Same eagerly-created singleton that attaches as the mesh courier listener.
+     */
+    @Binds
+    internal abstract val CourierCoordinator.bindCourierDepositor: CourierDepositor
 
     /**
      * The mesh reads the nickname from the transport-owned in-memory [NicknameHolder]; the data

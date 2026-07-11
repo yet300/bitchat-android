@@ -335,6 +335,34 @@ internal class MeshOutboundSender(
         sendNoisePayloadToPeer(payload, peerID, "vouch attestations")
     }
 
+    /**
+     * Send an encoded CourierEnvelope as a signed, directed 0x04 packet. Unlike a Noise payload this
+     * is not session-encrypted (the envelope ciphertext is its own one-way seal); the Ed25519 packet
+     * signature lets a courier authenticate the depositor. Directed by recipientID — routing floods it
+     * toward the target exactly like a directed DM.
+     */
+    fun sendCourierEnvelope(payload: ByteArray, toPeerID: String) {
+        scope.launch {
+            try {
+                val packet = BitchatPacket(
+                    version = 1u,
+                    type = MessageType.COURIER_ENVELOPE.value,
+                    senderID = peerIdToRoutingBytes(myPeerID),
+                    recipientID = peerIdToRoutingBytes(toPeerID),
+                    timestamp = epochMillis().toULong(),
+                    payload = payload,
+                    signature = null,
+                    ttl = MAX_TTL
+                )
+                val signedPacket = signPacketBeforeBroadcast(packet)
+                meshNetwork.broadcast(RoutedPacket(signedPacket))
+                Log.d(TAG, "📦 Sent courier envelope to $toPeerID (${payload.size} bytes)")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send courier envelope to $toPeerID: ${e.message}")
+            }
+        }
+    }
+
     private fun sendNoisePayloadToPeer(payload: NoisePayload, recipientPeerID: String, label: String) {
         scope.launch {
             try {

@@ -17,6 +17,7 @@ import com.app.database.db.DatabaseManager
 import com.app.domain.model.Fingerprint
 import com.app.domain.model.MyIdentity
 import com.app.domain.repository.IdentityRepository
+import com.app.transport.courier.CourierEventListener
 import kotlinx.serialization.builtins.SetSerializer
 import kotlinx.serialization.builtins.serializer
 import com.app.transport.mesh.BleDebugHandle
@@ -277,10 +278,13 @@ class VouchCoordinatorTest {
 
         override var vouchEventListener: VouchEventListener? = null
         override var verifyEventListener: VerifyEventListener? = null
+        override var courierEventListener: CourierEventListener? = null
 
         override fun sendVouchAttestations(batchPayload: ByteArray, peerID: String) {
             deliverVouchTo?.invoke(batchPayload)
         }
+
+        override fun sendCourierEnvelope(payload: ByteArray, toPeerID: String) = Unit
 
         override fun getPeerFingerprint(peerID: String): String? = fingerprintByPeer[peerID]
         override fun getPeerInfo(peerID: String): PeerInfo? = peerInfo[peerID]
