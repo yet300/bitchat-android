@@ -1,0 +1,18 @@
+-- Migration v3 -> v4: add the courier store table (store-and-forward via a trusted peer, 0x04).
+-- Existing installs keep their data; this only adds the new table. Fresh installs get it from
+-- CourierStore.sq via Schema.create instead. The two definitions must stay identical.
+CREATE TABLE courier_envelope (
+    id                      INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    recipient_tag           BLOB    NOT NULL,
+    expiry                  INTEGER NOT NULL,
+    ciphertext              BLOB    NOT NULL,
+    depositor_noise_key     BLOB    NOT NULL,
+    stored_at               INTEGER NOT NULL,
+    tier                    TEXT    NOT NULL,
+    copies                  INTEGER NOT NULL,
+    sprayed_to              TEXT    NOT NULL,
+    last_remote_handover_at INTEGER,
+    prekey_id               INTEGER
+);
+
+CREATE INDEX courier_tag ON courier_envelope(recipient_tag);

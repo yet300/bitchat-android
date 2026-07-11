@@ -1,0 +1,65 @@
+-- Courier store: opaque store-and-forward envelopes this device carries for OFFLINE third parties
+-- (BitchatPacket 0x04, CourierEnvelope). Distinct from `outbox_envelope` (our own undelivered mail)
+-- and from StoreForwardManager (passive on-path packet cache): these are explicit envelopes deposited
+-- by a trusted peer and physically carried until we meet the recipient or another courier.
+--
+-- Envelopes are opaque ciphertext; this store never learns sender, recipient, or content. Strict
+-- quotas (bounded total, per-depositor by trust tier, bounded size, 24h lifetime) keep the device
+-- from becoming a public mailbag. All carried mail is dropped on panic wipe.
+CREATE TABLE courier_envelope (
+    id                      INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    -- Rotating recipient hint (16 bytes): HMAC(recipientNoiseKey, ctx || epochDay). Not the identity.
+    recipient_tag           BLOB    NOT NULL,
+    -- ms since epoch after which the envelope must be discarded.
+    expiry                  INTEGER NOT NULL,
+    -- Opaque one-way Noise X ciphertext (sender identity rides inside).
+    ciphertext              BLOB    NOT NULL,
+    -- Noise static key of the peer who deposited this mail (charged against their quota).
+    depositor_noise_key     BLOB    NOT NULL,
+    -- ms since epoch when we accepted the deposit (FIFO tiebreak lives in `id`).
+    stored_at               INTEGER NOT NULL,
+    -- Trust tier decided by the caller's policy: 'favorite' | 'verified'.
+    tier                    TEXT    NOT NULL,
+    -- Remaining spray-and-wait budget (1 = carry-only).
+    copies                  INTEGER NOT NULL,
+    -- JSON array of lowercase-hex courier keys already sprayed, so a repeat encounter doesn't
+    -- burn budget on a copy they already hold.
+    sprayed_to              TEXT    NOT NULL,
+    -- ms since epoch of the last speculative multi-hop handover toward a relayed announce; null=never.
+    last_remote_handover_at INTEGER,
+    -- Prekey-sealed (envelope v2) discriminator; null for static-sealed v1.
+    prekey_id               INTEGER
+);
+
+CREATE INDEX courier_tag ON courier_envelope(recipient_tag);
+
+selectAll:
+SELECT * FROM courier_envelope ORDER BY id ASC;
+
+selectByCiphertext:
+SELECT * FROM courier_envelope WHERE ciphertext = ?;
+
+countAll:
+SELECT COUNT(*) FROM courier_envelope;
+
+insert:
+INSERT INTO courier_envelope(
+    recipient_tag, expiry, ciphertext, depositor_noise_key, stored_at, tier, copies, sprayed_to,
+    last_remote_handover_at, prekey_id
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+updateCopiesAndSpray:
+UPDATE courier_envelope SET copies = :copies, sprayed_to = :sprayedTo WHERE id = :id;
+
+updateRemoteHandoverAt:
+UPDATE courier_envelope SET last_remote_handover_at = :at WHERE id = :id;
+
+deleteById:
+DELETE FROM courier_envelope WHERE id = ?;
+
+-- Drop envelopes whose expiry has passed.
+deleteExpired:
+DELETE FROM courier_envelope WHERE expiry <= ?;
+
+deleteAll:
+DELETE FROM courier_envelope;
