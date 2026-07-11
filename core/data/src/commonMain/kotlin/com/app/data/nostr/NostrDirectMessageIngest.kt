@@ -235,7 +235,10 @@ class NostrDirectMessageIngest(
             NoisePayloadType.VERIFY_RESPONSE,
             // Vouch attestations only travel inside an authenticated mesh Noise session, where the
             // voucher is the session peer; there is no such binding over a Nostr DM, so drop it.
-            NoisePayloadType.VOUCH -> Unit // not carried over Nostr DMs
+            NoisePayloadType.VOUCH,
+            // Group state is creator-authenticated over a 1:1 mesh Noise session; not carried over Nostr.
+            NoisePayloadType.GROUP_INVITE,
+            NoisePayloadType.GROUP_KEY_UPDATE -> Unit // not carried over Nostr DMs
         }
     }
 

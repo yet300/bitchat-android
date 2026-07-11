@@ -206,6 +206,11 @@ internal class MessageHandler(
                     Log.d(TAG, "🪪 Vouch batch received from $peerID (${noisePayload.data.size} bytes)")
                     delegate?.onVouchAttestationsReceived(peerID, noisePayload.data, packet.timestamp.toLong())
                 }
+                NoisePayloadType.GROUP_INVITE, NoisePayloadType.GROUP_KEY_UPDATE -> {
+                    // Creator-signed group state; accepted by the groups coordinator (wired in a
+                    // later phase). Dropped here for now — no group store exists yet to apply it to.
+                    Log.d(TAG, "👥 Group state (${noisePayload.type}) received from $peerID (${noisePayload.data.size} bytes) — not yet handled")
+                }
             }
             
         } catch (e: Exception) {
