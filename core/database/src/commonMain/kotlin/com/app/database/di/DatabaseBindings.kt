@@ -5,6 +5,7 @@ import com.app.database.dao.ChannelDao
 import com.app.database.dao.ContactDao
 import com.app.database.dao.ConversationDao
 import com.app.database.dao.CourierDao
+import com.app.database.dao.GroupDao
 import com.app.database.dao.VouchDao
 import com.app.database.dao.ConversationPrefDao
 import com.app.database.dao.GeohashDao
@@ -84,4 +85,9 @@ object DatabaseBindings {
     @Provides
     fun provideCourierDao(manager: DatabaseManager, dispatchers: AppDispatchers): CourierDao =
         CourierDao(manager, dispatchers)
+
+    @SingleIn(AppScope::class)
+    @Provides
+    fun provideGroupDao(manager: DatabaseManager, dispatchers: AppDispatchers): GroupDao =
+        GroupDao(manager, dispatchers)
 }
