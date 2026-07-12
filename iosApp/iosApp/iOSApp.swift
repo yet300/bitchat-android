@@ -55,6 +55,14 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         appGraph.meshLifecycleController.stop_()
     }
 
+    func applicationWillEnterForeground(_ application: UIApplication) {
+        appGraph.meshLifecycleController.setAppIsActive(active: true)
+    }
+
+    func applicationDidEnterBackground(_ application: UIApplication) {
+        appGraph.meshLifecycleController.setAppIsActive(active: false)
+    }
+
     func application(_ application: UIApplication, shouldSaveSecureApplicationState coder: NSCoder) -> Bool {
         StateKeeperUtilsKt.save(coder: coder, state: stateKeeper.save())
         return true

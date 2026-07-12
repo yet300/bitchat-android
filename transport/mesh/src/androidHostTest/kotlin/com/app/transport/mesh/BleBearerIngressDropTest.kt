@@ -30,6 +30,7 @@ class BleBearerIngressDropTest {
     }
 
     private class FakeBearerTransport : BearerTransport {
+        val appActivity = mutableListOf<Boolean>()
         override var delegate: BearerTransportDelegate? = null
         override val addressPeerMap: MutableMap<String, String> = mutableMapOf()
         override fun startServices(): Boolean = true
@@ -40,6 +41,7 @@ class BleBearerIngressDropTest {
         override fun isClientConnection(address: String): Boolean? = null
         override fun setNicknameResolver(resolver: (String) -> String?) {}
         override fun setMeshServiceActive(active: Boolean) {}
+        override fun setAppIsActive(active: Boolean) { appActivity += active }
         override fun startServer() {}
         override fun stopServer() {}
         override fun startClient() {}
@@ -97,5 +99,20 @@ class BleBearerIngressDropTest {
             (total - 1).toULong(),
             received.last().packet.timestamp,
         )
+    }
+
+    @Test
+    fun `app lifecycle state is forwarded to the platform bearer`() {
+        val transport = FakeBearerTransport()
+        val bearer = BleBearer(
+            myPeerID = "1111111111111111",
+            debugSettingsManager = NoOpMeshTelemetry,
+            connectionManagerFactory = { transport },
+        )
+
+        bearer.setAppIsActive(false)
+        bearer.setAppIsActive(true)
+
+        assertEquals(listOf(false, true), transport.appActivity)
     }
 }

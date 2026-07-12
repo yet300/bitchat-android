@@ -5,12 +5,21 @@ import com.app.common.utils.Log
 import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
 import com.app.common.encoding.toHexString
+import com.app.common.encoding.hexEncodedString
 import com.app.transport.MeshDebugToggles
 import com.app.transport.protocol.MessageType
+import com.app.transport.crypto.Sha256
+import co.touchlab.stately.concurrency.Lock
+import co.touchlab.stately.concurrency.withLock
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Centralized packet relay management
@@ -22,6 +31,7 @@ internal class PacketRelayManager(
     private val myPeerID: String,
     private val debugSettingsManager: MeshDebugToggles,
     dispatchers: AppDispatchers = AppDispatchers(),
+    private val jitter: (IntRange) -> Int = { range -> range.random() },
 ) {
     companion object {
         private const val TAG = "PacketRelayManager"
@@ -38,6 +48,8 @@ internal class PacketRelayManager(
     
     // Coroutines
     private val relayScope = CoroutineScope(dispatchers.io + SupervisorJob())
+    private val scheduledRelays = mutableMapOf<String, Job>()
+    private val scheduledRelaysLock = Lock()
     
     /**
      * Main entry point for relay decisions
@@ -112,11 +124,33 @@ internal class PacketRelayManager(
         }
         val decision = decideRelay(packet)
         if (decision.shouldRelay) {
-            relayPacket(RoutedPacket(packet.copy(ttl = decision.newTTL), peerID, routed.relayAddress))
+            scheduleRelay(routed, packet.copy(ttl = decision.newTTL), packetID(packet), decision.delayMs)
         } else {
             Log.d(TAG, "Relay decision: NOT relaying packet type ${packet.type} (ttl=${packet.ttl}, degree=${delegate?.getLocalDegree()})")
         }
     }
+
+    /** Cancels a pending broadcast relay after another neighbor already retransmitted the packet. */
+    fun cancelScheduledRelayForDuplicate(packet: BitchatPacket) {
+        if ((delegate?.getLocalDegree() ?: 0) <= 2) return
+        scheduledRelaysLock.withLock { scheduledRelays.remove(packetID(packet)) }?.cancel()
+    }
+
+    private fun scheduleRelay(routed: RoutedPacket, relayPacket: BitchatPacket, id: String, delayMs: Int) {
+        val job = relayScope.launch(start = CoroutineStart.LAZY) {
+            delay(delayMs.milliseconds)
+            scheduledRelaysLock.withLock { scheduledRelays.remove(id) }
+            relayPacket(RoutedPacket(relayPacket, routed.peerID, routed.relayAddress))
+        }
+        scheduledRelaysLock.withLock {
+            scheduledRelays.remove(id)?.cancel()
+            scheduledRelays[id] = job
+        }
+        job.start()
+    }
+
+    private fun packetID(packet: BitchatPacket): String =
+        "${packet.senderID.hexEncodedString()}-${packet.timestamp}-${packet.type}-${Sha256.digest(packet.payload).copyOf(4).hexEncodedString()}"
 
     /**
      * iOS RelayController.decide() inputs derived from the packet. senderIsSelf and
@@ -140,11 +174,13 @@ internal class PacketRelayManager(
             recipientIsSelf = false,
             isDirectedEncrypted = ridesDirectedPath && isDirected,
             isFragment = mt == MessageType.FRAGMENT,
+            isVoiceFrame = mt == MessageType.VOICE_FRAME,
             isDirectedFragment = mt == MessageType.FRAGMENT && isDirected,
             isHandshake = mt == MessageType.NOISE_HANDSHAKE,
             isAnnounce = mt == MessageType.ANNOUNCE,
             isRequestSync = mt == MessageType.REQUEST_SYNC,
             degree = delegate?.getLocalDegree() ?: 0,
+            jitter = jitter,
         )
     }
     
@@ -196,6 +232,10 @@ internal class PacketRelayManager(
     fun shutdown() {
         Log.d(TAG, "Shutting down PacketRelayManager")
         relayScope.cancel()
+        scheduledRelaysLock.withLock {
+            scheduledRelays.values.forEach { it.cancel() }
+            scheduledRelays.clear()
+        }
     }
 }
 

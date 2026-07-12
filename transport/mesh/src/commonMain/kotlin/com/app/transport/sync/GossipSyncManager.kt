@@ -81,6 +81,19 @@ internal class GossipSyncManager(
     private val latestAnnouncementByPeer = LinkedHashMap<String, Pair<String, BitchatPacket>>()
     private val announcementsLock = Lock()
 
+    // Wire-preserving archives for non-public sync types. DAOs hold decoded application state, but
+    // a sync response must replay the exact packet originally signed by its author.
+    private val typedPackets = mutableMapOf<SyncTypeFlags, LinkedHashMap<String, BitchatPacket>>()
+    private val typedPacketsLock = Lock()
+    private val lastPeriodicSyncAt = mutableMapOf<SyncTypeFlags, Long>()
+    private val periodicTypes = listOf(
+        SyncTypeFlags.publicMessages.union(SyncTypeFlags.groupMessage) to 15_000L,
+        SyncTypeFlags.fragment to 30_000L,
+        SyncTypeFlags.fileTransfer to 60_000L,
+        SyncTypeFlags.prekeyBundle to 60_000L,
+        SyncTypeFlags.boardPost to 60_000L,
+    )
+
     // Per-peer rate limiting keyed on the last SENT request time, plus a guard against
     // stacking multiple delayed jobs while one is already queued for the peer.
     private val lastSyncRequestSentAt = ConcurrentMutableMap<String, Long>()
@@ -99,8 +112,15 @@ internal class GossipSyncManager(
         periodicJob = scope.launch(dispatchers.io) {
             while (isActive) {
                 try {
-                    delay(30_000)
-                    sendRequestSync()
+                    delay(1_000)
+                    val now = nowMillis()
+                    periodicTypes.forEach { (types, interval) ->
+                        val last = lastPeriodicSyncAt[types]
+                        if (last == null || now - last >= interval) {
+                            lastPeriodicSyncAt[types] = now
+                            sendRequestSync(types)
+                        }
+                    }
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) { Log.e(TAG, "Periodic sync error: ${e.message}") }
             }
@@ -154,7 +174,8 @@ internal class GossipSyncManager(
         val mt = MessageType.fromValue(packet.type)
         val isBroadcastMessage = (mt == MessageType.MESSAGE && (packet.recipientID == null || packet.recipientID.contentEquals(SpecialRecipients.BROADCAST)))
         val isAnnouncement = (mt == MessageType.ANNOUNCE)
-        if (!isBroadcastMessage && !isAnnouncement) return
+        val syncType = syncTypeFor(packet)
+        if (!isBroadcastMessage && !isAnnouncement && syncType == null) return
 
         val idBytes = PacketIdUtil.computeIdBytes(packet)
         val id = idBytes.hexEncodedString()
@@ -190,11 +211,21 @@ internal class GossipSyncManager(
                     if (it.hasNext()) { it.next(); it.remove() } else break
                 }
             }
+        } else if (syncType != null) {
+            typedPacketsLock.withLock {
+                val packets = typedPackets.getOrPut(syncType) { LinkedHashMap() }
+                packets[id] = packet
+                val cap = configProvider.seenCapacity().coerceAtLeast(1)
+                while (packets.size > cap) {
+                    val iterator = packets.entries.iterator()
+                    if (iterator.hasNext()) { iterator.next(); iterator.remove() } else break
+                }
+            }
         }
     }
 
-    private fun sendRequestSync() {
-        val payload = buildGcsPayload()
+    private fun sendRequestSync(types: SyncTypeFlags = SyncTypeFlags.publicMessages) {
+        val payload = buildGcsPayload(types)
 
         val packet = BitchatPacket(
             type = MessageType.REQUEST_SYNC.value,
@@ -219,7 +250,7 @@ internal class GossipSyncManager(
         }
         lastSyncRequestSentAt[peerID] = now
 
-        val payload = buildGcsPayload()
+        val payload = buildGcsPayload(allSyncTypes())
 
         val packet = BitchatPacket(
             type = MessageType.REQUEST_SYNC.value,
@@ -288,6 +319,21 @@ internal class GossipSyncManager(
                 }
             }
         }
+
+        // Every non-public archive shares the same GCS/missing-packet and since-cursor semantics.
+        // The packets are replayed unchanged except for the neighbor-only response TTL.
+        typedPacketsLock.withLock {
+            typedPackets.forEach { (type, packets) ->
+                if (!requestedTypes.contains(type)) return@forEach
+                packets.values.forEach { pkt ->
+                    if (since != null && pkt.timestamp.toLong() < since) return@forEach
+                    val idBytes = PacketIdUtil.computeIdBytes(pkt)
+                    if (!mightContain(idBytes)) {
+                        delegate?.sendPacketToPeer(fromPeerID, pkt.copy(ttl = SyncDefaults.SYNC_TTL_HOPS))
+                    }
+                }
+            }
+        }
     }
 
     private fun hexToBytes(hex: String): ByteArray {
@@ -301,18 +347,17 @@ internal class GossipSyncManager(
         return out
     }
 
-    private fun buildGcsPayload(): ByteArray {
+    private fun buildGcsPayload(types: SyncTypeFlags = SyncTypeFlags.publicMessages): ByteArray {
         // Collect candidates: latest announcement per peer + recent broadcast messages
         val list = ArrayList<BitchatPacket>()
         // announcements
-        announcementsLock.withLock {
-            for ((_, pair) in latestAnnouncementByPeer) {
-                list.add(pair.second)
-            }
+        if (types.contains(SyncTypeFlags.announce)) announcementsLock.withLock {
+            for ((_, pair) in latestAnnouncementByPeer) list.add(pair.second)
         }
         // messages
-        messagesLock.withLock {
-            list.addAll(messages.values)
+        if (types.contains(SyncTypeFlags.message)) messagesLock.withLock { list.addAll(messages.values) }
+        typedPacketsLock.withLock {
+            typedPackets.forEach { (type, packets) -> if (types.contains(type)) list.addAll(packets.values) }
         }
         // sort by timestamp desc, then take up to min(seenCapacity, fit capacity)
         list.sortByDescending { it.timestamp.toLong() }
@@ -327,7 +372,7 @@ internal class GossipSyncManager(
             val p0 = GCSFilter.deriveP(fpr)
             return RequestSyncPacket(
                 p = p0, m = 1, data = ByteArray(0),
-                types = SyncTypeFlags.publicMessages,
+                types = types,
             ).encode()
         }
         val included = list.take(takeN)
@@ -344,10 +389,21 @@ internal class GossipSyncManager(
             if (covered < list.size && covered > 0) included[covered - 1].timestamp.toLong() else null
         return RequestSyncPacket(
             p = params.p, m = mVal, data = params.data,
-            types = SyncTypeFlags.publicMessages,
+            types = types,
             sinceTimestamp = sinceTimestamp,
         ).encode()
     }
+
+    private fun syncTypeFor(packet: BitchatPacket): SyncTypeFlags? = when (MessageType.fromValue(packet.type)) {
+        MessageType.FRAGMENT -> SyncTypeFlags.fragment
+        MessageType.FILE_TRANSFER -> SyncTypeFlags.fileTransfer
+        MessageType.BOARD_POST -> SyncTypeFlags.boardPost
+        MessageType.PREKEY_BUNDLE -> SyncTypeFlags.prekeyBundle
+        MessageType.GROUP_MESSAGE -> SyncTypeFlags.groupMessage
+        else -> null
+    }
+
+    private fun allSyncTypes(): SyncTypeFlags = periodicTypes.fold(SyncTypeFlags.publicMessages) { acc, entry -> acc.union(entry.first) }
 
     // Periodically remove stale announcements and all their messages
     private fun pruneStaleAnnouncements() {

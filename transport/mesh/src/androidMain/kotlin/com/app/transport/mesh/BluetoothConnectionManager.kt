@@ -323,6 +323,7 @@ internal class BluetoothConnectionManager(
 
     /** Forward the mesh-foreground-service signal to the power manager (see [PowerManager.setMeshServiceActive]). */
     override fun setMeshServiceActive(active: Boolean) { powerManager.setMeshServiceActive(active) }
+    override fun setAppIsActive(active: Boolean) = Unit
 
     // Debug snapshots for connected devices
     override fun getConnectedDeviceEntries(): List<Triple<String, Boolean, Int?>> {

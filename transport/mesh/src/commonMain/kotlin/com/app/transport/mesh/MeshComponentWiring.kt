@@ -24,6 +24,7 @@ import com.app.transport.model.BoardWire
 import com.app.transport.prekey.PrekeyEventListener
 import com.app.transport.verification.VerifyEventListener
 import com.app.transport.vouch.VouchEventListener
+import com.app.transport.voice.PublicVoiceFrame
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -60,6 +61,8 @@ internal class MeshComponentWiring(
     private val boardListener: () -> BoardEventListener?,
     private val prekeyListener: () -> PrekeyEventListener?,
     private val nostrCarrierHandler: () -> ((ByteArray, String, Boolean) -> Unit)?,
+    private val voiceFrameSink: (PublicVoiceFrame) -> Unit,
+    private val nowMillis: () -> Long,
 ) {
 
     companion object {
@@ -485,6 +488,20 @@ internal class MeshComponentWiring(
                 return true
             }
 
+            override fun handleVoiceFrame(routed: RoutedPacket): Boolean {
+                val fromPeerId = routed.peerID ?: return false
+                val packet = routed.packet
+                val accepted = VoiceFrameIngressPolicy.accepts(packet, nowMillis()) {
+                    val signature = packet.signature ?: return@accepts false
+                    val signingKey = peerManager.getPeerInfo(fromPeerId)?.signingPublicKey ?: return@accepts false
+                    val signingBytes = packet.toBinaryDataForSigning() ?: return@accepts false
+                    encryptionService.verifyEd25519Signature(signature, signingBytes, signingKey)
+                }
+                if (!accepted) return false
+                voiceFrameSink(PublicVoiceFrame(fromPeerId, packet.payload, packet.timestamp.toLong()))
+                return true
+            }
+
             override fun handleNostrCarrier(routed: RoutedPacket, directedToUs: Boolean) {
                 val from = routed.peerID ?: return
                 nostrCarrierHandler()?.invoke(routed.packet.payload, from, directedToUs)
@@ -607,8 +624,9 @@ internal class MeshComponentWiring(
             override fun handlePrekeyBundle(routed: RoutedPacket) {
                 // Hand the raw broadcast to the coordinator for attribution + signature verification
                 // and caching. The generic relay step runs regardless (bundles must spread even
-                // before this node can verify them). Gossip backfill is not tracked here: like board
-                // posts in this port, bundles propagate by broadcast + relay, not GCS diff.
+                // before this node can verify them). Keep the original packet for typed GCS replay;
+                // the prekey coordinator remains the signature-verification authority for persistence.
+                try { gossipSyncManager.onPublicPacketSeen(routed.packet) } catch (_: Exception) { }
                 prekeyListener()?.onPrekeyBundleReceived(routed.packet)
             }
         }

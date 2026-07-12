@@ -31,7 +31,10 @@ enum class MessageType(val value: UByte) {
     PONG(0x27u),
 
     // Complete signed Nostr event ferried between mesh-only and internet gateway peers.
-    NOSTR_CARRIER(0x28u);
+    NOSTR_CARRIER(0x28u),
+
+    // Signed live push-to-talk burst packet; it is broadcast-only and ephemeral.
+    VOICE_FRAME(0x29u);
 
     companion object {
         fun fromValue(value: UByte): MessageType? {

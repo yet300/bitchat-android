@@ -138,6 +138,21 @@ class RequestSyncPacketGoldenTest {
     }
 
     @Test
+    fun `golden P5 - typed board prekey and group requests use two-byte little-endian flags`() {
+        fun request(types: SyncTypeFlags) = RequestSyncPacket(
+            p = 7,
+            m = 1,
+            data = ByteArray(0),
+            types = types,
+        ).encode().hex()
+
+        val prefix = "0100" + "0107" + "0200" + "0400000001" + "0300" + "00" + "0400" + "02"
+        assertEquals(prefix + "0001", request(SyncTypeFlags.boardPost))
+        assertEquals(prefix + "0002", request(SyncTypeFlags.prekeyBundle))
+        assertEquals(prefix + "0004", request(SyncTypeFlags.groupMessage))
+    }
+
+    @Test
     fun `golden P3 - omitted optionals stay byte-identical to the frozen 3-TLV form`() {
         val legacy = RequestSyncPacket(p = 7, m = 256, data = byteArrayOf(0xAB.toByte(), 0xCD.toByte()))
         assertEquals("0100" + "0107" + "0200" + "0400000100" + "0300" + "02abcd", legacy.encode().hex())

@@ -7,6 +7,9 @@ import com.app.transport.model.BitchatFilePacket
 import com.app.transport.prekey.PrekeyEventListener
 import com.app.transport.verification.VerifyEventListener
 import com.app.transport.vouch.VouchEventListener
+import com.app.transport.voice.PublicVoiceFrame
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 /**
  * commonMain contract for the mesh operations the data layer drives (peer directory, Noise session
@@ -18,6 +21,10 @@ import com.app.transport.vouch.VouchEventListener
  * (their own consumers); this is the broad app/data-facing facade.
  */
 interface MeshService {
+
+    /** Ephemeral public 0x29 frames accepted by the mesh identity/freshness gate. */
+    val publicVoiceFrames: Flow<PublicVoiceFrame>
+        get() = emptyFlow()
 
     /** Our current mesh ephemeral peer id (16-hex); rotates on panic reset. */
     val myPeerID: String
@@ -151,4 +158,7 @@ interface MeshService {
     fun setNostrCarrierHandler(handler: ((payload: ByteArray, fromPeerId: String, directedToUs: Boolean) -> Unit)?) = Unit
 
     fun broadcastNostrCarrier(payload: ByteArray) = Unit
+
+    /** Broadcasts one already-encoded live voice burst as signed, ephemeral 0x29 traffic. */
+    fun broadcastVoiceFrame(payload: ByteArray) = Unit
 }

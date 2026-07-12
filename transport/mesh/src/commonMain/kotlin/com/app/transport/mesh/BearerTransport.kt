@@ -47,6 +47,7 @@ interface BearerTransport {
 
     fun setNicknameResolver(resolver: (String) -> String?)
     fun setMeshServiceActive(active: Boolean)
+    fun setAppIsActive(active: Boolean)
 
     // Debug-only role controls / diagnostics (BleDebugHandle).
     fun startServer()

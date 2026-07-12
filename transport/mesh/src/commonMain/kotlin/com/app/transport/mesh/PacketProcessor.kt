@@ -173,6 +173,12 @@ internal class PacketProcessor(
         // permanently kill that peer's actor.
         when (delegate?.validatePacketSecurity(packet, peerID)) {
             PacketValidationResult.ACCEPT -> Unit
+            PacketValidationResult.DUPLICATE -> {
+                // Another neighbor has already supplied this packet. If our degree is high
+                // enough, cancel the jittered flood that has not left this node yet.
+                packetRelayManager.cancelScheduledRelayForDuplicate(packet)
+                return
+            }
             PacketValidationResult.DUPLICATE_ANNOUNCE_LIVENESS -> {
                 // Byte-identical ANNOUNCE from a direct neighbor: refresh link binding and
                 // last-seen only. No reprocessing, no relay, no sync scheduling — a peer
@@ -225,6 +231,11 @@ internal class PacketProcessor(
                 // Malformed or forged posts must not spread: the delegate decodes + verifies the inner
                 // author signature synchronously and returns false to skip the relay step below.
                 if (delegate?.handleBoardPost(routed) != true) return
+            }
+            MessageType.VOICE_FRAME -> {
+                // Public live audio is ephemeral: the delegate synchronously checks the broadcast
+                // shape, freshness, payload and outer signature before this falls through to relay.
+                if (delegate?.handleVoiceFrame(routed) != true) return
             }
             MessageType.NOSTR_CARRIER -> {
                 val directed = packet.recipientID != null && !isBroadcast(packet)
@@ -470,6 +481,9 @@ internal interface PacketProcessorDelegate {
      * malformed / bad-signature so forged posts do not spread).
      */
     fun handleBoardPost(routed: RoutedPacket): Boolean
+
+    /** Public live voice (0x29): returns true only after its synchronous relay eligibility gate. */
+    fun handleVoiceFrame(routed: RoutedPacket): Boolean
 
     fun handleNostrCarrier(routed: RoutedPacket, directedToUs: Boolean) = Unit
 

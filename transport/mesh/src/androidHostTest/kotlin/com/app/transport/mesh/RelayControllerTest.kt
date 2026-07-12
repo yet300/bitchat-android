@@ -17,6 +17,7 @@ class RelayControllerTest {
         degree: Int,
         isAnnounce: Boolean = false,
         isFragment: Boolean = false,
+        isVoiceFrame: Boolean = false,
         isDirectedFragment: Boolean = false,
         isHandshake: Boolean = false,
         isDirectedEncrypted: Boolean = false,
@@ -29,6 +30,7 @@ class RelayControllerTest {
         recipientIsSelf = recipientIsSelf,
         isDirectedEncrypted = isDirectedEncrypted,
         isFragment = isFragment,
+        isVoiceFrame = isVoiceFrame,
         isDirectedFragment = isDirectedFragment,
         isHandshake = isHandshake,
         isAnnounce = isAnnounce,
@@ -97,5 +99,11 @@ class RelayControllerTest {
         // Dense: cap 5 -> outgoing 4; sparse: cap 7 -> outgoing 6.
         assertEquals(4, decide(ttl = 7u, degree = 6, isFragment = true).newTTL.toInt())
         assertEquals(6, decide(ttl = 7u, degree = 2, isFragment = true).newTTL.toInt())
+    }
+
+    @Test
+    fun publicVoiceFramesUseTheFragmentTtlClamp() {
+        assertEquals(4, decide(ttl = 7u, degree = 6, isVoiceFrame = true).newTTL.toInt())
+        assertEquals(6, decide(ttl = 7u, degree = 2, isVoiceFrame = true).newTTL.toInt())
     }
 }

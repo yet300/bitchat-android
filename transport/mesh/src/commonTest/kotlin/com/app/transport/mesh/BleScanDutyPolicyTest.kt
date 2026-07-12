@@ -45,4 +45,23 @@ class BleScanDutyPolicyTest {
             BleScanDutyPolicy.plan(dutyEnabled = true, appIsActive = false, connectedCount = 5, hasRecentTraffic = false),
         )
     }
+
+    @Test
+    fun activeToBackgroundTransitionStopsTheQuietConnectedDutyCycle() {
+        val active = BleScanDutyPolicy.plan(
+            dutyEnabled = true,
+            appIsActive = true,
+            connectedCount = 4,
+            hasRecentTraffic = false,
+        )
+        val background = BleScanDutyPolicy.plan(
+            dutyEnabled = true,
+            appIsActive = false,
+            connectedCount = 4,
+            hasRecentTraffic = false,
+        )
+
+        assertEquals(BleScanDutyPlan.DutyCycle(5_000L, 10_000L), active)
+        assertEquals(BleScanDutyPlan.Continuous, background)
+    }
 }

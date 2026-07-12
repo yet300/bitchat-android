@@ -6,8 +6,12 @@ import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
 import com.app.transport.protocol.SpecialRecipients
 import com.app.transport.protocol.peerIdToRoutingBytes
+import com.app.common.AppDispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -42,7 +46,12 @@ class PacketRelayManagerPingTest {
 
     private val relayed = mutableListOf<BitchatPacket>()
 
-    private fun manager(): PacketRelayManager = PacketRelayManager(ME, Toggles()).apply {
+    private fun manager(dispatchers: AppDispatchers = AppDispatchers()): PacketRelayManager = PacketRelayManager(
+        myPeerID = ME,
+        debugSettingsManager = Toggles(),
+        dispatchers = dispatchers,
+        jitter = { 0 },
+    ).apply {
         delegate = object : PacketRelayManagerDelegate {
             override fun getNetworkSize(): Int = 40
             override fun getLocalDegree(): Int = DENSE_DEGREE
@@ -67,16 +76,20 @@ class PacketRelayManagerPingTest {
     )
 
     @Test
-    fun `directed ping for another peer relays deterministically without the dense TTL clamp`() {
-        manager().handlePacketRelay(packet(MessageType.PING.value, recipient = OTHER))
+    fun `directed ping for another peer relays deterministically without the dense TTL clamp`() = runTest {
+        manager(AppDispatchers(default = StandardTestDispatcher(testScheduler), io = StandardTestDispatcher(testScheduler)))
+            .handlePacketRelay(packet(MessageType.PING.value, recipient = OTHER))
+        runCurrent()
 
         assertEquals(1, relayed.size)
         assertEquals("directed probe: ttl-1, not the dense clamp to 4", 6, relayed.single().ttl.toInt())
     }
 
     @Test
-    fun `directed pong for another peer relays deterministically without the dense TTL clamp`() {
-        manager().handlePacketRelay(packet(MessageType.PONG.value, recipient = OTHER))
+    fun `directed pong for another peer relays deterministically without the dense TTL clamp`() = runTest {
+        manager(AppDispatchers(default = StandardTestDispatcher(testScheduler), io = StandardTestDispatcher(testScheduler)))
+            .handlePacketRelay(packet(MessageType.PONG.value, recipient = OTHER))
+        runCurrent()
 
         assertEquals(1, relayed.size)
         assertEquals(6, relayed.single().ttl.toInt())
@@ -101,7 +114,7 @@ class PacketRelayManagerPingTest {
      * so it must fall back to the degree-based broadcast clamp instead of the always-relay path.
      */
     @Test
-    fun `ping with the broadcast recipient falls back to the broadcast clamp`() {
+    fun `ping with the broadcast recipient falls back to the broadcast clamp`() = runTest {
         val broadcastPing = RoutedPacket(
             packet = BitchatPacket(
                 version = 1u,
@@ -116,7 +129,9 @@ class PacketRelayManagerPingTest {
             peerID = SENDER,
         )
 
-        manager().handlePacketRelay(broadcastPing)
+        manager(AppDispatchers(default = StandardTestDispatcher(testScheduler), io = StandardTestDispatcher(testScheduler)))
+            .handlePacketRelay(broadcastPing)
+        runCurrent()
 
         assertEquals(1, relayed.size)
         assertEquals("dense clamp: min(7,5) - 1", 4, relayed.single().ttl.toInt())

@@ -20,4 +20,10 @@ interface MeshLifecycleController {
      * screen off. The service sets it true after promoting to foreground, false on teardown.
      */
     fun setMeshServiceActive(active: Boolean)
+
+    /**
+     * Reports application foreground activity to platform BLE policy. This is distinct from the
+     * Android foreground-service signal: iOS uses it to stop duty-cycling scans in background.
+     */
+    fun setAppIsActive(active: Boolean)
 }

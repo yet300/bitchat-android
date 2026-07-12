@@ -248,7 +248,7 @@ class SecurityManagerTest {
         assertEquals("First packet should be accepted", PacketValidationResult.ACCEPT, result1)
 
         val result2 = securityManager.validatePacket(packet, otherPeerID)
-        assertEquals("Duplicate packet should be rejected", PacketValidationResult.DROP, result2)
+        assertEquals("Duplicate packet should be marked for relay cancellation", PacketValidationResult.DUPLICATE, result2)
     }
 
     /**
@@ -298,7 +298,7 @@ class SecurityManagerTest {
         )
 
         assertEquals(PacketValidationResult.ACCEPT, securityManager.validatePacket(packet(), otherPeerID))
-        assertEquals("Byte-identical replay must be dropped", PacketValidationResult.DROP, securityManager.validatePacket(packet(), otherPeerID))
+        assertEquals("Byte-identical replay must not be accepted", PacketValidationResult.DUPLICATE, securityManager.validatePacket(packet(), otherPeerID))
     }
 
     @Test
@@ -325,7 +325,7 @@ class SecurityManagerTest {
         
         // 2. Relayed Duplicate (Lower TTL)
         val packet2 = packet1.copy(ttl = (com.app.transport.MeshConstants.MESSAGE_TTL_HOPS - 1u).toUByte())
-        assertEquals("Relayed duplicate ANNOUNCE should be rejected", PacketValidationResult.DROP, securityManager.validatePacket(packet2, unknownPeerID))
+        assertEquals("Relayed duplicate ANNOUNCE should cancel a pending relay", PacketValidationResult.DUPLICATE, securityManager.validatePacket(packet2, unknownPeerID))
         
         // 3. Direct Duplicate (Max TTL)
         val packet3 = packet1.copy(ttl = com.app.transport.MeshConstants.MESSAGE_TTL_HOPS)

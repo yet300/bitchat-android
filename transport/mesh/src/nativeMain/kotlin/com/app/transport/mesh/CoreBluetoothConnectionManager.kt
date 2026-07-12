@@ -3,6 +3,8 @@
 package com.app.transport.mesh
 
 import co.touchlab.stately.collections.ConcurrentMutableMap
+import co.touchlab.stately.concurrency.Lock
+import co.touchlab.stately.concurrency.withLock
 import com.app.common.AppDispatchers
 import com.app.common.utils.Log
 import com.app.common.encoding.toHexString
@@ -14,6 +16,7 @@ import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import platform.CoreBluetooth.CBATTErrorSuccess
 import platform.CoreBluetooth.CBATTRequest
 import platform.CoreBluetooth.CBAdvertisementDataIsConnectable
@@ -108,6 +111,8 @@ internal class CoreBluetoothConnectionManager(
 
     // Last time we received any frame — feeds the scan-duty policy's "recent traffic" input.
     private var lastTrafficMs: Long = 0L
+    private val appActivityLock = Lock()
+    private var appIsActive = true
 
     // Server (peripheral) state, keyed by CBCentral.identifier.UUIDString.
     private val subscribedCentrals = ConcurrentMutableMap<String, CBCentral>()
@@ -172,8 +177,7 @@ internal class CoreBluetoothConnectionManager(
             if (active) startScan() else try { centralManager.stopScan() } catch (_: Exception) {}
         }
 
-        // The mesh runs under a foreground service; treat the process as active for duty decisions.
-        override fun appIsActive(): Boolean = true
+        override fun appIsActive(): Boolean = appActivityLock.withLock { appIsActive }
         override fun hasRecentTraffic(): Boolean = nowMs() - lastTrafficMs < RECENT_TRAFFIC_WINDOW_MS
     }
 
@@ -596,6 +600,15 @@ internal class CoreBluetoothConnectionManager(
 
     override fun setNicknameResolver(resolver: (String) -> String?) = Unit
     override fun setMeshServiceActive(active: Boolean) = Unit
+    override fun setAppIsActive(active: Boolean) {
+        val changed = appActivityLock.withLock {
+            if (appIsActive == active) false else {
+                appIsActive = active
+                true
+            }
+        }
+        if (changed) scope.launch { centralPolicy.onAppActivityChanged() }
+    }
     override fun startServer() = Unit
     override fun stopServer() = Unit
     override fun startClient() = Unit

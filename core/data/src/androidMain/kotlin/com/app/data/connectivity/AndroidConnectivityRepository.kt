@@ -38,6 +38,8 @@ class AndroidConnectivityRepository(
     private val nostrRelayManager: NostrRelayManager,
 ) : ConnectivityRepository {
 
+    private val networkAvailabilityRelayNotifier = NetworkAvailabilityRelayNotifier(nostrRelayManager)
+
     override fun observe(): Flow<List<TransportStatus>> = flow {
         while (true) {
             emit(snapshot())
@@ -48,6 +50,7 @@ class AndroidConnectivityRepository(
     private suspend fun snapshot(): List<TransportStatus> {
         val bluetooth = bluetoothState()
         val internet = internetState()
+        networkAvailabilityRelayNotifier.onInternetState(internet)
         return listOf(
             // Mesh peers ride BLE (primary) and Wi-Fi Aware; surfaced under Bluetooth as "nearby".
             TransportStatus(TransportKind.BLUETOOTH, bluetooth, count = meshPeerCount(bluetooth)),
