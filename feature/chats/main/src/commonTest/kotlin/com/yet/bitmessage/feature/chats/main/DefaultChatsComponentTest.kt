@@ -16,7 +16,9 @@ import com.arkivanov.decompose.router.slot.ChildSlot
 import com.yet.bitmessage.feature.chats.conversations.connectivity.ConnectivityComponent
 import com.yet.bitmessage.feature.chats.conversations.contacts.ContactsComponent
 import com.yet.bitmessage.feature.chats.conversations.groups.GroupsComponent
+import com.yet.bitmessage.feature.chats.conversations.voice.VoiceComponent
 import com.arkivanov.decompose.router.stack.ChildStack
+import kotlinx.coroutines.flow.emptyFlow
 import com.yet.bitmessage.feature.chats.conversations.search.SearchComponent
 import com.yet.bitmessage.feature.chats.conversations.search.SearchTab
 import com.yet.bitmessage.feature.chats.conversations.settings.NotifPermissionStatus
@@ -39,6 +41,7 @@ class DefaultChatsComponentTest {
         val onContactsRequested: () -> Unit,
         val onSettingsRequested: () -> Unit,
         val onGroupsRequested: () -> Unit,
+        val onVoiceRequested: () -> Unit,
     ) : ConversationsComponent {
         override val model: Value<ConversationsComponent.Model> =
             MutableValue(
@@ -56,6 +59,7 @@ class DefaultChatsComponentTest {
         override fun onContactsClicked() = onContactsRequested()
         override fun onSettingsClicked() = onSettingsRequested()
         override fun onGroupsClicked() = onGroupsRequested()
+        override fun onVoiceClicked() = onVoiceRequested()
         override fun onTogglePin(id: ConversationId) = Unit
         override fun onToggleMute(id: ConversationId) = Unit
         override fun onDismissBanner() = Unit
@@ -160,6 +164,14 @@ class DefaultChatsComponentTest {
         override fun onBackClicked() = Unit
     }
 
+    private class FakeVoiceComponent(val onClose: () -> Unit) : VoiceComponent {
+        override val model: Value<VoiceComponent.Model> = MutableValue(VoiceComponent.Model(received = emptyList()))
+        override val playback = emptyFlow<List<ByteArray>>()
+        override fun onBurstCaptured(frames: List<ByteArray>, durationMs: Int) = Unit
+        override suspend fun requestMicrophonePermission(): Boolean = true
+        override fun onCloseClicked() = onClose()
+    }
+
     private class FakeChatComponent(
         config: ChatConfig,
         val onFinished: () -> Unit,
@@ -206,8 +218,8 @@ class DefaultChatsComponentTest {
         val lifecycle = LifecycleRegistry()
         return DefaultChatsComponent(
             componentContext = DefaultComponentContext(lifecycle),
-            conversationsFactory = { _, onSelected, onConnectivity, onSearch, onContacts, onSettings, onGroups ->
-                FakeConversationsComponent(onSelected, onConnectivity, onSearch, onContacts, onSettings, onGroups)
+            conversationsFactory = { _, onSelected, onConnectivity, onSearch, onContacts, onSettings, onGroups, onVoice ->
+                FakeConversationsComponent(onSelected, onConnectivity, onSearch, onContacts, onSettings, onGroups, onVoice)
             },
             chatFactory = { _: ComponentContext, config: ChatConfig, onFinished: () -> Unit, _ ->
                 FakeChatComponent(config, onFinished)
@@ -221,6 +233,7 @@ class DefaultChatsComponentTest {
             },
             settingsFactory = { _, onClose, _ -> FakeSettingsComponent(onClose) },
             groupsFactory = { ctx, onClose -> FakeGroupsComponent(ctx, onClose) },
+            voiceFactory = { _, onClose -> FakeVoiceComponent(onClose) },
             onOpenMap = {},
             onOpenDebug = {},
         )
@@ -339,6 +352,17 @@ class DefaultChatsComponentTest {
 
         component.mainConversations.onGroupsClicked()
         assertIs<ChatsComponent.SheetChild.Groups>(component.sheetSlot.value.child?.instance)
+
+        component.onDismissSheet()
+        assertNull(component.sheetSlot.value.child)
+    }
+
+    @Test
+    fun requesting_voice_opens_the_overlay_and_dismiss_closes_it() {
+        val component = build()
+
+        component.mainConversations.onVoiceClicked()
+        assertIs<ChatsComponent.SheetChild.Voice>(component.sheetSlot.value.child?.instance)
 
         component.onDismissSheet()
         assertNull(component.sheetSlot.value.child)

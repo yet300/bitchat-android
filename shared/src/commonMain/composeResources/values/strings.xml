@@ -88,6 +88,12 @@
     <string name="groups_send">Send</string>
     <string name="groups_back">Back</string>
     <string name="groups_you">You</string>
+    <string name="voice_title">Live voice</string>
+    <string name="voice_close">Close</string>
+    <string name="voice_empty">No voice received yet</string>
+    <string name="voice_hold_to_talk">Hold to talk</string>
+    <string name="voice_recording">Recording…</string>
+    <string name="voice_received">Voice from %1$s · %2$d ms</string>
     <string name="search_hint">Search</string>
     <string name="search_close">Close</string>
     <string name="search_tab_chats">Chats</string>

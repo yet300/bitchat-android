@@ -51,6 +51,8 @@ import com.app.data.routing.RoutingCore
 import com.app.data.routing.RoutingMessageTransport
 import com.app.data.session.MeshNoiseSessionPort
 import com.app.data.verification.VerificationCoordinator
+import com.app.data.voice.VoiceRepositoryImpl
+import com.app.domain.repository.VoiceRepository
 import com.app.data.board.BoardCoordinator
 import com.app.data.group.GroupCoordinator
 import com.app.data.vouch.VouchCoordinator
@@ -134,6 +136,9 @@ abstract class DataBindings {
 
     @Binds
     internal abstract val GatewayRepositoryImpl.bindGatewayRepository: GatewayRepository
+
+    @Binds
+    internal abstract val VoiceRepositoryImpl.bindVoiceRepository: VoiceRepository
 
     @Binds
     internal abstract val SettingsRepositoryImpl.bindSettings: SettingsRepository

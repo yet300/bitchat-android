@@ -65,6 +65,7 @@ import com.yet.bitmessage.shared.resources.connectivity_tor
 import com.yet.bitmessage.shared.resources.connectivity_wifi_aware
 import com.yet.bitmessage.shared.resources.conversations_contacts
 import com.yet.bitmessage.shared.resources.groups_title
+import com.yet.bitmessage.shared.resources.voice_title
 import com.yet.bitmessage.shared.resources.conversations_empty
 import com.yet.bitmessage.shared.resources.conversations_more
 import com.yet.bitmessage.shared.resources.conversations_yesterday
@@ -109,6 +110,7 @@ fun ConversationsContent(component: ConversationsComponent, modifier: Modifier =
                         onConnectivity = component::onConnectivityClicked,
                         onContacts = component::onContactsClicked,
                         onGroups = component::onGroupsClicked,
+                        onVoice = component::onVoiceClicked,
                         onSettings = component::onSettingsClicked,
                     )
                 },
@@ -154,6 +156,7 @@ private fun OverflowMenu(
     onConnectivity: () -> Unit,
     onContacts: () -> Unit,
     onGroups: () -> Unit,
+    onVoice: () -> Unit,
     onSettings: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
@@ -171,6 +174,10 @@ private fun OverflowMenu(
             DropdownMenuItem(
                 text = { Text(stringResource(Res.string.groups_title)) },
                 onClick = { open = false; onGroups() },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(Res.string.voice_title)) },
+                onClick = { open = false; onVoice() },
             )
             DropdownMenuItem(
                 text = { Text(stringResource(Res.string.connectivity_title)) },

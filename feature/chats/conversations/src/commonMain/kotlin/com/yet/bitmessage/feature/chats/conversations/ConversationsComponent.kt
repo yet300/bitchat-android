@@ -34,6 +34,9 @@ interface ConversationsComponent {
     /** Open the private-groups screen (hosted as a slot by the parent). */
     fun onGroupsClicked()
 
+    /** Open the live-voice (push-to-talk) screen (hosted as a slot by the parent). */
+    fun onVoiceClicked()
+
     fun onTogglePin(id: ConversationId)
 
     fun onToggleMute(id: ConversationId)
@@ -66,6 +69,7 @@ interface ConversationsComponent {
             onContactsRequested: () -> Unit,
             onSettingsRequested: () -> Unit,
             onGroupsRequested: () -> Unit,
+            onVoiceRequested: () -> Unit,
         ): ConversationsComponent
     }
 }

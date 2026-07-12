@@ -13,6 +13,8 @@ import com.yet.bitmessage.feature.chats.conversations.groups.chat.GroupChatCompo
 import com.yet.bitmessage.feature.chats.conversations.groups.list.DefaultGroupListComponentFactory
 import com.yet.bitmessage.feature.chats.conversations.groups.list.GroupListComponent
 import com.yet.bitmessage.feature.chats.conversations.search.DefaultSearchComponentFactory
+import com.yet.bitmessage.feature.chats.conversations.voice.DefaultVoiceComponentFactory
+import com.yet.bitmessage.feature.chats.conversations.voice.VoiceComponent
 import com.yet.bitmessage.feature.chats.conversations.search.SearchComponent
 import com.yet.bitmessage.feature.chats.conversations.settings.DefaultSettingsComponentFactory
 import com.yet.bitmessage.feature.chats.conversations.settings.SettingsComponent
@@ -47,4 +49,7 @@ abstract class ConversationsBindings {
 
     @Binds
     internal abstract val DefaultGroupChatComponentFactory.bindGroupChatComponentFactory: GroupChatComponent.Factory
+
+    @Binds
+    internal abstract val DefaultVoiceComponentFactory.bindVoiceComponentFactory: VoiceComponent.Factory
 }
