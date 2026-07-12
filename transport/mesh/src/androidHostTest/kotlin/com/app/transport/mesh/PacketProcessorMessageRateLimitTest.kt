@@ -91,10 +91,14 @@ class PacketProcessorMessageRateLimitTest {
             repeat(8) { i -> processor.processPacket(broadcastMessage(i)) }
             runBlocking {
                 withTimeoutOrNull(5_000) { while (delegate.handled.size < 5) delay(5) }
-                delay(100) // settle: catch over-accepts
+                withTimeoutOrNull(5_000) { while (delegate.relayed.size < 5) delay(5) }
             }
             assertEquals(listOf(0, 1, 2, 3, 4), delegate.handled.toList())
-            assertEquals("dropped messages must not be relayed", listOf(0, 1, 2, 3, 4), delegate.relayed.toList())
+            assertEquals(
+                "dropped messages must not be relayed",
+                listOf(0, 1, 2, 3, 4),
+                delegate.relayed.sorted(),
+            )
 
             // Refill 1.0/s: one more slot after a second.
             now += 1_000

@@ -1,5 +1,6 @@
 package com.app.transport.mesh
 
+import com.app.common.AppDispatchers
 import com.app.transport.debug.DebugConfigStore
 import com.app.transport.debug.DebugPreferenceManager
 import com.app.transport.debug.DebugSettingsManager
@@ -7,6 +8,8 @@ import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
@@ -96,10 +99,18 @@ class PacketRelayManagerTest {
     
     @Test
     fun `packet with empty route is broadcast`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        packetRelayManager = PacketRelayManager(
+            myPeerID = myPeerID,
+            debugSettingsManager = DebugSettingsManager(DebugPreferenceManager(FakeDebugConfigStore())),
+            dispatchers = AppDispatchers(default = dispatcher, io = dispatcher),
+            jitter = { 0 },
+        ).also { it.delegate = delegate }
         val packet = createPacket(null)
         val routedPacket = RoutedPacket(packet, otherPeerID)
 
         packetRelayManager.handlePacketRelay(routedPacket)
+        runCurrent()
 
         verify(delegate, never()).sendToPeer(any(), any())
         verify(delegate).broadcastPacket(any())

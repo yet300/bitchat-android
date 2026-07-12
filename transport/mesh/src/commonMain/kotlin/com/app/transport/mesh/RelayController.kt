@@ -1,7 +1,11 @@
 package com.app.transport.mesh
 
 /** One relay scheduling choice: whether to relay and with what outgoing TTL. */
-internal data class RelayDecision(val shouldRelay: Boolean, val newTTL: UByte)
+internal data class RelayDecision(
+    val shouldRelay: Boolean,
+    val newTTL: UByte,
+    val delayMs: Int = 0,
+)
 
 /**
  * Centralized flood-control policy for relays — port of the reference iOS
@@ -37,6 +41,7 @@ internal object RelayController {
         isRequestSync: Boolean,
         /** LOCAL degree: directly connected links, NOT the multi-hop peer count. */
         degree: Int,
+        jitter: (IntRange) -> Int = { range -> range.random() },
     ): RelayDecision {
         val ttlCap = minOf(ttl.toInt(), TTL_MAX)
 
@@ -51,7 +56,7 @@ internal object RelayController {
 
         // Session-critical or directed traffic: deterministic, no TTL cap beyond 7.
         if (isHandshake || isDirectedFragment || isDirectedEncrypted) {
-            return RelayDecision(true, (ttlCap - 1).toUByte())
+            return RelayDecision(true, (ttlCap - 1).toUByte(), jitter(if (isHandshake) 10..35 else 20..60))
         }
 
         // Live voice uses the fragment flood policy: sustained audio needs the same dense-graph
@@ -60,7 +65,7 @@ internal object RelayController {
             val cap = if (degree >= HIGH_DEGREE_THRESHOLD) FRAGMENT_TTL_CAP_DENSE else FRAGMENT_TTL_CAP
             val ttlLimit = minOf(ttlCap, cap)
             if (ttlLimit <= 1) return RelayDecision(false, ttlLimit.toUByte())
-            return RelayDecision(true, (ttlLimit - 1).toUByte())
+            return RelayDecision(true, (ttlLimit - 1).toUByte(), jitter(8..25))
         }
 
         // Broadcast TTL clamp by local degree:
@@ -72,6 +77,12 @@ internal object RelayController {
             degree <= 2 -> ttlCap
             else -> maxOf(2, minOf(ttlCap, if (isAnnounce) 7 else 6))
         }
-        return RelayDecision(true, (ttlLimit - 1).toUByte())
+        val delayRange = when (degree) {
+            in 0..2 -> 10..40
+            in 3..5 -> 60..150
+            in 6..9 -> 80..180
+            else -> 100..220
+        }
+        return RelayDecision(true, (ttlLimit - 1).toUByte(), jitter(delayRange))
     }
 }

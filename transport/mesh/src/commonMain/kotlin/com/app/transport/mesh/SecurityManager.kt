@@ -33,6 +33,7 @@ import kotlin.time.ExperimentalTime
  */
 internal enum class PacketValidationResult {
     ACCEPT,
+    DUPLICATE,
     DUPLICATE_ANNOUNCE_LIVENESS,
     DROP,
 }
@@ -116,7 +117,7 @@ internal class SecurityManager(
         val messageType = MessageType.fromValue(packet.type)
 
         // Duplicate detection
-        val messageID = generateMessageID(packet, peerID)
+        val messageID = generateMessageID(packet)
 
         if (isProcessed(messageID)) {
             // ANNOUNCE exception: a byte-identical announce re-received at max TTL still
@@ -128,8 +129,8 @@ internal class SecurityManager(
                     packet.ttl >= MeshConstants.MESSAGE_TTL_HOPS
 
             if (!isDirectAnnounce) {
-                Log.d(TAG, "Dropping duplicate packet: $messageID")
-                return PacketValidationResult.DROP
+                Log.d(TAG, "Duplicate packet: $messageID")
+                return PacketValidationResult.DUPLICATE
             }
             // Signature must still hold before the duplicate may refresh liveness:
             // the messageID is recorded before signature verification, so a replayed
@@ -310,9 +311,9 @@ internal class SecurityManager(
      * and back-to-back packets sharing sender/timestamp/type are never collapsed.
      * Local-only key — never serialized to the wire.
      */
-    private fun generateMessageID(packet: BitchatPacket, peerID: String): String {
+    private fun generateMessageID(packet: BitchatPacket): String {
         val digestPrefix = Sha256.digest(packet.payload).copyOf(4).hexEncodedString()
-        return "$peerID-${packet.timestamp}-${packet.type}-$digestPrefix"
+        return "${packet.senderID.hexEncodedString()}-${packet.timestamp}-${packet.type}-$digestPrefix"
     }
     
     /**

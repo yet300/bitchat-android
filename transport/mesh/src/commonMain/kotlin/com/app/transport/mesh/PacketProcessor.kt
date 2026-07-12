@@ -173,6 +173,12 @@ internal class PacketProcessor(
         // permanently kill that peer's actor.
         when (delegate?.validatePacketSecurity(packet, peerID)) {
             PacketValidationResult.ACCEPT -> Unit
+            PacketValidationResult.DUPLICATE -> {
+                // Another neighbor has already supplied this packet. If our degree is high
+                // enough, cancel the jittered flood that has not left this node yet.
+                packetRelayManager.cancelScheduledRelayForDuplicate(packet)
+                return
+            }
             PacketValidationResult.DUPLICATE_ANNOUNCE_LIVENESS -> {
                 // Byte-identical ANNOUNCE from a direct neighbor: refresh link binding and
                 // last-seen only. No reprocessing, no relay, no sync scheduling — a peer
