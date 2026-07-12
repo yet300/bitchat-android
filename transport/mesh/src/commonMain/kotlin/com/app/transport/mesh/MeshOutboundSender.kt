@@ -478,6 +478,29 @@ internal class MeshOutboundSender(
         meshNetwork.broadcast(RoutedPacket(packet))
     }
 
+    /** Sends one encoded public live-voice burst without persistence or gossip-sync tracking. */
+    fun broadcastVoiceFrame(payload: ByteArray) {
+        if (payload.isEmpty()) return
+        scope.launch {
+            val packet = BitchatPacket(
+                version = 1u,
+                type = MessageType.VOICE_FRAME.value,
+                senderID = peerIdToRoutingBytes(myPeerID),
+                recipientID = SpecialRecipients.BROADCAST,
+                timestamp = epochMillis().toULong(),
+                payload = payload,
+                signature = null,
+                ttl = MAX_TTL,
+            )
+            val signed = signPacketBeforeBroadcast(packet)
+            if (signed.signature == null) {
+                Log.w(TAG, "Dropping public voice frame because packet signing failed")
+                return@launch
+            }
+            meshNetwork.broadcast(RoutedPacket(signed))
+        }
+    }
+
     private fun sendNoisePayloadToPeer(payload: NoisePayload, recipientPeerID: String, label: String) {
         scope.launch {
             try {

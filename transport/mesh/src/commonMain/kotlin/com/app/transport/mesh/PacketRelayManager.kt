@@ -140,6 +140,7 @@ internal class PacketRelayManager(
             recipientIsSelf = false,
             isDirectedEncrypted = ridesDirectedPath && isDirected,
             isFragment = mt == MessageType.FRAGMENT,
+            isVoiceFrame = mt == MessageType.VOICE_FRAME,
             isDirectedFragment = mt == MessageType.FRAGMENT && isDirected,
             isHandshake = mt == MessageType.NOISE_HANDSHAKE,
             isAnnounce = mt == MessageType.ANNOUNCE,

@@ -4,34 +4,41 @@ package com.app.transport.mesh
 
 import co.touchlab.stately.concurrency.Lock
 import co.touchlab.stately.concurrency.withLock
+import com.app.common.AppDispatchers
 import com.app.common.utils.Log
 import com.app.crypto.EncryptionService
 import com.app.crypto.identity.PeerFingerprintManager
-import com.app.transport.model.BitchatMessage
-import com.app.transport.model.PeerCapabilities
-import com.app.transport.model.RoutedPacket
-import com.app.transport.protocol.BitchatPacket
-import com.app.transport.sync.GossipSyncManager
-import com.app.common.AppDispatchers
+import com.app.transport.FavoriteNostrLink
+import com.app.transport.GeohashReadReceiptRouter
+import com.app.transport.IncomingMessageSink
 import com.app.transport.MeshConstants
 import com.app.transport.MeshTelemetry
 import com.app.transport.NicknameSource
-import com.app.transport.notification.ServiceNotifier
-import com.app.transport.VerificationService
-import com.app.transport.IncomingMessageSink
-import com.app.transport.FavoriteNostrLink
-import com.app.transport.GeohashReadReceiptRouter
 import com.app.transport.SeenMessageStore
-import com.app.transport.features.file.IncomingFileStore
-import com.app.transport.meshgraph.MeshGraphService
-import com.app.transport.verification.VerifyEventListener
+import com.app.transport.VerificationService
 import com.app.transport.board.BoardEventListener
 import com.app.transport.courier.CourierEventListener
+import com.app.transport.features.file.IncomingFileStore
 import com.app.transport.group.GroupEventListener
+import com.app.transport.meshgraph.MeshGraphService
+import com.app.transport.model.BitchatMessage
+import com.app.transport.model.PeerCapabilities
+import com.app.transport.model.RoutedPacket
+import com.app.transport.notification.ServiceNotifier
 import com.app.transport.prekey.PrekeyEventListener
+import com.app.transport.protocol.BitchatPacket
+import com.app.transport.sync.GossipSyncManager
+import com.app.transport.verification.VerifyEventListener
+import com.app.transport.voice.VoiceFrameEventStream
 import com.app.transport.vouch.VouchEventListener
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlin.concurrent.Volatile
-import kotlinx.coroutines.*
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.ExperimentalTime
@@ -148,6 +155,8 @@ class MeshCoordinator(
     // Sink for prekey bundle events (0x24); the platform-free prekey coordinator attaches itself.
     override var prekeyEventListener: PrekeyEventListener? = null
     private var nostrCarrierHandler: ((ByteArray, String, Boolean) -> Unit)? = null
+    private val voiceFrameEvents = VoiceFrameEventStream()
+    override val publicVoiceFrames = voiceFrameEvents.frames
 
     // Coroutines
     private var serviceScope = CoroutineScope(dispatchers.io + SupervisorJob())
@@ -257,6 +266,8 @@ class MeshCoordinator(
             boardListener = { boardEventListener },
             prekeyListener = { prekeyEventListener },
             nostrCarrierHandler = { nostrCarrierHandler },
+            voiceFrameSink = voiceFrameEvents::emit,
+            nowMillis = { epochMillis() },
         ).wire()
         messageHandler.packetProcessor = packetProcessor
         messageHandler.favoriteNostrLink = favoriteNostrLink
@@ -560,6 +571,8 @@ class MeshCoordinator(
     }
 
     override fun broadcastNostrCarrier(payload: ByteArray) = outbound.broadcastNostrCarrier(payload)
+
+    override fun broadcastVoiceFrame(payload: ByteArray) = outbound.broadcastVoiceFrame(payload)
 
     override fun connectedPeerIDs(): List<String> =
         try { peerManager.getActivePeerIDs() } catch (_: Exception) { emptyList() }

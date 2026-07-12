@@ -24,6 +24,7 @@ import com.app.transport.model.BoardWire
 import com.app.transport.prekey.PrekeyEventListener
 import com.app.transport.verification.VerifyEventListener
 import com.app.transport.vouch.VouchEventListener
+import com.app.transport.voice.PublicVoiceFrame
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -60,6 +61,8 @@ internal class MeshComponentWiring(
     private val boardListener: () -> BoardEventListener?,
     private val prekeyListener: () -> PrekeyEventListener?,
     private val nostrCarrierHandler: () -> ((ByteArray, String, Boolean) -> Unit)?,
+    private val voiceFrameSink: (PublicVoiceFrame) -> Unit,
+    private val nowMillis: () -> Long,
 ) {
 
     companion object {
@@ -482,6 +485,20 @@ internal class MeshComponentWiring(
                 if (!verified) return false
                 try { gossipSyncManager.onPublicPacketSeen(routed.packet) } catch (_: Exception) { }
                 boardListener()?.onBoardPacketReceived(routed.packet.payload)
+                return true
+            }
+
+            override fun handleVoiceFrame(routed: RoutedPacket): Boolean {
+                val fromPeerId = routed.peerID ?: return false
+                val packet = routed.packet
+                val accepted = VoiceFrameIngressPolicy.accepts(packet, nowMillis()) {
+                    val signature = packet.signature ?: return@accepts false
+                    val signingKey = peerManager.getPeerInfo(fromPeerId)?.signingPublicKey ?: return@accepts false
+                    val signingBytes = packet.toBinaryDataForSigning() ?: return@accepts false
+                    encryptionService.verifyEd25519Signature(signature, signingBytes, signingKey)
+                }
+                if (!accepted) return false
+                voiceFrameSink(PublicVoiceFrame(fromPeerId, packet.payload, packet.timestamp.toLong()))
                 return true
             }
 

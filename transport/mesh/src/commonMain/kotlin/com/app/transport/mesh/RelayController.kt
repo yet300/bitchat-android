@@ -30,6 +30,7 @@ internal object RelayController {
         recipientIsSelf: Boolean,
         isDirectedEncrypted: Boolean,
         isFragment: Boolean,
+        isVoiceFrame: Boolean,
         isDirectedFragment: Boolean,
         isHandshake: Boolean,
         isAnnounce: Boolean,
@@ -53,8 +54,9 @@ internal object RelayController {
             return RelayDecision(true, (ttlCap - 1).toUByte())
         }
 
-        // Broadcast fragments: dense graphs clamp harder to contain full-fanout floods.
-        if (isFragment) {
+        // Live voice uses the fragment flood policy: sustained audio needs the same dense-graph
+        // clamp, while sparse paths retain full TTL depth.
+        if (isFragment || isVoiceFrame) {
             val cap = if (degree >= HIGH_DEGREE_THRESHOLD) FRAGMENT_TTL_CAP_DENSE else FRAGMENT_TTL_CAP
             val ttlLimit = minOf(ttlCap, cap)
             if (ttlLimit <= 1) return RelayDecision(false, ttlLimit.toUByte())
