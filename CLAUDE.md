@@ -1,29 +1,264 @@
-# bitMessage (bitchat rewrite) — project rules
+# Project Rules
 
-## Process
-- One iteration = branch `bitMessage/<slug>` → green gate (`:core:*` + `:feature:*` tests, `:shared:assemble`, `:androidApp:testDebugUnitTest`, `:androidApp:assembleDebug`) → `merge --no-ff` into `bitMessage/main`. (The legacy `:app` module was removed in the A–D rewrite; the application module is now `:androidApp`.)
-- Commits and code comments in English. Responses to the user in Russian.
-- `docs/MIGRATION_PLAN.md` and `docs/FEATURE_MAP.md` are deliberately untracked — never `git add` them.
+## General philosophy
+The code should be written for humans first, AI second.
 
-## Architecture
-- Target stack: Decompose + MVIKotlin + Metro DI, Compose Multiplatform (Material3).
-- `:shared` module hosts the CMP UI, integrates all feature/core modules, and owns the DI setup (architecture modeled on the BlockBlast project).
-- Single `@DependencyGraph` per platform; Metro annotations in lower modules are metadata only.
-- Dependency Rule: `:core:domain` (pure KMP) ← `:core:data` ← `:core:transport` / `:core:crypto` / `:core:common`.
-- Navigation: Decompose; prefer `ChildPanels` for list/detail (chats/details) over Activity-based flows.
+Every implementation must prioritize:
 
-## Code rules
-- No Android `Context` and no business logic inside `@Composable` functions.
-- Max 800 lines per file. If a file outgrows that, refactor meaningfully (SOLID, DRY, KISS) — no mechanical splits.
-- Refer to classes by simple names with imports; never fully-qualified names inline in code.
-- Write code comments only for constraints the code can't express.
-- Coroutine dispatchers: never use `Dispatchers.IO` directly (absent on native — breaks commonMain/iOS) and avoid hardcoding `Dispatchers.Default/Main`. Inject `com.app.common.AppDispatchers` (ctor param, defaults to `AppDispatchers()`) and use `dispatchers.io` / `.default` / `.main` / `.unconfined`. commonMain code with no DI seam may reference the `ioDispatcher` expect val. Migrate existing direct `Dispatchers.*` call sites to `AppDispatchers` opportunistically when touching a file.
+- Readability over cleverness.
+- Simplicity over abstraction.
+- Maintainability over short-term speed.
+- Explicitness over magic.
+- Composition over inheritance.
 
-## Hard invariants (do not break)
-- iOS wire compatibility: `BinaryProtocol` BLE bytes, Nostr NIP-01/17 JSON, Noise XX. `BinaryProtocolTest` + `BinaryProtocolGoldenTest` must stay green.
-- Foreground service owns the mesh lifecycle.
-- Never touch `core/crypto/**/southernstorm/`.
-- Do not upgrade dependencies without an explicit request.
+The project should always become easier to understand after every change.
+
+---
+
+# Architecture
+
+## Clean Architecture
+
+Always separate:
+
+- UI
+- Presentation
+- Business Logic
+- Data
+
+Never mix responsibilities.
+
+Business logic must never depend on Compose or Android APIs.
+
+UI must never contain business logic.
+
+Domain should be platform-independent and live inside commonMain whenever possible.
+
+---
+
+# Compose
+
+Composable functions should only describe UI.
+
+Composable functions must NOT:
+
+- perform business logic
+- transform complex data
+- access repositories
+- launch unrelated coroutines
+- contain networking
+- contain database operations
+
+Complex UI should be split into small reusable composables.
+
+Prefer many small composables over one giant screen.
+
+---
+
+# Code Quality
+
+Write code that another developer can understand in under one minute.
+
+Prefer:
+
+- descriptive names
+- short functions
+- early returns
+- immutable state
+- small classes
+
+Avoid:
+
+- nested conditionals
+- huge functions
+- huge classes
+- boolean flags controlling multiple behaviors
+- unnecessary abstractions
+
+Every class should have one responsibility.
+
+Every function should have one clear purpose.
+
+---
+
+# File Size
+
+Target:
+
+- 200–300 lines per file
+
+Soft limit:
+
+- 400 lines
+
+Hard limit:
+
+- 500 lines
+
+If a file grows beyond the soft limit, refactor it.
+
+Never split files mechanically.
+Split only by responsibility.
+
+---
+
+# Refactoring
+
+Leave the codebase cleaner than you found it.
+
+Whenever touching existing code:
+
+- simplify
+- remove duplication
+- improve naming
+- improve structure
+
+Do not introduce technical debt.
+
+---
+
+# Naming
+
+Names should explain intent.
+
+Avoid names like:
+
+- Helper
+- Utils
+- Manager
+- Data
+- Stuff
+
+Prefer domain language.
+
+---
+
+# State
+
+State should have a single source of truth.
+
+State must be immutable.
+
+Avoid mutable shared state.
+
+---
+
+# Dependency Injection
+
+Depend on interfaces, not implementations.
+
+Inject dependencies through constructors.
+
+Never create dependencies inside business classes.
+
+---
+
+# Kotlin
+
+Prefer Kotlin idioms.
+
+Use:
+
+- data classes
+- sealed interfaces/classes
+- extension functions (only when meaningful)
+- value classes where appropriate
+
+Avoid overusing:
+
+- object
+- companion object
+- singleton
+- global mutable state
+
+---
+
+# Coroutines
+
+Never block threads.
+
+Keep suspend functions small.
+
+Use structured concurrency.
+
+Inject dispatchers.
+
+---
+
+# KMP
+
+All shared business logic belongs in commonMain unless platform APIs are required.
+
+Avoid platform-specific code when shared implementation is possible.
+
+---
+
+# Performance
+
+Do not optimize prematurely.
+
+Measure before optimizing.
+
+Avoid unnecessary recompositions.
+
+Avoid unnecessary allocations.
+
+Avoid unnecessary object creation.
+
+---
+
+# Comments
+
+Code should explain itself.
+
+Write comments only when explaining:
+
+- why
+- constraints
+- protocol requirements
+
+Never comment obvious code.
+
+---
+
+# Testing
+
+Business logic should be easily testable.
+
+Architecture should naturally allow unit tests.
+
+Avoid hidden dependencies.
+
+---
+
+# SOLID
+
+Follow:
+
+- SOLID
+- DRY
+- KISS
+- YAGNI
+
+When they conflict, prefer readability.
+
+---
+
+# AI Agent Guidelines
+
+Before writing code ask yourself:
+
+1. Can this be simpler?
+2. Can this be split into smaller pieces?
+3. Would another developer immediately understand it?
+4. Is business logic separated from UI?
+5. Can this be tested?
+6. Is this reusable?
+7. Is this the minimum code required?
+
+If any answer is "No", refactor before finishing.
+
+The final implementation should look like it was written by an experienced software engineer, not generated by AI.
 
 ## Skills
 Project skills live in `.agents/skills/` and are exposed to Claude Code via symlinks in `.claude/skills/` (auto-discovered). Available: decompose-component, decompose-navigation, decompose-compose, mvikotlin-code, metro-di, compose-multiplatform-adaptive-design, mobile-android-design, edge-to-edge (system/), r8-analyzer (performance/). Use them whenever the task touches their domain.
