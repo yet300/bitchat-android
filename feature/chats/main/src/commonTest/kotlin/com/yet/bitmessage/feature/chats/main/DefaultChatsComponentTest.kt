@@ -15,6 +15,8 @@ import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
 import com.arkivanov.decompose.router.slot.ChildSlot
 import com.yet.bitmessage.feature.chats.conversations.connectivity.ConnectivityComponent
 import com.yet.bitmessage.feature.chats.conversations.contacts.ContactsComponent
+import com.yet.bitmessage.feature.chats.conversations.groups.GroupsComponent
+import com.arkivanov.decompose.router.stack.ChildStack
 import com.yet.bitmessage.feature.chats.conversations.search.SearchComponent
 import com.yet.bitmessage.feature.chats.conversations.search.SearchTab
 import com.yet.bitmessage.feature.chats.conversations.settings.NotifPermissionStatus
@@ -36,6 +38,7 @@ class DefaultChatsComponentTest {
         val onSearchRequested: () -> Unit,
         val onContactsRequested: () -> Unit,
         val onSettingsRequested: () -> Unit,
+        val onGroupsRequested: () -> Unit,
     ) : ConversationsComponent {
         override val model: Value<ConversationsComponent.Model> =
             MutableValue(
@@ -52,6 +55,7 @@ class DefaultChatsComponentTest {
         override fun onSearchClicked() = onSearchRequested()
         override fun onContactsClicked() = onContactsRequested()
         override fun onSettingsClicked() = onSettingsRequested()
+        override fun onGroupsClicked() = onGroupsRequested()
         override fun onTogglePin(id: ConversationId) = Unit
         override fun onToggleMute(id: ConversationId) = Unit
         override fun onDismissBanner() = Unit
@@ -146,6 +150,16 @@ class DefaultChatsComponentTest {
         override fun onCloseClicked() = onClose()
     }
 
+    private class FakeGroupsComponent(
+        componentContext: ComponentContext,
+        val onClose: () -> Unit,
+    ) : GroupsComponent, ComponentContext by componentContext {
+        override val stack: Value<ChildStack<*, GroupsComponent.Child>>
+            get() = error("not used in these tests")
+
+        override fun onBackClicked() = Unit
+    }
+
     private class FakeChatComponent(
         config: ChatConfig,
         val onFinished: () -> Unit,
@@ -192,8 +206,8 @@ class DefaultChatsComponentTest {
         val lifecycle = LifecycleRegistry()
         return DefaultChatsComponent(
             componentContext = DefaultComponentContext(lifecycle),
-            conversationsFactory = { _, onSelected, onConnectivity, onSearch, onContacts, onSettings ->
-                FakeConversationsComponent(onSelected, onConnectivity, onSearch, onContacts, onSettings)
+            conversationsFactory = { _, onSelected, onConnectivity, onSearch, onContacts, onSettings, onGroups ->
+                FakeConversationsComponent(onSelected, onConnectivity, onSearch, onContacts, onSettings, onGroups)
             },
             chatFactory = { _: ComponentContext, config: ChatConfig, onFinished: () -> Unit, _ ->
                 FakeChatComponent(config, onFinished)
@@ -206,6 +220,7 @@ class DefaultChatsComponentTest {
                 FakeContactsComponent(onContactSelected, onClose)
             },
             settingsFactory = { _, onClose, _ -> FakeSettingsComponent(onClose) },
+            groupsFactory = { ctx, onClose -> FakeGroupsComponent(ctx, onClose) },
             onOpenMap = {},
             onOpenDebug = {},
         )
@@ -316,6 +331,17 @@ class DefaultChatsComponentTest {
         val component = build()
         component.mainConversations.onSettingsClicked()
         assertIs<ChatsComponent.SheetChild.Settings>(component.sheetSlot.value.child?.instance)
+    }
+
+    @Test
+    fun requesting_groups_opens_the_overlay_and_dismiss_closes_it() {
+        val component = build()
+
+        component.mainConversations.onGroupsClicked()
+        assertIs<ChatsComponent.SheetChild.Groups>(component.sheetSlot.value.child?.instance)
+
+        component.onDismissSheet()
+        assertNull(component.sheetSlot.value.child)
     }
 
     @Test

@@ -9,6 +9,7 @@ import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.backhandler.BackHandlerOwner
 import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
 import com.yet.bitmessage.feature.chats.conversations.connectivity.ConnectivityComponent
+import com.yet.bitmessage.feature.chats.conversations.groups.GroupsComponent
 import com.yet.bitmessage.feature.chats.conversations.contacts.ContactsComponent
 import com.yet.bitmessage.feature.chats.conversations.search.SearchComponent
 import com.yet.bitmessage.feature.chats.conversations.settings.SettingsComponent
@@ -50,6 +51,7 @@ interface ChatsComponent : BackHandlerOwner {
         class Search(val component: SearchComponent) : SheetChild
         class Contacts(val component: ContactsComponent) : SheetChild
         class Settings(val component: SettingsComponent) : SheetChild
+        class Groups(val component: GroupsComponent) : SheetChild
     }
 
     fun interface Factory {

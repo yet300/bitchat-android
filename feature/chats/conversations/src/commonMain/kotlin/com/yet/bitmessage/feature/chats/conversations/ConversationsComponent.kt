@@ -31,6 +31,9 @@ interface ConversationsComponent {
     /** Open the settings screen (hosted as a slot by the parent). */
     fun onSettingsClicked()
 
+    /** Open the private-groups screen (hosted as a slot by the parent). */
+    fun onGroupsClicked()
+
     fun onTogglePin(id: ConversationId)
 
     fun onToggleMute(id: ConversationId)
@@ -62,6 +65,7 @@ interface ConversationsComponent {
             onSearchRequested: () -> Unit,
             onContactsRequested: () -> Unit,
             onSettingsRequested: () -> Unit,
+            onGroupsRequested: () -> Unit,
         ): ConversationsComponent
     }
 }

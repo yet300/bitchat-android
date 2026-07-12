@@ -6,6 +6,12 @@ import com.yet.bitmessage.feature.chats.conversations.connectivity.ConnectivityC
 import com.yet.bitmessage.feature.chats.conversations.connectivity.DefaultConnectivityComponentFactory
 import com.yet.bitmessage.feature.chats.conversations.contacts.ContactsComponent
 import com.yet.bitmessage.feature.chats.conversations.contacts.DefaultContactsComponentFactory
+import com.yet.bitmessage.feature.chats.conversations.groups.DefaultGroupsComponentFactory
+import com.yet.bitmessage.feature.chats.conversations.groups.GroupsComponent
+import com.yet.bitmessage.feature.chats.conversations.groups.chat.DefaultGroupChatComponentFactory
+import com.yet.bitmessage.feature.chats.conversations.groups.chat.GroupChatComponent
+import com.yet.bitmessage.feature.chats.conversations.groups.list.DefaultGroupListComponentFactory
+import com.yet.bitmessage.feature.chats.conversations.groups.list.GroupListComponent
 import com.yet.bitmessage.feature.chats.conversations.search.DefaultSearchComponentFactory
 import com.yet.bitmessage.feature.chats.conversations.search.SearchComponent
 import com.yet.bitmessage.feature.chats.conversations.settings.DefaultSettingsComponentFactory
@@ -32,4 +38,13 @@ abstract class ConversationsBindings {
 
     @Binds
     internal abstract val DefaultSettingsComponentFactory.bindSettingsComponentFactory: SettingsComponent.Factory
+
+    @Binds
+    internal abstract val DefaultGroupsComponentFactory.bindGroupsComponentFactory: GroupsComponent.Factory
+
+    @Binds
+    internal abstract val DefaultGroupListComponentFactory.bindGroupListComponentFactory: GroupListComponent.Factory
+
+    @Binds
+    internal abstract val DefaultGroupChatComponentFactory.bindGroupChatComponentFactory: GroupChatComponent.Factory
 }
