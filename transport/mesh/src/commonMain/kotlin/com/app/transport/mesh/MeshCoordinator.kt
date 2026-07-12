@@ -541,7 +541,12 @@ class MeshCoordinator(
     override fun connectedPeerIDs(): List<String> =
         try { peerManager.getActivePeerIDs() } catch (_: Exception) { emptyList() }
 
-    override fun sendBroadcastAnnounce() = outbound.sendBroadcastAnnounce()
+    override fun sendBroadcastAnnounce() {
+        outbound.sendBroadcastAnnounce()
+        // Piggyback our prekey bundle on presence like the reference (the coordinator throttles the
+        // actual re-broadcast), so a peer that joins after our last publish still learns our bundle.
+        try { prekeyEventListener?.onAnnounceBroadcast() } catch (_: Exception) { }
+    }
 
     override fun sendAnnouncementToPeer(peerID: String) = outbound.sendAnnouncementToPeer(peerID)
 

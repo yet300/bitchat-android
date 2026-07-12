@@ -29,4 +29,11 @@ interface PrekeyEventListener {
      * peers replace their cached copy and stop assigning the consumed id before the grace lapses.
      */
     fun onLocalPrekeyConsumed()
+
+    /**
+     * A broadcast announce just went out. The coordinator (re)publishes our prekey bundle alongside
+     * it — throttled — so late-joining peers learn our bundle. Mirrors the reference, which sends its
+     * bundle from inside the announce path.
+     */
+    fun onAnnounceBroadcast()
 }

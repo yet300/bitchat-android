@@ -103,6 +103,12 @@ class PrekeyCoordinator(
         }
     }
 
+    override fun onAnnounceBroadcast() {
+        // Throttled re-publish alongside presence; the throttle keeps announces (every ~30s) from
+        // flooding the mesh with bundle re-broadcasts.
+        scope.launch { publishBundle(force = false) }
+    }
+
     // MARK: - Publish
 
     /** Builds, signs and broadcasts our current bundle. Unforced sends obey [REBROADCAST_MS]. */
