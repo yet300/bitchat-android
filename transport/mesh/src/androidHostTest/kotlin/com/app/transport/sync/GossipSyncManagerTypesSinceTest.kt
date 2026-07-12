@@ -28,6 +28,12 @@ import kotlin.time.Clock
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class GossipSyncManagerTypesSinceTest {
+    private val initialSyncTypes = SyncTypeFlags.publicMessages
+        .union(SyncTypeFlags.groupMessage)
+        .union(SyncTypeFlags.fragment)
+        .union(SyncTypeFlags.fileTransfer)
+        .union(SyncTypeFlags.prekeyBundle)
+        .union(SyncTypeFlags.boardPost)
 
     private class RecordingDelegate : GossipSyncManager.Delegate {
         val broadcasts = mutableListOf<BitchatPacket>()
@@ -95,7 +101,7 @@ class GossipSyncManagerTypesSinceTest {
         assertEquals(1, delegate.unicasts.size)
         val req = RequestSyncPacket.decode(delegate.unicasts[0].second.payload)
         assertNotNull(req)
-        assertEquals(SyncTypeFlags.publicMessages, req!!.types)
+        assertEquals(initialSyncTypes, req!!.types)
         assertNull("small store fully covered -> no cursor", req.sinceTimestamp)
     }
 
@@ -114,7 +120,7 @@ class GossipSyncManagerTypesSinceTest {
         assertEquals(1, delegate.unicasts.size)
         val req = RequestSyncPacket.decode(delegate.unicasts[0].second.payload)
         assertNotNull(req)
-        assertEquals(SyncTypeFlags.publicMessages, req!!.types)
+        assertEquals(initialSyncTypes, req!!.types)
         val since = req.sinceTimestamp
         assertNotNull("filter cannot cover 100 candidates -> cursor must be set", since)
 
@@ -181,5 +187,30 @@ class GossipSyncManagerTypesSinceTest {
         )
         assertEquals(1, delegate.unicasts.size)
         assertEquals(MessageType.ANNOUNCE.value, delegate.unicasts[0].second.type)
+    }
+
+    @Test
+    fun typedRequestReturnsOnlyTheRequestedArchiveWithSinceCursor() = runTest {
+        val delegate = RecordingDelegate()
+        val manager = manager(delegate)
+        val base = 5_000_000L
+        fun group(index: Int) = BitchatPacket(
+            type = MessageType.GROUP_MESSAGE.value,
+            senderID = ByteArray(8) { 0x21 },
+            timestamp = (base + index * 1_000L).toULong(),
+            payload = byteArrayOf(index.toByte()),
+            ttl = 7u,
+        )
+        manager.onPublicPacketSeen(group(0))
+        manager.onPublicPacketSeen(group(1))
+        manager.onPublicPacketSeen(message(1, base + 9_000L))
+
+        manager.handleRequestSync(
+            "aaaabbbbccccdddd",
+            RequestSyncPacket(7, 1, ByteArray(0), types = SyncTypeFlags.groupMessage, sinceTimestamp = base + 1_000L),
+        )
+
+        assertEquals(listOf(MessageType.GROUP_MESSAGE.value), delegate.unicasts.map { it.second.type })
+        assertEquals(base + 1_000L, delegate.unicasts.single().second.timestamp.toLong())
     }
 }

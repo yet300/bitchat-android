@@ -624,8 +624,9 @@ internal class MeshComponentWiring(
             override fun handlePrekeyBundle(routed: RoutedPacket) {
                 // Hand the raw broadcast to the coordinator for attribution + signature verification
                 // and caching. The generic relay step runs regardless (bundles must spread even
-                // before this node can verify them). Gossip backfill is not tracked here: like board
-                // posts in this port, bundles propagate by broadcast + relay, not GCS diff.
+                // before this node can verify them). Keep the original packet for typed GCS replay;
+                // the prekey coordinator remains the signature-verification authority for persistence.
+                try { gossipSyncManager.onPublicPacketSeen(routed.packet) } catch (_: Exception) { }
                 prekeyListener()?.onPrekeyBundleReceived(routed.packet)
             }
         }
