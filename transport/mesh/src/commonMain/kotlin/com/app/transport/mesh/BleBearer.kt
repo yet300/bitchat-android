@@ -49,6 +49,7 @@ class BleBearer(
 
     // Survives reset(): the new radio stack must inherit the current foreground state.
     private var meshServiceActive: Boolean = false
+    private var appIsActive: Boolean = true
 
     /**
      * The platform radio stack. Replaced in place by [reset]; the BleBearer object keeps its graph
@@ -171,6 +172,7 @@ class BleBearer(
         wireConnectionManager()
         nicknameResolver?.let { connectionManager.setNicknameResolver(it) }
         connectionManager.setMeshServiceActive(meshServiceActive)
+        connectionManager.setAppIsActive(appIsActive)
     }
 
     override fun start(): Boolean = connectionManager.startServices()
@@ -191,6 +193,12 @@ class BleBearer(
     fun setMeshServiceActive(active: Boolean) {
         meshServiceActive = active
         connectionManager.setMeshServiceActive(active)
+    }
+
+    /** Signals process foreground activity to the platform scan-duty policy. */
+    fun setAppIsActive(active: Boolean) {
+        appIsActive = active
+        connectionManager.setAppIsActive(active)
     }
 
     // BleDebugHandle (debug sheet only)

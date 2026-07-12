@@ -114,6 +114,9 @@ internal class CoreBluetoothCentralPolicy(
         scheduler.reset()
     }
 
+    /** Re-evaluate immediately when UIKit reports an active/background transition. */
+    fun onAppActivityChanged() = applyScanDuty()
+
     private fun issueConnect(peripheralID: String) {
         scheduler.recordConnectionAttempt(nowMs())
         ops.connect(peripheralID)

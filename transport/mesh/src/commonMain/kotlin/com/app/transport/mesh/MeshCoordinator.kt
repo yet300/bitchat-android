@@ -508,6 +508,7 @@ class MeshCoordinator(
     override val isMeshActive: Boolean get() = isActive
     override fun activePeerCount(): Int = getActivePeerCount()
     override fun setMeshServiceActive(active: Boolean) = bleBearer.setMeshServiceActive(active)
+    override fun setAppIsActive(active: Boolean) = bleBearer.setAppIsActive(active)
 
     // MARK: - Outbound messaging (delegated to MeshOutboundSender)
 
