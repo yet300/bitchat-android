@@ -5,6 +5,7 @@ import com.app.transport.debug.DebugConfigStore
 import com.app.transport.net.TorConfigStore
 import com.app.transport.net.TorMode
 import com.app.transport.nostr.NostrConfigStore
+import com.app.transport.mesh.GatewayConfigStore
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -37,6 +38,19 @@ internal object TransportConfigKeys {
     const val SEEN_PACKET_CAPACITY = "seen_packet_capacity"
     const val GCS_MAX_FILTER_BYTES = "gcs_max_filter_bytes"
     const val GCS_FILTER_FPR_PERCENT = "gcs_filter_fpr_percent"
+    const val GATEWAY_USER_ENABLED = "gateway.userEnabled"
+}
+
+@SingleIn(AppScope::class)
+@Inject
+internal class SettingsGatewayConfigStore(
+    private val settings: SettingsStore,
+) : GatewayConfigStore {
+    override fun isGatewayEnabled(): Boolean =
+        settings.getBoolean(TransportConfigKeys.GATEWAY_USER_ENABLED, false)
+
+    override fun setGatewayEnabled(enabled: Boolean) =
+        settings.putBoolean(TransportConfigKeys.GATEWAY_USER_ENABLED, enabled)
 }
 
 @SingleIn(AppScope::class)

@@ -7,6 +7,11 @@ import com.app.transport.nostr.NostrProtocol
 import com.app.transport.nostr.NostrRelayManager
 import com.app.transport.nostr.PoWPreferenceManager
 import com.app.transport.nostr.RelayDirectory
+import com.app.transport.mesh.MeshService
+import com.app.transport.MeshTelemetry
+import com.app.transport.mesh.NostrGatewaySender
+import com.app.transport.model.PeerCapabilities
+import com.app.data.gateway.GatewayRuntime
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -29,10 +34,23 @@ class GeohashMessageSender(
     private val relayDirectory: RelayDirectory,
     private val nostrIdentityBridge: NostrIdentityBridge,
     private val powPreferenceManager: PoWPreferenceManager,
+    private val meshService: MeshService,
+    private val telemetry: MeshTelemetry,
+    @Suppress("UNUSED_PARAMETER") gatewayRuntime: GatewayRuntime,
     dispatchers: AppDispatchers,
 ) {
 
     private val scope = CoroutineScope(dispatchers.io + SupervisorJob())
+    private val gatewaySender = NostrGatewaySender(
+        relaysConnected = { relayManager.isConnected.value },
+        gatewayPeers = {
+            meshService.connectedPeerIDs().filter { peerId ->
+                meshService.getPeerInfo(peerId)?.capabilities?.contains(PeerCapabilities.GATEWAY) == true
+            }
+        },
+        sendDirected = meshService::sendNostrCarrier,
+        telemetry = telemetry::onGatewayEvent,
+    )
 
     fun sendPublic(content: String, geohash: String, nickname: String?) {
         scope.launch {
@@ -46,6 +64,7 @@ class GeohashMessageSender(
                     nickname = nickname,
                 )
                 relayManager.sendEventToGeohash(event, geohash, relayDirectory)
+                gatewaySender.uplink(event.id, event.toJsonString().encodeToByteArray(), geohash)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send geohash message to #$geohash: ${e.message}")
             }

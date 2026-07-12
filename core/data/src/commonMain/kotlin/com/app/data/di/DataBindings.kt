@@ -5,6 +5,10 @@ import com.app.common.encoding.hexEncodedString
 import com.app.common.settings.SettingsStore
 import com.app.data.transportconfig.SettingsDebugConfigStore
 import com.app.data.transportconfig.SettingsNostrConfigStore
+import com.app.data.transportconfig.SettingsGatewayConfigStore
+import com.app.transport.mesh.GatewayConfigStore
+import com.app.data.gateway.GatewayRepositoryImpl
+import com.app.domain.repository.GatewayRepository
 import com.app.data.transportconfig.SettingsTorConfigStore
 import com.app.transport.debug.DebugConfigStore
 import com.app.transport.net.TorConfigStore
@@ -128,6 +132,12 @@ abstract class DataBindings {
 
     @Binds
     internal abstract val SettingsDebugConfigStore.bindDebugConfigStore: DebugConfigStore
+
+    @Binds
+    internal abstract val SettingsGatewayConfigStore.bindGatewayConfigStore: GatewayConfigStore
+
+    @Binds
+    internal abstract val GatewayRepositoryImpl.bindGatewayRepository: GatewayRepository
 
     @Binds
     internal abstract val SettingsRepositoryImpl.bindSettings: SettingsRepository

@@ -4,12 +4,14 @@ import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
 import com.app.transport.protocol.SpecialRecipients
+import com.app.transport.model.FragmentPayload
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Pins the queued directed-send path (SYNC_SCALE P2): a RoutedPacket carrying
@@ -109,5 +111,36 @@ class BleSendCoreDirectedQueueTest {
             BleOutboundPriority.OWN_HIGH,
             BleOutboundPriority.of(RoutedPacket(storedBroadcast())),
         )
+    }
+
+    @Test
+    fun `large directed nostr carrier is fragmented and every fragment stays on target link`() = runTest {
+        val core = core()
+        var prng = 0x13579BDF
+        val carrier = BitchatPacket(
+            type = MessageType.NOSTR_CARRIER.value,
+            senderID = ByteArray(8) { 0x44 },
+            recipientID = PEER_SRV_2.chunked(2).map { it.toInt(16).toByte() }.toByteArray(),
+            timestamp = 1_700_000_000_000uL,
+            // Incompressible deterministic payload: a real signed Nostr JSON may not shrink
+            // enough for the transport compressor to cross the BLE fragmentation threshold.
+            payload = ByteArray(1_200) {
+                prng = prng * 1_103_515_245 + 12_345
+                (prng ushr 16).toByte()
+            },
+            ttl = 7u,
+        )
+
+        core.broadcastPacket(RoutedPacket(carrier, directedPeerID = PEER_SRV_2))
+        advanceUntilIdle()
+
+        assertTrue(radio.emissions.size > 1)
+        assertEquals(setOf(ADDR_SRV_2), radio.emissions.map { it.first }.toSet())
+        radio.emissions.forEach { (_, frame) ->
+            val fragment = BitchatPacket.fromBinaryData(frame)!!
+            assertEquals(MessageType.FRAGMENT.value, fragment.type)
+            assertEquals(MessageType.NOSTR_CARRIER.value, FragmentPayload.decode(fragment.payload)!!.originalType)
+        }
+        core.shutdown()
     }
 }

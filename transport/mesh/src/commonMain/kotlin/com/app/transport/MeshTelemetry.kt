@@ -99,6 +99,8 @@ interface MeshTrafficLog {
      * no-op; debug telemetry can count these so hostile floods become observable.
      */
     fun onRateLimitDrop(limiter: String) {}
+
+    fun onGatewayEvent(event: String, reason: String? = null) {}
 }
 
 /**

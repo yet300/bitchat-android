@@ -7,6 +7,7 @@ import com.app.transport.debug.DebugPreferenceManager
 import com.app.transport.features.file.IncomingFileStore
 import com.app.transport.mesh.BleBearer
 import com.app.transport.mesh.FragmentManager
+import com.app.transport.mesh.GatewayConfigStore
 import com.app.transport.mesh.MeshBearer
 import com.app.transport.mesh.MeshCoordinator
 import com.app.transport.mesh.MeshLifecycleController
@@ -92,6 +93,7 @@ class MeshTransportConfig(
     val stores: MeshStores,
     val bearers: (MeshBearerScope) -> MeshBearers,
     val meshGraphService: MeshGraphService,
+    val gatewayConfigStore: GatewayConfigStore,
     val dispatchers: AppDispatchers = AppDispatchers(),
 )
 
@@ -146,6 +148,7 @@ class MeshTransport private constructor(
                 fragmentManager = fragmentManager,
                 bleBearer = built.primary,
                 meshNetwork = meshNetwork,
+                gatewayConfigStore = config.gatewayConfigStore,
                 dispatchers = config.dispatchers,
             )
             return MeshTransport(coordinator, fragmentManager, meshNetwork, transferProgressManager)
