@@ -449,6 +449,21 @@ internal class MeshOutboundSender(
         }
     }
 
+    fun sendNostrCarrier(payload: ByteArray, toPeerID: String): Boolean {
+        if (payload.isEmpty()) return false
+        val packet = BitchatPacket(
+            version = 1u,
+            type = MessageType.NOSTR_CARRIER.value,
+            senderID = peerIdToRoutingBytes(myPeerID),
+            recipientID = peerIdToRoutingBytes(toPeerID),
+            timestamp = epochMillis().toULong(),
+            payload = payload,
+            signature = null,
+            ttl = MAX_TTL,
+        )
+        return meshNetwork.sendToPeer(toPeerID, RoutedPacket(packet)) != SendPath.NoRoute
+    }
+
     private fun sendNoisePayloadToPeer(payload: NoisePayload, recipientPeerID: String, label: String) {
         scope.launch {
             try {

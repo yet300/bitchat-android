@@ -28,7 +28,10 @@ enum class MessageType(val value: UByte) {
 
     // Mesh diagnostics: directed, unsigned, unencrypted echo probe/reply (MeshPingPayload).
     PING(0x26u),
-    PONG(0x27u);
+    PONG(0x27u),
+
+    // Complete signed Nostr event ferried between mesh-only and internet gateway peers.
+    NOSTR_CARRIER(0x28u);
 
     companion object {
         fun fromValue(value: UByte): MessageType? {

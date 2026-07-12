@@ -538,6 +538,9 @@ class MeshCoordinator(
     override fun sendPrekeyBundle(payload: ByteArray) =
         outbound.sendPrekeyBundle(payload)
 
+    override fun sendNostrCarrier(payload: ByteArray, toPeerID: String): Boolean =
+        outbound.sendNostrCarrier(payload, toPeerID)
+
     override fun connectedPeerIDs(): List<String> =
         try { peerManager.getActivePeerIDs() } catch (_: Exception) { emptyList() }
 

@@ -140,4 +140,7 @@ interface MeshService {
      * primary authenticity gate and survives multi-hop relay + rebroadcast.
      */
     fun sendPrekeyBundle(payload: ByteArray)
+
+    /** Sends an unsigned directed 0x28 carrier; the enclosed Nostr event is self-authenticating. */
+    fun sendNostrCarrier(payload: ByteArray, toPeerID: String): Boolean = false
 }
