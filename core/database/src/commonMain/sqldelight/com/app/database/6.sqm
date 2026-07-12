@@ -1,0 +1,17 @@
+-- Migration v6 -> v7: add the one-time prekey bundle tables (verified peer bundles, 0x24).
+-- Existing installs keep their data; this only adds the new tables. Fresh installs get them from
+-- Prekey.sq via Schema.create instead. The two definitions must stay identical.
+CREATE TABLE prekey_bundle (
+    noise_key    BLOB    NOT NULL PRIMARY KEY,
+    generated_at INTEGER NOT NULL,
+    updated_at   INTEGER NOT NULL
+);
+
+CREATE TABLE prekey_bundle_key (
+    noise_key           BLOB    NOT NULL,
+    prekey_id           INTEGER NOT NULL,
+    public_key          BLOB    NOT NULL,
+    used                INTEGER NOT NULL DEFAULT 0,
+    assigned_message_id TEXT,
+    PRIMARY KEY (noise_key, prekey_id)
+);

@@ -6,11 +6,13 @@ import com.app.common.AppDispatchers
 import com.app.crypto.EncryptionService
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.database.dao.CourierTier
+import com.app.database.dao.PrekeyBundleDao
 import com.app.transport.courier.CourierEventListener
 import com.app.transport.mesh.MeshService
 import com.app.transport.model.CourierEnvelope
 import com.app.transport.model.NoisePayload
 import com.app.transport.model.NoisePayloadType
+import com.app.transport.model.PeerCapabilities
 import com.app.transport.model.PrivateMessagePacket
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.routing.CourierDepositor
@@ -48,6 +50,7 @@ class CourierCoordinator(
     private val encryption: EncryptionService,
     private val favoritesService: FavoritesPersistenceService,
     private val courierStore: CourierStore,
+    private val prekeyBundleDao: PrekeyBundleDao,
     dispatchers: AppDispatchers,
 ) : CourierEventListener, CourierDepositor {
 
@@ -130,14 +133,19 @@ class CourierCoordinator(
         if (courierPeerIDs.isEmpty()) return false
         val pmBytes = PrivateMessagePacket(messageID, content).encode() ?: return false
         val typedPayload = NoisePayload(NoisePayloadType.PRIVATE_MESSAGE, pmBytes).encode()
-        val sealed = encryption.sealCourierPayload(typedPayload, recipientNoiseKey) ?: return false
+
+        // When a verified, unexpired one-time prekey bundle is cached for the recipient, seal to one
+        // of its prekeys (forward secret, envelope v2); otherwise fall back to their static key
+        // (one-way Noise X, v1). One prekey per message id regardless of courier count.
+        val sealed = sealForRecipient(messageID, typedPayload, recipientNoiseKey) ?: return false
 
         val now = nowMs()
         val envelope = CourierEnvelope(
             recipientTag = CourierEnvelope.recipientTag(recipientNoiseKey, CourierEnvelope.epochDay(now / 1000)),
             expiry = (now + CourierEnvelope.MAX_LIFETIME_SECONDS * 1000).toULong(),
-            ciphertext = sealed,
+            ciphertext = sealed.ciphertext,
             copies = INITIAL_COPIES,
+            prekeyID = sealed.prekeyID,
         )
         val payload = envelope.encode() ?: return false
         for (courier in courierPeerIDs) {
@@ -145,6 +153,42 @@ class CourierCoordinator(
         }
         return true
     }
+
+    private class SealedCiphertext(val ciphertext: ByteArray, val prekeyID: UInt?)
+
+    /**
+     * Seal [typedPayload] for [recipientNoiseKey], choosing envelope v2 (a cached one-time prekey,
+     * forward secret) when one is available and not vetoed, else v1 (static-sealed). The `.prekeys`
+     * capability is only a veto for peers we currently see on the mesh: an on-mesh peer that does not
+     * advertise it forces v1, while unknown/offline recipients rely purely on a cached fresh bundle
+     * (a bundle can outlive a peer's downgrade to a build without prekey support).
+     */
+    private suspend fun sealForRecipient(
+        messageID: String,
+        typedPayload: ByteArray,
+        recipientNoiseKey: ByteArray,
+    ): SealedCiphertext? {
+        val onMesh = peerInfoForNoiseKey(recipientNoiseKey)
+        val vetoed = onMesh != null && !onMesh.capabilities.contains(PeerCapabilities.PREKEYS)
+        if (!vetoed) {
+            val prekey = prekeyBundleDao.assignPrekey(messageID, recipientNoiseKey, nowMs())
+            if (prekey != null) {
+                val sealed = encryption.sealPrekeyPayload(typedPayload, prekey.id, prekey.publicKey)
+                if (sealed != null) return SealedCiphertext(sealed, prekey.id)
+            }
+        }
+        val sealed = encryption.sealCourierPayload(typedPayload, recipientNoiseKey) ?: return null
+        return SealedCiphertext(sealed, prekeyID = null)
+    }
+
+    private fun peerInfoForNoiseKey(noiseKey: ByteArray) =
+        try {
+            meshService.connectedPeerIDs()
+                .mapNotNull { meshService.getPeerInfo(it) }
+                .firstOrNull { it.noisePublicKey?.contentEquals(noiseKey) == true }
+        } catch (_: Exception) {
+            null
+        }
 
     /**
      * Last-resort deposit from the route selector: the recipient could not be routed, so seal the

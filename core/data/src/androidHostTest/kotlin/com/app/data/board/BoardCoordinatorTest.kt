@@ -137,6 +137,8 @@ class BoardCoordinatorTest {
         var onBroadcast: (ByteArray) -> Unit = {}
         override var boardEventListener: BoardEventListener? = null
         override fun sendBoardPayload(payload: ByteArray) = onBroadcast(payload)
+        override var prekeyEventListener: com.app.transport.prekey.PrekeyEventListener? = null
+        override fun sendPrekeyBundle(payload: ByteArray) = Unit
 
         override var vouchEventListener: VouchEventListener? = null
         override var verifyEventListener: VerifyEventListener? = null

@@ -1,0 +1,72 @@
+-- Verified one-time prekey bundles received from other peers (MessageType 0x24, PrekeyBundle).
+-- One bundle per owner Noise static key: a strictly newer generated_at replaces the cached copy,
+-- keeping the prekey IDs this device already sealed with marked used so a prekey is never reused
+-- across messages. Assignments are remembered per message ID so deposit retries of the same message
+-- re-use its prekey (and its copy budget) instead of burning a fresh one per courier.
+--
+-- Only PUBLIC key material lives here (our own one-time PRIVATE prekeys live behind the secure
+-- key-value seam, next to the identity keys). Persisted so a sender can prekey-seal for recipients
+-- met long ago; the encrypted database's panic wipe covers it transitively.
+CREATE TABLE prekey_bundle (
+    -- Owner's Noise static public key (32 bytes).
+    noise_key    BLOB    NOT NULL PRIMARY KEY,
+    -- ms since epoch the owner generated this bundle; strictly newer replaces.
+    generated_at INTEGER NOT NULL,
+    -- ms since epoch of the last local touch (ingest or assignment); LRU eviction key.
+    updated_at   INTEGER NOT NULL
+);
+
+CREATE TABLE prekey_bundle_key (
+    -- Owner's Noise static public key (32 bytes); rows live and die with their prekey_bundle row.
+    noise_key           BLOB    NOT NULL,
+    -- Owner-assigned sequential prekey id (u32).
+    prekey_id           INTEGER NOT NULL,
+    -- One-time Curve25519 public prekey (32 bytes).
+    public_key          BLOB    NOT NULL,
+    -- 1 once this device sealed a message to this prekey (never reused).
+    used                INTEGER NOT NULL DEFAULT 0,
+    -- Message ID this prekey was assigned to, so re-deposits share one prekey.
+    assigned_message_id TEXT,
+    PRIMARY KEY (noise_key, prekey_id)
+);
+
+selectBundle:
+SELECT * FROM prekey_bundle WHERE noise_key = ?;
+
+selectAllBundles:
+SELECT * FROM prekey_bundle ORDER BY updated_at ASC;
+
+countBundles:
+SELECT COUNT(*) FROM prekey_bundle;
+
+selectKeys:
+SELECT * FROM prekey_bundle_key WHERE noise_key = ? ORDER BY prekey_id ASC;
+
+insertBundle:
+INSERT INTO prekey_bundle(noise_key, generated_at, updated_at) VALUES (?, ?, ?);
+
+updateBundle:
+UPDATE prekey_bundle SET generated_at = :generatedAt, updated_at = :updatedAt WHERE noise_key = :noiseKey;
+
+touchBundle:
+UPDATE prekey_bundle SET updated_at = :updatedAt WHERE noise_key = :noiseKey;
+
+insertKey:
+INSERT INTO prekey_bundle_key(noise_key, prekey_id, public_key, used, assigned_message_id)
+VALUES (?, ?, ?, ?, ?);
+
+markKeyUsed:
+UPDATE prekey_bundle_key SET used = 1, assigned_message_id = :messageId
+WHERE noise_key = :noiseKey AND prekey_id = :prekeyId;
+
+deleteKeysForBundle:
+DELETE FROM prekey_bundle_key WHERE noise_key = ?;
+
+deleteBundle:
+DELETE FROM prekey_bundle WHERE noise_key = ?;
+
+deleteAllBundles:
+DELETE FROM prekey_bundle;
+
+deleteAllKeys:
+DELETE FROM prekey_bundle_key;

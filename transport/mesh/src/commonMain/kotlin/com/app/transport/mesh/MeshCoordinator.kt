@@ -28,6 +28,7 @@ import com.app.transport.verification.VerifyEventListener
 import com.app.transport.board.BoardEventListener
 import com.app.transport.courier.CourierEventListener
 import com.app.transport.group.GroupEventListener
+import com.app.transport.prekey.PrekeyEventListener
 import com.app.transport.vouch.VouchEventListener
 import kotlin.concurrent.Volatile
 import kotlinx.coroutines.*
@@ -142,6 +143,9 @@ class MeshCoordinator(
     // Sink for board events (0x23); the platform-free board coordinator attaches itself.
     override var boardEventListener: BoardEventListener? = null
 
+    // Sink for prekey bundle events (0x24); the platform-free prekey coordinator attaches itself.
+    override var prekeyEventListener: PrekeyEventListener? = null
+
     // Coroutines
     private var serviceScope = CoroutineScope(dispatchers.io + SupervisorJob())
     // Tracks whether the current component generation was terminated via stopServices()
@@ -247,6 +251,7 @@ class MeshCoordinator(
             courierListener = { courierEventListener },
             groupListener = { groupEventListener },
             boardListener = { boardEventListener },
+            prekeyListener = { prekeyEventListener },
         ).wire()
         messageHandler.packetProcessor = packetProcessor
         messageHandler.favoriteNostrLink = favoriteNostrLink
@@ -530,10 +535,18 @@ class MeshCoordinator(
     override fun sendBoardPayload(payload: ByteArray) =
         outbound.sendBoardPayload(payload)
 
+    override fun sendPrekeyBundle(payload: ByteArray) =
+        outbound.sendPrekeyBundle(payload)
+
     override fun connectedPeerIDs(): List<String> =
         try { peerManager.getActivePeerIDs() } catch (_: Exception) { emptyList() }
 
-    override fun sendBroadcastAnnounce() = outbound.sendBroadcastAnnounce()
+    override fun sendBroadcastAnnounce() {
+        outbound.sendBroadcastAnnounce()
+        // Piggyback our prekey bundle on presence like the reference (the coordinator throttles the
+        // actual re-broadcast), so a peer that joins after our last publish still learns our bundle.
+        try { prekeyEventListener?.onAnnounceBroadcast() } catch (_: Exception) { }
+    }
 
     override fun sendAnnouncementToPeer(peerID: String) = outbound.sendAnnouncementToPeer(peerID)
 

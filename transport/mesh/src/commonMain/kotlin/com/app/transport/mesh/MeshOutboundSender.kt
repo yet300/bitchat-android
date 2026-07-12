@@ -423,6 +423,32 @@ internal class MeshOutboundSender(
         }
     }
 
+    // MARK: One-time prekey bundles (0x24 broadcast)
+
+    /**
+     * Broadcast a signed prekey bundle (0x24) as a public packet. Signed so receivers can verify the
+     * outer packet against the owner's announce-bound signing key (defeating replay under a spoofed
+     * sender); the inner bundle signature is the primary gate and survives multi-hop relay.
+     */
+    fun sendPrekeyBundle(payload: ByteArray) {
+        if (payload.isEmpty()) return
+        scope.launch {
+            val packet = BitchatPacket(
+                version = 1u,
+                type = MessageType.PREKEY_BUNDLE.value,
+                senderID = peerIdToRoutingBytes(myPeerID),
+                recipientID = SpecialRecipients.BROADCAST,
+                timestamp = epochMillis().toULong(),
+                payload = payload,
+                signature = null,
+                ttl = MAX_TTL,
+            )
+            val signed = signPacketBeforeBroadcast(packet)
+            meshNetwork.broadcast(RoutedPacket(signed))
+            Log.d(TAG, "🔑 Broadcast prekey bundle (${payload.size} bytes)")
+        }
+    }
+
     private fun sendNoisePayloadToPeer(payload: NoisePayload, recipientPeerID: String, label: String) {
         scope.launch {
             try {

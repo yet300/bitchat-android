@@ -9,6 +9,7 @@ import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.secure.SecureKeyValueStore
 import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.crypto.noise.NoiseEncryptionService
+import com.app.crypto.prekey.PublicPrekey
 import com.app.crypto.sign.Ed25519
 
 /**
@@ -149,6 +150,49 @@ open class EncryptionService(
         }
     }
 
+    // MARK: - One-Time Prekey Envelopes (forward-secret Noise X, envelope v2)
+
+    /**
+     * Seal [payload] to one of a recipient's gossiped one-time prekeys — forward-secret courier
+     * envelope v2. The prologue is bound to [recipientPrekeyID] so a ciphertext cannot be replayed
+     * against a different prekey. Returns null on failure.
+     */
+    fun sealPrekeyPayload(payload: ByteArray, recipientPrekeyID: UInt, recipientPrekey: ByteArray): ByteArray? {
+        return try {
+            noiseService.sealPrekeyPayload(payload, recipientPrekeyID, recipientPrekey)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to seal prekey envelope: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * Open a courier envelope v2 sealed to one of our one-time prekeys, consuming the prekey (48h
+     * redelivery grace). Returns the payload, the sender's authenticated static key, and whether
+     * this open retired the prekey (false for a redelivery), or null when the prekey ID is unknown
+     * / grace-expired or the ciphertext is malformed.
+     */
+    fun openPrekeyPayload(ciphertext: ByteArray, prekeyID: UInt): PrekeyEnvelopeOpen? {
+        return try {
+            val opened = noiseService.openPrekeyPayload(ciphertext, prekeyID)
+            PrekeyEnvelopeOpen(opened.payload, opened.senderStaticKey, opened.consumedPrekey)
+        } catch (e: Exception) {
+            Log.d(TAG, "Prekey envelope failed to open: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * Our current unconsumed public prekeys plus the bundle's `generatedAt`, minting the initial
+     * batch on first use. The wire bundle (TLV + Ed25519 signature over the canonical bytes) is
+     * assembled by the prekey coordinator, which owns the `transport` wire types — this facade stays
+     * free of them, mirroring the courier split.
+     */
+    fun currentBundlePrekeys(): Pair<List<PublicPrekey>, ULong> = noiseService.currentBundlePrekeys()
+
+    /** Prune dead prekeys and top the batch back up when consumption runs it low. */
+    fun replenishPrekeysIfNeeded(): Boolean = noiseService.replenishPrekeysIfNeeded()
+
     // MARK: - Announce-bound Peer Signing Keys
 
     /**
@@ -163,6 +207,14 @@ open class EncryptionService(
 
     /** The announce-bound Ed25519 signing key for [fingerprint], if we ever saw its announce. */
     fun announcedSigningKey(fingerprint: String): ByteArray? = identityState.getSigningPublicKey(fingerprint)
+
+    /**
+     * The announce-bound Ed25519 signing key for a peer identified by its Noise static key, if we
+     * ever cached a verified announce for it. Used to verify prekey bundles from owners who may be
+     * offline (the bundle carries only the Noise key).
+     */
+    fun announcedSigningKeyForNoiseKey(noisePublicKey: ByteArray): ByteArray? =
+        identityState.getSigningPublicKey(identityState.generateFingerprint(noisePublicKey))
 
     /**
      * Add peer's public key and start handshake if needed
@@ -477,3 +529,14 @@ open class EncryptionService(
         return privateKey to publicKey
     }
 }
+
+/**
+ * Result of opening a prekey-sealed (v2) courier envelope: the recovered payload, the sender's
+ * authenticated static key, and whether this open actually retired the prekey (false for a
+ * redelivery of already-consumed mail — the caller re-gossips its shrunken bundle only when true).
+ */
+class PrekeyEnvelopeOpen(
+    val payload: ByteArray,
+    val senderStaticKey: ByteArray,
+    val consumedPrekey: Boolean,
+)

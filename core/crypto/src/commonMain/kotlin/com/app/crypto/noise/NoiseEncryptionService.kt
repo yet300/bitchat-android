@@ -6,6 +6,8 @@ import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.crypto.identity.PeerFingerprintManager
 import com.app.crypto.secure.SecureKeyValueStore
 import com.app.crypto.hash.Sha256
+import com.app.crypto.prekey.LocalPrekeyStore
+import com.app.crypto.prekey.PublicPrekey
 import com.app.crypto.sign.Ed25519
 import com.app.crypto.noise.southernstorm.protocol.HandshakeState
 
@@ -35,6 +37,20 @@ internal class NoiseEncryptionService(
         private val COURIER_PROLOGUE = "bitchat-courier-v1".encodeToByteArray()
         // X message = e(32) + encrypted static s(32+16) + AEAD tag over payload(16); pad generously.
         private const val COURIER_HANDSHAKE_OVERHEAD = 128
+
+        // Prekey-sealed envelopes (v2): same one-way Noise X, but the responder static is a one-time
+        // prekey (not the identity), and the prologue is bound to the specific prekey ID so a
+        // ciphertext cannot be replayed against a different prekey.
+        private val PREKEY_PROLOGUE_PREFIX = "bitchat-prekey-v1".encodeToByteArray()
+
+        private fun prekeyPrologue(prekeyID: UInt): ByteArray {
+            val prologue = ByteArray(PREKEY_PROLOGUE_PREFIX.size + 4)
+            PREKEY_PROLOGUE_PREFIX.copyInto(prologue)
+            for (i in 0 until 4) {
+                prologue[PREKEY_PROLOGUE_PREFIX.size + i] = (prekeyID shr (8 * (3 - i))).toByte()
+            }
+            return prologue
+        }
     }
     
     // Static identity key (persistent across app restarts) - loaded from secure storage
@@ -54,6 +70,10 @@ internal class NoiseEncryptionService(
     // Identity management for peer ID rotation support
     private val identityStateManager: SecureIdentityStateManager
 
+    // One-time prekey privates for forward-secret courier sealing (lazy generation on first bundle
+    // request). Persisted behind the same secure store as the identity keys; wiped on panic.
+    private val localPrekeys: LocalPrekeyStore
+
     // Callbacks
     var onPeerAuthenticated: ((String, String) -> Unit)? = null // (peerID, fingerprint)
     var onHandshakeRequired: ((String) -> Unit)? = null // peerID needs handshake
@@ -61,7 +81,8 @@ internal class NoiseEncryptionService(
     init {
         // Initialize identity state manager for persistent storage
         identityStateManager = SecureIdentityStateManager(store)
-        
+        localPrekeys = LocalPrekeyStore(store)
+
         // Load or create keys - temporary placeholders
         staticIdentityPrivateKey = ByteArray(32)
         staticIdentityPublicKey = ByteArray(32)
@@ -163,6 +184,8 @@ internal class NoiseEncryptionService(
         
         // 1. Clear storage
         identityStateManager.clearIdentityKeysImmediate()
+        // One-time prekey privates go with the identity they were bound to.
+        localPrekeys.wipe()
 
         // 2. Clear all sessions immediately
         if (::sessionManager.isInitialized) {
@@ -309,6 +332,74 @@ internal class NoiseEncryptionService(
             handshake.destroy()
         }
     }
+
+    // MARK: - One-Time Prekey Envelopes (forward-secret Noise X, envelope v2)
+
+    /**
+     * Encrypt [payload] to one of the recipient's gossiped one-time prekeys (Noise X where the
+     * responder static is the prekey, not the identity key). Unlike [sealCourierPayload], this is
+     * forward secret: once the recipient consumes the prekey and its grace window lapses, the
+     * private key is deleted and captured ciphertext becomes undecryptable even if the recipient's
+     * identity key is later compromised. The initiator's static still rides (encrypted) inside, so
+     * the recipient authenticates the sender exactly as with static-sealed envelopes.
+     * Byte-compatible with the reference iOS `sealPrekeyPayload`.
+     */
+    fun sealPrekeyPayload(payload: ByteArray, recipientPrekeyID: UInt, recipientPrekey: ByteArray): ByteArray {
+        val prologue = prekeyPrologue(recipientPrekeyID)
+        val handshake = HandshakeState(COURIER_PROTOCOL_NAME, HandshakeState.INITIATOR)
+        try {
+            handshake.setPrologue(prologue, 0, prologue.size)
+            handshake.localKeyPair?.setPrivateKey(staticIdentityPrivateKey, 0)
+                ?: throw NoiseEncryptionError.InvalidMessage
+            handshake.remotePublicKey?.setPublicKey(recipientPrekey, 0)
+                ?: throw NoiseEncryptionError.InvalidMessage
+            handshake.start()
+            val buffer = ByteArray(payload.size + COURIER_HANDSHAKE_OVERHEAD)
+            val length = handshake.writeMessage(buffer, 0, payload, 0, payload.size)
+            return buffer.copyOf(length)
+        } finally {
+            handshake.destroy()
+        }
+    }
+
+    /**
+     * Decrypt an envelope sealed to one of our one-time prekeys. On success the prekey is marked
+     * consumed (its private survives a 48h grace window for spray-and-wait redeliveries, then is
+     * deleted for good). Returns the payload, the sender's authenticated static key, and whether
+     * this open actually retired the prekey — false for a redelivery of already-consumed mail — so
+     * the caller re-gossips the shrunken bundle only when it changed.
+     *
+     * Throws [NoiseEncryptionError.UnknownPrekey] when the prekey ID is unknown or grace-expired.
+     * Byte-compatible with the reference iOS `openPrekeyPayload`.
+     */
+    fun openPrekeyPayload(envelopeCiphertext: ByteArray, prekeyID: UInt): PrekeyOpenResult {
+        val prekeyPrivate = localPrekeys.privateKey(prekeyID) ?: throw NoiseEncryptionError.UnknownPrekey
+        val prologue = prekeyPrologue(prekeyID)
+        val handshake = HandshakeState(COURIER_PROTOCOL_NAME, HandshakeState.RESPONDER)
+        try {
+            handshake.setPrologue(prologue, 0, prologue.size)
+            handshake.localKeyPair?.setPrivateKey(prekeyPrivate, 0)
+                ?: throw NoiseEncryptionError.InvalidMessage
+            handshake.start()
+            val payloadBuffer = ByteArray(envelopeCiphertext.size)
+            val length = handshake.readMessage(envelopeCiphertext, 0, envelopeCiphertext.size, payloadBuffer, 0)
+            if (handshake.hasRemotePublicKey() != true) throw NoiseEncryptionError.InvalidMessage
+            val senderStaticKey = ByteArray(32)
+            handshake.remotePublicKey?.getPublicKey(senderStaticKey, 0)
+                ?: throw NoiseEncryptionError.InvalidMessage
+            val consumed = localPrekeys.markConsumed(prekeyID)
+            return PrekeyOpenResult(payloadBuffer.copyOf(length), senderStaticKey, consumed)
+        } finally {
+            prekeyPrivate.fill(0)
+            handshake.destroy()
+        }
+    }
+
+    /** Current unconsumed public prekeys for the gossiped bundle, minting the initial batch lazily. */
+    fun currentBundlePrekeys(): Pair<List<PublicPrekey>, ULong> = localPrekeys.currentBundlePrekeys()
+
+    /** Prune dead prekeys and top the batch back up when consumption runs it low. */
+    fun replenishPrekeysIfNeeded(): Boolean = localPrekeys.replenishIfNeeded()
 
     // MARK: - Peer Management
 
@@ -519,11 +610,23 @@ internal class NoiseEncryptionService(
 }
 
 /**
+ * Result of opening a prekey-sealed (v2) courier envelope: the recovered payload, the sender's
+ * authenticated static key, and whether this open actually retired the prekey (false for a
+ * redelivery of already-consumed mail).
+ */
+internal class PrekeyOpenResult(
+    val payload: ByteArray,
+    val senderStaticKey: ByteArray,
+    val consumedPrekey: Boolean,
+)
+
+/**
  * Noise-specific errors
  */
 internal sealed class NoiseEncryptionError(message: String) : Exception(message) {
     object HandshakeRequired : NoiseEncryptionError("Handshake required before encryption")
     object SessionNotEstablished : NoiseEncryptionError("No established Noise session")
     object InvalidMessage : NoiseEncryptionError("Invalid message format")
+    object UnknownPrekey : NoiseEncryptionError("Unknown or grace-expired one-time prekey")
     class HandshakeFailed(cause: Throwable) : NoiseEncryptionError("Handshake failed: ${cause.message}")
 }

@@ -124,15 +124,16 @@ class PeerCapabilitiesGoldenTest {
     }
 
     /**
-     * We advertise exactly [PeerCapabilities.VOUCH] now that transitive verification is complete.
-     * Bit 5 = 32 = 0x20, which fits in one byte (0x20 >> 8 == 0, so the encoder's do/while stops
-     * after the first byte). Every other reference bit names a feature this client does not yet
+     * We advertise [PeerCapabilities.VOUCH] + [PeerCapabilities.PREKEYS] now that transitive
+     * verification and one-time prekey bundles are complete. VOUCH = bit 5 = 0x20, PREKEYS = bit 0 =
+     * 0x01, so the set = 0x21, which fits in one byte (0x21 >> 8 == 0, so the encoder's do/while
+     * stops after the first byte). Every other reference bit names a feature this client does not yet
      * implement; meshDiagnostics stays withheld because the reference leaves it out of its own
      * `localSupported` too.
      */
     @Test
-    fun `we advertise exactly the vouch capability`() {
-        assertEquals(PeerCapabilities.VOUCH, PeerCapabilities.LOCAL_SUPPORTED)
-        assertEquals("20", PeerCapabilities.LOCAL_SUPPORTED.encoded().hex())
+    fun `we advertise the vouch and prekeys capabilities`() {
+        assertEquals(PeerCapabilities.VOUCH + PeerCapabilities.PREKEYS, PeerCapabilities.LOCAL_SUPPORTED)
+        assertEquals("21", PeerCapabilities.LOCAL_SUPPORTED.encoded().hex())
     }
 }

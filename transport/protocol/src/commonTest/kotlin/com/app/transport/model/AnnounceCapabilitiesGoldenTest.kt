@@ -188,22 +188,23 @@ class AnnounceCapabilitiesGoldenTest {
     }
 
     /**
-     * The bytes we actually put on the radio now carry a 0x05 capabilities TLV of `[.vouch]` = 0x20,
-     * appended after the identity TLVs. A reference peer reads the bit and knows we accept vouch
-     * batches; a pre-capabilities peer skips the unknown TLV. `05 01 20` is the whole addition.
+     * The bytes we actually put on the radio now carry a 0x05 capabilities TLV of
+     * `[.vouch, .prekeys]` = 0x21, appended after the identity TLVs. A reference peer reads the bits
+     * and knows we accept vouch batches and can open forward-secret prekey-sealed courier mail; a
+     * pre-capabilities peer skips the unknown TLV. `05 01 21` is the whole addition.
      */
     @Test
-    fun `our production announce advertises the vouch capability`() {
+    fun `our production announce advertises the vouch and prekeys capabilities`() {
         val advertised = PeerCapabilities.LOCAL_SUPPORTED.takeIf { !it.isEmpty() }
         val encoded = IdentityAnnouncement("ivan", noiseKey, signingKey, advertised).encode()
 
         assertNotNull(encoded)
-        assertEquals(PeerCapabilities.VOUCH, advertised)
+        assertEquals(PeerCapabilities.VOUCH + PeerCapabilities.PREKEYS, advertised)
         val expected = tlv(0x01, "ivan".encodeToByteArray()) +
             tlv(0x02, noiseKey) +
             tlv(0x03, signingKey) +
-            byteArrayOf(0x05, 0x01, 0x20)
+            byteArrayOf(0x05, 0x01, 0x21)
         assertEquals(expected.hex(), encoded.hex())
-        assertEquals(PeerCapabilities.VOUCH, IdentityAnnouncement.decode(encoded)?.capabilities)
+        assertEquals(PeerCapabilities.VOUCH + PeerCapabilities.PREKEYS, IdentityAnnouncement.decode(encoded)?.capabilities)
     }
 }

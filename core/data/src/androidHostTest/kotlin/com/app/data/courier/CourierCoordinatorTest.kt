@@ -13,6 +13,7 @@ import com.app.crypto.secure.SecureKeyValueStore
 import com.app.data.favorites.FavoritesPersistenceService
 import com.app.database.BitMessageDatabase
 import com.app.database.dao.CourierDao
+import com.app.database.dao.PrekeyBundleDao
 import com.app.database.db.DatabaseDriverFactory
 import com.app.database.db.DatabaseManager
 import com.app.transport.courier.CourierEventListener
@@ -54,13 +55,13 @@ class CourierCoordinatorTest {
 
     private val dispatchers = AppDispatchers(io = UnconfinedTestDispatcher())
 
-    private fun newDao(): CourierDao {
+    private fun newManager(): DatabaseManager {
         val factory = object : DatabaseDriverFactory {
             private val driver: SqlDriver =
                 JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY, Properties(), BitMessageDatabase.Schema)
             override suspend fun create(): SqlDriver = driver
         }
-        return CourierDao(DatabaseManager(factory, dispatchers), dispatchers)
+        return DatabaseManager(factory, dispatchers)
     }
 
     private inner class Node(val pid: String) {
@@ -68,9 +69,11 @@ class CourierCoordinatorTest {
         val encryption = EncryptionService(store, PeerFingerprintManager())
         val identityState = SecureIdentityStateManager(store)
         val favorites = FavoritesPersistenceService(identityState)
-        val courierStore = CourierStore(newDao())
+        private val dbManager = newManager()
+        val courierStore = CourierStore(CourierDao(dbManager, dispatchers))
+        val prekeyDao = PrekeyBundleDao(dbManager, dispatchers)
         val mesh = FakeCourierMesh()
-        val coordinator = CourierCoordinator(mesh, encryption, favorites, courierStore, dispatchers)
+        val coordinator = CourierCoordinator(mesh, encryption, favorites, courierStore, prekeyDao, dispatchers)
 
         val noiseKey: ByteArray get() = encryption.getStaticPublicKey()!!
         val signingKey: ByteArray get() = encryption.getSigningPublicKey()!!
@@ -271,6 +274,8 @@ class CourierCoordinatorTest {
         override fun sendGroupState(payload: ByteArray, toPeerID: String, isInvite: Boolean) = Unit
         override var boardEventListener: BoardEventListener? = null
         override fun sendBoardPayload(payload: ByteArray) = Unit
+        override var prekeyEventListener: com.app.transport.prekey.PrekeyEventListener? = null
+        override fun sendPrekeyBundle(payload: ByteArray) = Unit
         override fun sendCourierEnvelope(payload: ByteArray, toPeerID: String) {
             sent.add(toPeerID to payload)
         }
