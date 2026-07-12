@@ -5,6 +5,8 @@ import com.yet.bitmessage.feature.chats.conversations.DefaultConversationsCompon
 import com.yet.bitmessage.feature.chats.conversations.connectivity.ConnectivityComponent
 import com.yet.bitmessage.feature.chats.conversations.connectivity.DefaultConnectivityComponentFactory
 import com.yet.bitmessage.feature.chats.conversations.contacts.ContactsComponent
+import com.yet.bitmessage.feature.chats.conversations.boards.BoardsComponent
+import com.yet.bitmessage.feature.chats.conversations.boards.DefaultBoardsComponentFactory
 import com.yet.bitmessage.feature.chats.conversations.contacts.DefaultContactsComponentFactory
 import com.yet.bitmessage.feature.chats.conversations.groups.DefaultGroupsComponentFactory
 import com.yet.bitmessage.feature.chats.conversations.groups.GroupsComponent
@@ -52,4 +54,7 @@ abstract class ConversationsBindings {
 
     @Binds
     internal abstract val DefaultVoiceComponentFactory.bindVoiceComponentFactory: VoiceComponent.Factory
+
+    @Binds
+    internal abstract val DefaultBoardsComponentFactory.bindBoardsComponentFactory: BoardsComponent.Factory
 }

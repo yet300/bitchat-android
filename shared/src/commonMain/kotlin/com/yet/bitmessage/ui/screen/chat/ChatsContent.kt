@@ -89,6 +89,8 @@ fun ChatsContent(component: ChatsComponent, modifier: Modifier = Modifier) {
             GroupsContent(child.component)
         is ChatsComponent.SheetChild.Voice ->
             VoiceContent(child.component)
+        is ChatsComponent.SheetChild.Boards ->
+            BoardsContent(child.component)
         null -> Unit
     }
 }

@@ -94,6 +94,19 @@
     <string name="voice_hold_to_talk">Hold to talk</string>
     <string name="voice_recording">Recording…</string>
     <string name="voice_received">Voice from %1$s · %2$d ms</string>
+    <string name="boards_title">Boards</string>
+    <string name="boards_close">Close</string>
+    <string name="boards_empty">No posts on this board</string>
+    <string name="boards_geohash_hint">Geohash (empty = mesh-local)</string>
+    <string name="boards_create">New post</string>
+    <string name="boards_create_title">New board post</string>
+    <string name="boards_content_hint">Post content</string>
+    <string name="boards_urgent">Urgent</string>
+    <string name="boards_expiry_days">Expires in %1$d day(s)</string>
+    <string name="boards_post">Post</string>
+    <string name="boards_delete">Delete</string>
+    <string name="boards_ok">Go</string>
+    <string name="boards_cancel">Cancel</string>
     <string name="search_hint">Search</string>
     <string name="search_close">Close</string>
     <string name="search_tab_chats">Chats</string>

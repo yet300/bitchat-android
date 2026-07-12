@@ -15,6 +15,8 @@ import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
 import com.arkivanov.decompose.router.slot.ChildSlot
 import com.yet.bitmessage.feature.chats.conversations.connectivity.ConnectivityComponent
 import com.yet.bitmessage.feature.chats.conversations.contacts.ContactsComponent
+import com.yet.bitmessage.feature.chats.conversations.boards.BoardDialog
+import com.yet.bitmessage.feature.chats.conversations.boards.BoardsComponent
 import com.yet.bitmessage.feature.chats.conversations.groups.GroupsComponent
 import com.yet.bitmessage.feature.chats.conversations.voice.VoiceComponent
 import com.arkivanov.decompose.router.stack.ChildStack
@@ -42,6 +44,7 @@ class DefaultChatsComponentTest {
         val onSettingsRequested: () -> Unit,
         val onGroupsRequested: () -> Unit,
         val onVoiceRequested: () -> Unit,
+        val onBoardsRequested: () -> Unit,
     ) : ConversationsComponent {
         override val model: Value<ConversationsComponent.Model> =
             MutableValue(
@@ -60,6 +63,7 @@ class DefaultChatsComponentTest {
         override fun onSettingsClicked() = onSettingsRequested()
         override fun onGroupsClicked() = onGroupsRequested()
         override fun onVoiceClicked() = onVoiceRequested()
+        override fun onBoardsClicked() = onBoardsRequested()
         override fun onTogglePin(id: ConversationId) = Unit
         override fun onToggleMute(id: ConversationId) = Unit
         override fun onDismissBanner() = Unit
@@ -172,6 +176,18 @@ class DefaultChatsComponentTest {
         override fun onCloseClicked() = onClose()
     }
 
+    private class FakeBoardsComponent(val onClose: () -> Unit) : BoardsComponent {
+        override val model: Value<BoardsComponent.Model> =
+            MutableValue(BoardsComponent.Model(isLoading = false, geohash = "", posts = emptyList()))
+        override val dialog: Value<ChildSlot<*, BoardDialog>> = MutableValue(ChildSlot<Any, BoardDialog>())
+        override fun onSelectBoard(geohash: String) = Unit
+        override fun onCreateClicked() = Unit
+        override fun onSubmitCreate(content: String, urgent: Boolean, expiryDays: Int) = Unit
+        override fun onDelete(postIdHex: String) = Unit
+        override fun onDismissDialog() = Unit
+        override fun onCloseClicked() = onClose()
+    }
+
     private class FakeChatComponent(
         config: ChatConfig,
         val onFinished: () -> Unit,
@@ -218,8 +234,8 @@ class DefaultChatsComponentTest {
         val lifecycle = LifecycleRegistry()
         return DefaultChatsComponent(
             componentContext = DefaultComponentContext(lifecycle),
-            conversationsFactory = { _, onSelected, onConnectivity, onSearch, onContacts, onSettings, onGroups, onVoice ->
-                FakeConversationsComponent(onSelected, onConnectivity, onSearch, onContacts, onSettings, onGroups, onVoice)
+            conversationsFactory = { _, onSelected, onConnectivity, onSearch, onContacts, onSettings, onGroups, onVoice, onBoards ->
+                FakeConversationsComponent(onSelected, onConnectivity, onSearch, onContacts, onSettings, onGroups, onVoice, onBoards)
             },
             chatFactory = { _: ComponentContext, config: ChatConfig, onFinished: () -> Unit, _ ->
                 FakeChatComponent(config, onFinished)
@@ -234,6 +250,7 @@ class DefaultChatsComponentTest {
             settingsFactory = { _, onClose, _ -> FakeSettingsComponent(onClose) },
             groupsFactory = { ctx, onClose -> FakeGroupsComponent(ctx, onClose) },
             voiceFactory = { _, onClose -> FakeVoiceComponent(onClose) },
+            boardsFactory = { _, onClose -> FakeBoardsComponent(onClose) },
             onOpenMap = {},
             onOpenDebug = {},
         )
@@ -363,6 +380,17 @@ class DefaultChatsComponentTest {
 
         component.mainConversations.onVoiceClicked()
         assertIs<ChatsComponent.SheetChild.Voice>(component.sheetSlot.value.child?.instance)
+
+        component.onDismissSheet()
+        assertNull(component.sheetSlot.value.child)
+    }
+
+    @Test
+    fun requesting_boards_opens_the_overlay_and_dismiss_closes_it() {
+        val component = build()
+
+        component.mainConversations.onBoardsClicked()
+        assertIs<ChatsComponent.SheetChild.Boards>(component.sheetSlot.value.child?.instance)
 
         component.onDismissSheet()
         assertNull(component.sheetSlot.value.child)

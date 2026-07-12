@@ -30,6 +30,7 @@ internal class DefaultConversationsComponent(
     private val onSettingsRequested: () -> Unit,
     private val onGroupsRequested: () -> Unit,
     private val onVoiceRequested: () -> Unit,
+    private val onBoardsRequested: () -> Unit,
 ) : ConversationsComponent, ComponentContext by componentContext {
 
     private val store = instanceKeeper.getStore { storeFactory.create() }
@@ -51,6 +52,8 @@ internal class DefaultConversationsComponent(
     override fun onGroupsClicked() = onGroupsRequested()
 
     override fun onVoiceClicked() = onVoiceRequested()
+
+    override fun onBoardsClicked() = onBoardsRequested()
 
     override fun onTogglePin(id: ConversationId) = store.accept(ConversationsStore.Intent.TogglePin(id))
 
@@ -77,6 +80,7 @@ internal class DefaultConversationsComponentFactory(
         onSettingsRequested: () -> Unit,
         onGroupsRequested: () -> Unit,
         onVoiceRequested: () -> Unit,
+        onBoardsRequested: () -> Unit,
     ): ConversationsComponent = DefaultConversationsComponent(
         componentContext = componentContext,
         storeFactory = ConversationsStoreFactory(
@@ -95,5 +99,6 @@ internal class DefaultConversationsComponentFactory(
         onSettingsRequested = onSettingsRequested,
         onGroupsRequested = onGroupsRequested,
         onVoiceRequested = onVoiceRequested,
+        onBoardsRequested = onBoardsRequested,
     )
 }
