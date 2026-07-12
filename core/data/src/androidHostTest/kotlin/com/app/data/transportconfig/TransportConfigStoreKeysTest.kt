@@ -56,6 +56,18 @@ class TransportConfigStoreKeysTest {
         assertEquals("seen_packet_capacity", TransportConfigKeys.SEEN_PACKET_CAPACITY)
         assertEquals("gcs_max_filter_bytes", TransportConfigKeys.GCS_MAX_FILTER_BYTES)
         assertEquals("gcs_filter_fpr_percent", TransportConfigKeys.GCS_FILTER_FPR_PERCENT)
+        assertEquals("gateway.userEnabled", TransportConfigKeys.GATEWAY_USER_ENABLED)
+    }
+
+    @Test
+    fun `gateway store defaults off and persists opt in`() {
+        val settings = RecordingSettingsStore()
+        val store = SettingsGatewayConfigStore(settings)
+
+        assertEquals(false, store.isGatewayEnabled())
+        store.setGatewayEnabled(true)
+        assertEquals(true, settings.backing["gateway.userEnabled"])
+        assertEquals(true, store.isGatewayEnabled())
     }
 
     @Test

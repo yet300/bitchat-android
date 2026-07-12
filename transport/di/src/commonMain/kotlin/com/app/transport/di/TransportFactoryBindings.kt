@@ -27,6 +27,7 @@ import com.app.transport.features.file.IncomingFileStore
 import com.app.transport.mesh.MeshLifecycleController
 import com.app.transport.mesh.MeshNetwork
 import com.app.transport.mesh.MeshService
+import com.app.transport.mesh.GatewayConfigStore
 import com.app.transport.meshgraph.MeshGraphService
 import com.app.transport.net.ArtiTorManager
 import com.app.transport.net.TorConfigStore
@@ -189,6 +190,7 @@ object TransportFactoryBindings {
         telemetry: MeshTelemetry,
         debugPreferenceManager: DebugPreferenceManager,
         meshGraphService: MeshGraphService,
+        gatewayConfigStore: GatewayConfigStore,
         bearerBuilder: MeshBearerBuilder,
         dispatchers: AppDispatchers,
     ): MeshTransport = MeshTransport.create(
@@ -211,6 +213,7 @@ object TransportFactoryBindings {
             ),
             bearers = bearerBuilder::build,
             meshGraphService = meshGraphService,
+            gatewayConfigStore = gatewayConfigStore,
             dispatchers = dispatchers,
         ),
     )

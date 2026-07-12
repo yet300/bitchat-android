@@ -59,6 +59,7 @@ internal class MeshComponentWiring(
     private val groupListener: () -> GroupEventListener?,
     private val boardListener: () -> BoardEventListener?,
     private val prekeyListener: () -> PrekeyEventListener?,
+    private val nostrCarrierHandler: () -> ((ByteArray, String, Boolean) -> Unit)?,
 ) {
 
     companion object {
@@ -482,6 +483,11 @@ internal class MeshComponentWiring(
                 try { gossipSyncManager.onPublicPacketSeen(routed.packet) } catch (_: Exception) { }
                 boardListener()?.onBoardPacketReceived(routed.packet.payload)
                 return true
+            }
+
+            override fun handleNostrCarrier(routed: RoutedPacket, directedToUs: Boolean) {
+                val from = routed.peerID ?: return
+                nostrCarrierHandler()?.invoke(routed.packet.payload, from, directedToUs)
             }
 
             override suspend fun handleNoiseHandshake(routed: RoutedPacket): Boolean {

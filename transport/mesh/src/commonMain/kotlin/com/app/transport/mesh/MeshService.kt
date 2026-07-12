@@ -143,4 +143,12 @@ interface MeshService {
 
     /** Sends an unsigned directed 0x28 carrier; the enclosed Nostr event is self-authenticating. */
     fun sendNostrCarrier(payload: ByteArray, toPeerID: String): Boolean = false
+
+    fun isGatewayEnabled(): Boolean = false
+
+    fun setGatewayEnabled(enabled: Boolean) = Unit
+
+    fun setNostrCarrierHandler(handler: ((payload: ByteArray, fromPeerId: String, directedToUs: Boolean) -> Unit)?) = Unit
+
+    fun broadcastNostrCarrier(payload: ByteArray) = Unit
 }

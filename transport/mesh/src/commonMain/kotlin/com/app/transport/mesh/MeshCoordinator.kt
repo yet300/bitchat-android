@@ -76,6 +76,7 @@ class MeshCoordinator(
     private val fragmentManager: FragmentManager,
     val bleBearer: BleBearer,
     private val meshNetwork: MeshNetwork,
+    private val gatewayConfigStore: GatewayConfigStore = DisabledGatewayConfigStore,
     private val dispatchers: AppDispatchers = AppDispatchers(),
 ) : MeshLifecycleController, MeshService {
 
@@ -114,6 +115,7 @@ class MeshCoordinator(
     private lateinit var outbound: MeshOutboundSender
     // Mesh diagnostics echo probes for the current generation; built by wireComponents()
     private lateinit var pingService: MeshPingService
+    @Volatile private var gatewayEnabled = gatewayConfigStore.isGatewayEnabled()
 
     // Single monitor for all lifecycle transitions (start/stop/reset/finishStop): the
     // delayed teardown runs on IO while callers arrive on main — without one lock the
@@ -145,6 +147,7 @@ class MeshCoordinator(
 
     // Sink for prekey bundle events (0x24); the platform-free prekey coordinator attaches itself.
     override var prekeyEventListener: PrekeyEventListener? = null
+    private var nostrCarrierHandler: ((ByteArray, String, Boolean) -> Unit)? = null
 
     // Coroutines
     private var serviceScope = CoroutineScope(dispatchers.io + SupervisorJob())
@@ -201,6 +204,7 @@ class MeshCoordinator(
             verificationService = verificationService,
             scope = serviceScope,
             initiateHandshake = { peerID -> messageHandler.delegate?.initiateNoiseHandshake(peerID) },
+            gatewayEnabled = { gatewayEnabled },
         )
 
         // Mesh diagnostics probes. myPeerID is read live (panic reset rotates it) and the probe
@@ -252,6 +256,7 @@ class MeshCoordinator(
             groupListener = { groupEventListener },
             boardListener = { boardEventListener },
             prekeyListener = { prekeyEventListener },
+            nostrCarrierHandler = { nostrCarrierHandler },
         ).wire()
         messageHandler.packetProcessor = packetProcessor
         messageHandler.favoriteNostrLink = favoriteNostrLink
@@ -540,6 +545,21 @@ class MeshCoordinator(
 
     override fun sendNostrCarrier(payload: ByteArray, toPeerID: String): Boolean =
         outbound.sendNostrCarrier(payload, toPeerID)
+
+    override fun isGatewayEnabled(): Boolean = gatewayEnabled
+
+    override fun setGatewayEnabled(enabled: Boolean) {
+        if (gatewayEnabled == enabled) return
+        gatewayEnabled = enabled
+        gatewayConfigStore.setGatewayEnabled(enabled)
+        sendBroadcastAnnounce()
+    }
+
+    override fun setNostrCarrierHandler(handler: ((ByteArray, String, Boolean) -> Unit)?) {
+        nostrCarrierHandler = handler
+    }
+
+    override fun broadcastNostrCarrier(payload: ByteArray) = outbound.broadcastNostrCarrier(payload)
 
     override fun connectedPeerIDs(): List<String> =
         try { peerManager.getActivePeerIDs() } catch (_: Exception) { emptyList() }

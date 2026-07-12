@@ -10,6 +10,7 @@ import com.app.transport.nostr.RelayDirectory
 import com.app.transport.mesh.MeshService
 import com.app.transport.mesh.NostrGatewaySender
 import com.app.transport.model.PeerCapabilities
+import com.app.data.gateway.GatewayRuntime
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -33,6 +34,7 @@ class GeohashMessageSender(
     private val nostrIdentityBridge: NostrIdentityBridge,
     private val powPreferenceManager: PoWPreferenceManager,
     private val meshService: MeshService,
+    @Suppress("UNUSED_PARAMETER") gatewayRuntime: GatewayRuntime,
     dispatchers: AppDispatchers,
 ) {
 

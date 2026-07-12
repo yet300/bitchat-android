@@ -226,6 +226,12 @@ internal class PacketProcessor(
                 // author signature synchronously and returns false to skip the relay step below.
                 if (delegate?.handleBoardPost(routed) != true) return
             }
+            MessageType.NOSTR_CARRIER -> {
+                val directed = packet.recipientID != null && !isBroadcast(packet)
+                if (!directed || packetRelayManager.isPacketAddressedToMe(packet)) {
+                    delegate?.handleNostrCarrier(routed, directed)
+                }
+            }
             else -> {
                 // Handle private packet types (address check required)
                 if (packetRelayManager.isPacketAddressedToMe(packet)) {
@@ -464,6 +470,8 @@ internal interface PacketProcessorDelegate {
      * malformed / bad-signature so forged posts do not spread).
      */
     fun handleBoardPost(routed: RoutedPacket): Boolean
+
+    fun handleNostrCarrier(routed: RoutedPacket, directedToUs: Boolean) = Unit
 
     // Communication
     fun sendAnnouncementToPeer(peerID: String)

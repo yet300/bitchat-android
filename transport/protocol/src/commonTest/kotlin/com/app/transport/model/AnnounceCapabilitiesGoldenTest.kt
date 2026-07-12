@@ -195,7 +195,7 @@ class AnnounceCapabilitiesGoldenTest {
      */
     @Test
     fun `our production announce advertises the vouch and prekeys capabilities`() {
-        val advertised = PeerCapabilities.LOCAL_SUPPORTED.takeIf { !it.isEmpty() }
+        val advertised = PeerCapabilities.localSupported(gatewayEnabled = false).takeIf { !it.isEmpty() }
         val encoded = IdentityAnnouncement("ivan", noiseKey, signingKey, advertised).encode()
 
         assertNotNull(encoded)
@@ -206,5 +206,20 @@ class AnnounceCapabilitiesGoldenTest {
             byteArrayOf(0x05, 0x01, 0x21)
         assertEquals(expected.hex(), encoded.hex())
         assertEquals(PeerCapabilities.VOUCH + PeerCapabilities.PREKEYS, IdentityAnnouncement.decode(encoded)?.capabilities)
+    }
+
+    @Test
+    fun `golden - enabled gateway changes production capability bytes from 05 01 21 to 05 01 25`() {
+        val disabled = IdentityAnnouncement(
+            "ivan", noiseKey, signingKey, PeerCapabilities.localSupported(gatewayEnabled = false),
+        ).encode()
+        val enabled = IdentityAnnouncement(
+            "ivan", noiseKey, signingKey, PeerCapabilities.localSupported(gatewayEnabled = true),
+        ).encode()
+
+        assertNotNull(disabled)
+        assertNotNull(enabled)
+        assertTrue(disabled.hex().endsWith("050121"))
+        assertTrue(enabled.hex().endsWith("050125"))
     }
 }

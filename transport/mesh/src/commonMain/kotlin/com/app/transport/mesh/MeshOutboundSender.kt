@@ -49,6 +49,7 @@ internal class MeshOutboundSender(
     private val verificationService: VerificationService,
     private val scope: CoroutineScope,
     private val initiateHandshake: (String) -> Unit,
+    private val gatewayEnabled: () -> Boolean = { false },
 ) {
 
     companion object {
@@ -464,6 +465,16 @@ internal class MeshOutboundSender(
         return meshNetwork.sendToPeer(toPeerID, RoutedPacket(packet)) != SendPath.NoRoute
     }
 
+    fun broadcastNostrCarrier(payload: ByteArray) {
+        if (payload.isEmpty()) return
+        val packet = BitchatPacket(
+            version = 1u, type = MessageType.NOSTR_CARRIER.value,
+            senderID = peerIdToRoutingBytes(myPeerID), recipientID = SpecialRecipients.BROADCAST,
+            timestamp = epochMillis().toULong(), payload = payload, signature = null, ttl = MAX_TTL,
+        )
+        meshNetwork.broadcast(RoutedPacket(packet))
+    }
+
     private fun sendNoisePayloadToPeer(payload: NoisePayload, recipientPeerID: String, label: String) {
         scope.launch {
             try {
@@ -568,7 +579,7 @@ internal class MeshOutboundSender(
         // Create iOS-compatible IdentityAnnouncement with TLV encoding. We advertise only what we
         // actually implement; while that set is empty the 0x05 TLV is omitted entirely, leaving the
         // announce bytes unchanged from before capabilities existed.
-        val advertised = PeerCapabilities.LOCAL_SUPPORTED.takeIf { !it.isEmpty() }
+        val advertised = PeerCapabilities.localSupported(gatewayEnabled()).takeIf { !it.isEmpty() }
         val announcement = IdentityAnnouncement(nickname, staticKey, signingKey, advertised)
         val encoded = announcement.encode()
         if (encoded == null) {

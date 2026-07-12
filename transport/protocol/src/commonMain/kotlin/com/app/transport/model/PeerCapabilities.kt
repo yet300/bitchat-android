@@ -72,6 +72,9 @@ value class PeerCapabilities(val rawValue: ULong) {
          */
         val LOCAL_SUPPORTED = VOUCH + PREKEYS
 
+        fun localSupported(gatewayEnabled: Boolean): PeerCapabilities =
+            if (gatewayEnabled) LOCAL_SUPPORTED + GATEWAY else LOCAL_SUPPORTED
+
         /** Accepts any length; bytes beyond the low 64 bits are ignored for forward compatibility. */
         fun decode(data: ByteArray): PeerCapabilities {
             var value = 0uL
