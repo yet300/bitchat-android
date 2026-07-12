@@ -13,15 +13,6 @@ class ParseCommandUseCaseTest {
         assertNull(parse("@alice hi"))
     }
 
-    @Test fun `join normalizes tag and reads password`() {
-        assertEquals(ChatCommand.Join("#gen", null), parse("/j gen"))
-        assertEquals(ChatCommand.Join("#foo", "secret"), parse("/join #foo secret"))
-    }
-
-    @Test fun `join without arg is usage`() {
-        assertEquals(ChatCommand.Usage("usage: /join <channel>"), parse("/join"))
-    }
-
     @Test fun `msg strips at and joins body`() {
         assertEquals(ChatCommand.Msg("alice", "hey there"), parse("/msg @alice hey there"))
         assertEquals(ChatCommand.Msg("bob", null), parse("/m bob"))
@@ -30,7 +21,17 @@ class ParseCommandUseCaseTest {
     @Test fun `simple commands`() {
         assertEquals(ChatCommand.Who, parse("/w"))
         assertEquals(ChatCommand.Clear, parse("/clear"))
-        assertEquals(ChatCommand.Channels, parse("/channels"))
+    }
+
+    @Test fun `retired password-channel commands are unknown`() {
+        // Password channels were retired in favor of private groups (0x25); their commands no
+        // longer parse and fall through to Unknown.
+        assertEquals(ChatCommand.Unknown("/j"), parse("/j gen"))
+        assertEquals(ChatCommand.Unknown("/join"), parse("/join #foo secret"))
+        assertEquals(ChatCommand.Unknown("/pass"), parse("/pass hunter2"))
+        assertEquals(ChatCommand.Unknown("/save"), parse("/save"))
+        assertEquals(ChatCommand.Unknown("/channels"), parse("/channels"))
+        assertEquals(ChatCommand.Unknown("/transfer"), parse("/transfer @alice"))
     }
 
     @Test fun `block list vs target`() {
@@ -46,12 +47,6 @@ class ParseCommandUseCaseTest {
     @Test fun `actions hug and slap`() {
         assertEquals(ChatCommand.Action(ActionKind.HUG, "sam"), parse("/hug @sam"))
         assertEquals(ChatCommand.Action(ActionKind.SLAP, "sam"), parse("/slap sam"))
-    }
-
-    @Test fun `save and transfer`() {
-        assertEquals(ChatCommand.Save, parse("/save"))
-        assertEquals(ChatCommand.Transfer("alice"), parse("/transfer @alice"))
-        assertEquals(ChatCommand.Transfer(null), parse("/transfer"))
     }
 
     @Test fun `unknown command`() {

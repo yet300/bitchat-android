@@ -63,10 +63,7 @@ internal class NoiseEncryptionService(
     
     // Session management
     private lateinit var sessionManager: NoiseSessionManager
-    
-    // Channel encryption for password-protected channels
-    private val channelEncryption = NoiseChannelEncryption()
-    
+
     // Identity management for peer ID rotation support
     private val identityStateManager: SecureIdentityStateManager
 
@@ -436,52 +433,6 @@ internal class NoiseEncryptionService(
         fingerprintManager.updatePeerIDMapping(oldPeerID, newPeerID, fingerprint)
     }
     
-    // MARK: - Channel Encryption
-    
-    /**
-     * Set password for a channel (derives encryption key)
-     */
-    fun setChannelPassword(password: String, channel: String) {
-        channelEncryption.setChannelPassword(password, channel)
-    }
-    
-    /**
-     * Encrypt message for a password-protected channel
-     */
-    fun encryptChannelMessage(message: String, channel: String): ByteArray? {
-        return try {
-            channelEncryption.encryptChannelMessage(message, channel)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to encrypt channel message for $channel: ${e.message}")
-            null
-        }
-    }
-    
-    /**
-     * Decrypt channel message
-     */
-    fun decryptChannelMessage(encryptedData: ByteArray, channel: String): String? {
-        return try {
-            channelEncryption.decryptChannelMessage(encryptedData, channel)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to decrypt channel message for $channel: ${e.message}")
-            null
-        }
-    }
-    
-    /**
-     * Remove channel password (when leaving channel)
-     */
-    fun removeChannelPassword(channel: String) {
-        channelEncryption.removeChannelPassword(channel)
-    }
-
-    /** SHA-256 commitment of the derived channel key (null if no key) — used to verify passwords. */
-    fun channelKeyCommitment(channel: String): String? = channelEncryption.calculateKeyCommitment(channel)
-
-    /** Whether an encryption key is currently held for [channel]. */
-    fun hasChannelKey(channel: String): Boolean = channelEncryption.hasChannelKey(channel)
-
     // MARK: - Session Maintenance
     
     /**
@@ -604,7 +555,6 @@ internal class NoiseEncryptionService(
         if (::sessionManager.isInitialized) {
             sessionManager.shutdown()
         }
-        channelEncryption.clear()
         // No need to clear fingerprints here - they are managed centrally
     }
 }

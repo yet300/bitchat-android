@@ -5,7 +5,6 @@ import com.app.domain.model.BitMessage
 import com.app.domain.model.ConversationId
 import com.app.domain.model.PeerId
 import com.app.domain.model.SenderRef
-import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.GeohashBookmarksRepository
@@ -53,7 +52,6 @@ internal class ChatStoreFactory(
     private val geohashRepository: GeohashRepository,
     private val geohashBookmarks: GeohashBookmarksRepository,
     private val peerRepository: PeerRepository,
-    channelRepository: ChannelRepository,
     messageTransport: MessageTransport,
     noiseSession: NoiseSessionPort,
 ) {
@@ -65,7 +63,7 @@ internal class ChatStoreFactory(
     private val parseCommand = ParseCommandUseCase()
     private val parseMentions = ParseMentionsUseCase()
     private val processCommand =
-        ProcessCommandUseCase(messageRepository, channelRepository, contactRepository, peerRepository)
+        ProcessCommandUseCase(messageRepository, contactRepository, peerRepository)
     private val startGeohashDm = StartGeohashDmUseCase(geohashRepository)
     private val openConversation = OpenConversationUseCase(noiseSession)
 

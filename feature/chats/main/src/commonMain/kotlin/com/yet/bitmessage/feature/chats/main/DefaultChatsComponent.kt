@@ -17,7 +17,6 @@ import com.arkivanov.decompose.router.slot.childSlot
 import com.arkivanov.decompose.router.slot.dismiss
 import com.arkivanov.decompose.value.Value
 import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
-import com.yet.bitmessage.feature.chats.conversations.channels.ChannelsComponent
 import com.yet.bitmessage.feature.chats.conversations.connectivity.ConnectivityComponent
 import com.yet.bitmessage.feature.chats.conversations.contacts.ContactsComponent
 import com.yet.bitmessage.feature.chats.conversations.search.SearchComponent
@@ -36,7 +35,6 @@ internal class DefaultChatsComponent(
     private val searchFactory: SearchComponent.Factory,
     private val contactsFactory: ContactsComponent.Factory,
     private val settingsFactory: SettingsComponent.Factory,
-    private val channelsFactory: ChannelsComponent.Factory,
     private val onOpenMap: (initialGeohash: String?) -> Unit,
     private val onOpenDebug: () -> Unit,
 ) : ChatsComponent, ComponentContext by componentContext {
@@ -61,7 +59,6 @@ internal class DefaultChatsComponent(
                         onSearchRequested = { sheetNavigation.activate(SheetConfig.Search) },
                         onContactsRequested = { sheetNavigation.activate(SheetConfig.Contacts) },
                         onSettingsRequested = { sheetNavigation.activate(SheetConfig.Settings) },
-                        onChannelsRequested = { sheetNavigation.activate(SheetConfig.Channels) },
                     ),
                 )
             },
@@ -125,19 +122,6 @@ internal class DefaultChatsComponent(
                                 },
                             ),
                         )
-                    SheetConfig.Channels ->
-                        ChatsComponent.SheetChild.Channels(
-                            channelsFactory.create(
-                                componentContext = ctx,
-                                onChannelSelected = { tag ->
-                                    sheetNavigation.dismiss()
-                                    navigation.navigate {
-                                        it.copy(details = ChatConfig.from(ConversationId.Channel(tag)))
-                                    }
-                                },
-                                onClose = { sheetNavigation.dismiss() },
-                            ),
-                        )
                 }
             },
         )
@@ -166,9 +150,6 @@ internal class DefaultChatsComponent(
 
         @Serializable
         data object Settings : SheetConfig
-
-        @Serializable
-        data object Channels : SheetConfig
     }
 }
 
@@ -180,7 +161,6 @@ internal class DefaultChatsComponentFactory(
     private val searchFactory: SearchComponent.Factory,
     private val contactsFactory: ContactsComponent.Factory,
     private val settingsFactory: SettingsComponent.Factory,
-    private val channelsFactory: ChannelsComponent.Factory,
 ) : ChatsComponent.Factory {
     override fun create(
         componentContext: ComponentContext,
@@ -195,7 +175,6 @@ internal class DefaultChatsComponentFactory(
             searchFactory = searchFactory,
             contactsFactory = contactsFactory,
             settingsFactory = settingsFactory,
-            channelsFactory = channelsFactory,
             onOpenMap = onOpenMap,
             onOpenDebug = onOpenDebug,
         )

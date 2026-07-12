@@ -31,9 +31,6 @@ interface ConversationsComponent {
     /** Open the settings screen (hosted as a slot by the parent). */
     fun onSettingsClicked()
 
-    /** Open the channel-management screen (hosted as a slot by the parent). */
-    fun onChannelsClicked()
-
     fun onTogglePin(id: ConversationId)
 
     fun onToggleMute(id: ConversationId)
@@ -65,7 +62,6 @@ interface ConversationsComponent {
             onSearchRequested: () -> Unit,
             onContactsRequested: () -> Unit,
             onSettingsRequested: () -> Unit,
-            onChannelsRequested: () -> Unit,
         ): ConversationsComponent
     }
 }

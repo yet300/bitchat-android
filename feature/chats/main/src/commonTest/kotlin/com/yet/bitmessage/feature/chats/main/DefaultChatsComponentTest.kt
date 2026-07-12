@@ -5,7 +5,6 @@ import com.app.domain.model.ConversationId
 import com.app.domain.model.Peer
 import com.app.domain.model.PeerId
 import com.app.domain.model.Reachability
-import com.app.domain.model.RetentionPolicy
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.DefaultComponentContext
 import com.arkivanov.decompose.router.panels.ChildPanelsMode
@@ -14,8 +13,6 @@ import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
 import com.arkivanov.decompose.router.slot.ChildSlot
-import com.yet.bitmessage.feature.chats.conversations.channels.ChannelDialog
-import com.yet.bitmessage.feature.chats.conversations.channels.ChannelsComponent
 import com.yet.bitmessage.feature.chats.conversations.connectivity.ConnectivityComponent
 import com.yet.bitmessage.feature.chats.conversations.contacts.ContactsComponent
 import com.yet.bitmessage.feature.chats.conversations.search.SearchComponent
@@ -39,7 +36,6 @@ class DefaultChatsComponentTest {
         val onSearchRequested: () -> Unit,
         val onContactsRequested: () -> Unit,
         val onSettingsRequested: () -> Unit,
-        val onChannelsRequested: () -> Unit,
     ) : ConversationsComponent {
         override val model: Value<ConversationsComponent.Model> =
             MutableValue(
@@ -56,7 +52,6 @@ class DefaultChatsComponentTest {
         override fun onSearchClicked() = onSearchRequested()
         override fun onContactsClicked() = onContactsRequested()
         override fun onSettingsClicked() = onSettingsRequested()
-        override fun onChannelsClicked() = onChannelsRequested()
         override fun onTogglePin(id: ConversationId) = Unit
         override fun onToggleMute(id: ConversationId) = Unit
         override fun onDismissBanner() = Unit
@@ -151,25 +146,6 @@ class DefaultChatsComponentTest {
         override fun onCloseClicked() = onClose()
     }
 
-    private class FakeChannelsComponent(
-        val onChannelSelected: (String) -> Unit,
-        val onClose: () -> Unit,
-    ) : ChannelsComponent {
-        override val model: Value<ChannelsComponent.Model> =
-            MutableValue(ChannelsComponent.Model(isLoading = false, channels = emptyList(), error = null))
-        override val dialog: Value<ChildSlot<*, ChannelDialog>> = MutableValue(ChildSlot<Any, ChannelDialog>())
-
-        override fun onChannelClicked(tag: String) = onChannelSelected(tag)
-        override fun onJoin(tag: String) = Unit
-        override fun onSetPasswordClicked(tag: String) = Unit
-        override fun onRetentionClicked(tag: String) = Unit
-        override fun onLeave(tag: String) = Unit
-        override fun onSubmitPassword(tag: String, mode: ChannelDialog.Password.Mode, password: String) = Unit
-        override fun onRetentionSelected(tag: String, policy: RetentionPolicy) = Unit
-        override fun onDismissDialog() = Unit
-        override fun onCloseClicked() = onClose()
-    }
-
     private class FakeChatComponent(
         config: ChatConfig,
         val onFinished: () -> Unit,
@@ -216,8 +192,8 @@ class DefaultChatsComponentTest {
         val lifecycle = LifecycleRegistry()
         return DefaultChatsComponent(
             componentContext = DefaultComponentContext(lifecycle),
-            conversationsFactory = { _, onSelected, onConnectivity, onSearch, onContacts, onSettings, onChannels ->
-                FakeConversationsComponent(onSelected, onConnectivity, onSearch, onContacts, onSettings, onChannels)
+            conversationsFactory = { _, onSelected, onConnectivity, onSearch, onContacts, onSettings ->
+                FakeConversationsComponent(onSelected, onConnectivity, onSearch, onContacts, onSettings)
             },
             chatFactory = { _: ComponentContext, config: ChatConfig, onFinished: () -> Unit, _ ->
                 FakeChatComponent(config, onFinished)
@@ -230,9 +206,6 @@ class DefaultChatsComponentTest {
                 FakeContactsComponent(onContactSelected, onClose)
             },
             settingsFactory = { _, onClose, _ -> FakeSettingsComponent(onClose) },
-            channelsFactory = { _, onChannelSelected, onClose ->
-                FakeChannelsComponent(onChannelSelected, onClose)
-            },
             onOpenMap = {},
             onOpenDebug = {},
         )
@@ -343,19 +316,6 @@ class DefaultChatsComponentTest {
         val component = build()
         component.mainConversations.onSettingsClicked()
         assertIs<ChatsComponent.SheetChild.Settings>(component.sheetSlot.value.child?.instance)
-    }
-
-    @Test
-    fun requesting_channels_opens_the_overlay_and_open_navigates_and_closes() {
-        val component = build()
-        component.mainConversations.onChannelsClicked()
-        val channels = assertIs<ChatsComponent.SheetChild.Channels>(component.sheetSlot.value.child?.instance)
-
-        channels.component.onChannelClicked("#kotlin")
-
-        assertNull(component.sheetSlot.value.child)
-        val chat = assertIs<ChatsComponent.Details.Chat>(component.panels.value.details?.instance)
-        assertEquals(ConversationId.Channel("#kotlin"), chat.component.model.value.conversationId)
     }
 
     @Test

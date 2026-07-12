@@ -1,13 +1,9 @@
 package com.app.domain.usecase
 
 import com.app.domain.model.ConversationId
-import com.app.domain.model.RetentionPolicy
-import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
-import com.app.domain.repository.JoinResult
 import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.PeerRepository
-import kotlinx.coroutines.flow.first
 
 /** Outcome of executing a [ChatCommand]; the caller renders feedback or routes a send. */
 sealed interface CommandResult {
@@ -30,19 +26,11 @@ sealed interface CommandResult {
  */
 class ProcessCommandUseCase(
     private val messages: MessageRepository,
-    private val channels: ChannelRepository,
     private val contacts: ContactRepository,
     private val peers: PeerRepository,
 ) {
     suspend operator fun invoke(conversationId: ConversationId, command: ChatCommand): CommandResult =
         when (command) {
-            is ChatCommand.Join -> when (val r = channels.join(command.channel, command.password)) {
-                JoinResult.Joined -> CommandResult.Feedback("Joined ${command.channel}")
-                JoinResult.NeedsPassword ->
-                    CommandResult.Feedback("${command.channel} is password-protected: /join ${command.channel} <password>")
-                is JoinResult.Failed -> CommandResult.Feedback(r.reason)
-            }
-
             is ChatCommand.Msg ->
                 CommandResult.Feedback("Open a DM with ${command.nickname} from Search or Contacts")
 
@@ -56,11 +44,6 @@ class ProcessCommandUseCase(
                 CommandResult.Handled
             }
 
-            ChatCommand.Channels -> {
-                val joined = channels.observeJoinedChannels().first().sorted()
-                CommandResult.Feedback(if (joined.isEmpty()) "No channels joined" else "Channels: ${joined.joinToString(", ")}")
-            }
-
             is ChatCommand.Block -> {
                 val nickname = command.nickname
                     ?: return CommandResult.Feedback("usage: /block <nickname>")
@@ -68,34 +51,6 @@ class ProcessCommandUseCase(
             }
 
             is ChatCommand.Unblock -> blockByNickname(command.nickname, blocked = false)
-
-            is ChatCommand.Pass -> {
-                val tag = (conversationId as? ConversationId.Channel)?.tag
-                    ?: return CommandResult.Feedback("usage: /pass <password> — only inside a channel")
-                val password = command.password
-                    ?: return CommandResult.Feedback("usage: /pass <password>")
-                channels.setPassword(tag, password)
-                CommandResult.Feedback("Password set for $tag")
-            }
-
-            ChatCommand.Save -> {
-                val tag = (conversationId as? ConversationId.Channel)?.tag
-                    ?: return CommandResult.Feedback("usage: /save — only inside a channel")
-                // Local retention only: legacy /save broadcast an owner toggle to channel members,
-                // a protocol this rewrite does not carry. Set the device-local retention to keep
-                // everything; finer policies (day/week/month) live in the channel-management surface.
-                channels.setRetention(tag, RetentionPolicy.KEEP_ALL)
-                CommandResult.Feedback("Messages in $tag will be kept on this device")
-            }
-
-            is ChatCommand.Transfer -> {
-                command.nickname
-                    ?: return CommandResult.Feedback("usage: /transfer <nickname>")
-                // Parity: channel-ownership transfer was advertised by the legacy command palette but
-                // never executed (no creator/ownership state is resolvable yet). Acknowledge instead
-                // of routing to a non-existent port.
-                CommandResult.Feedback("Channel ownership transfer is not available")
-            }
 
             is ChatCommand.Action ->
                 CommandResult.SendAsMessage("${command.kind.verb} ${command.target} ${command.kind.obj}")

@@ -19,12 +19,9 @@ import com.app.crypto.identity.SecureIdentityStateManager
 import com.app.crypto.secure.SecureKeyValueStore
 import com.app.data.DbMessagePersistence
 import com.app.data.MessagePersistence
-import com.app.data.channel.ChannelCipher
-import com.app.data.channel.EncryptionServiceChannelCipher
 import com.app.data.database.DatabaseKeyProviderImpl
 import com.app.data.geohash.CompassPlaceGeocoder
 import com.app.data.nostr.CurrentGeohashSource
-import com.app.data.repository.ChannelRepositoryImpl
 import com.app.data.repository.ContactRepositoryImpl
 import com.app.data.repository.ConversationPrefsRepositoryImpl
 import com.app.data.repository.ConversationRepositoryImpl
@@ -57,7 +54,6 @@ import com.app.data.verification.VerificationCoordinator
 import com.app.data.board.BoardCoordinator
 import com.app.data.group.GroupCoordinator
 import com.app.data.vouch.VouchCoordinator
-import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationPrefsRepository
 import com.app.domain.repository.ConversationRepository
@@ -159,12 +155,6 @@ abstract class DataBindings {
 
     @Binds
     internal abstract val ContactRepositoryImpl.bindContact: ContactRepository
-
-    @Binds
-    internal abstract val ChannelRepositoryImpl.bindChannel: ChannelRepository
-
-    @Binds
-    internal abstract val EncryptionServiceChannelCipher.bindChannelCipher: ChannelCipher
 
     @Binds
     internal abstract val DbMessagePersistence.bindMessagePersistence: MessagePersistence

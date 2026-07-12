@@ -2,8 +2,6 @@ package com.yet.bitmessage.feature.chats.conversations.di
 
 import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
 import com.yet.bitmessage.feature.chats.conversations.DefaultConversationsComponentFactory
-import com.yet.bitmessage.feature.chats.conversations.channels.ChannelsComponent
-import com.yet.bitmessage.feature.chats.conversations.channels.DefaultChannelsComponentFactory
 import com.yet.bitmessage.feature.chats.conversations.connectivity.ConnectivityComponent
 import com.yet.bitmessage.feature.chats.conversations.connectivity.DefaultConnectivityComponentFactory
 import com.yet.bitmessage.feature.chats.conversations.contacts.ContactsComponent
@@ -34,7 +32,4 @@ abstract class ConversationsBindings {
 
     @Binds
     internal abstract val DefaultSettingsComponentFactory.bindSettingsComponentFactory: SettingsComponent.Factory
-
-    @Binds
-    internal abstract val DefaultChannelsComponentFactory.bindChannelsComponentFactory: ChannelsComponent.Factory
 }
