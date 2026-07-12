@@ -60,5 +60,10 @@ class GatewayRuntime(
         coordinator.rebroadcastRelayEvent(event, geohash)
     }
 
+    /** Called for the relay connectivity transition so a quiet recovered relay still drains. */
+    fun onRelayConnectivityChanged(connected: Boolean) {
+        if (connected) coordinator.flushQueuedUplinks()
+    }
+
     fun onGatewayDisabled() = coordinator.clearQueues()
 }

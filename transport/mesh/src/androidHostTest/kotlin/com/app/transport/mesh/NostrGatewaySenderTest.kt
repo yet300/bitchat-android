@@ -53,4 +53,30 @@ class NostrGatewaySenderTest {
         assertTrue(sender.uplink("event-1", eventJson, "u4pruy"))
         assertFalse(sender.uplink("event-1", eventJson, "u4pruy"))
     }
+
+    @Test
+    fun `sender emits observable outcomes for no gateway send failure and duplicate`() {
+        val events = mutableListOf<Pair<String, String?>>()
+        var accepting = false
+        val sender = NostrGatewaySender(
+            relaysConnected = { false },
+            gatewayPeers = { if (accepting) listOf("gateway-a") else emptyList() },
+            sendDirected = { _, _ -> accepting },
+            telemetry = { event, reason -> events += event to reason },
+        )
+
+        assertFalse(sender.uplink("event-1", eventJson, "u4pruy"))
+        accepting = true
+        assertTrue(sender.uplink("event-1", eventJson, "u4pruy"))
+        assertFalse(sender.uplink("event-1", eventJson, "u4pruy"))
+
+        assertEquals(
+            listOf(
+                "sender_dropped" to "no_gateway",
+                "sender_sent" to null,
+                "sender_dropped" to "duplicate",
+            ),
+            events,
+        )
+    }
 }

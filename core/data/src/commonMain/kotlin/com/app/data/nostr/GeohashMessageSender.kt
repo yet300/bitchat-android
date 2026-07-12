@@ -8,6 +8,7 @@ import com.app.transport.nostr.NostrRelayManager
 import com.app.transport.nostr.PoWPreferenceManager
 import com.app.transport.nostr.RelayDirectory
 import com.app.transport.mesh.MeshService
+import com.app.transport.MeshTelemetry
 import com.app.transport.mesh.NostrGatewaySender
 import com.app.transport.model.PeerCapabilities
 import com.app.data.gateway.GatewayRuntime
@@ -34,6 +35,7 @@ class GeohashMessageSender(
     private val nostrIdentityBridge: NostrIdentityBridge,
     private val powPreferenceManager: PoWPreferenceManager,
     private val meshService: MeshService,
+    private val telemetry: MeshTelemetry,
     @Suppress("UNUSED_PARAMETER") gatewayRuntime: GatewayRuntime,
     dispatchers: AppDispatchers,
 ) {
@@ -47,6 +49,7 @@ class GeohashMessageSender(
             }
         },
         sendDirected = meshService::sendNostrCarrier,
+        telemetry = telemetry::onGatewayEvent,
     )
 
     fun sendPublic(content: String, geohash: String, nickname: String?) {

@@ -7,20 +7,40 @@ class NostrGatewaySender(
     private val relaysConnected: () -> Boolean,
     private val gatewayPeers: () -> List<String>,
     private val sendDirected: (payload: ByteArray, peerId: String) -> Boolean,
+    private val telemetry: (event: String, reason: String?) -> Unit = { _, _ -> },
 ) {
     private val sentIds = HashSet<String>()
     private val sentOrder = ArrayDeque<String>()
 
     fun uplink(eventId: String, eventJson: ByteArray, geohash: String): Boolean {
-        if (relaysConnected() || eventId in sentIds) return false
-        val gateway = gatewayPeers().firstOrNull() ?: return false
+        if (relaysConnected()) {
+            telemetry("sender_skipped", "relays_connected")
+            return false
+        }
+        if (eventId in sentIds) {
+            telemetry("sender_dropped", "duplicate")
+            return false
+        }
+        val gateway = gatewayPeers().firstOrNull()
+        if (gateway == null) {
+            telemetry("sender_dropped", "no_gateway")
+            return false
+        }
         val carrier = NostrCarrierPacket.orNull(
             direction = NostrCarrierPacket.Direction.TO_GATEWAY,
             geohash = geohash,
             eventJson = eventJson,
-        ) ?: return false
-        if (!sendDirected(carrier.encode(), gateway)) return false
+        )
+        if (carrier == null) {
+            telemetry("sender_dropped", "invalid_carrier")
+            return false
+        }
+        if (!sendDirected(carrier.encode(), gateway)) {
+            telemetry("sender_send_failed", null)
+            return false
+        }
         remember(eventId)
+        telemetry("sender_sent", null)
         return true
     }
 

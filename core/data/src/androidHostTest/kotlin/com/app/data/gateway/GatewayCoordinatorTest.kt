@@ -3,6 +3,12 @@ package com.app.data.gateway
 import com.app.transport.mesh.NostrGatewaySender
 import com.app.transport.nostr.NostrEvent
 import com.app.transport.nostr.NostrKind
+import java.util.Collections
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -121,6 +127,67 @@ class GatewayCoordinatorTest {
         now += 61
         scheduled.single().second()
         assertEquals(GatewayCoordinator.DOWNLINKS_PER_MINUTE + 1, broadcasts.size)
+    }
+
+    @Test
+    fun `inline scheduler runs drain after coordinator unlocks`() {
+        val broadcasts = mutableListOf<ByteArray>()
+        val coordinator = GatewayCoordinator(
+            enabled = { true }, relaysConnected = { true }, nowSeconds = { now },
+            verifySignature = { true }, publish = { _, _ -> }, broadcast = { broadcasts += it },
+            scheduleDownlinkDrain = { _, work ->
+                now += 61
+                work()
+            },
+        )
+
+        repeat(GatewayCoordinator.DOWNLINKS_PER_MINUTE + 1) { index ->
+            coordinator.rebroadcastRelayEvent(event("inline-$index"), "u4pruy")
+        }
+
+        assertEquals(GatewayCoordinator.DOWNLINKS_PER_MINUTE + 1, broadcasts.size)
+    }
+
+    @Test
+    fun `quiet relay recovery flushes queued uplinks without an inbound relay event`() {
+        var connected = false
+        val published = mutableListOf<NostrEvent>()
+        val coordinator = GatewayCoordinator(
+            enabled = { true }, relaysConnected = { connected }, nowSeconds = { now },
+            verifySignature = { true }, publish = { event, _ -> published += event },
+        )
+
+        coordinator.handleMeshCarrier(carrier(event("queued")), "sender", directedToUs = true)
+        assertTrue(published.isEmpty())
+        connected = true
+        coordinator.flushQueuedUplinks()
+
+        assertEquals(listOf("queued"), published.map { it.id })
+    }
+
+    @Test
+    fun `concurrent reconnect and mesh deposit preserve queue dedup`() = runBlocking {
+        val connected = AtomicBoolean(false)
+        val published = Collections.synchronizedList(mutableListOf<NostrEvent>())
+        val coordinator = GatewayCoordinator(
+            enabled = { true }, relaysConnected = connected::get, nowSeconds = { now },
+            verifySignature = { true }, publish = { event, _ -> published += event },
+        )
+        val payload = carrier(event("concurrent"))
+        coordinator.handleMeshCarrier(payload, "sender", directedToUs = true)
+
+        (0 until 64).map { index ->
+            async(Dispatchers.Default) {
+                if (index % 2 == 0) {
+                    connected.set(true)
+                    coordinator.flushQueuedUplinks()
+                } else {
+                    coordinator.handleMeshCarrier(payload, "sender", directedToUs = true)
+                }
+            }
+        }.awaitAll()
+
+        assertEquals(listOf("concurrent"), published.map { it.id })
     }
 
     private fun carrier(event: NostrEvent, carrierGeohash: String = "u4pruy"): ByteArray =

@@ -78,6 +78,13 @@ internal class GeohashRepositoryImpl(
             inject = { event -> currentGeohash()?.let { ingest(event, it) } },
         )
         scope.launch { geohashDao.observeBlocked().collect { blockedMirror.value = it.toSet() } }
+        gatewayRuntime?.let { gateway ->
+            scope.launch {
+                relayManager.isConnected.collect { connected ->
+                    gateway.onRelayConnectivityChanged(connected)
+                }
+            }
+        }
         // Pause the high-volume presence firehose (kind 20001) while backgrounded; chat messages
         // (kind 20000) stay subscribed so the timeline and participant count keep updating. (#706)
         scope.launch {

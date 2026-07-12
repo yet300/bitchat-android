@@ -462,7 +462,10 @@ internal class MeshOutboundSender(
             signature = null,
             ttl = MAX_TTL,
         )
-        return meshNetwork.sendToPeer(toPeerID, RoutedPacket(packet)) != SendPath.NoRoute
+        // A carrier commonly contains a full Nostr event and therefore exceeds a BLE frame.
+        // The queued directed path preserves the recipient while routing every fragment through
+        // the shared fragmentation and back-pressure policy.
+        return meshNetwork.sendToPeerQueued(toPeerID, RoutedPacket(packet)) != SendPath.NoRoute
     }
 
     fun broadcastNostrCarrier(payload: ByteArray) {

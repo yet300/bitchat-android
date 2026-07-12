@@ -1,5 +1,7 @@
 package com.app.data.gateway
 
+import co.touchlab.stately.concurrency.Lock
+import co.touchlab.stately.concurrency.withLock
 import com.app.transport.model.NostrCarrierPacket
 import com.app.transport.nostr.NostrEvent
 import com.app.transport.nostr.NostrKind
@@ -26,42 +28,117 @@ class GatewayCoordinator(
     private val pendingDownlinks = ArrayDeque<Pair<NostrEvent, String>>()
     private var downlinkDrainScheduled = false
 
+    // Mesh ingress, relay subscriptions, and connectivity transitions are independent streams.
+    // Swift confines this service to MainActor. Here each state transition is serialized, but all
+    // externally supplied work is dispatched after unlocking so callback re-entry cannot deadlock.
+    private val stateLock = Lock()
+
     fun handleMeshCarrier(payload: ByteArray, fromPeerId: String, directedToUs: Boolean) {
-        val carrier = NostrCarrierPacket.decode(payload) ?: return rejected("decode")
-        when (carrier.direction) {
-            NostrCarrierPacket.Direction.TO_GATEWAY -> {
-                if (!directedToUs || !enabled()) return
-                handleUplink(carrier, fromPeerId)
+        dispatch(stateLock.withLock {
+            val effects = mutableListOf<Effect>()
+            val carrier = NostrCarrierPacket.decode(payload)
+            if (carrier == null) {
+                rejected("decode", effects)
+                return@withLock effects
             }
-            NostrCarrierPacket.Direction.FROM_GATEWAY -> {
-                if (directedToUs) return
-                handleDownlink(carrier)
+            when (carrier.direction) {
+                NostrCarrierPacket.Direction.TO_GATEWAY -> {
+                    if (directedToUs && enabled()) handleUplink(carrier, fromPeerId, effects)
+                }
+                NostrCarrierPacket.Direction.FROM_GATEWAY -> {
+                    if (!directedToUs) handleDownlink(carrier, effects)
+                }
+                NostrCarrierPacket.Direction.TO_BRIDGE,
+                NostrCarrierPacket.Direction.FROM_BRIDGE -> Unit
             }
-            NostrCarrierPacket.Direction.TO_BRIDGE,
-            NostrCarrierPacket.Direction.FROM_BRIDGE -> Unit
-        }
+            effects
+        })
     }
 
     fun flushQueuedUplinks() {
-        if (!enabled() || !relaysConnected()) return
-        while (queuedUplinks.isNotEmpty()) {
-            val item = queuedUplinks.removeFirst()
-            if (!publishedIds.contains(item.event.id)) publishAccepted(item.event, item.geohash)
-        }
+        dispatch(stateLock.withLock {
+            val effects = mutableListOf<Effect>()
+            if (!enabled() || !relaysConnected()) return@withLock effects
+            while (queuedUplinks.isNotEmpty()) {
+                val item = queuedUplinks.removeFirst()
+                if (!publishedIds.contains(item.event.id)) publishAccepted(item.event, item.geohash, effects)
+            }
+            effects
+        })
     }
 
     fun rebroadcastRelayEvent(event: NostrEvent, geohash: String) {
-        if (!enabled() || !structurallyValid(event, geohash)) return
-        if (meshBroadcastIds.contains(event.id) || publishedIds.contains(event.id) ||
-            rebroadcastIds.contains(event.id) || pendingDownlinks.any { it.first.id == event.id }
-        ) return
-        if (!verifySignature(event)) return rejected("signature")
-        pendingDownlinks.addLast(event to geohash)
-        while (pendingDownlinks.size > MAX_PENDING_DOWNLINKS) pendingDownlinks.removeFirst()
-        drainPendingDownlinks()
+        dispatch(stateLock.withLock {
+            val effects = mutableListOf<Effect>()
+            if (!enabled() || !structurallyValid(event, geohash)) return@withLock effects
+            if (meshBroadcastIds.contains(event.id) || publishedIds.contains(event.id) ||
+                rebroadcastIds.contains(event.id) || pendingDownlinks.any { it.first.id == event.id }
+            ) return@withLock effects
+            if (!verifySignature(event)) {
+                rejected("signature", effects)
+                return@withLock effects
+            }
+            pendingDownlinks.addLast(event to geohash)
+            while (pendingDownlinks.size > MAX_PENDING_DOWNLINKS) pendingDownlinks.removeFirst()
+            drainPendingDownlinksLocked(effects)
+            effects
+        })
     }
 
     fun drainPendingDownlinks() {
+        dispatch(stateLock.withLock {
+            mutableListOf<Effect>().also(::drainPendingDownlinksLocked)
+        })
+    }
+
+    fun clearQueues() = stateLock.withLock {
+        queuedUplinks.clear()
+        pendingDownlinks.clear()
+        uplinkTimes.clear()
+        downlinkDrainScheduled = false
+    }
+
+    private fun handleUplink(
+        carrier: NostrCarrierPacket,
+        depositor: String,
+        effects: MutableList<Effect>,
+    ) {
+        val event = parseAndValidateStructure(carrier)
+        if (event == null) {
+            rejected("structure", effects)
+            return
+        }
+        if (meshBroadcastIds.contains(event.id) || publishedIds.contains(event.id) ||
+            queuedUplinks.any { it.event.id == event.id }
+        ) return
+        if (!allowUplink(depositor)) {
+            rejected("rate_limit", effects)
+            return
+        }
+        if (!verifySignature(event)) {
+            rejected("signature", effects)
+            return
+        }
+        val accepted = if (relaysConnected()) {
+            publishAccepted(event, carrier.geohash, effects)
+            true
+        } else {
+            enqueue(QueuedUplink(depositor, carrier.geohash, event), effects)
+        }
+        if (accepted && currentGeohash() == carrier.geohash) effects += Effect.Inject(event)
+    }
+
+    private fun handleDownlink(carrier: NostrCarrierPacket, effects: MutableList<Effect>) {
+        val event = parseAndValidateStructure(carrier)
+        if (event == null) {
+            rejected("structure", effects)
+            return
+        }
+        if (!verifySignature(event) || !meshBroadcastIds.add(event.id)) return
+        if (currentGeohash() == carrier.geohash) effects += Effect.Inject(event)
+    }
+
+    private fun drainPendingDownlinksLocked(effects: MutableList<Effect>) {
         prune(downlinkTimes)
         while (pendingDownlinks.isNotEmpty() && downlinkTimes.size < DOWNLINKS_PER_MINUTE) {
             val (event, geohash) = pendingDownlinks.removeFirst()
@@ -71,46 +148,16 @@ class GatewayCoordinator(
                 geohash,
                 event.toJsonString().encodeToByteArray(),
             ) ?: continue
-            broadcast(packet.encode())
             rebroadcastIds.add(event.id)
             downlinkTimes.addLast(nowSeconds())
-            telemetry(GatewayTelemetryEvent("downlink_sent"))
+            effects += Effect.Broadcast(packet.encode())
+            effects += Effect.Telemetry(GatewayTelemetryEvent("downlink_sent"))
         }
         if (pendingDownlinks.isNotEmpty() && !downlinkDrainScheduled) {
             val delay = ((downlinkTimes.firstOrNull() ?: nowSeconds()) + 60 - nowSeconds()).coerceAtLeast(1)
             downlinkDrainScheduled = true
-            scheduleDownlinkDrain(delay) {
-                downlinkDrainScheduled = false
-                drainPendingDownlinks()
-            }
+            effects += Effect.ScheduleDrain(delay)
         }
-    }
-
-    fun clearQueues() {
-        queuedUplinks.clear()
-        pendingDownlinks.clear()
-        uplinkTimes.clear()
-        downlinkDrainScheduled = false
-    }
-
-    private fun handleUplink(carrier: NostrCarrierPacket, depositor: String) {
-        val event = parseAndValidateStructure(carrier) ?: return rejected("structure")
-        if (meshBroadcastIds.contains(event.id) || publishedIds.contains(event.id) ||
-            queuedUplinks.any { it.event.id == event.id }
-        ) return
-        if (!allowUplink(depositor)) return rejected("rate_limit")
-        if (!verifySignature(event)) return rejected("signature")
-        val accepted = if (relaysConnected()) {
-            publishAccepted(event, carrier.geohash)
-            true
-        } else enqueue(QueuedUplink(depositor, carrier.geohash, event))
-        if (accepted && currentGeohash() == carrier.geohash) injectInbound(event)
-    }
-
-    private fun handleDownlink(carrier: NostrCarrierPacket) {
-        val event = parseAndValidateStructure(carrier) ?: return rejected("structure")
-        if (!verifySignature(event) || !meshBroadcastIds.add(event.id)) return
-        if (currentGeohash() == carrier.geohash) injectInbound(event)
     }
 
     private fun parseAndValidateStructure(carrier: NostrCarrierPacket): NostrEvent? {
@@ -140,25 +187,51 @@ class GatewayCoordinator(
         while (times.firstOrNull()?.let { it < cutoff } == true) times.removeFirst()
     }
 
-    private fun enqueue(item: QueuedUplink): Boolean {
+    private fun enqueue(item: QueuedUplink, effects: MutableList<Effect>): Boolean {
         if (queuedUplinks.count { it.depositor == item.depositor } >= MAX_QUEUED_PER_DEPOSITOR) return false
         while (queuedUplinks.size >= MAX_QUEUED_UPLINKS) queuedUplinks.removeFirst()
         queuedUplinks.addLast(item)
-        telemetry(GatewayTelemetryEvent("uplink_queued"))
+        effects += Effect.Telemetry(GatewayTelemetryEvent("uplink_queued"))
         return true
     }
 
-    private fun publishAccepted(event: NostrEvent, geohash: String) {
+    private fun publishAccepted(event: NostrEvent, geohash: String, effects: MutableList<Effect>) {
         publishedIds.add(event.id)
-        publish(event, geohash)
-        telemetry(GatewayTelemetryEvent("uplink_published"))
+        effects += Effect.Publish(event, geohash)
+        effects += Effect.Telemetry(GatewayTelemetryEvent("uplink_published"))
     }
 
-    private fun rejected(reason: String) {
-        telemetry(GatewayTelemetryEvent("rejected", reason))
+    private fun rejected(reason: String, effects: MutableList<Effect>) {
+        effects += Effect.Telemetry(GatewayTelemetryEvent("rejected", reason))
+    }
+
+    private fun dispatch(effects: List<Effect>) {
+        effects.forEach { effect ->
+            when (effect) {
+                is Effect.Publish -> publish(effect.event, effect.geohash)
+                is Effect.Broadcast -> broadcast(effect.payload)
+                is Effect.Inject -> injectInbound(effect.event)
+                is Effect.Telemetry -> telemetry(effect.event)
+                is Effect.ScheduleDrain -> scheduleDownlinkDrain(effect.delaySeconds) {
+                    val delayedEffects = stateLock.withLock {
+                        downlinkDrainScheduled = false
+                        mutableListOf<Effect>().also(::drainPendingDownlinksLocked)
+                    }
+                    dispatch(delayedEffects)
+                }
+            }
+        }
     }
 
     private data class QueuedUplink(val depositor: String, val geohash: String, val event: NostrEvent)
+
+    private sealed interface Effect {
+        data class Publish(val event: NostrEvent, val geohash: String) : Effect
+        data class Broadcast(val payload: ByteArray) : Effect
+        data class Inject(val event: NostrEvent) : Effect
+        data class Telemetry(val event: GatewayTelemetryEvent) : Effect
+        data class ScheduleDrain(val delaySeconds: Long) : Effect
+    }
 
     companion object {
         const val UPLINKS_PER_MINUTE = 10
