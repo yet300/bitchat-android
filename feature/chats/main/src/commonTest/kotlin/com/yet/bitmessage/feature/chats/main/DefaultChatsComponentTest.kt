@@ -206,6 +206,8 @@ class DefaultChatsComponentTest {
                     reachability = Reachability.OFFLINE,
                     isEncrypted = false,
                     isVerified = false,
+                    isVouched = false,
+                    voucherCount = 0,
                     participantCount = 0,
                     isBookmarked = false,
                     participants = emptyList(),

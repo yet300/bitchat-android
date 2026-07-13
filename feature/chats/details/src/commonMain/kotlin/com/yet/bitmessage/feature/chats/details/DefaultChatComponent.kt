@@ -11,6 +11,7 @@ import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.MessageTransport
 import com.app.domain.repository.NoiseSessionPort
 import com.app.domain.repository.PeerRepository
+import com.app.domain.repository.VouchRepository
 import com.app.domain.usecase.ResolveReachabilityUseCase
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.router.slot.ChildSlot
@@ -148,6 +149,7 @@ internal class DefaultChatComponentFactory(
     private val contactRepository: ContactRepository,
     private val geohashRepository: GeohashRepository,
     private val geohashBookmarks: GeohashBookmarksRepository,
+    private val vouchRepository: VouchRepository,
     private val noiseSession: NoiseSessionPort,
     private val verifyScanFactory: VerifyScanComponent.Factory,
     private val locationNotesFactory: LocationNotesComponent.Factory,
@@ -174,6 +176,7 @@ internal class DefaultChatComponentFactory(
             messageTransport = messageTransport,
             geohashRepository = geohashRepository,
             geohashBookmarks = geohashBookmarks,
+            vouchRepository = vouchRepository,
             noiseSession = noiseSession,
         ),
         verifyScanFactory = verifyScanFactory,

@@ -14,6 +14,7 @@ import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.MessageTransport
 import com.app.domain.repository.NoiseSessionPort
 import com.app.domain.repository.PeerRepository
+import com.app.domain.repository.VouchRepository
 import com.app.domain.usecase.ChatCommand
 import com.app.domain.usecase.CommandResult
 import com.app.domain.usecase.MarkConversationReadUseCase
@@ -52,6 +53,7 @@ internal class ChatStoreFactory(
     private val geohashRepository: GeohashRepository,
     private val geohashBookmarks: GeohashBookmarksRepository,
     private val peerRepository: PeerRepository,
+    private val vouchRepository: VouchRepository,
     messageTransport: MessageTransport,
     noiseSession: NoiseSessionPort,
 ) {
@@ -89,6 +91,7 @@ internal class ChatStoreFactory(
                 is ChatStore.Msg.TitleResolved -> copy(title = msg.title)
                 is ChatStore.Msg.ReachabilityChanged -> copy(reachability = msg.reachability)
                 is ChatStore.Msg.VerifiedChanged -> copy(isVerified = msg.verified)
+                is ChatStore.Msg.VouchChanged -> copy(isVouched = msg.isVouched, voucherCount = msg.voucherCount)
                 is ChatStore.Msg.ParticipantCountChanged -> copy(participantCount = msg.count)
                 is ChatStore.Msg.ParticipantsChanged -> copy(participants = msg.participants)
                 is ChatStore.Msg.MentionCandidatesChanged -> copy(mentionCandidates = msg.nicknames)
@@ -135,6 +138,18 @@ internal class ChatStoreFactory(
                             contactRepository.observeVerified(privateId.peer.raw).collect {
                                 dispatch(ChatStore.Msg.VerifiedChanged(it))
                             }
+                        }
+                        // Derived "vouched" tier: recomputed once from stored attestations. It is
+                        // outranked by my own verification, so the UI only surfaces it when unverified.
+                        scope.launch {
+                            val fingerprint = peerRepository.peer(privateId.peer)?.fingerprint ?: return@launch
+                            val vouchers = vouchRepository.validVouchers(fingerprint)
+                            dispatch(
+                                ChatStore.Msg.VouchChanged(
+                                    isVouched = vouchRepository.isVouched(fingerprint),
+                                    voucherCount = vouchers.size,
+                                ),
+                            )
                         }
                     }
                     // Geo chats: select the location channel so the repository subscribes to the

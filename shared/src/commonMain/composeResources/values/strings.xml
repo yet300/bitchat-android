@@ -152,6 +152,8 @@
     <string name="chat_empty">No messages yet</string>
     <string name="chat_encrypted">Encrypted</string>
     <string name="chat_verified">Verified</string>
+    <string name="chat_vouched">Vouched</string>
+    <string name="chat_vouched_by">Vouched by %1$d</string>
     <string name="chat_reach_nearby">Nearby</string>
     <string name="chat_reach_internet">via Nostr</string>
     <string name="chat_reach_offline">Offline</string>
