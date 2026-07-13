@@ -16,17 +16,14 @@ import com.app.domain.model.PeerId
 import com.app.domain.model.PeerIdentity
 import com.app.domain.model.Reachability
 import com.app.domain.model.SenderRef
-import com.app.domain.model.Channel
 import com.app.domain.model.Contact
-import com.app.domain.model.RetentionPolicy
-import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.model.GeoPerson
 import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.GeohashBookmarksRepository
+import com.app.domain.repository.VouchRepository
 import com.app.domain.repository.GeohashRepository
 import com.app.domain.repository.IdentityRepository
-import com.app.domain.repository.JoinResult
 import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.MessageTransport
 import com.app.domain.repository.NoiseSessionPort
@@ -150,17 +147,6 @@ class ChatStoreFactoryTest {
         override suspend fun clearAll() = Unit
     }
 
-    private class FakeChannelRepository : ChannelRepository {
-        override fun observeJoinedChannels(): Flow<Set<String>> = MutableStateFlow(emptySet())
-        override fun observeChannels(): Flow<List<Channel>> = MutableStateFlow(emptyList())
-        override suspend fun join(tag: String, password: String?): JoinResult = JoinResult.Joined
-        override suspend fun leave(tag: String) = Unit
-        override suspend fun setPassword(tag: String, password: String) = Unit
-        override suspend fun isCreator(tag: String): Boolean = false
-        override fun observeRetention(tag: String): Flow<RetentionPolicy> =
-            MutableStateFlow(RetentionPolicy.KEEP_ALL)
-        override suspend fun setRetention(tag: String, policy: RetentionPolicy) = Unit
-    }
 
     private class FakeGeohashBookmarks : GeohashBookmarksRepository {
         private val set = MutableStateFlow<Set<String>>(emptySet())
@@ -171,6 +157,16 @@ class ChatStoreFactoryTest {
             toggled += geohash
             set.value = if (geohash in set.value) set.value - geohash else set.value + geohash
         }
+    }
+
+    private class FakeVouchRepository(
+        private val vouchedFingerprints: Set<String> = emptySet(),
+        private val vouchers: List<Fingerprint> = emptyList(),
+    ) : VouchRepository {
+        override suspend fun isVouched(fingerprint: Fingerprint): Boolean =
+            fingerprint.value in vouchedFingerprints
+        override suspend fun validVouchers(fingerprint: Fingerprint): List<Fingerprint> =
+            if (fingerprint.value in vouchedFingerprints) vouchers else emptyList()
     }
 
     private class FakeGeohashRepository(
@@ -211,6 +207,7 @@ class ChatStoreFactoryTest {
         targetMessageId: String? = null,
         geohash: FakeGeohashRepository = FakeGeohashRepository(),
         bookmarks: FakeGeohashBookmarks = FakeGeohashBookmarks(),
+        vouch: FakeVouchRepository = FakeVouchRepository(),
         noiseSession: NoiseSessionPort = NoopNoiseSessionPort(),
     ) = ChatStoreFactory(
         storeFactory = DefaultStoreFactory(),
@@ -221,12 +218,12 @@ class ChatStoreFactoryTest {
         identityRepository = identity,
         conversationRepository = conversations,
         resolveReachability = ResolveReachabilityUseCase(FakePeerRepository(peers), FakeContactRepository()),
-        channelRepository = FakeChannelRepository(),
         contactRepository = contacts,
         peerRepository = FakePeerRepository(peers),
         messageTransport = transport,
         geohashRepository = geohash,
         geohashBookmarks = bookmarks,
+        vouchRepository = vouch,
         noiseSession = noiseSession,
     )
 
@@ -237,6 +234,23 @@ class ChatStoreFactoryTest {
         assertFalse(store.state.isLoading)
         assertEquals("dev", store.state.title)
         assertEquals(conversationId, store.state.conversationId)
+    }
+
+    @Test
+    fun vouched_tier_is_surfaced_for_a_dm_peer_a_verified_contact_vouches_for() = runTest {
+        val noiseKey = "a".repeat(64)
+        val peer = Peer(
+            id = PeerId(noiseKey), nickname = "n", isConnected = true, isDirect = true,
+            fingerprint = Fingerprint("fp-1"),
+        )
+        val store = factory(
+            id = ConversationId.Private(PeerId(noiseKey)),
+            peers = listOf(peer),
+            vouch = FakeVouchRepository(setOf("fp-1"), listOf(Fingerprint("voucher-1"))),
+        ).create()
+
+        assertTrue(store.state.isVouched)
+        assertEquals(1, store.state.voucherCount)
     }
 
     @Test

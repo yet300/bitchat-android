@@ -70,6 +70,7 @@ import com.yet.bitmessage.shared.resources.settings_theme_dark
 import com.yet.bitmessage.shared.resources.settings_theme_light
 import com.yet.bitmessage.shared.resources.settings_theme_system
 import com.yet.bitmessage.shared.resources.settings_title
+import com.yet.bitmessage.shared.resources.settings_gateway
 import com.yet.bitmessage.shared.resources.settings_tor
 import com.yet.bitmessage.ui.component.QrCodeImage
 import com.yet.bitmessage.ui.component.button.IconCircleButton
@@ -153,6 +154,7 @@ fun SettingsContent(component: SettingsComponent, modifier: Modifier = Modifier)
                         }
                     }
                 }
+                ToggleRow(stringResource(Res.string.settings_gateway), model.gatewayEnabled, component::onGatewayToggled)
 
                 SectionHeader(stringResource(Res.string.settings_section_background))
                 ToggleRow(stringResource(Res.string.settings_auto_start), model.autoStartEnabled, component::onAutoStartToggled)

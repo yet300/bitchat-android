@@ -34,6 +34,8 @@ internal class DebugStoreFactory(
                 is DebugStore.Msg.StatusChanged -> copy(status = msg.status)
                 is DebugStore.Msg.PacketLogChanged -> copy(packetLog = msg.entries)
                 is DebugStore.Msg.TopologyChanged -> copy(topology = msg.topology)
+                DebugStore.Msg.PingStarted -> copy(isPinging = true, pingResult = null)
+                is DebugStore.Msg.PingFinished -> copy(isPinging = false, pingResult = msg.result)
             }
     }
 
@@ -88,7 +90,19 @@ internal class DebugStoreFactory(
                     dispatch(DebugStore.Msg.SeenCapacityChanged(intent.value))
                 }
                 DebugStore.Intent.RefreshStatus -> dispatch(DebugStore.Msg.StatusChanged(debug.debugStatus()))
+                is DebugStore.Intent.PingPeer -> {
+                    if (state().isPinging) return
+                    dispatch(DebugStore.Msg.PingStarted)
+                    scope.launch {
+                        val probe = debug.pingPeer(intent.peerId)
+                        val result = probe?.let { formatProbe(it) } ?: "timeout"
+                        dispatch(DebugStore.Msg.PingFinished(result))
+                    }
+                }
             }
         }
+
+        private fun formatProbe(probe: com.app.domain.model.MeshPingProbe): String =
+            "RTT ${probe.rttMs} ms" + (probe.hops?.let { " · $it hop(s)" } ?: "")
     }
 }

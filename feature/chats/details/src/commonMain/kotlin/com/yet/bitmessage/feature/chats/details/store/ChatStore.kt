@@ -17,6 +17,10 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
         val draft: String = "",
         val reachability: Reachability = Reachability.OFFLINE,
         val isVerified: Boolean = false,
+        /** Derived "web of trust" tier: a peer I have not verified but a verified peer vouches for. */
+        val isVouched: Boolean = false,
+        /** How many of my verified peers currently vouch for this peer. */
+        val voucherCount: Int = 0,
         val participantCount: Int = 0,
         /** Whether the current geohash is bookmarked (false for non-geo chats). */
         val isBookmarked: Boolean = false,
@@ -63,6 +67,7 @@ internal interface ChatStore : Store<ChatStore.Intent, ChatStore.State, ChatStor
         data class TitleResolved(val title: String) : Msg
         data class ReachabilityChanged(val reachability: Reachability) : Msg
         data class VerifiedChanged(val verified: Boolean) : Msg
+        data class VouchChanged(val isVouched: Boolean, val voucherCount: Int) : Msg
         data class ParticipantCountChanged(val count: Int) : Msg
         data class ParticipantsChanged(val participants: List<GeoPerson>) : Msg
         data class MentionCandidatesChanged(val nicknames: Set<String>) : Msg

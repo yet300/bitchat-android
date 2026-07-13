@@ -4,6 +4,7 @@ import com.app.common.decompose.asValue
 import com.app.domain.model.ThemeMode
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.DatabasePanicWiper
+import com.app.domain.repository.GatewayRepository
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.MediaCleaner
 import com.app.domain.repository.MeshResetPort
@@ -64,6 +65,7 @@ internal class DefaultSettingsComponent(
             backgroundEnabled = state.backgroundEnabled,
             notifPermission = state.notifPermission,
             globalMuteEnabled = state.globalMuteEnabled,
+            gatewayEnabled = state.gatewayEnabled,
             myQr = state.myQr,
         )
     }
@@ -84,6 +86,8 @@ internal class DefaultSettingsComponent(
     override fun onBackgroundToggled(enabled: Boolean) = store.accept(SettingsStore.Intent.BackgroundToggled(enabled))
 
     override fun onGlobalMuteToggled(enabled: Boolean) = store.accept(SettingsStore.Intent.GlobalMuteToggled(enabled))
+
+    override fun onGatewayToggled(enabled: Boolean) = store.accept(SettingsStore.Intent.GatewayToggled(enabled))
 
     override fun onEnableNotificationsClicked() = store.accept(SettingsStore.Intent.EnableNotificationsClicked)
 
@@ -120,6 +124,7 @@ internal class DefaultSettingsComponentFactory(
     private val notificationSettingsRepository: NotificationSettingsRepository,
     private val permissionController: PermissionController,
     private val verificationRepository: VerificationRepository,
+    private val gatewayRepository: GatewayRepository,
     private val meshResetPort: MeshResetPort,
     private val mediaCleaner: MediaCleaner,
     private val databasePanicWiper: DatabasePanicWiper,
@@ -142,6 +147,7 @@ internal class DefaultSettingsComponentFactory(
                 notificationSettingsRepository = notificationSettingsRepository,
                 permissionController = permissionController,
                 verificationRepository = verificationRepository,
+                gatewayRepository = gatewayRepository,
                 panicWipe = PanicWipeUseCase(
                     messageRepository, contactRepository, identityRepository,
                     meshResetPort, mediaCleaner, databasePanicWiper,

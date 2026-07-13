@@ -2,7 +2,6 @@ package com.yet.bitmessage.feature.chats.details
 
 import com.app.common.permission.AppPermission
 import com.app.common.permission.PermissionController
-import com.app.domain.repository.ChannelRepository
 import com.app.domain.repository.ContactRepository
 import com.app.domain.repository.ConversationRepository
 import com.app.domain.repository.GeohashBookmarksRepository
@@ -12,6 +11,7 @@ import com.app.domain.repository.MessageRepository
 import com.app.domain.repository.MessageTransport
 import com.app.domain.repository.NoiseSessionPort
 import com.app.domain.repository.PeerRepository
+import com.app.domain.repository.VouchRepository
 import com.app.domain.usecase.ResolveReachabilityUseCase
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.router.slot.ChildSlot
@@ -147,9 +147,9 @@ internal class DefaultChatComponentFactory(
     private val conversationRepository: ConversationRepository,
     private val peerRepository: PeerRepository,
     private val contactRepository: ContactRepository,
-    private val channelRepository: ChannelRepository,
     private val geohashRepository: GeohashRepository,
     private val geohashBookmarks: GeohashBookmarksRepository,
+    private val vouchRepository: VouchRepository,
     private val noiseSession: NoiseSessionPort,
     private val verifyScanFactory: VerifyScanComponent.Factory,
     private val locationNotesFactory: LocationNotesComponent.Factory,
@@ -171,12 +171,12 @@ internal class DefaultChatComponentFactory(
             identityRepository = identityRepository,
             conversationRepository = conversationRepository,
             resolveReachability = ResolveReachabilityUseCase(peerRepository, contactRepository),
-            channelRepository = channelRepository,
             contactRepository = contactRepository,
             peerRepository = peerRepository,
             messageTransport = messageTransport,
             geohashRepository = geohashRepository,
             geohashBookmarks = geohashBookmarks,
+            vouchRepository = vouchRepository,
             noiseSession = noiseSession,
         ),
         verifyScanFactory = verifyScanFactory,

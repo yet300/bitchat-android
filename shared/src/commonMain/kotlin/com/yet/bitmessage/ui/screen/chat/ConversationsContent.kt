@@ -62,9 +62,11 @@ import com.yet.bitmessage.shared.resources.connectivity_bluetooth
 import com.yet.bitmessage.shared.resources.connectivity_internet
 import com.yet.bitmessage.shared.resources.connectivity_title
 import com.yet.bitmessage.shared.resources.connectivity_tor
-import com.yet.bitmessage.shared.resources.channels_title
 import com.yet.bitmessage.shared.resources.connectivity_wifi_aware
 import com.yet.bitmessage.shared.resources.conversations_contacts
+import com.yet.bitmessage.shared.resources.boards_title
+import com.yet.bitmessage.shared.resources.groups_title
+import com.yet.bitmessage.shared.resources.voice_title
 import com.yet.bitmessage.shared.resources.conversations_empty
 import com.yet.bitmessage.shared.resources.conversations_more
 import com.yet.bitmessage.shared.resources.conversations_yesterday
@@ -108,7 +110,9 @@ fun ConversationsContent(component: ConversationsComponent, modifier: Modifier =
                     OverflowMenu(
                         onConnectivity = component::onConnectivityClicked,
                         onContacts = component::onContactsClicked,
-                        onChannels = component::onChannelsClicked,
+                        onGroups = component::onGroupsClicked,
+                        onVoice = component::onVoiceClicked,
+                        onBoards = component::onBoardsClicked,
                         onSettings = component::onSettingsClicked,
                     )
                 },
@@ -153,7 +157,9 @@ fun ConversationsContent(component: ConversationsComponent, modifier: Modifier =
 private fun OverflowMenu(
     onConnectivity: () -> Unit,
     onContacts: () -> Unit,
-    onChannels: () -> Unit,
+    onGroups: () -> Unit,
+    onVoice: () -> Unit,
+    onBoards: () -> Unit,
     onSettings: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
@@ -169,8 +175,16 @@ private fun OverflowMenu(
                 onClick = { open = false; onContacts() },
             )
             DropdownMenuItem(
-                text = { Text(stringResource(Res.string.channels_title)) },
-                onClick = { open = false; onChannels() },
+                text = { Text(stringResource(Res.string.groups_title)) },
+                onClick = { open = false; onGroups() },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(Res.string.voice_title)) },
+                onClick = { open = false; onVoice() },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(Res.string.boards_title)) },
+                onClick = { open = false; onBoards() },
             )
             DropdownMenuItem(
                 text = { Text(stringResource(Res.string.connectivity_title)) },

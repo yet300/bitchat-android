@@ -17,8 +17,10 @@ import com.arkivanov.decompose.router.slot.childSlot
 import com.arkivanov.decompose.router.slot.dismiss
 import com.arkivanov.decompose.value.Value
 import com.yet.bitmessage.feature.chats.conversations.ConversationsComponent
-import com.yet.bitmessage.feature.chats.conversations.channels.ChannelsComponent
 import com.yet.bitmessage.feature.chats.conversations.connectivity.ConnectivityComponent
+import com.yet.bitmessage.feature.chats.conversations.boards.BoardsComponent
+import com.yet.bitmessage.feature.chats.conversations.groups.GroupsComponent
+import com.yet.bitmessage.feature.chats.conversations.voice.VoiceComponent
 import com.yet.bitmessage.feature.chats.conversations.contacts.ContactsComponent
 import com.yet.bitmessage.feature.chats.conversations.search.SearchComponent
 import com.yet.bitmessage.feature.chats.conversations.settings.SettingsComponent
@@ -36,7 +38,9 @@ internal class DefaultChatsComponent(
     private val searchFactory: SearchComponent.Factory,
     private val contactsFactory: ContactsComponent.Factory,
     private val settingsFactory: SettingsComponent.Factory,
-    private val channelsFactory: ChannelsComponent.Factory,
+    private val groupsFactory: GroupsComponent.Factory,
+    private val voiceFactory: VoiceComponent.Factory,
+    private val boardsFactory: BoardsComponent.Factory,
     private val onOpenMap: (initialGeohash: String?) -> Unit,
     private val onOpenDebug: () -> Unit,
 ) : ChatsComponent, ComponentContext by componentContext {
@@ -61,7 +65,9 @@ internal class DefaultChatsComponent(
                         onSearchRequested = { sheetNavigation.activate(SheetConfig.Search) },
                         onContactsRequested = { sheetNavigation.activate(SheetConfig.Contacts) },
                         onSettingsRequested = { sheetNavigation.activate(SheetConfig.Settings) },
-                        onChannelsRequested = { sheetNavigation.activate(SheetConfig.Channels) },
+                        onGroupsRequested = { sheetNavigation.activate(SheetConfig.Groups) },
+                        onVoiceRequested = { sheetNavigation.activate(SheetConfig.Voice) },
+                        onBoardsRequested = { sheetNavigation.activate(SheetConfig.Boards) },
                     ),
                 )
             },
@@ -125,16 +131,24 @@ internal class DefaultChatsComponent(
                                 },
                             ),
                         )
-                    SheetConfig.Channels ->
-                        ChatsComponent.SheetChild.Channels(
-                            channelsFactory.create(
+                    SheetConfig.Groups ->
+                        ChatsComponent.SheetChild.Groups(
+                            groupsFactory.create(
                                 componentContext = ctx,
-                                onChannelSelected = { tag ->
-                                    sheetNavigation.dismiss()
-                                    navigation.navigate {
-                                        it.copy(details = ChatConfig.from(ConversationId.Channel(tag)))
-                                    }
-                                },
+                                onClose = { sheetNavigation.dismiss() },
+                            ),
+                        )
+                    SheetConfig.Voice ->
+                        ChatsComponent.SheetChild.Voice(
+                            voiceFactory.create(
+                                componentContext = ctx,
+                                onClose = { sheetNavigation.dismiss() },
+                            ),
+                        )
+                    SheetConfig.Boards ->
+                        ChatsComponent.SheetChild.Boards(
+                            boardsFactory.create(
+                                componentContext = ctx,
                                 onClose = { sheetNavigation.dismiss() },
                             ),
                         )
@@ -168,7 +182,13 @@ internal class DefaultChatsComponent(
         data object Settings : SheetConfig
 
         @Serializable
-        data object Channels : SheetConfig
+        data object Groups : SheetConfig
+
+        @Serializable
+        data object Voice : SheetConfig
+
+        @Serializable
+        data object Boards : SheetConfig
     }
 }
 
@@ -180,7 +200,9 @@ internal class DefaultChatsComponentFactory(
     private val searchFactory: SearchComponent.Factory,
     private val contactsFactory: ContactsComponent.Factory,
     private val settingsFactory: SettingsComponent.Factory,
-    private val channelsFactory: ChannelsComponent.Factory,
+    private val groupsFactory: GroupsComponent.Factory,
+    private val voiceFactory: VoiceComponent.Factory,
+    private val boardsFactory: BoardsComponent.Factory,
 ) : ChatsComponent.Factory {
     override fun create(
         componentContext: ComponentContext,
@@ -195,7 +217,9 @@ internal class DefaultChatsComponentFactory(
             searchFactory = searchFactory,
             contactsFactory = contactsFactory,
             settingsFactory = settingsFactory,
-            channelsFactory = channelsFactory,
+            groupsFactory = groupsFactory,
+            voiceFactory = voiceFactory,
+            boardsFactory = boardsFactory,
             onOpenMap = onOpenMap,
             onOpenDebug = onOpenDebug,
         )

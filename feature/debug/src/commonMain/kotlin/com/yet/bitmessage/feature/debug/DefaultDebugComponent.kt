@@ -28,6 +28,7 @@ internal class DefaultDebugComponent(
     override fun onPacketRelayToggled(enabled: Boolean) = store.accept(DebugStore.Intent.SetPacketRelay(enabled))
     override fun onSeenCapacityChanged(value: Int) = store.accept(DebugStore.Intent.SetSeenCapacity(value))
     override fun onRefreshStatus() = store.accept(DebugStore.Intent.RefreshStatus)
+    override fun onPingClicked(peerId: String) = store.accept(DebugStore.Intent.PingPeer(peerId))
     override fun onCloseClicked() = onClose()
 }
 

@@ -79,6 +79,8 @@ import com.yet.bitmessage.shared.resources.chat_back
 import com.yet.bitmessage.shared.resources.chat_empty
 import com.yet.bitmessage.shared.resources.chat_encrypted
 import com.yet.bitmessage.shared.resources.chat_verified
+import com.yet.bitmessage.shared.resources.chat_vouched
+import com.yet.bitmessage.shared.resources.chat_vouched_by
 import com.yet.bitmessage.shared.resources.chat_input_hint
 import com.yet.bitmessage.shared.resources.chat_geo_here
 import com.yet.bitmessage.shared.resources.chat_geo_participants
@@ -121,6 +123,7 @@ import com.yet.bitmessage.ui.component.icon.Done
 import com.yet.bitmessage.ui.component.icon.LocationOn
 import com.yet.bitmessage.ui.component.icon.DoneAll
 import com.yet.bitmessage.ui.component.icon.Lock
+import com.yet.bitmessage.ui.component.icon.LockPerson
 import com.yet.bitmessage.ui.component.icon.Mic
 import com.yet.bitmessage.ui.component.icon.QrCodeScanner
 import com.yet.bitmessage.ui.component.icon.Send
@@ -463,6 +466,19 @@ private fun ChatTitle(model: ChatComponent.Model) {
                     contentDescription = stringResource(Res.string.chat_verified),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(12.dp),
+                )
+            } else if (model.isVouched) {
+                // Derived web-of-trust tier: a peer one of my verified contacts vouches for.
+                Icon(
+                    imageVector = LockPerson,
+                    contentDescription = stringResource(Res.string.chat_vouched),
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(12.dp),
+                )
+                Text(
+                    text = stringResource(Res.string.chat_vouched_by, model.voucherCount),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary,
                 )
             }
             val subtitle = if (model.conversationId is ConversationId.Geohash) {

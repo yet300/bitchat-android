@@ -76,6 +76,8 @@ interface ChatComponent {
         val reachability: Reachability,
         val isEncrypted: Boolean,
         val isVerified: Boolean,
+        val isVouched: Boolean,
+        val voucherCount: Int,
         val participantCount: Int,
         val isBookmarked: Boolean,
         val participants: List<GeoPerson>,

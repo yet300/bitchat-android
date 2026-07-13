@@ -15,6 +15,10 @@ internal interface DebugStore : Store<DebugStore.Intent, DebugStore.State, Nothi
         val status: String = "",
         val packetLog: List<PacketLogEntry> = emptyList(),
         val topology: MeshTopology = MeshTopology(emptyList(), emptyList()),
+        /** Whether a directed echo probe is currently in flight. */
+        val isPinging: Boolean = false,
+        /** The last probe outcome (RTT / hops, or a timeout note); null before any ping. */
+        val pingResult: String? = null,
     )
 
     sealed interface Intent {
@@ -24,6 +28,8 @@ internal interface DebugStore : Store<DebugStore.Intent, DebugStore.State, Nothi
         data class SetPacketRelay(val enabled: Boolean) : Intent
         data class SetSeenCapacity(val value: Int) : Intent
         data object RefreshStatus : Intent
+        /** Send one directed echo probe (ping 0x26) to [peerId] and await the pong (0x27). */
+        data class PingPeer(val peerId: String) : Intent
     }
 
     sealed interface Action {
@@ -40,5 +46,7 @@ internal interface DebugStore : Store<DebugStore.Intent, DebugStore.State, Nothi
         data class StatusChanged(val status: String) : Msg
         data class PacketLogChanged(val entries: List<PacketLogEntry>) : Msg
         data class TopologyChanged(val topology: MeshTopology) : Msg
+        data object PingStarted : Msg
+        data class PingFinished(val result: String) : Msg
     }
 }

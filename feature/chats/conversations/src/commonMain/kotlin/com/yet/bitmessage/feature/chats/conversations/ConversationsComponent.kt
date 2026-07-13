@@ -31,8 +31,14 @@ interface ConversationsComponent {
     /** Open the settings screen (hosted as a slot by the parent). */
     fun onSettingsClicked()
 
-    /** Open the channel-management screen (hosted as a slot by the parent). */
-    fun onChannelsClicked()
+    /** Open the private-groups screen (hosted as a slot by the parent). */
+    fun onGroupsClicked()
+
+    /** Open the live-voice (push-to-talk) screen (hosted as a slot by the parent). */
+    fun onVoiceClicked()
+
+    /** Open the geohash bulletin-boards screen (hosted as a slot by the parent). */
+    fun onBoardsClicked()
 
     fun onTogglePin(id: ConversationId)
 
@@ -65,7 +71,9 @@ interface ConversationsComponent {
             onSearchRequested: () -> Unit,
             onContactsRequested: () -> Unit,
             onSettingsRequested: () -> Unit,
-            onChannelsRequested: () -> Unit,
+            onGroupsRequested: () -> Unit,
+            onVoiceRequested: () -> Unit,
+            onBoardsRequested: () -> Unit,
         ): ConversationsComponent
     }
 }

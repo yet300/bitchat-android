@@ -11,6 +11,7 @@ import com.app.domain.model.PeerId
 import com.app.domain.model.PeerIdentity
 import com.app.domain.model.ThemeMode
 import com.app.domain.repository.ContactRepository
+import com.app.domain.repository.GatewayRepository
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.MeshSettingsRepository
 import com.app.domain.repository.MessageRepository
@@ -158,6 +159,11 @@ class SettingsStoreFactoryTest {
         }
     }
 
+    private class FakeGatewayRepository(private var enabled: Boolean = false) : GatewayRepository {
+        override fun isEnabled(): Boolean = enabled
+        override fun setEnabled(enabled: Boolean) { this.enabled = enabled }
+    }
+
     private fun factory(
         settings: FakeSettingsRepository = FakeSettingsRepository(),
         identity: FakeIdentityRepository = FakeIdentityRepository(),
@@ -170,6 +176,7 @@ class SettingsStoreFactoryTest {
         notifSettings: FakeNotificationSettingsRepository = FakeNotificationSettingsRepository(),
         notifPermission: FakePermissionController = FakePermissionController(),
         verification: FakeVerificationRepository = FakeVerificationRepository(),
+        gateway: FakeGatewayRepository = FakeGatewayRepository(),
     ) = SettingsStoreFactory(
         storeFactory = DefaultStoreFactory(),
         settingsRepository = settings,
@@ -181,6 +188,7 @@ class SettingsStoreFactoryTest {
         notificationSettingsRepository = notifSettings,
         permissionController = notifPermission,
         verificationRepository = verification,
+        gatewayRepository = gateway,
         panicWipe = PanicWipeUseCase(
             messages, contacts, identity,
             meshReset = object : MeshResetPort { override suspend fun reset() {} },
@@ -285,6 +293,19 @@ class SettingsStoreFactoryTest {
 
         assertEquals(false, notifSettings.globalMute.value)
         assertEquals(false, store.state.globalMuteEnabled)
+    }
+
+    @Test
+    fun gateway_loads_off_and_toggles_on() = runTest {
+        val gateway = FakeGatewayRepository(enabled = false)
+        val store = factory(gateway = gateway).create()
+
+        assertEquals(false, store.state.gatewayEnabled)
+
+        store.accept(SettingsStore.Intent.GatewayToggled(true))
+
+        assertTrue(gateway.isEnabled())
+        assertTrue(store.state.gatewayEnabled)
     }
 
     @Test

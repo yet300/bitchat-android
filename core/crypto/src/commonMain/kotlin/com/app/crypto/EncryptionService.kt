@@ -379,42 +379,6 @@ open class EncryptionService(
         noiseService.updatePeerIDMapping(oldPeerID, newPeerID, fingerprint)
     }
     
-    // MARK: - Channel Encryption
-    
-    /**
-     * Set password for a channel (derives encryption key using Argon2id)
-     */
-    fun setChannelPassword(password: String, channel: String) {
-        noiseService.setChannelPassword(password, channel)
-    }
-    
-    /**
-     * Encrypt message for a password-protected channel
-     */
-    fun encryptChannelMessage(message: String, channel: String): ByteArray? {
-        return noiseService.encryptChannelMessage(message, channel)
-    }
-    
-    /**
-     * Decrypt channel message
-     */
-    fun decryptChannelMessage(encryptedData: ByteArray, channel: String): String? {
-        return noiseService.decryptChannelMessage(encryptedData, channel)
-    }
-    
-    /**
-     * Remove channel password (when leaving channel)
-     */
-    fun removeChannelPassword(channel: String) {
-        noiseService.removeChannelPassword(channel)
-    }
-
-    /** SHA-256 commitment of the derived channel key (null if no key). Lets a join verify the password. */
-    fun channelKeyCommitment(channel: String): String? = noiseService.channelKeyCommitment(channel)
-
-    /** Whether an encryption key is currently held for [channel]. */
-    fun hasChannelKey(channel: String): Boolean = noiseService.hasChannelKey(channel)
-
     // MARK: - Session Management
     
     /**
