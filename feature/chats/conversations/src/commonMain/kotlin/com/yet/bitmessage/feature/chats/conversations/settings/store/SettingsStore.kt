@@ -22,6 +22,7 @@ internal interface SettingsStore :
         val backgroundEnabled: Boolean = true,
         val notifPermission: NotifPermissionStatus = NotifPermissionStatus.LOADING,
         val globalMuteEnabled: Boolean = false,
+        val gatewayEnabled: Boolean = false,
         val myQr: String? = null,
     )
 
@@ -35,6 +36,7 @@ internal interface SettingsStore :
         data class AutoStartToggled(val enabled: Boolean) : Intent
         data class BackgroundToggled(val enabled: Boolean) : Intent
         data class GlobalMuteToggled(val enabled: Boolean) : Intent
+        data class GatewayToggled(val enabled: Boolean) : Intent
         data object EnableNotificationsClicked : Intent
         data object ShowMyQrClicked : Intent
     }
@@ -55,6 +57,7 @@ internal interface SettingsStore :
         data class BackgroundLoaded(val enabled: Boolean) : Msg
         data class NotifPermissionLoaded(val status: NotifPermissionStatus) : Msg
         data class GlobalMuteLoaded(val enabled: Boolean) : Msg
+        data class GatewayLoaded(val enabled: Boolean) : Msg
         data class MyQrLoaded(val qr: String?) : Msg
     }
 

@@ -2,6 +2,7 @@ package com.yet.bitmessage.feature.chats.conversations.settings.store
 
 import com.app.common.permission.AppPermission
 import com.app.common.permission.PermissionController
+import com.app.domain.repository.GatewayRepository
 import com.app.domain.repository.IdentityRepository
 import com.app.domain.repository.MeshSettingsRepository
 import com.app.domain.repository.NotificationSettingsRepository
@@ -30,6 +31,7 @@ internal class SettingsStoreFactory(
     private val notificationSettingsRepository: NotificationSettingsRepository,
     private val permissionController: PermissionController,
     private val verificationRepository: VerificationRepository,
+    private val gatewayRepository: GatewayRepository,
     private val panicWipe: PanicWipeUseCase,
 ) {
     fun create(): SettingsStore =
@@ -56,6 +58,7 @@ internal class SettingsStoreFactory(
                 is SettingsStore.Msg.BackgroundLoaded -> copy(backgroundEnabled = msg.enabled)
                 is SettingsStore.Msg.NotifPermissionLoaded -> copy(notifPermission = msg.status)
                 is SettingsStore.Msg.GlobalMuteLoaded -> copy(globalMuteEnabled = msg.enabled)
+                is SettingsStore.Msg.GatewayLoaded -> copy(gatewayEnabled = msg.enabled)
                 is SettingsStore.Msg.MyQrLoaded -> copy(myQr = msg.qr)
             }
     }
@@ -98,6 +101,8 @@ internal class SettingsStoreFactory(
                         notificationSettingsRepository.observeGlobalMuteEnabled()
                             .collect { dispatch(SettingsStore.Msg.GlobalMuteLoaded(it)) }
                     }
+                    // Gateway opt-in is a plain persisted flag (no reactive stream) — read once.
+                    dispatch(SettingsStore.Msg.GatewayLoaded(gatewayRepository.isEnabled()))
                 }
             }
         }
@@ -127,6 +132,10 @@ internal class SettingsStoreFactory(
                 }
                 is SettingsStore.Intent.GlobalMuteToggled -> scope.launch {
                     notificationSettingsRepository.setGlobalMuteEnabled(intent.enabled)
+                }
+                is SettingsStore.Intent.GatewayToggled -> {
+                    gatewayRepository.setEnabled(intent.enabled)
+                    dispatch(SettingsStore.Msg.GatewayLoaded(intent.enabled))
                 }
                 SettingsStore.Intent.EnableNotificationsClicked -> scope.launch {
                     permissionController.requestPermission(AppPermission.Notifications)

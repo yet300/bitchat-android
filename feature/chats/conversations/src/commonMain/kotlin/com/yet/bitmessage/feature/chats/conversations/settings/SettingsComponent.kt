@@ -34,6 +34,9 @@ interface SettingsComponent {
 
     fun onGlobalMuteToggled(enabled: Boolean)
 
+    /** Toggle the opt-in internet-sharing gateway (0x28); default off. */
+    fun onGatewayToggled(enabled: Boolean)
+
     /** Triggers the system POST_NOTIFICATIONS dialog (or app-settings on permanent denial). */
     fun onEnableNotificationsClicked()
 
@@ -67,6 +70,7 @@ interface SettingsComponent {
         val backgroundEnabled: Boolean,
         val notifPermission: NotifPermissionStatus,
         val globalMuteEnabled: Boolean,
+        val gatewayEnabled: Boolean,
         val myQr: String?,
     )
 

@@ -136,6 +136,7 @@ class DefaultChatsComponentTest {
                     backgroundEnabled = true,
                     notifPermission = NotifPermissionStatus.GRANTED,
                     globalMuteEnabled = false,
+                    gatewayEnabled = false,
                     myQr = null,
                 ),
             )
@@ -149,6 +150,7 @@ class DefaultChatsComponentTest {
         override fun onAutoStartToggled(enabled: Boolean) = Unit
         override fun onBackgroundToggled(enabled: Boolean) = Unit
         override fun onGlobalMuteToggled(enabled: Boolean) = Unit
+        override fun onGatewayToggled(enabled: Boolean) = Unit
         override fun onEnableNotificationsClicked() = Unit
         override fun onShowMyQrClicked() = Unit
         override fun onPanicWipeClicked() = Unit

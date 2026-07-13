@@ -40,6 +40,7 @@
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_section_network">Network</string>
     <string name="settings_tor">Route over Tor</string>
+    <string name="settings_gateway">Share internet gateway</string>
     <string name="settings_pow">Proof-of-work</string>
     <string name="settings_pow_difficulty">PoW difficulty</string>
     <string name="settings_section_background">Background</string>
