@@ -117,6 +117,8 @@ class DefaultRootComponentTest {
                     status = "",
                     packetLog = emptyList(),
                     topology = MeshTopology(emptyList(), emptyList()),
+                    isPinging = false,
+                    pingResult = null,
                 ),
             )
         override fun onGattServerToggled(enabled: Boolean) = Unit
@@ -125,6 +127,7 @@ class DefaultRootComponentTest {
         override fun onPacketRelayToggled(enabled: Boolean) = Unit
         override fun onSeenCapacityChanged(value: Int) = Unit
         override fun onRefreshStatus() = Unit
+        override fun onPingClicked(peerId: String) = Unit
         override fun onCloseClicked() = Unit
     }
 

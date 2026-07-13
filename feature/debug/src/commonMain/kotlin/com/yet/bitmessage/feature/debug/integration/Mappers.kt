@@ -13,5 +13,7 @@ internal val stateToModel: (DebugStore.State) -> DebugComponent.Model =  { state
         status = state.status,
         packetLog = state.packetLog,
         topology = state.topology,
+        isPinging = state.isPinging,
+        pingResult = state.pingResult,
     )
 }

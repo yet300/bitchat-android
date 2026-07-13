@@ -52,7 +52,31 @@ class DebugStoreFactoryTest {
         override fun observePacketLog(): Flow<List<PacketLogEntry>> = packetLog
         val topology = MutableStateFlow(MeshTopology(emptyList(), emptyList()))
         override fun observeMeshTopology(): Flow<MeshTopology> = topology
-        override suspend fun pingPeer(peerId: String): MeshPingProbe? = null
+        var pingResult: MeshPingProbe? = null
+        val pinged = mutableListOf<String>()
+        override suspend fun pingPeer(peerId: String): MeshPingProbe? { pinged += peerId; return pingResult }
+    }
+
+    @Test
+    fun ping_routes_to_repository_and_reports_rtt_and_hops() = runTest {
+        val repo = FakeDebugRepository().apply { pingResult = MeshPingProbe(rttMs = 42, hops = 2) }
+        val store = DebugStoreFactory(DefaultStoreFactory(), repo).create()
+
+        store.accept(DebugStore.Intent.PingPeer("peer-1"))
+
+        assertEquals(listOf("peer-1"), repo.pinged)
+        assertEquals(false, store.state.isPinging)
+        assertEquals("RTT 42 ms · 2 hop(s)", store.state.pingResult)
+    }
+
+    @Test
+    fun ping_timeout_is_reported() = runTest {
+        val repo = FakeDebugRepository().apply { pingResult = null }
+        val store = DebugStoreFactory(DefaultStoreFactory(), repo).create()
+
+        store.accept(DebugStore.Intent.PingPeer("peer-1"))
+
+        assertEquals("timeout", store.state.pingResult)
     }
 
     @Test

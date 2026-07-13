@@ -71,6 +71,10 @@
     <string name="debug_packet_log_empty">No packets yet</string>
     <string name="debug_mesh_graph">Mesh graph</string>
     <string name="debug_mesh_graph_empty">No peers in range</string>
+    <string name="debug_ping">Ping (echo probe)</string>
+    <string name="debug_ping_button">Ping</string>
+    <string name="debug_ping_empty">No peers to ping</string>
+    <string name="debug_pinging">Pinging…</string>
     <string name="groups_title">Groups</string>
     <string name="groups_close">Close</string>
     <string name="groups_empty">No groups yet</string>

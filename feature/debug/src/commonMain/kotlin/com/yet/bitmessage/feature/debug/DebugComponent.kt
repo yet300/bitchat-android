@@ -20,6 +20,10 @@ interface DebugComponent {
     fun onPacketRelayToggled(enabled: Boolean)
     fun onSeenCapacityChanged(value: Int)
     fun onRefreshStatus()
+
+    /** Send one directed echo probe to [peerId] and show its RTT / hop count. */
+    fun onPingClicked(peerId: String)
+
     fun onCloseClicked()
 
     data class Model(
@@ -31,6 +35,8 @@ interface DebugComponent {
         val status: String,
         val packetLog: List<PacketLogEntry>,
         val topology: MeshTopology,
+        val isPinging: Boolean,
+        val pingResult: String?,
     )
 
     fun interface Factory {

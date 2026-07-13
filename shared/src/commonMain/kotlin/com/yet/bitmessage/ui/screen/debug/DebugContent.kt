@@ -45,6 +45,10 @@ import com.yet.bitmessage.shared.resources.debug_gatt_client
 import com.yet.bitmessage.shared.resources.debug_gatt_server
 import com.yet.bitmessage.shared.resources.debug_mesh_graph
 import com.yet.bitmessage.shared.resources.debug_mesh_graph_empty
+import com.yet.bitmessage.shared.resources.debug_ping
+import com.yet.bitmessage.shared.resources.debug_ping_button
+import com.yet.bitmessage.shared.resources.debug_ping_empty
+import com.yet.bitmessage.shared.resources.debug_pinging
 import com.yet.bitmessage.shared.resources.debug_packet_log
 import com.yet.bitmessage.shared.resources.debug_packet_log_empty
 import com.yet.bitmessage.shared.resources.debug_packet_relay
@@ -130,6 +134,19 @@ fun DebugContent(component: DebugComponent, modifier: Modifier = Modifier) {
                 HorizontalDivider()
 
                 Text(
+                    text = stringResource(Res.string.debug_ping),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(start = 16.dp, top = 8.dp),
+                )
+                PingSection(
+                    topology = model.topology,
+                    isPinging = model.isPinging,
+                    result = model.pingResult,
+                    onPing = component::onPingClicked,
+                )
+                HorizontalDivider()
+
+                Text(
                     text = stringResource(Res.string.debug_packet_log),
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.padding(start = 16.dp, top = 8.dp),
@@ -137,6 +154,48 @@ fun DebugContent(component: DebugComponent, modifier: Modifier = Modifier) {
                 PacketLog(model.packetLog)
             }
         }
+    }
+}
+
+/** Directed echo probe (0x26/27): ping each known neighbour, show RTT / hop count. */
+@Composable
+private fun PingSection(
+    topology: MeshTopology,
+    isPinging: Boolean,
+    result: String?,
+    onPing: (String) -> Unit,
+) {
+    if (topology.nodes.isEmpty()) {
+        Text(
+            text = stringResource(Res.string.debug_ping_empty),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+        return
+    }
+    topology.nodes.forEach { node ->
+        ListItem(
+            headlineContent = { Text(node.nickname ?: node.peerId) },
+            supportingContent = { Text(node.peerId, style = MaterialTheme.typography.labelSmall) },
+            trailingContent = {
+                TextButton(enabled = !isPinging, onClick = { onPing(node.peerId) }) {
+                    Text(stringResource(Res.string.debug_ping_button))
+                }
+            },
+        )
+    }
+    val line = when {
+        isPinging -> stringResource(Res.string.debug_pinging)
+        result != null -> result
+        else -> null
+    }
+    if (line != null) {
+        Text(
+            text = line,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
     }
 }
 
