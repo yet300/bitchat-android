@@ -8,6 +8,14 @@
 	<string>bitchat uses Bluetooth to discover nearby peers and exchange end-to-end encrypted messages over the mesh, without internet.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>bitchat advertises over Bluetooth so nearby peers can find you and relay encrypted mesh messages.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>bitchat uses the camera to scan QR codes when verifying peers.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>bitchat uses your approximate location for optional local geohash channels. Your exact location is never shared.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>bitchat uses the microphone to record push-to-talk voice messages for nearby peers.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>bitchat lets you choose images and files from your library to share with nearby peers.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>
