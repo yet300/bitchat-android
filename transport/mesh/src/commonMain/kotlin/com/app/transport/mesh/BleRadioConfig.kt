@@ -53,4 +53,7 @@ data class BleRadioConfig(
     // --- redundant central-role link retirement (iOS bleLinkRebindCooldownSeconds) ---
     /** At most one redundant-link retirement pass per peer per this window. */
     val linkRebindCooldownMs: Long = 60_000L,
+
+    // --- directed spool when no writable links (iOS bleDirectedSpoolWindowSeconds) ---
+    val directedSpoolWindowMs: Long = 60_000L,
 )

@@ -108,6 +108,8 @@ class BleBearer(
                 PeerLink(peerID, linkAddress, isInbound = isInbound)
         }
         retireRedundantClientLinks(peerID = peerID, ingressAddress = linkAddress)
+        // Peer identity on a live link — re-attempt spooled directed traffic (iOS post-announce flush).
+        try { connectionManager.flushDirectedSpool() } catch (_: Exception) {}
     }
 
     private fun notifyPeerDisconnected(deviceAddress: String) {
@@ -193,6 +195,9 @@ class BleBearer(
                     val inbound = cm.isClientConnection(deviceAddress) == false
                     debugSettingsManager.logPeerConnection(peer ?: "unknown", nick, deviceAddress, inbound)
                 } catch (_: Exception) {}
+                // A link just came up — drain directed traffic parked while the radio was empty
+                // (iOS flushDirectedSpool after subscribe/announce).
+                try { cm.flushDirectedSpool() } catch (_: Exception) {}
                 _events.tryEmit(BearerEvent.LinkConnected(deviceAddress))
             }
 

@@ -350,6 +350,8 @@ internal class BluetoothConnectionManager(
     override fun connectToAddress(address: String): Boolean = clientManager.connectToAddress(address)
     override fun disconnectAddress(address: String) { connectionTracker.disconnectDevice(address) }
 
+    override fun flushDirectedSpool() = packetBroadcaster.flushDirectedSpool()
+
     /**
      * Central-role (GATT client) links only — used by [BleBearer] + [BleRedundantLinkPolicy]
      * after a direct-announce bind to retire restore-era duplicate connections.

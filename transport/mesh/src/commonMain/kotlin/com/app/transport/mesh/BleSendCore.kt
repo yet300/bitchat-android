@@ -1,9 +1,12 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.app.transport.mesh
 
 import com.app.common.encoding.toHexString
 import com.app.common.utils.Log
 import com.app.transport.MeshTrafficLog
 import com.app.transport.model.RoutedPacket
+import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
 import com.app.transport.protocol.SpecialRecipients
 import com.app.transport.sync.PacketIdUtil
@@ -11,6 +14,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /** One BLE link the local node can write to right now. */
 data class BleNeighbor(
@@ -69,6 +74,7 @@ class BleSendCore(
     private val sourceRoutingEnabled: Boolean,
     private val logTag: String,
     private val config: BleRadioConfig = BleRadioConfig(),
+    private val nowMs: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) {
     private var nicknameResolver: ((String) -> String?)? = null
 
@@ -82,6 +88,9 @@ class BleSendCore(
     private val sendQueue = BleOutboundFrameQueue(config.sendQueueCapacity) {
         trafficLog?.onOutboundDropped(BearerId.BLE)
     }
+
+    /** Short-lived directed bag while the radio has zero writable neighbors (iOS BLEDirectedRelaySpool). */
+    private val directedSpool = BleDirectedRelaySpool()
 
     init {
         scope.launch {
@@ -113,9 +122,14 @@ class BleSendCore(
      */
     fun sendToPeer(targetPeerID: String, routed: RoutedPacket): Boolean {
         val packet = routed.packet
+        val neighbors = radio.neighbors()
+        if (neighbors.isEmpty()) {
+            spoolIfDirected(packet, directedPeerID = targetPeerID)
+            return false
+        }
         // iOS-compatible: only Noise frames are padded over BLE (BLEPacketPaddingPolicy).
         val data = packet.toBinaryData(padding = BLEPacketPaddingPolicy.shouldPadForBLE(packet.type)) ?: return false
-        for (neighbor in radio.neighbors()) {
+        for (neighbor in neighbors) {
             if (neighbor.peerID != targetPeerID) continue
             if (radio.writeToNeighbor(neighbor, data)) {
                 logPacketRelay(routed, toPeer = targetPeerID, toAddress = neighbor.linkAddress)
@@ -125,7 +139,25 @@ class BleSendCore(
         return false
     }
 
+    /**
+     * Drain directed packets held while no links were writable (call on link-up / subscribe).
+     * Re-broadcasts unexpired entries; if links are still missing the send path re-spools them.
+     */
+    fun flushDirectedSpool() {
+        val toSend = directedSpool.drainUnexpired(nowMs(), config.directedSpoolWindowMs)
+        if (toSend.isEmpty()) return
+        Log.d(logTag, "🧳 Flushing ${toSend.size} directed spool packet(s)")
+        for (entry in toSend) {
+            broadcastPacket(RoutedPacket(entry.packet, directedPeerID = entry.recipient))
+        }
+    }
+
+    fun pruneDirectedSpool() {
+        directedSpool.pruneExpired(nowMs(), config.directedSpoolWindowMs)
+    }
+
     fun shutdown() {
+        directedSpool.clear()
         sendQueue.close()
     }
 
@@ -149,12 +181,21 @@ class BleSendCore(
         val senderID = packet.senderID.toHexString()
         val routeInfo = packet.route?.takeIf { it.isNotEmpty() }?.let { "routed: ${it.size} hops" }
         val neighbors = radio.neighbors()
+        val directedTarget = routed.directedPeerID
+            ?: packet.recipientID
+                ?.takeIf { !it.contentEquals(SpecialRecipients.BROADCAST) }
+                ?.toHexString()
+
+        // No writable links: park directed traffic briefly instead of dropping (iOS spool).
+        if (neighbors.isEmpty()) {
+            spoolIfDirected(packet, directedPeerID = directedTarget)
+            return
+        }
 
         // Queued directed send (gossip-sync responses): deliver only to the target peer's
         // link. If the link is gone, fall through to the broadcast fallback below — the
         // same historical fallback MeshNetwork.sendToPeer uses on the direct path.
-        val directedTarget = routed.directedPeerID
-        if (directedTarget != null) {
+        if (directedTarget != null && routed.directedPeerID != null) {
             for (neighbor in neighbors) {
                 if (neighbor.peerID != directedTarget) continue
                 if (radio.writeToNeighbor(neighbor, data)) {
@@ -212,6 +253,19 @@ class BleSendCore(
             if (radio.writeToNeighbor(neighbor, data)) {
                 logPacketRelay(routed, neighbor.peerID, neighbor.linkAddress, packet.version, routeInfo)
             }
+        }
+    }
+
+    private fun spoolIfDirected(packet: BitchatPacket, directedPeerID: String?) {
+        // Broadcast traffic has no single recipient to park for.
+        val recipient = directedPeerID
+            ?: packet.recipientID
+                ?.takeIf { !it.contentEquals(SpecialRecipients.BROADCAST) }
+                ?.toHexString()
+            ?: return
+        val messageID = PacketIdUtil.computeIdHex(packet)
+        if (directedSpool.enqueue(packet, recipient, messageID, nowMs())) {
+            Log.d(logTag, "🧳 Spooling directed packet for ${recipient.take(8)}… mid=${messageID.take(8)}…")
         }
     }
 

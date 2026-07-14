@@ -66,4 +66,10 @@ interface BearerTransport {
      * Default empty so fakes/mocks do not need to implement it.
      */
     fun clientLinkSnapshots(): List<BleClientLinkSnapshot> = emptyList()
+
+    /**
+     * Drain directed packets held while no BLE links were writable ([BleDirectedRelaySpool]).
+     * Platforms that own a [BleSendCore] implement this; default is a no-op.
+     */
+    fun flushDirectedSpool() = Unit
 }

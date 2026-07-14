@@ -85,6 +85,8 @@ internal class BluetoothPacketBroadcaster(
 
     fun cancelTransfer(transferId: String): Boolean = sendCore.cancelTransfer(transferId)
 
+    fun flushDirectedSpool() = sendCore.flushDirectedSpool()
+
     // ------------------------------------------------------------------
     // BleRadioLink — the only genuinely Android part: GATT notify/write
     // ------------------------------------------------------------------

@@ -300,6 +300,8 @@ internal class CoreBluetoothConnectionManager(
 
     override fun cancelTransfer(transferId: String): Boolean = sendCore.cancelTransfer(transferId)
 
+    override fun flushDirectedSpool() = sendCore.flushDirectedSpool()
+
     private inner class RadioLink : BleRadioLink {
         override fun neighbors(): List<BleNeighbor> =
             subscribedCentrals.keys.map { addr ->
