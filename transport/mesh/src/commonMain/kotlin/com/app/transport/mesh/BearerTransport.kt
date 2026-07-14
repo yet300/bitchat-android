@@ -59,4 +59,11 @@ interface BearerTransport {
     fun connectToAddress(address: String): Boolean
     fun disconnectAddress(address: String)
     fun getDebugInfo(): String
+
+    /**
+     * Central-role (client/outbound) links only, for [BleRedundantLinkPolicy].
+     * Server/inbound subscriptions are omitted — dual-role same-peer is normal.
+     * Default empty so fakes/mocks do not need to implement it.
+     */
+    fun clientLinkSnapshots(): List<BleClientLinkSnapshot> = emptyList()
 }

@@ -350,6 +350,26 @@ internal class BluetoothConnectionManager(
     override fun connectToAddress(address: String): Boolean = clientManager.connectToAddress(address)
     override fun disconnectAddress(address: String) { connectionTracker.disconnectDevice(address) }
 
+    /**
+     * Central-role (GATT client) links only — used by [BleBearer] + [BleRedundantLinkPolicy]
+     * after a direct-announce bind to retire restore-era duplicate connections.
+     */
+    override fun clientLinkSnapshots(): List<BleClientLinkSnapshot> {
+        return try {
+            connectionTracker.getConnectedDevices().mapNotNull { (address, dc) ->
+                if (!dc.isClient) return@mapNotNull null
+                BleClientLinkSnapshot(
+                    address = address,
+                    peerID = addressPeerMap[address] ?: dc.peerID,
+                    isConnected = true,
+                    hasCharacteristic = dc.characteristic != null,
+                )
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
 
     // Optionally disconnect all connections (server and client)
     fun disconnectAll() {

@@ -618,9 +618,42 @@ internal class CoreBluetoothConnectionManager(
         connectedPeripherals.keys.map { Triple(it, true, null) } +
                 subscribedCentrals.keys.map { Triple(it, false, null) }
 
+    /**
+     * Central-role (CBPeripheral we connected to) links only — [BleRedundantLinkPolicy] input.
+     * Server-role CBCentral subscriptions are omitted.
+     */
+    override fun clientLinkSnapshots(): List<BleClientLinkSnapshot> =
+        connectedPeripherals.keys.map { addr ->
+            BleClientLinkSnapshot(
+                address = addr,
+                peerID = addressPeerMap.get(addr),
+                isConnected = true,
+                hasCharacteristic = peripheralCharacteristics.get(addr) != null,
+            )
+        }
+
     override fun getLocalAdapterAddress(): String? = null
     override fun connectToAddress(address: String): Boolean = false
-    override fun disconnectAddress(address: String) = Unit
+
+    /**
+     * Cancels a central-role connection. Used by [BleBearer] redundant-link retirement and debug UI.
+     * Removes local bookkeeping first so the disconnect callback does not double-clean.
+     */
+    override fun disconnectAddress(address: String) {
+        val peripheral = connectedPeripherals.get(address) ?: pendingPeripherals.get(address) ?: return
+        connectedPeripherals.remove(address)
+        pendingPeripherals.remove(address)
+        peripheralCharacteristics.remove(address)
+        frameAssemblers.remove(address)
+        outbound.dropLink(address)
+        addressPeerMap.remove(address)
+        try {
+            centralManager.cancelPeripheralConnection(peripheral)
+        } catch (e: Exception) {
+            Log.w(TAG, "disconnectAddress($address) failed: ${e.message}")
+        }
+    }
+
     override fun getDebugInfo(): String =
         "CoreBluetooth: peripherals=${connectedPeripherals.size}, centrals=${subscribedCentrals.size}, active=$active"
 }

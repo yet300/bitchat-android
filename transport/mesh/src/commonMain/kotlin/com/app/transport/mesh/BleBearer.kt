@@ -1,5 +1,8 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.app.transport.mesh
 
+import com.app.common.utils.Log
 import com.app.transport.MeshTelemetry
 import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
@@ -13,6 +16,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Shared BLE implementation of [MeshBearer]: a single commonMain facade over a platform
@@ -36,9 +41,12 @@ class BleBearer(
     // Ownership predicate for [bindPeer]: returns false for link addresses owned by another bearer
     // (e.g. the `aware:` namespace of the Wi-Fi Aware bearer). Defaults to "owns everything".
     private val ownsLinkAddress: (String) -> Boolean = { true },
+    private val radioConfig: BleRadioConfig = BleRadioConfig(),
+    private val nowMs: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) : MeshBearer, BleDebugHandle {
 
     private companion object {
+        private const val TAG = "BleBearer"
         // Headroom over the old 64-slot SharedFlow buffer: absorbs a handshake burst on entry
         // to a dense zone before DROP_OLDEST starts shedding the stalest frames.
         const val INCOMING_BUFFER_CAPACITY = 256
@@ -50,6 +58,9 @@ class BleBearer(
     // Survives reset(): the new radio stack must inherit the current foreground state.
     private var meshServiceActive: Boolean = false
     private var appIsActive: Boolean = true
+
+    // iOS BLEService.lastRedundantLinkRetirementAt — one retirement pass per peer per cooldown.
+    private val lastRedundantLinkRetirementAt = mutableMapOf<String, Long>()
 
     /**
      * The platform radio stack. Replaced in place by [reset]; the BleBearer object keeps its graph
@@ -84,6 +95,9 @@ class BleBearer(
      * Engine-driven binding of a link address to a logical peerID (announce received with max TTL ⇒
      * direct neighbor). The bearer owns the address↔peer map; addresses owned by another bearer
      * (per [ownsLinkAddress]) are ignored.
+     *
+     * After binding, retires redundant central-role links to the same peer (iOS
+     * [BleRedundantLinkPolicy] parity) so restore/reconnect cannot multiply airtime.
      */
     override fun bindPeer(peerID: String, linkAddress: String) {
         if (!ownsLinkAddress(linkAddress)) return
@@ -93,10 +107,61 @@ class BleBearer(
             links.filterNot { it.deviceAddress == linkAddress }.toSet() +
                 PeerLink(peerID, linkAddress, isInbound = isInbound)
         }
+        retireRedundantClientLinks(peerID = peerID, ingressAddress = linkAddress)
     }
 
     private fun notifyPeerDisconnected(deviceAddress: String) {
         _neighbors.update { links -> links.filterNot { it.deviceAddress == deviceAddress }.toSet() }
+    }
+
+    /**
+     * Central-role duplicate retirement (iOS `BLEService` after verified direct announce).
+     * Only client/outbound links we own are considered; server-role subscriptions stay.
+     */
+    private fun retireRedundantClientLinks(peerID: String, ingressAddress: String) {
+        val now = nowMs()
+        val last = lastRedundantLinkRetirementAt[peerID]
+        if (last != null && now - last < radioConfig.linkRebindCooldownMs) return
+
+        val snapshots = connectionManager.clientLinkSnapshots()
+        if (snapshots.size <= 1) return
+
+        // Reflect the bind we just wrote — platforms read addressPeerMap, but a lagging snapshot
+        // peer field is overwritten from the map when present.
+        val links = snapshots.map { snap ->
+            val boundPeer = connectionManager.addressPeerMap[snap.address] ?: snap.peerID
+            snap.copy(peerID = boundPeer).toPolicyLink()
+        }
+
+        val keptUUID = BleRedundantLinkPolicy.keptPeripheralUUID(
+            ingressPeripheralUUID = ingressAddress,
+            mostRecentlyBoundUUID = ingressAddress,
+            links = links,
+            peerID = peerID,
+        ) ?: return
+
+        val retiring = BleRedundantLinkPolicy.peripheralUUIDsToRetire(
+            links = links,
+            peerID = peerID,
+            keeping = keptUUID,
+        )
+        if (retiring.isEmpty()) return
+
+        lastRedundantLinkRetirementAt[peerID] = now
+        // Survivor is the preferred reverse mapping for directed sends.
+        connectionManager.addressPeerMap[keptUUID] = peerID
+
+        for (uuid in retiring) {
+            // Drop binding before cancel so disconnect callbacks do not treat this as peer leave
+            // (the peer is still live on the kept link).
+            connectionManager.addressPeerMap.remove(uuid)
+            notifyPeerDisconnected(uuid)
+            try {
+                connectionManager.disconnectAddress(uuid)
+            } catch (_: Exception) {
+            }
+            Log.i(TAG, "Retiring redundant client link ${uuid.take(8)}… for peer ${peerID.take(8)}… (keeping ${keptUUID.take(8)}…)")
+        }
     }
 
     init {
@@ -168,6 +233,7 @@ class BleBearer(
         old.delegate = null
         this.myPeerID = myPeerID
         _neighbors.value = emptySet()
+        lastRedundantLinkRetirementAt.clear()
         connectionManager = connectionManagerFactory(myPeerID)
         wireConnectionManager()
         nicknameResolver?.let { connectionManager.setNicknameResolver(it) }

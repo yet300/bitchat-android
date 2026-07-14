@@ -49,4 +49,8 @@ data class BleRadioConfig(
     val dutyOffMs: Long = 10_000L,
     val dutyOnDenseMs: Long = 3_000L,
     val dutyOffDenseMs: Long = 15_000L,
+
+    // --- redundant central-role link retirement (iOS bleLinkRebindCooldownSeconds) ---
+    /** At most one redundant-link retirement pass per peer per this window. */
+    val linkRebindCooldownMs: Long = 60_000L,
 )
