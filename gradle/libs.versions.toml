@@ -129,6 +129,9 @@ filekit-dialogs-compose = { module = "io.github.vinceglb:filekit-dialogs-compose
 
 # Grant — KMP runtime permissions (headless, commonMain)
 grant-core = { module = "dev.brewkits:grant-core", version.ref = "grant" }
+grant-motion = { module = "dev.brewkits:grant-motion", version.ref = "grant" }
+grant-bluetooth = { module = "dev.brewkits:grant-bluetooth", version.ref = "grant" }
+grant-location-always = { module = "dev.brewkits:grant-location-always", version.ref = "grant" }
 
 # JSON
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }

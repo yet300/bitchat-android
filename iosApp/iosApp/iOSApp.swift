@@ -39,6 +39,10 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        GrantMotion.shared.initialize()          // if you added grant-motion
+        GrantBluetooth.shared.initialize()       // if you added grant-bluetooth
+        GrantLocationAlways.shared.initialize()  // if you added grant-location-always
+
         // The AppDelegate is the mesh lifecycle owner on iOS (no foreground-service concept):
         // the BLE mesh runs while the process lives, kept alive in background by the
         // bluetooth-central/peripheral background modes.

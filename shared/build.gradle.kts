@@ -19,6 +19,9 @@ kotlin {
             isStatic = true
             export(projects.feature.root)
             export(libs.bundles.decompose)
+            export(libs.grant.motion)
+            export(libs.grant.location.always)
+            export(libs.grant.bluetooth)
         }
     }
 
@@ -92,6 +95,10 @@ kotlin {
             implementation(libs.decompose.compose.experimental)
 
             implementation(libs.ksafe)
+
+            api(libs.grant.motion)
+            api(libs.grant.location.always)
+            api(libs.grant.bluetooth)
         }
         iosMain.dependencies {
             // Apple BLE bearer + native transport seams (NativeTransportBindings moved here).
