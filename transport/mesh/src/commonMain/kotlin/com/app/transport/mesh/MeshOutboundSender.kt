@@ -50,12 +50,16 @@ internal class MeshOutboundSender(
     private val scope: CoroutineScope,
     private val initiateHandshake: (String) -> Unit,
     private val gatewayEnabled: () -> Boolean = { false },
+    private val pendingNoise: BleNoiseSessionQueues = BleNoiseSessionQueues(),
 ) {
 
     companion object {
         private const val TAG = "MeshOutboundSender"
         private val MAX_TTL: UByte = MeshConstants.MESSAGE_TTL_HOPS
     }
+
+    /** Drop any pending handshake-deferred traffic (panic / generation rebuild). */
+    fun clearPendingNoiseQueues() = pendingNoise.clear()
 
     /**
      * Send public message
@@ -200,52 +204,108 @@ internal class MeshOutboundSender(
 
             // Check if we have an established Noise session
             if (encryptionService.hasEstablishedSession(recipientPeerID)) {
-                try {
-                    // Create TLV-encoded private message exactly like iOS
-                    val privateMessage = PrivateMessagePacket(
-                        messageID = finalMessageID,
-                        content = content
-                    )
-
-                    val tlvData = privateMessage.encode()
-                    if (tlvData == null) {
-                        Log.e(TAG, "Failed to encode private message with TLV")
-                        return@launch
-                    }
-
-                    // Create message payload with NoisePayloadType prefix: [type byte] + [TLV data]
-                    val messagePayload = NoisePayload(
-                        type = NoisePayloadType.PRIVATE_MESSAGE,
-                        data = tlvData
-                    )
-
-                    // Encrypt the payload
-                    val encrypted = encryptionService.encrypt(messagePayload.encode(), recipientPeerID)
-
-                    // Create NOISE_ENCRYPTED packet exactly like iOS
-                    val packet = BitchatPacket(
-                        version = 1u,
-                        type = MessageType.NOISE_ENCRYPTED.value,
-                        senderID = peerIdToRoutingBytes(myPeerID),
-                        recipientID = peerIdToRoutingBytes(recipientPeerID),
-                        timestamp = epochMillis().toULong(),
-                        payload = encrypted,
-                        signature = null,
-                        ttl = MAX_TTL
-                    )
-
-                    // Sign the packet before broadcasting
-                    val signedPacket = signPacketBeforeBroadcast(packet)
-                    meshNetwork.broadcast(RoutedPacket(signedPacket))
-                    Log.d(TAG, "📤 Sent encrypted private message to $recipientPeerID (${encrypted.size} bytes)")
-
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to encrypt private message for $recipientPeerID: ${e.message}")
+                if (!sendEncryptedPrivateMessage(content, finalMessageID, recipientPeerID)) {
+                    // Session may have raced out from under us — queue + re-handshake like iOS.
+                    pendingNoise.appendPrivateMessage(content, finalMessageID, recipientPeerID)
+                    initiateHandshake(recipientPeerID)
                 }
             } else {
-                // Fire and forget - initiate handshake but don't queue exactly like iOS
-                Log.d(TAG, "🤝 No session with $recipientPeerID, initiating handshake")
+                // iOS BLENoiseSessionQueues: hold the PM until XX completes, then flush.
+                Log.d(TAG, "🤝 No session with $recipientPeerID, queueing PM and initiating handshake")
+                pendingNoise.appendPrivateMessage(content, finalMessageID, recipientPeerID)
                 initiateHandshake(recipientPeerID)
+            }
+        }
+    }
+
+    /**
+     * Flush private messages and typed Noise payloads deferred until handshake completion.
+     * Safe to call multiple times (empty take is a no-op). Invoked from session-established wiring.
+     */
+    fun flushPendingAfterHandshake(peerID: String) {
+        if (peerID.isEmpty()) return
+        scope.launch {
+            sendPendingPrivateMessagesAfterHandshake(peerID)
+            sendPendingTypedPayloadsAfterHandshake(peerID)
+        }
+    }
+
+    private fun sendEncryptedPrivateMessage(
+        content: String,
+        messageID: String,
+        recipientPeerID: String,
+    ): Boolean {
+        return try {
+            val privateMessage = PrivateMessagePacket(
+                messageID = messageID,
+                content = content
+            )
+            val tlvData = privateMessage.encode()
+            if (tlvData == null) {
+                Log.e(TAG, "Failed to encode private message with TLV")
+                return false
+            }
+            val messagePayload = NoisePayload(
+                type = NoisePayloadType.PRIVATE_MESSAGE,
+                data = tlvData
+            )
+            val encrypted = encryptionService.encrypt(messagePayload.encode(), recipientPeerID)
+            val packet = BitchatPacket(
+                version = 1u,
+                type = MessageType.NOISE_ENCRYPTED.value,
+                senderID = peerIdToRoutingBytes(myPeerID),
+                recipientID = peerIdToRoutingBytes(recipientPeerID),
+                timestamp = epochMillis().toULong(),
+                payload = encrypted,
+                signature = null,
+                ttl = MAX_TTL
+            )
+            val signedPacket = signPacketBeforeBroadcast(packet)
+            meshNetwork.broadcast(RoutedPacket(signedPacket))
+            Log.d(TAG, "📤 Sent encrypted private message to $recipientPeerID (${encrypted.size} bytes)")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to encrypt private message for $recipientPeerID: ${e.message}")
+            false
+        }
+    }
+
+    private fun sendPendingPrivateMessagesAfterHandshake(peerID: String) {
+        val pending = pendingNoise.takePrivateMessages(peerID)
+        if (pending.isEmpty()) return
+        Log.d(TAG, "📤 Sending ${pending.size} pending PMs after handshake to ${peerID.take(8)}…")
+        val failed = mutableListOf<BleNoiseSessionQueues.PendingPrivateMessage>()
+        for (message in pending) {
+            if (!sendEncryptedPrivateMessage(message.content, message.messageID, peerID)) {
+                failed.add(message)
+            }
+        }
+        if (failed.isNotEmpty()) {
+            pendingNoise.prependPrivateMessages(failed, peerID)
+            Log.w(TAG, "⚠️ Re-queued ${failed.size} failed pending PMs for ${peerID.take(8)}…")
+        }
+    }
+
+    private fun sendPendingTypedPayloadsAfterHandshake(peerID: String) {
+        val payloads = pendingNoise.takeTypedPayloads(peerID)
+        if (payloads.isEmpty()) return
+        Log.d(TAG, "📤 Sending ${payloads.size} pending Noise payloads after handshake to ${peerID.take(8)}…")
+        for (typedPayload in payloads) {
+            try {
+                val encrypted = encryptionService.encrypt(typedPayload, peerID)
+                val packet = BitchatPacket(
+                    version = 1u,
+                    type = MessageType.NOISE_ENCRYPTED.value,
+                    senderID = peerIdToRoutingBytes(myPeerID),
+                    recipientID = peerIdToRoutingBytes(peerID),
+                    timestamp = epochMillis().toULong(),
+                    payload = encrypted,
+                    signature = null,
+                    ttl = MeshConstants.MESSAGE_TTL_HOPS
+                )
+                meshNetwork.broadcast(RoutedPacket(signPacketBeforeBroadcast(packet)))
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send pending Noise payload to ${peerID.take(8)}…: ${e.message}")
             }
         }
     }
@@ -270,16 +330,18 @@ internal class MeshOutboundSender(
                     return@launch
                 }
 
-                // Create read receipt payload using NoisePayloadType exactly like iOS
                 val readReceiptPayload = NoisePayload(
                     type = NoisePayloadType.READ_RECEIPT,
                     data = messageID.encodeToByteArray()
                 )
+                if (!encryptionService.hasEstablishedSession(recipientPeerID)) {
+                    pendingNoise.appendTypedPayload(readReceiptPayload.encode(), recipientPeerID)
+                    initiateHandshake(recipientPeerID)
+                    Log.d(TAG, "🕒 Queued read receipt for $recipientPeerID until handshake completes")
+                    return@launch
+                }
 
-                // Encrypt the payload
                 val encrypted = encryptionService.encrypt(readReceiptPayload.encode(), recipientPeerID)
-
-                // Create NOISE_ENCRYPTED packet exactly like iOS
                 val packet = BitchatPacket(
                     version = 1u,
                     type = MessageType.NOISE_ENCRYPTED.value,
@@ -288,17 +350,12 @@ internal class MeshOutboundSender(
                     timestamp = epochMillis().toULong(),
                     payload = encrypted,
                     signature = null,
-                    ttl = MeshConstants.MESSAGE_TTL_HOPS // Same TTL as iOS messageTTL
+                    ttl = MeshConstants.MESSAGE_TTL_HOPS
                 )
-
-                // Sign the packet before broadcasting
                 val signedPacket = signPacketBeforeBroadcast(packet)
                 meshNetwork.broadcast(RoutedPacket(signedPacket))
                 Log.d(TAG, "📤 Sent read receipt to $recipientPeerID for message $messageID")
-
-                // Persist as read after successful send
                 seenMessageStore.markRead(messageID)
-
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send read receipt to $recipientPeerID: ${e.message}")
             }
@@ -503,8 +560,15 @@ internal class MeshOutboundSender(
 
     private fun sendNoisePayloadToPeer(payload: NoisePayload, recipientPeerID: String, label: String) {
         scope.launch {
+            val typed = payload.encode()
+            if (!encryptionService.hasEstablishedSession(recipientPeerID)) {
+                pendingNoise.appendTypedPayload(typed, recipientPeerID)
+                initiateHandshake(recipientPeerID)
+                Log.d(TAG, "🕒 Queued $label for $recipientPeerID until handshake completes")
+                return@launch
+            }
             try {
-                val encrypted = encryptionService.encrypt(payload.encode(), recipientPeerID)
+                val encrypted = encryptionService.encrypt(typed, recipientPeerID)
                 val packet = BitchatPacket(
                     version = 1u,
                     type = MessageType.NOISE_ENCRYPTED.value,

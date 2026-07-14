@@ -80,6 +80,12 @@ internal class MeshComponentWiring(
     }
 
     private fun wireEncryptionCallbacks() {
+        // Flush PMs / typed Noise payloads queued before the XX handshake finished (iOS
+        // BLENoiseSessionQueues). Safe if onKeyExchangeCompleted also flushes — take() is empty
+        // the second time. Each generation re-registers, so the latest wins.
+        encryptionService.onSessionEstablished = { peerID ->
+            outbound.flushPendingAfterHandshake(peerID)
+        }
         // Session-established trigger for transitive verification: on a Noise session coming up with a
         // peer (fingerprint resolved), the vouch coordinator may send a batch. Additive — nothing
         // else consumes this callback. Each generation re-registers, so the latest wins.
@@ -118,6 +124,9 @@ internal class MeshComponentWiring(
         // SecurityManager delegate for key exchange notifications
         securityManager.delegate = object : SecurityManagerDelegate {
             override fun onKeyExchangeCompleted(peerID: String, peerPublicKeyData: ByteArray) {
+                // Drain handshake-deferred private traffic immediately (iOS
+                // sendPendingMessagesAfterHandshake / sendPendingNoisePayloadsAfterHandshake).
+                outbound.flushPendingAfterHandshake(peerID)
                 // Send announcement and cached messages after key exchange
                 scope.launch {
                     Log.d(TAG, "Key exchange completed with $peerID; sending follow-ups")
