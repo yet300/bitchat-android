@@ -55,10 +55,12 @@ class BleBearerIngressDropTest {
 
     private fun packet(marker: ULong): BitchatPacket = BitchatPacket(
         type = MessageType.MESSAGE.value,
-        senderID = ByteArray(8),
+        // Non-local sender so BleIngressPacketGuard does not treat this as self-loopback.
+        senderID = byteArrayOf(0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22),
         recipientID = null,
-        timestamp = marker,
-        payload = ByteArray(0),
+        // Wall-clock timestamps (ingress guard rejects >120s skew from now).
+        timestamp = (System.currentTimeMillis() + marker.toLong()).toULong(),
+        payload = byteArrayOf(marker.toByte()),
         ttl = 1u,
     )
 
@@ -89,15 +91,16 @@ class BleBearerIngressDropTest {
         }
 
         assertEquals("buffer retains exactly `capacity` frames", capacity, received.size)
+        // Markers live in payload[0] (timestamps are wall-clock for the ingress skew gate).
         assertEquals(
             "oldest surviving frame is marker $overflow (0..${overflow - 1} dropped)",
-            overflow.toULong(),
-            received.first().packet.timestamp,
+            overflow.toByte(),
+            received.first().packet.payload.first(),
         )
         assertEquals(
             "newest frame is always retained",
-            (total - 1).toULong(),
-            received.last().packet.timestamp,
+            (total - 1).toByte(),
+            received.last().packet.payload.first(),
         )
     }
 

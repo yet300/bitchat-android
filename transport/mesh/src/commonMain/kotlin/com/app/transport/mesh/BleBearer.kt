@@ -2,7 +2,9 @@
 
 package com.app.transport.mesh
 
+import com.app.common.encoding.toHexString
 import com.app.common.utils.Log
+import com.app.transport.MeshConstants
 import com.app.transport.MeshTelemetry
 import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
@@ -61,6 +63,9 @@ class BleBearer(
 
     // iOS BLEService.lastRedundantLinkRetirementAt — one retirement pass per peer per cooldown.
     private val lastRedundantLinkRetirementAt = mutableMapOf<String, Long>()
+
+    // Short-lived per-packet ingress memory (iOS BLEIngressLinkRegistry).
+    private val ingressRegistry = BleIngressLinkRegistry()
 
     /**
      * The platform radio stack. Replaced in place by [reset]; the BleBearer object keeps its graph
@@ -176,16 +181,59 @@ class BleBearer(
         val cm = connectionManager
         cm.delegate = object : BearerTransportDelegate {
             override fun onPacketReceived(packet: BitchatPacket, peerID: String, deviceAddress: String?) {
-                try {
-                    debugSettingsManager.logIncoming(
+                val claimedSenderID = packet.senderID.toHexString()
+                val boundPeerID = deviceAddress?.let { cm.addressPeerMap[it] }
+                val now = nowMs()
+                when (
+                    val evaluated = BleIngressPacketGuard.evaluate(
                         packet = packet,
-                        fromPeerID = peerID,
-                        fromNickname = null,
-                        fromDeviceAddress = deviceAddress,
-                        myPeerID = myPeerID,
+                        claimedSenderID = claimedSenderID,
+                        boundPeerID = boundPeerID,
+                        localPeerID = myPeerID,
+                        directAnnounceTTL = MeshConstants.MESSAGE_TTL_HOPS,
+                        nowMs = now,
+                        maxTimestampSkewMs = radioConfig.ingressMaxTimestampSkewMs,
+                        isRSR = false,
                     )
-                } catch (_: Exception) {}
-                _incoming.trySend(RoutedPacket(packet, peerID, deviceAddress))
+                ) {
+                    is BleIngressPacketGuard.EvaluateResult.Reject -> {
+                        Log.d(
+                            TAG,
+                            "Dropping ingress packet type ${packet.type}: ${evaluated.rejection}",
+                        )
+                        return
+                    }
+                    is BleIngressPacketGuard.EvaluateResult.Accept -> {
+                        val context = evaluated.context
+                        val linkId = when (cm.isClientConnection(deviceAddress ?: "")) {
+                            true -> BleIngressLinkId.Peripheral(deviceAddress ?: "unknown")
+                            false -> BleIngressLinkId.Central(deviceAddress ?: "unknown")
+                            null -> BleIngressLinkId.Peripheral(deviceAddress ?: "unknown")
+                        }
+                        if (!ingressRegistry.recordIfNew(
+                                packet = packet,
+                                link = linkId,
+                                peerID = context.receivedFromPeerID,
+                                nowMs = now,
+                                lifetimeMs = radioConfig.ingressRecordLifetimeMs,
+                            )
+                        ) {
+                            return
+                        }
+                        try {
+                            debugSettingsManager.logIncoming(
+                                packet = packet,
+                                fromPeerID = context.receivedFromPeerID,
+                                fromNickname = null,
+                                fromDeviceAddress = deviceAddress,
+                                myPeerID = myPeerID,
+                            )
+                        } catch (_: Exception) {}
+                        _incoming.trySend(
+                            RoutedPacket(packet, context.receivedFromPeerID, deviceAddress),
+                        )
+                    }
+                }
             }
 
             override fun onDeviceConnected(deviceAddress: String) {
@@ -239,6 +287,7 @@ class BleBearer(
         this.myPeerID = myPeerID
         _neighbors.value = emptySet()
         lastRedundantLinkRetirementAt.clear()
+        ingressRegistry.clear()
         connectionManager = connectionManagerFactory(myPeerID)
         wireConnectionManager()
         nicknameResolver?.let { connectionManager.setNicknameResolver(it) }

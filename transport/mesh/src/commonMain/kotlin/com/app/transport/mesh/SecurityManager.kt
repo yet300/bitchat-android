@@ -48,7 +48,7 @@ internal class SecurityManager(
     private val myPeerID: String,
     private val trafficLog: MeshTrafficLog? = null,
     dispatchers: AppDispatchers = AppDispatchers(),
-    nowMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+    private val nowMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) {
     
     companion object {
@@ -112,9 +112,34 @@ internal class SecurityManager(
             return PacketValidationResult.DROP
         }
 
-        // Replay attack protection (same 5-minute window as iOS)
-        val currentTime = Clock.System.now().toEpochMilliseconds()
+        // Replay attack protection — first-line clock skew matches iOS BLEIngressPacketGuard (120s).
+        // Use [nowMillis] (injectable) so unit tests can freeze time.
+        val currentTime = nowMillis()
         val messageType = MessageType.fromValue(packet.type)
+
+        BleIngressPacketGuard.validatePayload(
+            packet = packet,
+            peerID = peerID,
+            nowMs = currentTime,
+            maxTimestampSkewMs = BleIngressPacketGuard.DEFAULT_MAX_TIMESTAMP_SKEW_MS,
+            isRSR = false,
+        )?.let { rejection ->
+            when (rejection) {
+                is BleIngressPacketGuard.Rejection.TimestampSkew -> {
+                    Log.w(
+                        TAG,
+                        "Packet timestamp skewed by ${rejection.skewMs}ms " +
+                            "(max ${rejection.maxSkewMs}ms) from ${peerID.take(8)}…",
+                    )
+                    return PacketValidationResult.DROP
+                }
+                is BleIngressPacketGuard.Rejection.InvalidRSR -> {
+                    Log.w(TAG, "Invalid or unsolicited RSR from ${peerID.take(8)}…")
+                    return PacketValidationResult.DROP
+                }
+                else -> Unit
+            }
+        }
 
         // Duplicate detection
         val messageID = generateMessageID(packet)
@@ -311,10 +336,8 @@ internal class SecurityManager(
      * and back-to-back packets sharing sender/timestamp/type are never collapsed.
      * Local-only key — never serialized to the wire.
      */
-    private fun generateMessageID(packet: BitchatPacket): String {
-        val digestPrefix = Sha256.digest(packet.payload).copyOf(4).hexEncodedString()
-        return "${packet.senderID.hexEncodedString()}-${packet.timestamp}-${packet.type}-$digestPrefix"
-    }
+    private fun generateMessageID(packet: BitchatPacket): String =
+        BleIngressLinkRegistry.messageId(packet)
     
     /**
      * Verify packet signature using peer's signing public key

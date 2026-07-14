@@ -56,4 +56,8 @@ data class BleRadioConfig(
 
     // --- directed spool when no writable links (iOS bleDirectedSpoolWindowSeconds) ---
     val directedSpoolWindowMs: Long = 60_000L,
+
+    // --- ingress (iOS bleIngressRecordLifetimeSeconds / BLEIngressPacketGuard skew) ---
+    val ingressRecordLifetimeMs: Long = 3_000L,
+    val ingressMaxTimestampSkewMs: Long = 120_000L,
 )
