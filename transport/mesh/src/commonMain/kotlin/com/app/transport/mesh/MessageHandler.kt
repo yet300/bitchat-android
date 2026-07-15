@@ -149,7 +149,7 @@ internal class MessageHandler(
                 }
                 
                 NoisePayloadType.FILE_TRANSFER -> {
-                    // Handle encrypted file transfer; generate unique message ID
+                    // Legacy KMP Noise-wrapped private file (0x20). Prefer outer 0x22 from native iOS.
                     val file = BitchatFilePacket.decode(noisePayload.data)
                     if (file != null) {
                         Log.d(TAG, "🔓 Decrypted encrypted file from $peerID: name='${file.fileName}', size=${file.fileSize}, mime='${file.mimeType}'")
@@ -175,6 +175,16 @@ internal class MessageHandler(
                     } else {
                         Log.w(TAG, "⚠️ Failed to decode encrypted file transfer from $peerID")
                     }
+                }
+
+                NoisePayloadType.VOICE_FRAME -> {
+                    // DM live voice (iOS NoisePayloadType.voiceFrame 0x08)
+                    Log.d(TAG, "🎙️ Private voice frame from $peerID (${noisePayload.data.size} bytes)")
+                    delegate?.onPrivateVoiceFrameReceived(
+                        peerID,
+                        noisePayload.data,
+                        packet.timestamp.toLong(),
+                    )
                 }
                 
                 NoisePayloadType.DELIVERED -> {
@@ -746,6 +756,8 @@ internal interface MessageHandlerDelegate {
     fun onVerifyChallengeReceived(peerID: String, payload: ByteArray, timestampMs: Long)
     fun onVerifyResponseReceived(peerID: String, payload: ByteArray, timestampMs: Long)
     fun onVouchAttestationsReceived(peerID: String, payload: ByteArray, timestampMs: Long)
+    /** DM live voice burst payload (Noise 0x08). Default no-op for tests/stubs. */
+    fun onPrivateVoiceFrameReceived(peerID: String, payload: ByteArray, timestampMs: Long) {}
 
     // Courier store-and-forward (0x04)
     /** Our own Noise static public key, for computing our courier recipient tags. */

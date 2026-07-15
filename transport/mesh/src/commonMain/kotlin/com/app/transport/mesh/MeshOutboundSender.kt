@@ -123,65 +123,38 @@ internal class MeshOutboundSender(
     }
 
     /**
-     * Send a file as an encrypted private message using Noise protocol
+     * Send a private file as a directed, signed outer [MessageType.FILE_TRANSFER] (0x22) —
+     * byte-compatible with native iOS `BLEService.sendFilePrivate`. Content confidentiality
+     * is not Noise-wrapped on this path (same as reference); authenticity is the Ed25519 packet
+     * signature. Receivers also still accept legacy Noise-wrapped FILE_TRANSFER 0x20 from older KMP.
      */
     fun sendFilePrivate(recipientPeerID: String, file: BitchatFilePacket) {
         try {
-            Log.d(TAG, "📤 sendFilePrivate (ENCRYPTED): to=$recipientPeerID, name=${file.fileName}, size=${file.fileSize}")
-
+            Log.d(TAG, "📤 sendFilePrivate (0x22 directed): to=$recipientPeerID, name=${file.fileName}, size=${file.fileSize}")
             scope.launch {
-                // Check if we have an established Noise session
-                if (encryptionService.hasEstablishedSession(recipientPeerID)) {
-                    try {
-                        // Encode the file packet as TLV
-                        val filePayload = file.encode()
-                        if (filePayload == null) {
-                            Log.e(TAG, "❌ Failed to encode file packet for private send")
-                            return@launch
-                        }
-                        Log.d(TAG, "📦 Encoded file TLV: ${filePayload.size} bytes")
-
-                        // Create NoisePayload wrapper (type byte + file TLV data) - same as iOS
-                        val noisePayload = NoisePayload(
-                            type = NoisePayloadType.FILE_TRANSFER,
-                            data = filePayload
-                        )
-
-                        // Encrypt the payload using Noise
-                        val encrypted = encryptionService.encrypt(noisePayload.encode(), recipientPeerID)
-                        if (encrypted == null) {
-                            Log.e(TAG, "❌ Failed to encrypt file for $recipientPeerID")
-                            return@launch
-                        }
-                        Log.d(TAG, "🔐 Encrypted file payload: ${encrypted.size} bytes")
-
-                        // Create NOISE_ENCRYPTED packet (not FILE_TRANSFER!)
-                        val packet = BitchatPacket(
-                            version = 1u,
-                            type = MessageType.NOISE_ENCRYPTED.value,
-                            senderID = peerIdToRoutingBytes(myPeerID),
-                            recipientID = peerIdToRoutingBytes(recipientPeerID),
-                            timestamp = epochMillis().toULong(),
-                            payload = encrypted,
-                            signature = null,
-                            ttl = MeshConstants.MESSAGE_TTL_HOPS
-                        )
-
-                        // Sign and send the encrypted packet
-                        val signed = signPacketBeforeBroadcast(packet)
-                        // Use a stable transferId based on the unencrypted file TLV payload for progress tracking
-                        val transferId = sha256Hex(filePayload)
-                        meshNetwork.broadcast(RoutedPacket(signed, transferId = transferId))
-                        Log.d(TAG, "✅ Sent encrypted file to $recipientPeerID")
-
-                    } catch (e: Exception) {
-                        Log.e(TAG, "❌ Failed to encrypt file for $recipientPeerID: ${e.message}", e)
-                    }
-                } else {
-                    // No session - initiate handshake but don't queue file
-                    Log.w(TAG, "⚠️ No Noise session with $recipientPeerID for file transfer, initiating handshake")
-                    initiateHandshake(recipientPeerID)
+                val filePayload = file.encode()
+                if (filePayload == null) {
+                    Log.e(TAG, "❌ Failed to encode file packet for private send")
+                    return@launch
                 }
+                val packet = BitchatPacket(
+                    version = 2u,
+                    type = MessageType.FILE_TRANSFER.value,
+                    senderID = peerIdToRoutingBytes(myPeerID),
+                    recipientID = peerIdToRoutingBytes(recipientPeerID),
+                    timestamp = epochMillis().toULong(),
+                    payload = filePayload,
+                    signature = null,
+                    ttl = MeshConstants.MESSAGE_TTL_HOPS,
+                )
+                val signed = signPacketBeforeBroadcast(packet)
+                if (signed.signature == null) {
+                    Log.e(TAG, "❌ Failed to sign private file transfer to $recipientPeerID")
+                    return@launch
+                }
+                val transferId = sha256Hex(filePayload)
+                meshNetwork.broadcast(RoutedPacket(signed, transferId = transferId))
+                Log.d(TAG, "✅ Sent private file transfer (0x22) to $recipientPeerID (${filePayload.size} bytes)")
             }
         } catch (e: Exception) {
             Log.e(TAG, "❌ sendFilePrivate failed: ${e.message}", e)
@@ -533,6 +506,19 @@ internal class MeshOutboundSender(
             timestamp = epochMillis().toULong(), payload = payload, signature = null, ttl = MAX_TTL,
         )
         meshNetwork.broadcast(RoutedPacket(packet))
+    }
+
+    /**
+     * DM live voice: [NoisePayloadType.VOICE_FRAME] (0x08) inside directed noiseEncrypted —
+     * iOS `sendVoiceFrame` parity. Requires an established Noise session.
+     */
+    fun sendVoiceFrame(payload: ByteArray, toPeerID: String) {
+        if (payload.isEmpty() || toPeerID.isEmpty()) return
+        sendNoisePayloadToPeer(
+            NoisePayload(NoisePayloadType.VOICE_FRAME, payload),
+            toPeerID,
+            "voice frame",
+        )
     }
 
     /** Sends one encoded public live-voice burst without persistence or gossip-sync tracking. */

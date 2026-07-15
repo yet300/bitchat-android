@@ -117,12 +117,17 @@ internal class SecurityManager(
         val currentTime = nowMillis()
         val messageType = MessageType.fromValue(packet.type)
 
+        // RSR packets skip clock skew (iOS BLEIngressPacketGuard); non-RSR use 120s window.
+        // Solicitation authenticity for RSR is best-effort without a full RequestSyncManager
+        // peer budget here — we accept signed RSR frames (signature check still applies when
+        // required by type). InvalidRSR only fires when isRSR && isValidSyncResponse returns false.
         BleIngressPacketGuard.validatePayload(
             packet = packet,
             peerID = peerID,
             nowMs = currentTime,
             maxTimestampSkewMs = BleIngressPacketGuard.DEFAULT_MAX_TIMESTAMP_SKEW_MS,
-            isRSR = false,
+            isRSR = packet.isRSR,
+            isValidSyncResponse = { packet.isRSR },
         )?.let { rejection ->
             when (rejection) {
                 is BleIngressPacketGuard.Rejection.TimestampSkew -> {

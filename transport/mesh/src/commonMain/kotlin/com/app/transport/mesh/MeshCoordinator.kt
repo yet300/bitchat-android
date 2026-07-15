@@ -156,7 +156,9 @@ class MeshCoordinator(
     override var prekeyEventListener: PrekeyEventListener? = null
     private var nostrCarrierHandler: ((ByteArray, String, Boolean) -> Unit)? = null
     private val voiceFrameEvents = VoiceFrameEventStream()
+    private val privateVoiceFrameEvents = VoiceFrameEventStream()
     override val publicVoiceFrames = voiceFrameEvents.frames
+    override val privateVoiceFrames = privateVoiceFrameEvents.frames
 
     // Coroutines
     private var serviceScope = CoroutineScope(dispatchers.io + SupervisorJob())
@@ -267,6 +269,7 @@ class MeshCoordinator(
             prekeyListener = { prekeyEventListener },
             nostrCarrierHandler = { nostrCarrierHandler },
             voiceFrameSink = voiceFrameEvents::emit,
+            privateVoiceFrameSink = privateVoiceFrameEvents::emit,
             nowMillis = { epochMillis() },
         ).wire()
         messageHandler.packetProcessor = packetProcessor
@@ -574,6 +577,9 @@ class MeshCoordinator(
     override fun broadcastNostrCarrier(payload: ByteArray) = outbound.broadcastNostrCarrier(payload)
 
     override fun broadcastVoiceFrame(payload: ByteArray) = outbound.broadcastVoiceFrame(payload)
+
+    override fun sendVoiceFrame(payload: ByteArray, toPeerID: String) =
+        outbound.sendVoiceFrame(payload, toPeerID)
 
     override fun connectedPeerIDs(): List<String> =
         try { peerManager.getActivePeerIDs() } catch (_: Exception) { emptyList() }

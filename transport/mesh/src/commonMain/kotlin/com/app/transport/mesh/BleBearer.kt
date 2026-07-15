@@ -193,7 +193,7 @@ class BleBearer(
                         directAnnounceTTL = MeshConstants.MESSAGE_TTL_HOPS,
                         nowMs = now,
                         maxTimestampSkewMs = radioConfig.ingressMaxTimestampSkewMs,
-                        isRSR = false,
+                        isRSR = packet.isRSR,
                     )
                 ) {
                     is BleIngressPacketGuard.EvaluateResult.Reject -> {

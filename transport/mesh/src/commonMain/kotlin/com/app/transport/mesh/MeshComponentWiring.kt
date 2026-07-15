@@ -62,6 +62,7 @@ internal class MeshComponentWiring(
     private val prekeyListener: () -> PrekeyEventListener?,
     private val nostrCarrierHandler: () -> ((ByteArray, String, Boolean) -> Unit)?,
     private val voiceFrameSink: (PublicVoiceFrame) -> Unit,
+    private val privateVoiceFrameSink: (PublicVoiceFrame) -> Unit = {},
     private val nowMillis: () -> Long,
 ) {
 
@@ -399,6 +400,10 @@ internal class MeshComponentWiring(
 
             override fun onVouchAttestationsReceived(peerID: String, payload: ByteArray, timestampMs: Long) {
                 vouchListener()?.onVouchAttestations(peerID, payload, timestampMs)
+            }
+
+            override fun onPrivateVoiceFrameReceived(peerID: String, payload: ByteArray, timestampMs: Long) {
+                privateVoiceFrameSink(PublicVoiceFrame(peerID, payload, timestampMs))
             }
 
             // Courier store-and-forward (0x04)

@@ -299,7 +299,8 @@ internal class GossipSyncManager(
                 val idBytes = hexToBytes(id)
                 if (!mightContain(idBytes)) {
                     // Send original packet unchanged to requester only (keep local TTL)
-                    val toSend = pkt.copy(ttl = SyncDefaults.SYNC_TTL_HOPS)
+                    // Mark as solicited response (iOS GossipSyncManager isRSR = true).
+                    val toSend = pkt.copy(ttl = SyncDefaults.SYNC_TTL_HOPS, isRSR = true)
                     delegate?.sendPacketToPeer(fromPeerID, toSend)
                     Log.d(TAG, "Sent sync announce: Type ${toSend.type} from ${toSend.senderID.hexEncodedString()} to $fromPeerID packet id ${idBytes.hexEncodedString()}")
                 }
@@ -313,7 +314,7 @@ internal class GossipSyncManager(
                 if (since != null && pkt.timestamp.toLong() < since) continue
                 val idBytes = PacketIdUtil.computeIdBytes(pkt)
                 if (!mightContain(idBytes)) {
-                    val toSend = pkt.copy(ttl = SyncDefaults.SYNC_TTL_HOPS)
+                    val toSend = pkt.copy(ttl = SyncDefaults.SYNC_TTL_HOPS, isRSR = true)
                     delegate?.sendPacketToPeer(fromPeerID, toSend)
                     Log.d(TAG, "Sent sync message: Type ${toSend.type} to $fromPeerID packet id ${idBytes.hexEncodedString()}")
                 }
@@ -329,7 +330,10 @@ internal class GossipSyncManager(
                     if (since != null && pkt.timestamp.toLong() < since) return@forEach
                     val idBytes = PacketIdUtil.computeIdBytes(pkt)
                     if (!mightContain(idBytes)) {
-                        delegate?.sendPacketToPeer(fromPeerID, pkt.copy(ttl = SyncDefaults.SYNC_TTL_HOPS))
+                        delegate?.sendPacketToPeer(
+                            fromPeerID,
+                            pkt.copy(ttl = SyncDefaults.SYNC_TTL_HOPS, isRSR = true),
+                        )
                     }
                 }
             }

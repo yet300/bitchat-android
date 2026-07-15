@@ -65,8 +65,9 @@ internal class BleLinkOutboundBuffer(
             while (i < chunks.size) {
                 when (writer.writeChunk(chunks[i])) {
                     ChunkWriteResult.SENT -> i++
-                    // link died mid/at-start; head (if any) is gone, nothing to queue.
-                    ChunkWriteResult.GONE -> return@withLock true
+                    // Link died mid/at-start: report failure so the send path can spool or flood.
+                    // (Previously returned true, so directed frames were treated as delivered and lost.)
+                    ChunkWriteResult.GONE -> return@withLock false
                     ChunkWriteResult.BUSY -> {
                         // Stash the tail (chunks i..end); this frame's head already went out, so it
                         // is now the in-flight "started" frame — it must never be dropped.

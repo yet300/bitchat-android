@@ -224,12 +224,20 @@ class BleSendCore(
         val recipientID = packet.recipientID
         if (recipientID != null && !recipientID.contentEquals(SpecialRecipients.BROADCAST)) {
             val recipient = recipientID.toHexString()
+            var directedWriteFailed = false
             for (neighbor in neighbors) {
                 if (neighbor.peerID != recipient) continue
                 if (radio.writeToNeighbor(neighbor, data)) {
                     logPacketRelay(routed, neighbor.peerID, neighbor.linkAddress, packet.version, routeInfo)
                     return
                 }
+                directedWriteFailed = true
+            }
+            // Neighbor present but every write returned false (GONE/error) — park directed
+            // traffic instead of falling into a flood that may also fail silently (P0.6).
+            if (directedWriteFailed) {
+                spoolIfDirected(packet, directedPeerID = recipient)
+                return
             }
         }
 

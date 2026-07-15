@@ -77,7 +77,13 @@ data class BitchatPacket(
     val payload: ByteArray,
     var signature: ByteArray? = null,  // Changed from val to var for packet signing
     var ttl: UByte,
-    var route: List<ByteArray>? = null // Optional source route: ordered list of peerIDs (8 bytes each), not including sender and final recipient
+    var route: List<ByteArray>? = null, // Optional source route: ordered list of peerIDs (8 bytes each), not including sender and final recipient
+    /**
+     * Request-Sync Response flag (wire Flags.IS_RSR = 0x10). Mutable and **not** covered by
+     * the Ed25519 signature (iOS BitchatPacket parity) — set on solicited gossip-sync replies
+     * so receivers skip clock-skew checks and attribute validation to the previous hop.
+     */
+    var isRSR: Boolean = false,
 ) {
 
     constructor(
@@ -116,7 +122,8 @@ data class BitchatPacket(
             payload = payload,
             signature = null, // Remove signature for signing
             route = route,
-            ttl = 0u.toUByte() // Use fixed TTL=0 for signing to ensure relay compatibility
+            ttl = 0u.toUByte(), // Use fixed TTL=0 for signing to ensure relay compatibility
+            isRSR = false, // RSR is mutable and not part of the signature (iOS parity)
         )
         return BinaryProtocol.encode(unsignedPacket)
     }
@@ -186,6 +193,8 @@ object BinaryProtocol {
         const val HAS_SIGNATURE: UByte = 0x02u
         const val IS_COMPRESSED: UByte = 0x04u
         const val HAS_ROUTE: UByte = 0x08u
+        /** Request-Sync Response — solicited gossip reply (iOS Flags.isRSR). */
+        const val IS_RSR: UByte = 0x10u
     }
 
     private fun getHeaderSize(version: UByte): Int {
@@ -257,6 +266,9 @@ object BinaryProtocol {
             // HAS_ROUTE is only supported for v2+ packets
             if (!packet.route.isNullOrEmpty() && packet.version >= 2u.toUByte()) {
                 flags = flags or Flags.HAS_ROUTE
+            }
+            if (packet.isRSR) {
+                flags = flags or Flags.IS_RSR
             }
             buffer.writeByte(flags.toByte())
 
@@ -374,6 +386,7 @@ object BinaryProtocol {
             val isCompressed = (flags and Flags.IS_COMPRESSED) != 0u.toUByte()
             // HAS_ROUTE is only valid for v2+ packets; ignore the flag for v1
             val hasRoute = (version >= 2u.toUByte()) && (flags and Flags.HAS_ROUTE) != 0u.toUByte()
+            val isRSR = (flags and Flags.IS_RSR) != 0u.toUByte()
 
             // Payload length - version-dependent (2 or 4 bytes)
             val payloadLength = if (version >= 2u.toUByte()) {
@@ -482,7 +495,8 @@ object BinaryProtocol {
                 payload = payload,
                 signature = signature,
                 ttl = ttl,
-                route = route
+                route = route,
+                isRSR = isRSR,
             )
             
         } catch (e: Throwable) {

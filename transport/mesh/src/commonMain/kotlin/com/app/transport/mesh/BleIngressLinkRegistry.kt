@@ -97,8 +97,7 @@ class BleIngressLinkRegistry {
         /**
          * Attribute claimed sender vs link-bound peer (iOS packetContext).
          *
-         * @param isRSR Request-Sync Response flag (wire flag not yet on KMP BitchatPacket —
-         *   pass false until BinaryProtocol carries Flags.IS_RSR).
+         * @param isRSR Request-Sync Response flag (wire Flags.IS_RSR / [BitchatPacket.isRSR]).
          */
         fun packetContext(
             packet: BitchatPacket,

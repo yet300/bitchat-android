@@ -161,4 +161,14 @@ interface MeshService {
 
     /** Broadcasts one already-encoded live voice burst as signed, ephemeral 0x29 traffic. */
     fun broadcastVoiceFrame(payload: ByteArray) = Unit
+
+    /**
+     * DM live voice: Noise payload type 0x08 inside directed noiseEncrypted.
+     * Requires an established Noise session (queues until handshake like other typed payloads).
+     */
+    fun sendVoiceFrame(payload: ByteArray, toPeerID: String) = Unit
+
+    /** Inbound private live-voice frames (Noise 0x08), same payload framing as public bursts. */
+    val privateVoiceFrames: Flow<PublicVoiceFrame>
+        get() = emptyFlow()
 }

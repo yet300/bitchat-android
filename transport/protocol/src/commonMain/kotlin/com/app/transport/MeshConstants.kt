@@ -50,7 +50,9 @@ object MeshConstants {
         const val MAX_FRAGMENT_SIZE: Int = 469
         const val FRAGMENT_TIMEOUT_MS: Long = 30_000L
         const val CLEANUP_INTERVAL_MS: Long = 10_000L
-        const val MAX_FRAGMENTS_PER_ID: Int = 256
+        // 1 MiB payload / 469-byte fragments ≈ 2236; headroom for TLV + packet framing.
+        // (Previously 256 ≈ 116 KiB — broke native↔KMP 1 MiB file interop.)
+        const val MAX_FRAGMENTS_PER_ID: Int = 4096
         const val MAX_FRAGMENT_TOTAL_BYTES: Int = 1_048_576
         const val MAX_ACTIVE_FRAGMENT_SETS: Int = 64
         const val MAX_GLOBAL_FRAGMENT_TOTAL_BYTES: Long = 4L * 1_048_576L
