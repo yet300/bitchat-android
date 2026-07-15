@@ -52,8 +52,9 @@ interface BleRadioLink {
  * Owns, once, in commonMain:
  *  - fragmentation, inter-fragment pacing, transfer progress and cancel ([FragmentingPacketSender]),
  *  - `toBinaryData(padding = shouldPadForBLE(type))` — the iOS-compatible wire encoding,
- *  - source routing for originating packets (behind [sourceRoutingEnabled]: the Apple bearer never
- *    had it, so it stays off there until the owner enables it deliberately),
+ *  - source routing for originating packets (behind [sourceRoutingEnabled]; both Android and
+ *    CoreBluetooth enable this so multi-hop directed unicast can attach routes when the graph
+ *    has confirmed edges — empty routes still flood),
  *  - directed-send-to-neighbor with broadcast fallback,
  *  - broadcast with relay/sender anti-loop,
  *  - per-target relay telemetry through the [MeshTrafficLog] port (null = silent, Apple today).
