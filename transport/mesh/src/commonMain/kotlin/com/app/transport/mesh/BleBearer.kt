@@ -223,14 +223,23 @@ class BleBearer(
                         try {
                             debugSettingsManager.logIncoming(
                                 packet = packet,
-                                fromPeerID = context.receivedFromPeerID,
+                                // Log the logical origin; radio hop is in deviceAddress.
+                                fromPeerID = context.validationPeerID,
                                 fromNickname = null,
                                 fromDeviceAddress = deviceAddress,
                                 myPeerID = myPeerID,
                             )
                         } catch (_: Exception) {}
+                        // peerID MUST be validationPeerID (claimed logical origin) so
+                        // SecurityManager/Noise use the author key — not the previous hop
+                        // bound on this link (iOS packetContext / handleReceivedPacket split).
                         _incoming.trySend(
-                            RoutedPacket(packet, context.receivedFromPeerID, deviceAddress),
+                            RoutedPacket(
+                                packet = packet,
+                                peerID = context.validationPeerID,
+                                relayAddress = deviceAddress,
+                                previousHopPeerID = context.receivedFromPeerID,
+                            ),
                         )
                     }
                 }
