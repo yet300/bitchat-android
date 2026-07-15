@@ -62,6 +62,7 @@ internal class MeshComponentWiring(
     private val prekeyListener: () -> PrekeyEventListener?,
     private val nostrCarrierHandler: () -> ((ByteArray, String, Boolean) -> Unit)?,
     private val voiceFrameSink: (PublicVoiceFrame) -> Unit,
+    private val privateVoiceFrameSink: (PublicVoiceFrame) -> Unit = {},
     private val nowMillis: () -> Long,
 ) {
 
@@ -80,6 +81,12 @@ internal class MeshComponentWiring(
     }
 
     private fun wireEncryptionCallbacks() {
+        // Flush PMs / typed Noise payloads queued before the XX handshake finished (iOS
+        // BLENoiseSessionQueues). Safe if onKeyExchangeCompleted also flushes — take() is empty
+        // the second time. Each generation re-registers, so the latest wins.
+        encryptionService.onSessionEstablished = { peerID ->
+            outbound.flushPendingAfterHandshake(peerID)
+        }
         // Session-established trigger for transitive verification: on a Noise session coming up with a
         // peer (fingerprint resolved), the vouch coordinator may send a batch. Additive — nothing
         // else consumes this callback. Each generation re-registers, so the latest wins.
@@ -118,6 +125,9 @@ internal class MeshComponentWiring(
         // SecurityManager delegate for key exchange notifications
         securityManager.delegate = object : SecurityManagerDelegate {
             override fun onKeyExchangeCompleted(peerID: String, peerPublicKeyData: ByteArray) {
+                // Drain handshake-deferred private traffic immediately (iOS
+                // sendPendingMessagesAfterHandshake / sendPendingNoisePayloadsAfterHandshake).
+                outbound.flushPendingAfterHandshake(peerID)
                 // Send announcement and cached messages after key exchange
                 scope.launch {
                     Log.d(TAG, "Key exchange completed with $peerID; sending follow-ups")
@@ -392,6 +402,10 @@ internal class MeshComponentWiring(
                 vouchListener()?.onVouchAttestations(peerID, payload, timestampMs)
             }
 
+            override fun onPrivateVoiceFrameReceived(peerID: String, payload: ByteArray, timestampMs: Long) {
+                privateVoiceFrameSink(PublicVoiceFrame(peerID, payload, timestampMs))
+            }
+
             // Courier store-and-forward (0x04)
             override fun myNoiseStaticKey(): ByteArray? = encryptionService.getStaticPublicKey()
 
@@ -427,8 +441,12 @@ internal class MeshComponentWiring(
 
     private fun wirePacketProcessor() {
         packetProcessor.delegate = object : PacketProcessorDelegate {
-            override fun validatePacketSecurity(packet: BitchatPacket, peerID: String): PacketValidationResult {
-                return securityManager.validatePacket(packet, peerID)
+            override fun validatePacketSecurity(
+                packet: BitchatPacket,
+                peerID: String,
+                previousHopPeerID: String?,
+            ): PacketValidationResult {
+                return securityManager.validatePacket(packet, peerID, previousHopPeerID)
             }
 
             override fun handleDuplicateAnnounceLiveness(routed: RoutedPacket) {
@@ -572,7 +590,8 @@ internal class MeshComponentWiring(
                 scope.launch { messageHandler.handleLeave(routed) }
             }
 
-            override fun handleFragment(packet: BitchatPacket): BitchatPacket? {
+            override fun handleFragment(routed: RoutedPacket): BitchatPacket? {
+                val packet = routed.packet
                 // Track broadcast fragments for gossip sync
                 try {
                     val isBroadcast = (packet.recipientID == null || packet.recipientID.contentEquals(SpecialRecipients.BROADCAST))
@@ -580,6 +599,12 @@ internal class MeshComponentWiring(
                         gossipSyncManager.onPublicPacketSeen(packet)
                     }
                 } catch (_: Exception) { }
+                // iOS BLEFragmentHandler: self-authored fragment replay (incl. RSR after
+                // relaunch) is recorded as seen but never assembled — we authored the
+                // original, so reassembly would only burn fragment budgets.
+                if (!BleFragmentIngressPolicy.shouldAssemble(routed.peerID, myPeerID)) {
+                    return null
+                }
                 return fragmentManager.handleFragment(packet)
             }
 

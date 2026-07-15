@@ -238,7 +238,9 @@ class NostrDirectMessageIngest(
             NoisePayloadType.VOUCH,
             // Group state is creator-authenticated over a 1:1 mesh Noise session; not carried over Nostr.
             NoisePayloadType.GROUP_INVITE,
-            NoisePayloadType.GROUP_KEY_UPDATE -> Unit // not carried over Nostr DMs
+            NoisePayloadType.GROUP_KEY_UPDATE,
+            // Live private voice (0x08) is mesh-Noise only; never carried over Nostr DMs.
+            NoisePayloadType.VOICE_FRAME -> Unit // not carried over Nostr DMs
         }
     }
 

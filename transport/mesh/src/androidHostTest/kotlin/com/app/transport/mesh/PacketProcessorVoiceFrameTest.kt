@@ -20,7 +20,11 @@ class PacketProcessorVoiceFrameTest {
         val received = CopyOnWriteArrayList<ULong>()
         val relayed = CopyOnWriteArrayList<ULong>()
 
-        override fun validatePacketSecurity(packet: BitchatPacket, peerID: String) = PacketValidationResult.ACCEPT
+        override fun validatePacketSecurity(
+            packet: BitchatPacket,
+            peerID: String,
+            previousHopPeerID: String?,
+        ) = PacketValidationResult.ACCEPT
         override fun handleDuplicateAnnounceLiveness(routed: RoutedPacket) = Unit
         override fun updatePeerLastSeen(peerID: String) = Unit
         override fun getPeerNickname(peerID: String): String? = null
@@ -32,7 +36,7 @@ class PacketProcessorVoiceFrameTest {
         override fun handleAnnounce(routed: RoutedPacket) = Unit
         override fun handleMessage(routed: RoutedPacket) = Unit
         override fun handleLeave(routed: RoutedPacket) = Unit
-        override fun handleFragment(packet: BitchatPacket): BitchatPacket? = null
+        override fun handleFragment(routed: RoutedPacket): BitchatPacket? = null
         override fun handleRequestSync(routed: RoutedPacket) = Unit
         override fun handlePing(routed: RoutedPacket, linkKey: String) = Unit
         override fun handlePong(routed: RoutedPacket) = Unit

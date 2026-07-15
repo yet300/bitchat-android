@@ -1,5 +1,10 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.app.transport.mesh
 
+import com.app.common.encoding.toHexString
+import com.app.common.utils.Log
+import com.app.transport.MeshConstants
 import com.app.transport.MeshTelemetry
 import com.app.transport.model.RoutedPacket
 import com.app.transport.protocol.BitchatPacket
@@ -13,6 +18,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Shared BLE implementation of [MeshBearer]: a single commonMain facade over a platform
@@ -36,9 +43,12 @@ class BleBearer(
     // Ownership predicate for [bindPeer]: returns false for link addresses owned by another bearer
     // (e.g. the `aware:` namespace of the Wi-Fi Aware bearer). Defaults to "owns everything".
     private val ownsLinkAddress: (String) -> Boolean = { true },
+    private val radioConfig: BleRadioConfig = BleRadioConfig(),
+    private val nowMs: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) : MeshBearer, BleDebugHandle {
 
     private companion object {
+        private const val TAG = "BleBearer"
         // Headroom over the old 64-slot SharedFlow buffer: absorbs a handshake burst on entry
         // to a dense zone before DROP_OLDEST starts shedding the stalest frames.
         const val INCOMING_BUFFER_CAPACITY = 256
@@ -47,9 +57,22 @@ class BleBearer(
     private var myPeerID: String = myPeerID
     private var nicknameResolver: ((String) -> String?)? = null
 
+    /**
+     * Solicitation gate for inbound RSR (Flags.IS_RSR). Wired by [MeshCoordinator] to
+     * [com.app.transport.sync.RequestSyncManager.isValidResponse]. Default rejects all RSR
+     * (safe until the mesh engine attaches a real registry).
+     */
+    var isValidSyncResponse: (peerID: String) -> Boolean = { false }
+
     // Survives reset(): the new radio stack must inherit the current foreground state.
     private var meshServiceActive: Boolean = false
     private var appIsActive: Boolean = true
+
+    // iOS BLEService.lastRedundantLinkRetirementAt — one retirement pass per peer per cooldown.
+    private val lastRedundantLinkRetirementAt = mutableMapOf<String, Long>()
+
+    // Short-lived per-packet ingress memory (iOS BLEIngressLinkRegistry).
+    private val ingressRegistry = BleIngressLinkRegistry()
 
     /**
      * The platform radio stack. Replaced in place by [reset]; the BleBearer object keeps its graph
@@ -84,6 +107,9 @@ class BleBearer(
      * Engine-driven binding of a link address to a logical peerID (announce received with max TTL ⇒
      * direct neighbor). The bearer owns the address↔peer map; addresses owned by another bearer
      * (per [ownsLinkAddress]) are ignored.
+     *
+     * After binding, retires redundant central-role links to the same peer (iOS
+     * [BleRedundantLinkPolicy] parity) so restore/reconnect cannot multiply airtime.
      */
     override fun bindPeer(peerID: String, linkAddress: String) {
         if (!ownsLinkAddress(linkAddress)) return
@@ -93,10 +119,63 @@ class BleBearer(
             links.filterNot { it.deviceAddress == linkAddress }.toSet() +
                 PeerLink(peerID, linkAddress, isInbound = isInbound)
         }
+        retireRedundantClientLinks(peerID = peerID, ingressAddress = linkAddress)
+        // Peer identity on a live link — re-attempt spooled directed traffic (iOS post-announce flush).
+        try { connectionManager.flushDirectedSpool() } catch (_: Exception) {}
     }
 
     private fun notifyPeerDisconnected(deviceAddress: String) {
         _neighbors.update { links -> links.filterNot { it.deviceAddress == deviceAddress }.toSet() }
+    }
+
+    /**
+     * Central-role duplicate retirement (iOS `BLEService` after verified direct announce).
+     * Only client/outbound links we own are considered; server-role subscriptions stay.
+     */
+    private fun retireRedundantClientLinks(peerID: String, ingressAddress: String) {
+        val now = nowMs()
+        val last = lastRedundantLinkRetirementAt[peerID]
+        if (last != null && now - last < radioConfig.linkRebindCooldownMs) return
+
+        val snapshots = connectionManager.clientLinkSnapshots()
+        if (snapshots.size <= 1) return
+
+        // Reflect the bind we just wrote — platforms read addressPeerMap, but a lagging snapshot
+        // peer field is overwritten from the map when present.
+        val links = snapshots.map { snap ->
+            val boundPeer = connectionManager.addressPeerMap[snap.address] ?: snap.peerID
+            snap.copy(peerID = boundPeer).toPolicyLink()
+        }
+
+        val keptUUID = BleRedundantLinkPolicy.keptPeripheralUUID(
+            ingressPeripheralUUID = ingressAddress,
+            mostRecentlyBoundUUID = ingressAddress,
+            links = links,
+            peerID = peerID,
+        ) ?: return
+
+        val retiring = BleRedundantLinkPolicy.peripheralUUIDsToRetire(
+            links = links,
+            peerID = peerID,
+            keeping = keptUUID,
+        )
+        if (retiring.isEmpty()) return
+
+        lastRedundantLinkRetirementAt[peerID] = now
+        // Survivor is the preferred reverse mapping for directed sends.
+        connectionManager.addressPeerMap[keptUUID] = peerID
+
+        for (uuid in retiring) {
+            // Drop binding before cancel so disconnect callbacks do not treat this as peer leave
+            // (the peer is still live on the kept link).
+            connectionManager.addressPeerMap.remove(uuid)
+            notifyPeerDisconnected(uuid)
+            try {
+                connectionManager.disconnectAddress(uuid)
+            } catch (_: Exception) {
+            }
+            Log.i(TAG, "Retiring redundant client link ${uuid.take(8)}… for peer ${peerID.take(8)}… (keeping ${keptUUID.take(8)}…)")
+        }
     }
 
     init {
@@ -109,16 +188,71 @@ class BleBearer(
         val cm = connectionManager
         cm.delegate = object : BearerTransportDelegate {
             override fun onPacketReceived(packet: BitchatPacket, peerID: String, deviceAddress: String?) {
-                try {
-                    debugSettingsManager.logIncoming(
+                val claimedSenderID = packet.senderID.toHexString()
+                val boundPeerID = deviceAddress?.let { cm.addressPeerMap[it] }
+                val now = nowMs()
+                when (
+                    val evaluated = BleIngressPacketGuard.evaluate(
                         packet = packet,
-                        fromPeerID = peerID,
-                        fromNickname = null,
-                        fromDeviceAddress = deviceAddress,
-                        myPeerID = myPeerID,
+                        claimedSenderID = claimedSenderID,
+                        boundPeerID = boundPeerID,
+                        localPeerID = myPeerID,
+                        directAnnounceTTL = MeshConstants.MESSAGE_TTL_HOPS,
+                        nowMs = now,
+                        maxTimestampSkewMs = radioConfig.ingressMaxTimestampSkewMs,
+                        isRSR = packet.isRSR,
+                        isValidSyncResponse = isValidSyncResponse,
                     )
-                } catch (_: Exception) {}
-                _incoming.trySend(RoutedPacket(packet, peerID, deviceAddress))
+                ) {
+                    is BleIngressPacketGuard.EvaluateResult.Reject -> {
+                        Log.d(
+                            TAG,
+                            "Dropping ingress packet type ${packet.type}: ${evaluated.rejection}",
+                        )
+                        return
+                    }
+                    is BleIngressPacketGuard.EvaluateResult.Accept -> {
+                        val context = evaluated.context
+                        val linkId = when (cm.isClientConnection(deviceAddress ?: "")) {
+                            true -> BleIngressLinkId.Peripheral(deviceAddress ?: "unknown")
+                            false -> BleIngressLinkId.Central(deviceAddress ?: "unknown")
+                            null -> BleIngressLinkId.Peripheral(deviceAddress ?: "unknown")
+                        }
+                        if (!ingressRegistry.recordIfNew(
+                                packet = packet,
+                                link = linkId,
+                                peerID = context.receivedFromPeerID,
+                                nowMs = now,
+                                lifetimeMs = radioConfig.ingressRecordLifetimeMs,
+                            )
+                        ) {
+                            return
+                        }
+                        try {
+                            debugSettingsManager.logIncoming(
+                                packet = packet,
+                                // Always the claimed logical author; radio hop is in deviceAddress.
+                                fromPeerID = claimedSenderID,
+                                fromNickname = null,
+                                fromDeviceAddress = deviceAddress,
+                                myPeerID = myPeerID,
+                            )
+                        } catch (_: Exception) {}
+                        // peerID is ALWAYS the claimed logical author (packet.senderID) so
+                        // SecurityManager/Noise verify the author key. For RSR, ingress already
+                        // solicited against validationPeerID (= hop); previousHopPeerID carries
+                        // that hop for any downstream re-check (iOS handleReceivedPacket split:
+                        // hop for link liveness, packet.senderID for crypto).
+                        _incoming.trySend(
+                            RoutedPacket(
+                                packet = packet,
+                                peerID = claimedSenderID,
+                                relayAddress = deviceAddress,
+                                previousHopPeerID = context.receivedFromPeerID,
+                            ),
+                        )
+                    }
+                }
             }
 
             override fun onDeviceConnected(deviceAddress: String) {
@@ -128,6 +262,9 @@ class BleBearer(
                     val inbound = cm.isClientConnection(deviceAddress) == false
                     debugSettingsManager.logPeerConnection(peer ?: "unknown", nick, deviceAddress, inbound)
                 } catch (_: Exception) {}
+                // A link just came up — drain directed traffic parked while the radio was empty
+                // (iOS flushDirectedSpool after subscribe/announce).
+                try { cm.flushDirectedSpool() } catch (_: Exception) {}
                 _events.tryEmit(BearerEvent.LinkConnected(deviceAddress))
             }
 
@@ -162,12 +299,14 @@ class BleBearer(
      */
     fun reset(myPeerID: String) {
         val old = connectionManager
-        try { old.stopServices() } catch (_: Exception) {}
+        try { old.shutdown() } catch (_: Exception) {}
         // Detach the old stack's delegate: late asynchronous callbacks must neither emit stale
         // packets into the new generation's flow nor evict fresh address bindings.
         old.delegate = null
         this.myPeerID = myPeerID
         _neighbors.value = emptySet()
+        lastRedundantLinkRetirementAt.clear()
+        ingressRegistry.clear()
         connectionManager = connectionManagerFactory(myPeerID)
         wireConnectionManager()
         nicknameResolver?.let { connectionManager.setNicknameResolver(it) }
@@ -176,7 +315,7 @@ class BleBearer(
     }
 
     override fun start(): Boolean = connectionManager.startServices()
-    override fun stop() = connectionManager.stopServices()
+    override fun stop() = connectionManager.shutdown()
     override fun broadcast(packet: RoutedPacket) = connectionManager.broadcastPacket(packet)
     override fun sendToPeer(peerID: String, packet: RoutedPacket): Boolean =
         connectionManager.sendToPeer(peerID, packet)

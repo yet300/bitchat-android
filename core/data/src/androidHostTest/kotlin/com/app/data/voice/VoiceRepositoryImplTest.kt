@@ -27,6 +27,10 @@ class VoiceRepositoryImplTest {
         private val frames = MutableSharedFlow<PublicVoiceFrame>(extraBufferCapacity = 64)
         override val publicVoiceFrames: Flow<PublicVoiceFrame> = frames
 
+        fun emit(payload: ByteArray, fromPeerId: String = peerId) {
+            assertTrue(frames.tryEmit(PublicVoiceFrame(fromPeerId, payload, timestampMs = 0)))
+        }
+
         override fun broadcastVoiceFrame(payload: ByteArray) {
             sent += payload
             frames.tryEmit(PublicVoiceFrame(peerId, payload, timestampMs = 0))
@@ -65,6 +69,28 @@ class VoiceRepositoryImplTest {
         override fun sendBoardPayload(payload: ByteArray) = Unit
         override var prekeyEventListener: com.app.transport.prekey.PrekeyEventListener? = null
         override fun sendPrekeyBundle(payload: ByteArray) = Unit
+    }
+
+    private fun packet(
+        burst: Int,
+        kind: VoiceBurstPacket.Kind,
+        sequence: Int = 0,
+    ): ByteArray = VoiceBurstPacket(
+        burstId = ByteArray(VoiceBurstPacket.BURST_ID_SIZE) { burst.toByte() },
+        seq = sequence.toUShort(),
+        kind = kind,
+    ).encode()
+
+    private fun LoopbackMesh.start(burst: Int) {
+        emit(packet(burst, VoiceBurstPacket.Kind.Start(VoiceBurstPacket.Codec.AAC_LC_16K_MONO)))
+    }
+
+    private fun LoopbackMesh.frames(burst: Int, vararg frames: ByteArray) {
+        emit(packet(burst, VoiceBurstPacket.Kind.Frames(frames.toList()), sequence = 1))
+    }
+
+    private fun LoopbackMesh.end(burst: Int, durationMs: Int = 100) {
+        emit(packet(burst, VoiceBurstPacket.Kind.End(totalDataPackets = 1u, durationMs = durationMs.toUInt()), sequence = 2))
     }
 
     @Test
@@ -106,5 +132,109 @@ class VoiceRepositoryImplTest {
         val mesh = LoopbackMesh(peerId = "peer1")
         VoiceRepositoryImpl(mesh).broadcast(listOf(ByteArray(0)), durationMs = 10)
         assertTrue(mesh.sent.isEmpty())
+    }
+
+    @Test
+    fun thirtyThirdIncompleteAssemblyEvictsOldestInsertion() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val mesh = LoopbackMesh(peerId = "peer1")
+        val repo = VoiceRepositoryImpl(mesh)
+        val received = mutableListOf<com.app.domain.model.VoiceBurst>()
+        val job = launch(dispatcher) { repo.incomingBursts.collect { received += it } }
+
+        repeat(VoiceRepositoryImpl.MAX_PENDING_ASSEMBLIES + 1) { mesh.start(it) }
+        mesh.frames(0, "evicted".encodeToByteArray())
+        mesh.end(0)
+        mesh.frames(1, "retained".encodeToByteArray())
+        mesh.end(1)
+
+        assertEquals(listOf("retained"), received.flatMap { it.frames }.map { it.decodeToString() })
+        job.cancel()
+    }
+
+    @Test
+    fun burstOverByteBudgetIsRemovedAndEndDoesNotEmit() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val mesh = LoopbackMesh(peerId = "peer1")
+        val repo = VoiceRepositoryImpl(mesh)
+        val received = mutableListOf<com.app.domain.model.VoiceBurst>()
+        val job = launch(dispatcher) { repo.incomingBursts.collect { received += it } }
+
+        mesh.start(1)
+        mesh.frames(1, *Array(VoiceBurstPacket.MAX_FRAMES_PER_PACKET) { ByteArray(UShort.MAX_VALUE.toInt()) })
+        mesh.frames(1, ByteArray(9))
+        mesh.end(1)
+
+        assertTrue(received.isEmpty())
+        job.cancel()
+    }
+
+    @Test
+    fun assemblyOlderThanTimeoutIsRemovedUsingInjectedClock() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val mesh = LoopbackMesh(peerId = "peer1")
+        var now = 1_000L
+        val repo = VoiceRepositoryImpl(mesh, nowMs = { now })
+        val received = mutableListOf<com.app.domain.model.VoiceBurst>()
+        val job = launch(dispatcher) { repo.incomingBursts.collect { received += it } }
+
+        mesh.start(1)
+        now += VoiceRepositoryImpl.PENDING_TIMEOUT_MS + 1
+        mesh.frames(1, "late".encodeToByteArray())
+        mesh.end(1)
+
+        assertTrue(received.isEmpty())
+        job.cancel()
+    }
+
+    @Test
+    fun duplicateStartAtCapacityDoesNotEvictUnrelatedBurst() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val mesh = LoopbackMesh(peerId = "peer1")
+        val repo = VoiceRepositoryImpl(mesh)
+        val received = mutableListOf<com.app.domain.model.VoiceBurst>()
+        val job = launch(dispatcher) { repo.incomingBursts.collect { received += it } }
+
+        repeat(VoiceRepositoryImpl.MAX_PENDING_ASSEMBLIES) { mesh.start(it) }
+        mesh.start(VoiceRepositoryImpl.MAX_PENDING_ASSEMBLIES - 1)
+        mesh.frames(0, "oldest-unrelated".encodeToByteArray())
+        mesh.end(0)
+
+        assertEquals(listOf("oldest-unrelated"), received.single().frames.map { it.decodeToString() })
+        job.cancel()
+    }
+
+    @Test
+    fun newBurstReassemblesAfterEvictionAndTimeout() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val mesh = LoopbackMesh(peerId = "peer1")
+        var now = 1_000L
+        val repo = VoiceRepositoryImpl(mesh, nowMs = { now })
+        val received = mutableListOf<com.app.domain.model.VoiceBurst>()
+        val job = launch(dispatcher) { repo.incomingBursts.collect { received += it } }
+
+        repeat(VoiceRepositoryImpl.MAX_PENDING_ASSEMBLIES + 1) { mesh.start(it) }
+        now += VoiceRepositoryImpl.PENDING_TIMEOUT_MS + 1
+        mesh.start(100)
+        mesh.frames(100, "fresh".encodeToByteArray())
+        mesh.end(100)
+
+        assertEquals(listOf("fresh"), received.single().frames.map { it.decodeToString() })
+        job.cancel()
+    }
+
+    @Test
+    fun framesWithoutStartDoNotCreateAssembly() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val mesh = LoopbackMesh(peerId = "peer1")
+        val repo = VoiceRepositoryImpl(mesh)
+        val received = mutableListOf<com.app.domain.model.VoiceBurst>()
+        val job = launch(dispatcher) { repo.incomingBursts.collect { received += it } }
+
+        mesh.frames(1, "orphan".encodeToByteArray())
+        mesh.end(1)
+
+        assertTrue(received.isEmpty())
+        job.cancel()
     }
 }

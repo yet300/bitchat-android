@@ -46,6 +46,7 @@ class SendMessageUseCaseTest {
         assertEquals(listOf("bob"), echo.mentions)
         assertEquals(1, transport.publics.size)
         assertEquals(null, transport.publics.single().channel)
+        assertEquals(echo.id, transport.publics.single().messageId)
     }
 
     @Test fun `channel message routes with tag`() = runTest {
@@ -55,6 +56,7 @@ class SendMessageUseCaseTest {
 
         assertEquals(target, repo.appended.single().first)
         assertEquals("#dev", transport.publics.single().channel)
+        assertEquals(repo.appended.single().second.id, transport.publics.single().messageId)
     }
 
     @Test fun `private message echoes Sending and sends with id`() = runTest {

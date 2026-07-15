@@ -88,8 +88,6 @@ internal class CoreBluetoothConnectionManager(
         // State-restoration identifiers: let iOS relaunch the app into the background to hand back the
         // same central/peripheral managers (with their connections) after the process was killed. Also
         // requires the app's Info.plist UIBackgroundModes (bluetooth-central/peripheral) — app-side.
-        const val CENTRAL_RESTORE_ID = "chat.bitchat.mesh.central"
-        const val PERIPHERAL_RESTORE_ID = "chat.bitchat.mesh.peripheral"
         // CoreBluetooth has no MTU-request API: the central learns the negotiated ATT MTU and
         // exposes it via maximumWriteValueLengthForType; fragmentation uses the commonMain cap.
     }
@@ -140,11 +138,11 @@ internal class CoreBluetoothConnectionManager(
 
     private val centralManager = CBCentralManager(
         centralDelegate, null,
-        mapOf<Any?, Any?>(CBCentralManagerOptionRestoreIdentifierKey to CENTRAL_RESTORE_ID),
+        mapOf<Any?, Any?>(CBCentralManagerOptionRestoreIdentifierKey to CoreBluetoothRestoreIds.CENTRAL),
     )
     private val peripheralManager = CBPeripheralManager(
         peripheralDelegate, null,
-        mapOf<Any?, Any?>(CBPeripheralManagerOptionRestoreIdentifierKey to PERIPHERAL_RESTORE_ID),
+        mapOf<Any?, Any?>(CBPeripheralManagerOptionRestoreIdentifierKey to CoreBluetoothRestoreIds.PERIPHERAL),
     )
 
     private var active = false
@@ -200,6 +198,10 @@ internal class CoreBluetoothConnectionManager(
     }
 
     override fun stopServices() {
+        shutdown()
+    }
+
+    override fun shutdown() {
         active = false
         centralPolicy.stop()
         try {
@@ -220,16 +222,16 @@ internal class CoreBluetoothConnectionManager(
             } catch (_: Exception) {
             }
         }
+        // Drop outbound buffers and peer bindings so a restart cannot write to dead links or
+        // attribute spoofed senders to stale NSUUIDs.
+        (connectedPeripherals.keys + subscribedCentrals.keys).forEach { outbound.dropLink(it) }
         connectedPeripherals.clear()
         peripheralCharacteristics.clear()
         pendingPeripherals.clear()
         discoveredPeripherals.clear()
         subscribedCentrals.clear()
         frameAssemblers.clear()
-    }
-
-    fun shutdown() {
-        stopServices()
+        addressPeerMap.clear()
         sendCore.shutdown()
         outbound.shutdown()
         scope.cancel()
@@ -272,8 +274,8 @@ internal class CoreBluetoothConnectionManager(
 
     // -----------------------------------------------------------------
     // Send — shared BleSendCore (C1); only the raw CB writes below are Apple-specific.
-    // Source routing stays disabled here to preserve the pre-unification target set
-    // (the Apple bearer never source-routed); the owner can enable it deliberately.
+    // Source routing is enabled like Android: MeshOutboundSender attaches routes when the
+    // mesh graph has confirmed multi-hop paths; empty routes fall through to flood.
     // -----------------------------------------------------------------
 
     private val sendCore = BleSendCore(
@@ -283,7 +285,7 @@ internal class CoreBluetoothConnectionManager(
         myPeerID = myPeerID,
         radio = RadioLink(),
         trafficLog = null,
-        sourceRoutingEnabled = false,
+        sourceRoutingEnabled = true,
         logTag = TAG,
         config = config,
     )
@@ -299,6 +301,8 @@ internal class CoreBluetoothConnectionManager(
     }
 
     override fun cancelTransfer(transferId: String): Boolean = sendCore.cancelTransfer(transferId)
+
+    override fun flushDirectedSpool() = sendCore.flushDirectedSpool()
 
     private inner class RadioLink : BleRadioLink {
         override fun neighbors(): List<BleNeighbor> =
@@ -398,15 +402,26 @@ internal class CoreBluetoothConnectionManager(
 
         override fun centralManager(central: CBCentralManager, willRestoreState: Map<Any?, *>) {
             // Re-adopt peripherals iOS handed back after relaunching us: rebind our delegate and
-            // rediscover the mesh service so the links resume. On-device-only behavior.
+            // rediscover the mesh service / characteristic so the links resume writable.
+            // Restored connections often lack a cached characteristic (iOS reference does the same
+            // rediscovery) — without this step dual-role restore multiplies dead links.
             @Suppress("UNCHECKED_CAST")
             val restored = willRestoreState[CBCentralManagerRestoredStatePeripheralsKey] as? List<CBPeripheral> ?: return
             restored.forEach { peripheral ->
                 val addr = peripheral.identifier.UUIDString
                 peripheral.delegate = this
                 discoveredPeripherals.put(addr, peripheral)
+                // Already-connected restored links go into the connected map once the characteristic
+                // rediscovers; pending keeps them visible to the scheduler until then.
                 pendingPeripherals.put(addr, peripheral)
-                peripheral.discoverServices(listOf(serviceCbUuid))
+                if (peripheral.services?.any { (it as? CBService)?.UUID == serviceCbUuid } == true) {
+                    val service = peripheral.services!!
+                        .filterIsInstance<CBService>()
+                        .first { it.UUID == serviceCbUuid }
+                    peripheral.discoverCharacteristics(listOf(characteristicCbUuid), service)
+                } else {
+                    peripheral.discoverServices(listOf(serviceCbUuid))
+                }
             }
         }
 
@@ -481,19 +496,51 @@ internal class CoreBluetoothConnectionManager(
             didDiscoverCharacteristicsForService: CBService,
             error: NSError?,
         ) {
+            if (error != null) {
+                Log.w(TAG, "Characteristic discovery failed: ${error.localizedDescription}")
+                return
+            }
             val char = didDiscoverCharacteristicsForService.characteristics
                 ?.filterIsInstance<CBCharacteristic>()
                 ?.firstOrNull { it.UUID == characteristicCbUuid } ?: return
             val addr = peripheral.identifier.UUIDString
+            // The characteristic is already outbound-writeable; expose it while notify setup runs.
             connectedPeripherals.put(addr, peripheral)
             peripheralCharacteristics.put(addr, char)
             pendingPeripherals.remove(addr)
             discoveredPeripherals.remove(addr)
+            // Connected callbacks and spool flushing wait for inbound notifications below.
             peripheral.setNotifyValue(true, char)
-            centralPolicy.onConnected(addr)
-            delegate?.onDeviceConnected(addr)
         }
 
+        /**
+         * Notify subscription confirmed (or failed). Flush directed traffic once the link is
+         * bidirectional; [RadioLink.neighbors] may already use it for outbound writes.
+         */
+        @ObjCSignatureOverride
+        override fun peripheral(
+            peripheral: CBPeripheral,
+            didUpdateNotificationStateForCharacteristic: CBCharacteristic,
+            error: NSError?,
+        ) {
+            val addr = peripheral.identifier.UUIDString
+            if (error != null) {
+                Log.w(TAG, "Notify enable failed for ${addr.take(8)}…: ${error.localizedDescription}")
+                return
+            }
+            if (didUpdateNotificationStateForCharacteristic.UUID != characteristicCbUuid) return
+            if (connectedPeripherals.get(addr) == null) {
+                connectedPeripherals.put(addr, peripheral)
+            }
+            peripheralCharacteristics.put(addr, didUpdateNotificationStateForCharacteristic)
+            centralPolicy.onConnected(addr)
+            delegate?.onDeviceConnected(addr)
+            // Belt-and-suspenders: BleBearer also flushes on LinkConnected; call here so
+            // a platform that skips the bearer still drains the spool when the link is writable.
+            sendCore.flushDirectedSpool()
+        }
+
+        @ObjCSignatureOverride
         override fun peripheral(
             peripheral: CBPeripheral,
             didUpdateValueForCharacteristic: CBCharacteristic,
@@ -556,6 +603,8 @@ internal class CoreBluetoothConnectionManager(
             val addr = central.identifier.UUIDString
             subscribedCentrals.put(addr, central)
             delegate?.onDeviceConnected(addr)
+            // Server-role link is now notify-writable — drain directed spool (iOS post-subscribe).
+            sendCore.flushDirectedSpool()
         }
 
         @ObjCSignatureOverride
@@ -598,8 +647,12 @@ internal class CoreBluetoothConnectionManager(
     // are no-ops/empty on Apple (they only back the Android debug sheet).
     // -----------------------------------------------------------------
 
-    override fun setNicknameResolver(resolver: (String) -> String?) = Unit
+    override fun setNicknameResolver(resolver: (String) -> String?) {
+        sendCore.setNicknameResolver(resolver)
+    }
+
     override fun setMeshServiceActive(active: Boolean) = Unit
+
     override fun setAppIsActive(active: Boolean) {
         val changed = appActivityLock.withLock {
             if (appIsActive == active) false else {
@@ -607,7 +660,11 @@ internal class CoreBluetoothConnectionManager(
                 true
             }
         }
-        if (changed) scope.launch { centralPolicy.onAppActivityChanged() }
+        if (changed) {
+            // Re-apply scan duty and prune expired directed spool on foreground/background.
+            sendCore.pruneDirectedSpool()
+            scope.launch { centralPolicy.onAppActivityChanged() }
+        }
     }
     override fun startServer() = Unit
     override fun stopServer() = Unit
@@ -618,9 +675,50 @@ internal class CoreBluetoothConnectionManager(
         connectedPeripherals.keys.map { Triple(it, true, null) } +
                 subscribedCentrals.keys.map { Triple(it, false, null) }
 
+    /**
+     * Central-role (CBPeripheral we connected to) links only — [BleRedundantLinkPolicy] input.
+     * Server-role CBCentral subscriptions are omitted.
+     */
+    override fun clientLinkSnapshots(): List<BleClientLinkSnapshot> =
+        connectedPeripherals.keys.map { addr ->
+            BleClientLinkSnapshot(
+                address = addr,
+                peerID = addressPeerMap.get(addr),
+                isConnected = true,
+                hasCharacteristic = peripheralCharacteristics.get(addr) != null,
+            )
+        }
+
     override fun getLocalAdapterAddress(): String? = null
     override fun connectToAddress(address: String): Boolean = false
-    override fun disconnectAddress(address: String) = Unit
-    override fun getDebugInfo(): String =
-        "CoreBluetooth: peripherals=${connectedPeripherals.size}, centrals=${subscribedCentrals.size}, active=$active"
+
+    /**
+     * Cancels a central-role connection. Used by [BleBearer] redundant-link retirement and debug UI.
+     * Removes local bookkeeping first so the disconnect callback does not double-clean.
+     */
+    override fun disconnectAddress(address: String) {
+        val peripheral = connectedPeripherals.get(address) ?: pendingPeripherals.get(address) ?: return
+        connectedPeripherals.remove(address)
+        pendingPeripherals.remove(address)
+        peripheralCharacteristics.remove(address)
+        frameAssemblers.remove(address)
+        outbound.dropLink(address)
+        addressPeerMap.remove(address)
+        try {
+            centralManager.cancelPeripheralConnection(peripheral)
+        } catch (e: Exception) {
+            Log.w(TAG, "disconnectAddress($address) failed: ${e.message}")
+        }
+    }
+
+    override fun getDebugInfo(): String = buildString {
+        appendLine("CoreBluetooth dual-role")
+        appendLine("active=$active")
+        appendLine("client peripherals=${connectedPeripherals.size} (writable=${peripheralCharacteristics.size})")
+        appendLine("server centrals=${subscribedCentrals.size}")
+        appendLine("pending connects=${pendingPeripherals.size}")
+        appendLine("discovered candidates=${discoveredPeripherals.size}")
+        appendLine("addressPeerMap=${addressPeerMap.size}")
+        append(sendCore.getDebugInfo())
+    }
 }

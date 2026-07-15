@@ -32,6 +32,10 @@ internal class RoutingMessageTransport(
         mesh.sendMessage(content, mentions, channel)
     }
 
+    override suspend fun sendPublic(content: String, mentions: List<String>, channel: String?, messageId: String) {
+        mesh.sendMessage(content, mentions, channel, messageId)
+    }
+
     override suspend fun sendPrivate(content: String, to: PeerId, recipientNickname: String?, messageId: String) {
         router.sendPrivate(content, to.raw, recipientNickname ?: "", messageId)
     }

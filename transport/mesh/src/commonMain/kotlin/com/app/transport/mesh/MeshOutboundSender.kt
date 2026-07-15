@@ -50,6 +50,8 @@ internal class MeshOutboundSender(
     private val scope: CoroutineScope,
     private val initiateHandshake: (String) -> Unit,
     private val gatewayEnabled: () -> Boolean = { false },
+    private val pendingNoise: BleNoiseSessionQueues = BleNoiseSessionQueues(),
+    private val selfBroadcastTracker: BleSelfBroadcastTracker = BleSelfBroadcastTracker(),
 ) {
 
     companion object {
@@ -57,10 +59,13 @@ internal class MeshOutboundSender(
         private val MAX_TTL: UByte = MeshConstants.MESSAGE_TTL_HOPS
     }
 
+    /** Drop any pending handshake-deferred traffic (panic / generation rebuild). */
+    fun clearPendingNoiseQueues() = pendingNoise.clear()
+
     /**
      * Send public message
      */
-    fun sendMessage(content: String, mentions: List<String>, channel: String?) {
+    fun sendMessage(content: String, mentions: List<String>, channel: String?, messageID: String? = null) {
         if (content.isEmpty()) return
 
         scope.launch {
@@ -77,6 +82,9 @@ internal class MeshOutboundSender(
 
             // Sign the packet before broadcasting
             val signedPacket = signPacketBeforeBroadcast(packet)
+            if (messageID != null) {
+                selfBroadcastTracker.record(messageID, signedPacket, packet.timestamp.toLong())
+            }
             meshNetwork.broadcast(RoutedPacket(signedPacket))
             // Track our own broadcast message for sync
             try { gossipSyncManager.onPublicPacketSeen(signedPacket) } catch (_: Exception) { }
@@ -119,65 +127,38 @@ internal class MeshOutboundSender(
     }
 
     /**
-     * Send a file as an encrypted private message using Noise protocol
+     * Send a private file as a directed, signed outer [MessageType.FILE_TRANSFER] (0x22) —
+     * byte-compatible with native iOS `BLEService.sendFilePrivate`. Content confidentiality
+     * is not Noise-wrapped on this path (same as reference); authenticity is the Ed25519 packet
+     * signature. Receivers also still accept legacy Noise-wrapped FILE_TRANSFER 0x20 from older KMP.
      */
     fun sendFilePrivate(recipientPeerID: String, file: BitchatFilePacket) {
         try {
-            Log.d(TAG, "📤 sendFilePrivate (ENCRYPTED): to=$recipientPeerID, name=${file.fileName}, size=${file.fileSize}")
-
+            Log.d(TAG, "📤 sendFilePrivate (0x22 directed): to=$recipientPeerID, name=${file.fileName}, size=${file.fileSize}")
             scope.launch {
-                // Check if we have an established Noise session
-                if (encryptionService.hasEstablishedSession(recipientPeerID)) {
-                    try {
-                        // Encode the file packet as TLV
-                        val filePayload = file.encode()
-                        if (filePayload == null) {
-                            Log.e(TAG, "❌ Failed to encode file packet for private send")
-                            return@launch
-                        }
-                        Log.d(TAG, "📦 Encoded file TLV: ${filePayload.size} bytes")
-
-                        // Create NoisePayload wrapper (type byte + file TLV data) - same as iOS
-                        val noisePayload = NoisePayload(
-                            type = NoisePayloadType.FILE_TRANSFER,
-                            data = filePayload
-                        )
-
-                        // Encrypt the payload using Noise
-                        val encrypted = encryptionService.encrypt(noisePayload.encode(), recipientPeerID)
-                        if (encrypted == null) {
-                            Log.e(TAG, "❌ Failed to encrypt file for $recipientPeerID")
-                            return@launch
-                        }
-                        Log.d(TAG, "🔐 Encrypted file payload: ${encrypted.size} bytes")
-
-                        // Create NOISE_ENCRYPTED packet (not FILE_TRANSFER!)
-                        val packet = BitchatPacket(
-                            version = 1u,
-                            type = MessageType.NOISE_ENCRYPTED.value,
-                            senderID = peerIdToRoutingBytes(myPeerID),
-                            recipientID = peerIdToRoutingBytes(recipientPeerID),
-                            timestamp = epochMillis().toULong(),
-                            payload = encrypted,
-                            signature = null,
-                            ttl = MeshConstants.MESSAGE_TTL_HOPS
-                        )
-
-                        // Sign and send the encrypted packet
-                        val signed = signPacketBeforeBroadcast(packet)
-                        // Use a stable transferId based on the unencrypted file TLV payload for progress tracking
-                        val transferId = sha256Hex(filePayload)
-                        meshNetwork.broadcast(RoutedPacket(signed, transferId = transferId))
-                        Log.d(TAG, "✅ Sent encrypted file to $recipientPeerID")
-
-                    } catch (e: Exception) {
-                        Log.e(TAG, "❌ Failed to encrypt file for $recipientPeerID: ${e.message}", e)
-                    }
-                } else {
-                    // No session - initiate handshake but don't queue file
-                    Log.w(TAG, "⚠️ No Noise session with $recipientPeerID for file transfer, initiating handshake")
-                    initiateHandshake(recipientPeerID)
+                val filePayload = file.encode()
+                if (filePayload == null) {
+                    Log.e(TAG, "❌ Failed to encode file packet for private send")
+                    return@launch
                 }
+                val packet = BitchatPacket(
+                    version = 2u,
+                    type = MessageType.FILE_TRANSFER.value,
+                    senderID = peerIdToRoutingBytes(myPeerID),
+                    recipientID = peerIdToRoutingBytes(recipientPeerID),
+                    timestamp = epochMillis().toULong(),
+                    payload = filePayload,
+                    signature = null,
+                    ttl = MeshConstants.MESSAGE_TTL_HOPS,
+                )
+                val signed = signPacketBeforeBroadcast(packet)
+                if (signed.signature == null) {
+                    Log.e(TAG, "❌ Failed to sign private file transfer to $recipientPeerID")
+                    return@launch
+                }
+                val transferId = sha256Hex(filePayload)
+                meshNetwork.broadcast(RoutedPacket(signed, transferId = transferId))
+                Log.d(TAG, "✅ Sent private file transfer (0x22) to $recipientPeerID (${filePayload.size} bytes)")
             }
         } catch (e: Exception) {
             Log.e(TAG, "❌ sendFilePrivate failed: ${e.message}", e)
@@ -187,7 +168,7 @@ internal class MeshOutboundSender(
 
     /**
      * Send private message - SIMPLIFIED iOS-compatible version
-     * Uses NoisePayloadType system exactly like iOS SimplifiedBluetoothService
+     * NoisePayloadType private-message path (directed noiseEncrypted).
      */
     fun sendPrivateMessage(content: String, recipientPeerID: String, recipientNickname: String, messageID: String?) {
         if (content.isEmpty() || recipientPeerID.isEmpty()) return
@@ -200,53 +181,115 @@ internal class MeshOutboundSender(
 
             // Check if we have an established Noise session
             if (encryptionService.hasEstablishedSession(recipientPeerID)) {
-                try {
-                    // Create TLV-encoded private message exactly like iOS
-                    val privateMessage = PrivateMessagePacket(
-                        messageID = finalMessageID,
-                        content = content
-                    )
-
-                    val tlvData = privateMessage.encode()
-                    if (tlvData == null) {
-                        Log.e(TAG, "Failed to encode private message with TLV")
-                        return@launch
-                    }
-
-                    // Create message payload with NoisePayloadType prefix: [type byte] + [TLV data]
-                    val messagePayload = NoisePayload(
-                        type = NoisePayloadType.PRIVATE_MESSAGE,
-                        data = tlvData
-                    )
-
-                    // Encrypt the payload
-                    val encrypted = encryptionService.encrypt(messagePayload.encode(), recipientPeerID)
-
-                    // Create NOISE_ENCRYPTED packet exactly like iOS
-                    val packet = BitchatPacket(
-                        version = 1u,
-                        type = MessageType.NOISE_ENCRYPTED.value,
-                        senderID = peerIdToRoutingBytes(myPeerID),
-                        recipientID = peerIdToRoutingBytes(recipientPeerID),
-                        timestamp = epochMillis().toULong(),
-                        payload = encrypted,
-                        signature = null,
-                        ttl = MAX_TTL
-                    )
-
-                    // Sign the packet before broadcasting
-                    val signedPacket = signPacketBeforeBroadcast(packet)
-                    meshNetwork.broadcast(RoutedPacket(signedPacket))
-                    Log.d(TAG, "📤 Sent encrypted private message to $recipientPeerID (${encrypted.size} bytes)")
-
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to encrypt private message for $recipientPeerID: ${e.message}")
+                if (!sendEncryptedPrivateMessage(content, finalMessageID, recipientPeerID)) {
+                    // Session may have raced out from under us — queue + re-handshake like iOS.
+                    pendingNoise.appendPrivateMessage(content, finalMessageID, recipientPeerID)
+                    initiateHandshake(recipientPeerID)
                 }
             } else {
-                // Fire and forget - initiate handshake but don't queue exactly like iOS
-                Log.d(TAG, "🤝 No session with $recipientPeerID, initiating handshake")
+                // iOS BLENoiseSessionQueues: hold the PM until XX completes, then flush.
+                Log.d(TAG, "🤝 No session with $recipientPeerID, queueing PM and initiating handshake")
+                pendingNoise.appendPrivateMessage(content, finalMessageID, recipientPeerID)
                 initiateHandshake(recipientPeerID)
             }
+        }
+    }
+
+    /**
+     * Flush private messages and typed Noise payloads deferred until handshake completion.
+     * Safe to call multiple times (empty take is a no-op). Invoked from session-established wiring.
+     */
+    fun flushPendingAfterHandshake(peerID: String) {
+        if (peerID.isEmpty()) return
+        scope.launch {
+            sendPendingPrivateMessagesAfterHandshake(peerID)
+            sendPendingTypedPayloadsAfterHandshake(peerID)
+        }
+    }
+
+    private fun sendEncryptedPrivateMessage(
+        content: String,
+        messageID: String,
+        recipientPeerID: String,
+    ): Boolean {
+        return try {
+            val privateMessage = PrivateMessagePacket(
+                messageID = messageID,
+                content = content
+            )
+            val tlvData = privateMessage.encode()
+            if (tlvData == null) {
+                Log.e(TAG, "Failed to encode private message with TLV")
+                return false
+            }
+            val messagePayload = NoisePayload(
+                type = NoisePayloadType.PRIVATE_MESSAGE,
+                data = tlvData
+            )
+            val encrypted = encryptionService.encrypt(messagePayload.encode(), recipientPeerID)
+            val packet = BitchatPacket(
+                version = 1u,
+                type = MessageType.NOISE_ENCRYPTED.value,
+                senderID = peerIdToRoutingBytes(myPeerID),
+                recipientID = peerIdToRoutingBytes(recipientPeerID),
+                timestamp = epochMillis().toULong(),
+                payload = encrypted,
+                signature = null,
+                ttl = MAX_TTL
+            )
+            val signedPacket = signPacketBeforeBroadcast(packet)
+            meshNetwork.broadcast(RoutedPacket(signedPacket))
+            Log.d(TAG, "📤 Sent encrypted private message to $recipientPeerID (${encrypted.size} bytes)")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to encrypt private message for $recipientPeerID: ${e.message}")
+            false
+        }
+    }
+
+    private fun sendPendingPrivateMessagesAfterHandshake(peerID: String) {
+        val pending = pendingNoise.takePrivateMessages(peerID)
+        if (pending.isEmpty()) return
+        Log.d(TAG, "📤 Sending ${pending.size} pending PMs after handshake to ${peerID.take(8)}…")
+        val failed = mutableListOf<BleNoiseSessionQueues.PendingPrivateMessage>()
+        for (message in pending) {
+            if (!sendEncryptedPrivateMessage(message.content, message.messageID, peerID)) {
+                failed.add(message)
+            }
+        }
+        if (failed.isNotEmpty()) {
+            pendingNoise.prependPrivateMessages(failed, peerID)
+            Log.w(TAG, "⚠️ Re-queued ${failed.size} failed pending PMs for ${peerID.take(8)}…")
+        }
+    }
+
+    private fun sendPendingTypedPayloadsAfterHandshake(peerID: String) {
+        val payloads = pendingNoise.takeTypedPayloads(peerID)
+        if (payloads.isEmpty()) return
+        Log.d(TAG, "📤 Sending ${payloads.size} pending Noise payloads after handshake to ${peerID.take(8)}…")
+        val failed = mutableListOf<ByteArray>()
+        for (typedPayload in payloads) {
+            try {
+                val encrypted = encryptionService.encrypt(typedPayload, peerID)
+                val packet = BitchatPacket(
+                    version = 1u,
+                    type = MessageType.NOISE_ENCRYPTED.value,
+                    senderID = peerIdToRoutingBytes(myPeerID),
+                    recipientID = peerIdToRoutingBytes(peerID),
+                    timestamp = epochMillis().toULong(),
+                    payload = encrypted,
+                    signature = null,
+                    ttl = MeshConstants.MESSAGE_TTL_HOPS
+                )
+                meshNetwork.broadcast(RoutedPacket(signPacketBeforeBroadcast(packet)))
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send pending Noise payload to ${peerID.take(8)}…: ${e.message}")
+                failed.add(typedPayload)
+            }
+        }
+        if (failed.isNotEmpty()) {
+            pendingNoise.prependTypedPayloads(failed, peerID)
+            Log.w(TAG, "⚠️ Re-queued ${failed.size} failed pending Noise payloads for ${peerID.take(8)}…")
         }
     }
 
@@ -270,16 +313,18 @@ internal class MeshOutboundSender(
                     return@launch
                 }
 
-                // Create read receipt payload using NoisePayloadType exactly like iOS
                 val readReceiptPayload = NoisePayload(
                     type = NoisePayloadType.READ_RECEIPT,
                     data = messageID.encodeToByteArray()
                 )
+                if (!encryptionService.hasEstablishedSession(recipientPeerID)) {
+                    pendingNoise.appendTypedPayload(readReceiptPayload.encode(), recipientPeerID)
+                    initiateHandshake(recipientPeerID)
+                    Log.d(TAG, "🕒 Queued read receipt for $recipientPeerID until handshake completes")
+                    return@launch
+                }
 
-                // Encrypt the payload
                 val encrypted = encryptionService.encrypt(readReceiptPayload.encode(), recipientPeerID)
-
-                // Create NOISE_ENCRYPTED packet exactly like iOS
                 val packet = BitchatPacket(
                     version = 1u,
                     type = MessageType.NOISE_ENCRYPTED.value,
@@ -288,17 +333,12 @@ internal class MeshOutboundSender(
                     timestamp = epochMillis().toULong(),
                     payload = encrypted,
                     signature = null,
-                    ttl = MeshConstants.MESSAGE_TTL_HOPS // Same TTL as iOS messageTTL
+                    ttl = MeshConstants.MESSAGE_TTL_HOPS
                 )
-
-                // Sign the packet before broadcasting
                 val signedPacket = signPacketBeforeBroadcast(packet)
                 meshNetwork.broadcast(RoutedPacket(signedPacket))
                 Log.d(TAG, "📤 Sent read receipt to $recipientPeerID for message $messageID")
-
-                // Persist as read after successful send
                 seenMessageStore.markRead(messageID)
-
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send read receipt to $recipientPeerID: ${e.message}")
             }
@@ -478,6 +518,40 @@ internal class MeshOutboundSender(
         meshNetwork.broadcast(RoutedPacket(packet))
     }
 
+    /**
+     * DM live voice: [NoisePayloadType.VOICE_FRAME] (0x08) inside directed noiseEncrypted —
+     * iOS `sendVoiceFrame` parity. Fire-and-forget: without an established Noise session the
+     * frame is dropped immediately (stale live audio must never queue behind a handshake).
+     */
+    fun sendVoiceFrame(payload: ByteArray, toPeerID: String) {
+        if (payload.isEmpty() || toPeerID.isEmpty()) return
+        scope.launch {
+            if (!encryptionService.hasEstablishedSession(toPeerID)) {
+                Log.d(TAG, "PTT: dropping voice frame — no established session with ${toPeerID.take(8)}…")
+                return@launch
+            }
+            try {
+                val typed = NoisePayload(NoisePayloadType.VOICE_FRAME, payload).encode()
+                val encrypted = encryptionService.encrypt(typed, toPeerID)
+                val packet = BitchatPacket(
+                    version = 1u,
+                    type = MessageType.NOISE_ENCRYPTED.value,
+                    senderID = peerIdToRoutingBytes(myPeerID),
+                    recipientID = peerIdToRoutingBytes(toPeerID),
+                    timestamp = epochMillis().toULong(),
+                    payload = encrypted,
+                    signature = null,
+                    ttl = MeshConstants.MESSAGE_TTL_HOPS,
+                )
+                val signedPacket = signPacketBeforeBroadcast(packet)
+                meshNetwork.broadcast(RoutedPacket(signedPacket))
+                Log.d(TAG, "📤 Sent voice frame to $toPeerID (${payload.size} bytes)")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send voice frame to $toPeerID: ${e.message}")
+            }
+        }
+    }
+
     /** Sends one encoded public live-voice burst without persistence or gossip-sync tracking. */
     fun broadcastVoiceFrame(payload: ByteArray) {
         if (payload.isEmpty()) return
@@ -503,8 +577,15 @@ internal class MeshOutboundSender(
 
     private fun sendNoisePayloadToPeer(payload: NoisePayload, recipientPeerID: String, label: String) {
         scope.launch {
+            val typed = payload.encode()
+            if (!encryptionService.hasEstablishedSession(recipientPeerID)) {
+                pendingNoise.appendTypedPayload(typed, recipientPeerID)
+                initiateHandshake(recipientPeerID)
+                Log.d(TAG, "🕒 Queued $label for $recipientPeerID until handshake completes")
+                return@launch
+            }
             try {
-                val encrypted = encryptionService.encrypt(payload.encode(), recipientPeerID)
+                val encrypted = encryptionService.encrypt(typed, recipientPeerID)
                 val packet = BitchatPacket(
                     version = 1u,
                     type = MessageType.NOISE_ENCRYPTED.value,
@@ -526,7 +607,7 @@ internal class MeshOutboundSender(
     }
 
     /**
-     * Send broadcast announce with TLV-encoded identity announcement - exactly like iOS
+     * Send broadcast announce with TLV-encoded identity announcement
      */
     fun sendBroadcastAnnounce() {
         Log.d(TAG, "Sending broadcast announce")
@@ -553,7 +634,7 @@ internal class MeshOutboundSender(
     }
 
     /**
-     * Send announcement to specific peer with TLV-encoded identity announcement - exactly like iOS
+     * Send announcement to specific peer with TLV-encoded identity announcement
      */
     fun sendAnnouncementToPeer(peerID: String) {
         if (peerManager.hasAnnouncedToPeer(peerID)) return

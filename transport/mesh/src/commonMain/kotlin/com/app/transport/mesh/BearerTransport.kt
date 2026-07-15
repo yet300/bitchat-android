@@ -38,6 +38,9 @@ interface BearerTransport {
     fun startServices(): Boolean
     fun stopServices()
 
+    /** Terminal teardown for a transport generation; implementations must release owned scopes. */
+    fun shutdown() = stopServices()
+
     fun broadcastPacket(routed: RoutedPacket)
     fun sendToPeer(peerID: String, routed: RoutedPacket): Boolean
     fun cancelTransfer(transferId: String): Boolean
@@ -59,4 +62,17 @@ interface BearerTransport {
     fun connectToAddress(address: String): Boolean
     fun disconnectAddress(address: String)
     fun getDebugInfo(): String
+
+    /**
+     * Central-role (client/outbound) links only, for [BleRedundantLinkPolicy].
+     * Server/inbound subscriptions are omitted — dual-role same-peer is normal.
+     * Default empty so fakes/mocks do not need to implement it.
+     */
+    fun clientLinkSnapshots(): List<BleClientLinkSnapshot> = emptyList()
+
+    /**
+     * Drain directed packets held while no BLE links were writable ([BleDirectedRelaySpool]).
+     * Platforms that own a [BleSendCore] implement this; default is a no-op.
+     */
+    fun flushDirectedSpool() = Unit
 }

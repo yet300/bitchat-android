@@ -71,12 +71,24 @@ class SecurityManagerTest {
         }
     }
 
+    /**
+     * Frozen "now" aligned with wall clock at test start. Packet fixtures that use the
+     * BitchatPacket(senderID: String) convenience ctor stamp System.currentTimeMillis();
+     * [nowMillis] must stay within 120s of those stamps for the ingress skew gate.
+     */
+    private var testNowMs: Long = 0L
+
     @Before
     fun setup() {
+        testNowMs = System.currentTimeMillis()
         fakeEncryptionService = FakeEncryptionService()
         mockDelegate = mock()
         
-        securityManager = SecurityManager(fakeEncryptionService, myPeerID)
+        securityManager = SecurityManager(
+            encryptionService = fakeEncryptionService,
+            myPeerID = myPeerID,
+            nowMillis = { testNowMs },
+        )
         securityManager.delegate = mockDelegate
     }
 
@@ -268,7 +280,7 @@ class SecurityManagerTest {
             type = MessageType.MESSAGE.value,
             senderID = byteArrayOf(0xAA.toByte(), 0xAA.toByte(), 0xBB.toByte(), 0xBB.toByte(), 0xCC.toByte(), 0xCC.toByte(), 0xDD.toByte(), 0xDD.toByte()),
             recipientID = null,
-            timestamp = 1_000_000uL,
+            timestamp = testNowMs.toULong(),
             payload = prefix + tail,
             signature = validSignature,
             ttl = 7u
@@ -291,7 +303,7 @@ class SecurityManagerTest {
             type = MessageType.MESSAGE.value,
             senderID = byteArrayOf(0xAA.toByte(), 0xAA.toByte(), 0xBB.toByte(), 0xBB.toByte(), 0xCC.toByte(), 0xCC.toByte(), 0xDD.toByte(), 0xDD.toByte()),
             recipientID = null,
-            timestamp = 2_000_000uL,
+            timestamp = testNowMs.toULong(),
             payload = dummyPayload,
             signature = validSignature,
             ttl = 7u
@@ -408,7 +420,8 @@ class SecurityManagerTest {
                 type = MessageType.MESSAGE.value,
                 ttl = 7u,
                 senderID = ByteArray(8) { 0xAB.toByte() },
-                timestamp = i.toULong(),
+                // Distinct timestamps within the 120s ingress skew window of [testNowMs].
+                timestamp = (testNowMs + i).toULong(),
                 payload = "m$i".encodeToByteArray(),
                 signature = validSignature,
             )

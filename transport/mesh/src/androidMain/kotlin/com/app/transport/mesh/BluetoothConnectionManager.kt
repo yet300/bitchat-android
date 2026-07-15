@@ -256,27 +256,20 @@ internal class BluetoothConnectionManager(
      * Stop all Bluetooth services with proper cleanup
      */
     override fun stopServices() {
+        shutdown()
+    }
+
+    override fun shutdown() {
         Log.i(TAG, "Stopping power-optimized Bluetooth services")
-        
         isActive = false
-        
-        connectionScope.launch {
-            Log.d(TAG, "Stopping client/server and power components...")
-            // Stop component managers
-            clientManager.stop()
-            serverManager.stop()
-            
-            // Stop power manager
-            powerManager.stop()
-            
-            // Stop connection tracker
-            connectionTracker.stop()
-            
-            // Cancel the coroutine scope
-            connectionScope.cancel()
-            
-            Log.i(TAG, "All Bluetooth services stopped")
-        }
+        Log.d(TAG, "Stopping client/server and power components...")
+        clientManager.stop()
+        serverManager.stop()
+        powerManager.stop()
+        connectionTracker.stop()
+        packetBroadcaster.shutdown()
+        connectionScope.cancel()
+        Log.i(TAG, "All Bluetooth services stopped")
     }
 
     /**
@@ -349,6 +342,28 @@ internal class BluetoothConnectionManager(
      */
     override fun connectToAddress(address: String): Boolean = clientManager.connectToAddress(address)
     override fun disconnectAddress(address: String) { connectionTracker.disconnectDevice(address) }
+
+    override fun flushDirectedSpool() = packetBroadcaster.flushDirectedSpool()
+
+    /**
+     * Central-role (GATT client) links only — used by [BleBearer] + [BleRedundantLinkPolicy]
+     * after a direct-announce bind to retire restore-era duplicate connections.
+     */
+    override fun clientLinkSnapshots(): List<BleClientLinkSnapshot> {
+        return try {
+            connectionTracker.getConnectedDevices().mapNotNull { (address, dc) ->
+                if (!dc.isClient) return@mapNotNull null
+                BleClientLinkSnapshot(
+                    address = address,
+                    peerID = addressPeerMap[address] ?: dc.peerID,
+                    isConnected = true,
+                    hasCharacteristic = dc.characteristic != null,
+                )
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
 
 
     // Optionally disconnect all connections (server and client)

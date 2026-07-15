@@ -23,9 +23,15 @@ enum class NoisePayloadType(val value: UByte) {
     DELIVERED(0x03u),           // Message was delivered
     GROUP_INVITE(0x06u),        // Creator-signed group state carried 1:1 over Noise (invite)
     GROUP_KEY_UPDATE(0x07u),    // Creator-signed group state (key rotation / roster update)
+    /** Live push-to-talk burst (same VoiceBurstPacket framing as public 0x29). iOS 0x08. */
+    VOICE_FRAME(0x08u),
     VERIFY_CHALLENGE(0x10u),    // Verification challenge
     VERIFY_RESPONSE(0x11u),     // Verification response
     VOUCH(0x12u),               // Batch of vouch attestations (transitive verification)
+    /**
+     * Legacy KMP-only path: private file inside Noise. Native iOS private files use
+     * outer signed [MessageType.FILE_TRANSFER] 0x22; keep 0x20 for older KMP peers.
+     */
     FILE_TRANSFER(0x20u);
 
 

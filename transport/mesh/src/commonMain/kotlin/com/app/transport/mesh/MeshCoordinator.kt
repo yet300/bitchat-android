@@ -48,9 +48,10 @@ internal fun epochMillis(): Long = Clock.System.now().toEpochMilliseconds()
 
 /**
  * Bluetooth mesh service - REFACTORED to use component-based architecture
- * 100% compatible with iOS version and maintains exact same UUIDs, packet format, and protocol logic
- * 
- * This is now a coordinator that orchestrates the following components:
+ * Mesh coordinator: peer lifecycle, security, relay, and multi-bearer packet flow.
+ * GATT UUIDs and packet wire format aim for iOS bitchat interop (not full product parity).
+ *
+ * Orchestrates the following components:
  * - PeerManager: Peer lifecycle management
  * - FragmentManager: Message fragmentation and reassembly  
  * - SecurityManager: Security, duplicate detection, encryption
@@ -107,9 +108,18 @@ class MeshCoordinator(
     // Engine components. Rebuilt in place by reset()/revival — the BMS object itself keeps
     // its graph identity, so  consumers never hold a stale reference.
     private var peerManager = PeerManager(peerFingerprintManager)
+    // SecurityManager is rebuilt after gossipSyncManager in wireComponents so RSR
+    // solicitation can share the same RequestSyncManager instance.
     private var securityManager = SecurityManager(encryptionService, myPeerID, trafficLog = debugSettingsManager)
     private var storeForwardManager = StoreForwardManager()
-    private var messageHandler = MessageHandler(myPeerID, incomingFileStore, meshGraphService, dispatchers)
+    private val selfBroadcastTracker = BleSelfBroadcastTracker()
+    private var messageHandler = MessageHandler(
+        myPeerID,
+        incomingFileStore,
+        meshGraphService,
+        dispatchers,
+        selfBroadcastTracker,
+    )
 
     /**
      * Narrow BLE debug surface for [com.bitchat.android.ui.debug.DebugSettingsSheet]
@@ -156,7 +166,9 @@ class MeshCoordinator(
     override var prekeyEventListener: PrekeyEventListener? = null
     private var nostrCarrierHandler: ((ByteArray, String, Boolean) -> Unit)? = null
     private val voiceFrameEvents = VoiceFrameEventStream()
+    private val privateVoiceFrameEvents = VoiceFrameEventStream()
     override val publicVoiceFrames = voiceFrameEvents.frames
+    override val privateVoiceFrames = privateVoiceFrameEvents.frames
 
     // Coroutines
     private var serviceScope = CoroutineScope(dispatchers.io + SupervisorJob())
@@ -199,6 +211,16 @@ class MeshCoordinator(
             }
         )
 
+        // Shared RSR solicitation gate: BLE ingress + SecurityManager + gossip registry.
+        val isValidRsr: (String) -> Boolean = { peerID -> gossipSyncManager.isValidSyncResponse(peerID) }
+        bleBearer.isValidSyncResponse = isValidRsr
+        securityManager = SecurityManager(
+            encryptionService = encryptionService,
+            myPeerID = myPeerID,
+            trafficLog = debugSettingsManager,
+            isValidSyncResponse = isValidRsr,
+        )
+
         // Outbound send path for the current generation (signing, announces, messaging)
         outbound = MeshOutboundSender(
             myPeerID = myPeerID,
@@ -214,6 +236,7 @@ class MeshCoordinator(
             scope = serviceScope,
             initiateHandshake = { peerID -> messageHandler.delegate?.initiateNoiseHandshake(peerID) },
             gatewayEnabled = { gatewayEnabled },
+            selfBroadcastTracker = selfBroadcastTracker,
         )
 
         // Mesh diagnostics probes. myPeerID is read live (panic reset rotates it) and the probe
@@ -237,6 +260,8 @@ class MeshCoordinator(
             override fun signPacketForBroadcast(packet: BitchatPacket): BitchatPacket {
                 return outbound.signPacketBeforeBroadcast(packet)
             }
+            override fun getConnectedPeers(): List<String> =
+                meshNetwork.allNeighbors.map { it.peerID }.distinct()
         }
 
         // Inter-component delegate wiring for the current generation
@@ -267,6 +292,7 @@ class MeshCoordinator(
             prekeyListener = { prekeyEventListener },
             nostrCarrierHandler = { nostrCarrierHandler },
             voiceFrameSink = voiceFrameEvents::emit,
+            privateVoiceFrameSink = privateVoiceFrameEvents::emit,
             nowMillis = { epochMillis() },
         ).wire()
         messageHandler.packetProcessor = packetProcessor
@@ -326,6 +352,7 @@ class MeshCoordinator(
         try { storeForwardManager.shutdown() } catch (_: Exception) { }
         try { messageHandler.shutdown() } catch (_: Exception) { }
         try { packetProcessor.shutdown() } catch (_: Exception) { }
+        selfBroadcastTracker.clear()
     }
 
     /**
@@ -338,9 +365,15 @@ class MeshCoordinator(
         myPeerID = encryptionService.getIdentityFingerprint().take(16)
         peerManager = PeerManager(peerFingerprintManager)
         fragmentManager.clearAllFragments()
-        securityManager = SecurityManager(encryptionService, myPeerID, trafficLog = debugSettingsManager)
+        // SecurityManager is rebuilt inside wireComponents with the new gossip RSR gate.
         storeForwardManager = StoreForwardManager()
-        messageHandler = MessageHandler(myPeerID, incomingFileStore, meshGraphService, dispatchers)
+        messageHandler = MessageHandler(
+            myPeerID,
+            incomingFileStore,
+            meshGraphService,
+            dispatchers,
+            selfBroadcastTracker,
+        )
         packetProcessor = PacketProcessor(myPeerID, debugSettingsManager)
         bleBearer.reset(myPeerID)
         wireComponents()
@@ -515,6 +548,9 @@ class MeshCoordinator(
     override fun sendMessage(content: String, mentions: List<String>, channel: String?) =
         outbound.sendMessage(content, mentions, channel)
 
+    override fun sendMessage(content: String, mentions: List<String>, channel: String?, messageID: String) =
+        outbound.sendMessage(content, mentions, channel, messageID)
+
     override fun sendFileBroadcast(file: com.app.transport.model.BitchatFilePacket) =
         outbound.sendFileBroadcast(file)
 
@@ -574,6 +610,9 @@ class MeshCoordinator(
     override fun broadcastNostrCarrier(payload: ByteArray) = outbound.broadcastNostrCarrier(payload)
 
     override fun broadcastVoiceFrame(payload: ByteArray) = outbound.broadcastVoiceFrame(payload)
+
+    override fun sendVoiceFrame(payload: ByteArray, toPeerID: String) =
+        outbound.sendVoiceFrame(payload, toPeerID)
 
     override fun connectedPeerIDs(): List<String> =
         try { peerManager.getActivePeerIDs() } catch (_: Exception) { emptyList() }

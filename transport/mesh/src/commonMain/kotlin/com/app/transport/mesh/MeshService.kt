@@ -44,6 +44,9 @@ interface MeshService {
 
     fun sendMessage(content: String, mentions: List<String> = emptyList(), channel: String? = null)
 
+    fun sendMessage(content: String, mentions: List<String>, channel: String?, messageID: String) =
+        sendMessage(content, mentions, channel)
+
     fun sendPrivateMessage(
         content: String,
         recipientPeerID: String,
@@ -161,4 +164,14 @@ interface MeshService {
 
     /** Broadcasts one already-encoded live voice burst as signed, ephemeral 0x29 traffic. */
     fun broadcastVoiceFrame(payload: ByteArray) = Unit
+
+    /**
+     * DM live voice: Noise payload type 0x08 inside directed noiseEncrypted.
+     * Fire-and-forget: drops when no established Noise session (iOS sendVoiceFrame parity).
+     */
+    fun sendVoiceFrame(payload: ByteArray, toPeerID: String) = Unit
+
+    /** Inbound private live-voice frames (Noise 0x08), same payload framing as public bursts. */
+    val privateVoiceFrames: Flow<PublicVoiceFrame>
+        get() = emptyFlow()
 }

@@ -1,5 +1,11 @@
 package com.app.transport.mesh
 
+/** Stable IDs used by the native app and KMP CoreBluetooth state restoration. */
+internal object CoreBluetoothRestoreIds {
+    const val CENTRAL = "chat.bitchat.ble.central"
+    const val PERIPHERAL = "chat.bitchat.ble.peripheral"
+}
+
 /**
  * commonMain parity copy of the reference iOS `TransportConfig` BLE knobs (values verified against
  * `bitchat/bitchat-ios/bitchat/Services/TransportConfig.swift`). Kept as one place both platforms
@@ -49,4 +55,15 @@ data class BleRadioConfig(
     val dutyOffMs: Long = 10_000L,
     val dutyOnDenseMs: Long = 3_000L,
     val dutyOffDenseMs: Long = 15_000L,
+
+    // --- redundant central-role link retirement (iOS bleLinkRebindCooldownSeconds) ---
+    /** At most one redundant-link retirement pass per peer per this window. */
+    val linkRebindCooldownMs: Long = 60_000L,
+
+    // --- directed spool when no writable links (iOS bleDirectedSpoolWindowSeconds) ---
+    val directedSpoolWindowMs: Long = 60_000L,
+
+    // --- ingress (iOS bleIngressRecordLifetimeSeconds / BLEIngressPacketGuard skew) ---
+    val ingressRecordLifetimeMs: Long = 3_000L,
+    val ingressMaxTimestampSkewMs: Long = 120_000L,
 )
