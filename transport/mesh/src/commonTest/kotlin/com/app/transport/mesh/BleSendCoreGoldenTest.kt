@@ -173,18 +173,21 @@ class BleSendCoreGoldenTest {
     }
 
     @Test
-    fun `directed send falls back to broadcast when write fails everywhere`() = runTest {
+    fun `directed send spools when write fails on recipient link`() = runTest {
         radio.failAddresses = setOf(ADDR_SRV_2)
         val core = core(sourceRouting = false)
         val p = packet(recipient = hexToBytes(PEER_SRV_2))
         core.broadcastPacket(RoutedPacket(p))
         advanceUntilIdle()
 
-        // Recipient link write failed -> historical fallback: broadcast, now through the
-        // P4 fanout subset; a chosen link whose write fails emits nothing.
-        val allLinks = listOf(ADDR_SRV_1, ADDR_SRV_2, ADDR_CLI_1, ADDR_CLI_2)
-        val expected = expectedBroadcastTargets(p, allLinks).filter { it != ADDR_SRV_2 }
-        assertEquals(expected, radio.emissions.map { it.first })
+        // P0.6: neighbor present but write returns false/GONE → spool, do not silent-flood.
+        assertTrue(radio.emissions.isEmpty(), "failed directed write must not flood other links")
+
+        // Recover the link and flush the directed spool — packet must leave.
+        radio.failAddresses = emptySet()
+        core.flushDirectedSpool()
+        advanceUntilIdle()
+        assertEquals(listOf(ADDR_SRV_2), radio.emissions.map { it.first })
         core.shutdown()
     }
 

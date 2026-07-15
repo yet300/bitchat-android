@@ -162,7 +162,7 @@ internal class PacketProcessor(
     }
     
     /**
-     * Handle received packet - core protocol logic (exact same as iOS)
+     * Handle a received packet (security validation, type dispatch, relay).
      */
     private suspend fun handleReceivedPacket(routed: RoutedPacket) {
         val packet = routed.packet
@@ -171,7 +171,7 @@ internal class PacketProcessor(
         // Basic validation and security checks. A null delegate (teardown/rebuild window)
         // drops the packet — never NPE inside the per-peer consumer coroutine, which would
         // permanently kill that peer's actor.
-        when (delegate?.validatePacketSecurity(packet, peerID)) {
+        when (delegate?.validatePacketSecurity(packet, peerID, routed.previousHopPeerID)) {
             PacketValidationResult.ACCEPT -> Unit
             PacketValidationResult.DUPLICATE -> {
                 // Another neighbor has already supplied this packet. If our degree is high
@@ -355,10 +355,18 @@ internal class PacketProcessor(
         val peerID = routed.peerID ?: "unknown"
         Log.d(TAG, "Processing fragment from ${formatPeerForLog(peerID)}")
         
-        val reassembledPacket = delegate?.handleFragment(routed.packet)
+        val reassembledPacket = delegate?.handleFragment(routed)
         if (reassembledPacket != null) {
             Log.d(TAG, "Fragment reassembled, processing complete message")
-            handleReceivedPacket(RoutedPacket(reassembledPacket, routed.peerID, routed.relayAddress))
+            // Preserve hop metadata so RSR solicitation still keys on the radio hop.
+            handleReceivedPacket(
+                RoutedPacket(
+                    packet = reassembledPacket,
+                    peerID = routed.peerID,
+                    relayAddress = routed.relayAddress,
+                    previousHopPeerID = routed.previousHopPeerID,
+                ),
+            )
         }
         
         // Fragment relay is now handled by centralized PacketRelayManager
@@ -427,8 +435,12 @@ internal class PacketProcessor(
  * Delegate interface for packet processor callbacks
  */
 internal interface PacketProcessorDelegate {
-    // Security validation
-    fun validatePacketSecurity(packet: BitchatPacket, peerID: String): PacketValidationResult
+    // Security validation — [peerID] is logical author; [previousHopPeerID] is radio hop (RSR solicit).
+    fun validatePacketSecurity(
+        packet: BitchatPacket,
+        peerID: String,
+        previousHopPeerID: String? = null,
+    ): PacketValidationResult
 
     // Liveness-only path for duplicate direct-neighbor announces: refresh the
     // link→peer binding and last-seen without reprocessing, relaying or sync scheduling.
@@ -453,7 +465,11 @@ internal interface PacketProcessorDelegate {
     fun handleAnnounce(routed: RoutedPacket)
     fun handleMessage(routed: RoutedPacket)
     fun handleLeave(routed: RoutedPacket)
-    fun handleFragment(packet: BitchatPacket): BitchatPacket?
+    /**
+     * Append fragment / reassemble. [routed.peerID] is the logical author of the fragment
+     * packet (claimed sender). Return null when still incomplete, self-authored, or invalid.
+     */
+    fun handleFragment(routed: RoutedPacket): BitchatPacket?
     fun handleRequestSync(routed: RoutedPacket)
 
     /** Directed echo request addressed to us. [linkKey] identifies the ingress link, not the sender. */

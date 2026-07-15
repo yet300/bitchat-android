@@ -10,20 +10,16 @@ import com.app.common.utils.Log
 import com.app.transport.MeshConstants
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
-import com.app.transport.protocol.MessagePadding
 import com.app.transport.model.FragmentPayload
 import kotlinx.coroutines.*
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 /**
- * Manages message fragmentation and reassembly - 100% iOS Compatible
- * 
- * This implementation exactly matches iOS SimplifiedBluetoothService fragmentation:
- * - Same fragment payload structure (13-byte header + data)
- * - Same MTU thresholds and fragment sizes
- * - Same reassembly logic and timeout handling
- * - Uses new FragmentPayload model for type safety
+ * Message fragmentation and reassembly for BLE MTU.
+ *
+ * Wire-compatible with iOS SimplifiedBluetoothService fragmentation:
+ * 13-byte fragment header, ~512 MTU threshold, bounded reassembly budgets.
  */
 class FragmentManager(
     dispatchers: AppDispatchers = AppDispatchers(),
@@ -58,27 +54,20 @@ class FragmentManager(
     }
     
     /**
-     * Create fragments from a large packet - 100% iOS Compatible
-     * Matches iOS sendFragmentedPacket() implementation exactly
+     * Create fragments from a large packet (iOS sendFragmentedPacket shape).
      */
     fun createFragments(packet: BitchatPacket): List<BitchatPacket> {
         try {
             Log.d(TAG, "🔀 Creating fragments for packet type ${packet.type}, payload: ${packet.payload.size} bytes")
-        val encoded = packet.toBinaryData()
-            if (encoded == null) {
+        // Fragment the raw binary frame without PKCS#7 pad. For large packets encode()
+        // already skips block padding; calling MessagePadding.unpad on unpadded data can
+        // strip real trailing signature bytes that look like valid PKCS#7 (false positive).
+        val fullData = packet.toBinaryData(padding = false)
+            if (fullData == null) {
                 Log.e(TAG, "❌ Failed to encode packet to binary data")
                 return emptyList()
             }
-            Log.d(TAG, "📦 Encoded to ${encoded.size} bytes")
-        
-        // Fragment the unpadded frame; each fragment will be encoded (and padded) independently - iOS fix
-        val fullData = try {
-                MessagePadding.unpad(encoded)
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Failed to unpad data: ${e.message}", e)
-                return emptyList()
-            }
-            Log.d(TAG, "📏 Unpadded to ${fullData.size} bytes")
+            Log.d(TAG, "📦 Encoded to ${fullData.size} bytes (no pad; fragments pad independently)")
         
         // iOS logic: if data.count > 512 && packet.type != MessageType.fragment.rawValue
         if (fullData.size <= FRAGMENT_SIZE_THRESHOLD) {
@@ -135,7 +124,9 @@ class FragmentManager(
             )
             
             // iOS: MessageType.fragment.rawValue (single fragment type)
-            // Fix: Fragments must inherit source route and use v2 if routed
+            // Fix: Fragments must inherit source route and use v2 if routed.
+            // isRSR must be copied so gossip-replay fragments of old RSR packets still
+            // skip the 120s clock-skew gate (iOS BLEOutboundFragmentPlanner parity).
             val fragmentPacket = BitchatPacket(
                 version = if (packet.route != null) 2u else 1u,
                 type = MessageType.FRAGMENT.value,
@@ -145,7 +136,8 @@ class FragmentManager(
                 timestamp = packet.timestamp,
                 payload = fragmentPayload.encode(),
                 route = packet.route,
-                signature = null // iOS: signature: nil
+                signature = null, // iOS: signature: nil
+                isRSR = packet.isRSR,
             )
             
             fragments.add(fragmentPacket)
@@ -161,8 +153,7 @@ class FragmentManager(
     }
     
     /**
-     * Handle incoming fragment - 100% iOS Compatible  
-     * Matches iOS handleFragment() implementation exactly
+     * Handle an incoming fragment packet; returns the reassembled original when complete.
      */
     fun handleFragment(packet: BitchatPacket): BitchatPacket? {
         // iOS: guard packet.payload.count > 13 else { return }
@@ -267,15 +258,22 @@ class FragmentManager(
                 if (fragmentMap.size == expectedTotal) {
                     Log.d(TAG, "All fragments received for $fragmentIDString, reassembling...")
 
-                    // iOS reassembly logic: for i in 0..<total { if let fragment = fragments[i] { reassembled.append(fragment) } }
-                    val reassembledData = mutableListOf<Byte>()
+                    // Contiguous copy — avoid boxing every byte into List<Byte> (breaks ~1 MiB files).
+                    val totalBytes = fragmentCumulativeSize[fragmentIDString] ?: 0
+                    val reassembledData = ByteArray(totalBytes)
+                    var offset = 0
                     for (i in 0 until expectedTotal) {
-                        fragmentMap[i]?.let { data ->
-                            reassembledData.addAll(data.asIterable())
+                        val chunk = fragmentMap[i]
+                        if (chunk == null) {
+                            Log.e(TAG, "Missing fragment index $i for $fragmentIDString during reassembly")
+                            removeFragmentSetLocked(fragmentIDString)
+                            return null
                         }
+                        chunk.copyInto(reassembledData, destinationOffset = offset)
+                        offset += chunk.size
                     }
 
-                    val originalPacket = BitchatPacket.fromBinaryData(reassembledData.toByteArray())
+                    val originalPacket = BitchatPacket.fromBinaryData(reassembledData)
                     if (originalPacket != null) {
                         removeFragmentSetLocked(fragmentIDString)
 

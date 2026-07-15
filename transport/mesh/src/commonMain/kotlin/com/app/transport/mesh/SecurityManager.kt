@@ -49,6 +49,7 @@ internal class SecurityManager(
     private val trafficLog: MeshTrafficLog? = null,
     dispatchers: AppDispatchers = AppDispatchers(),
     private val nowMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+    private val isValidSyncResponse: (peerID: String) -> Boolean = { false },
 ) {
     
     companion object {
@@ -103,11 +104,26 @@ internal class SecurityManager(
     }
     
     /**
-     * Validate packet security (timestamp, replay attacks, duplicates, signatures)
+     * Validate packet security (timestamp, replay attacks, duplicates, signatures).
+     *
+     * @param peerID Logical author ([RoutedPacket.peerID] / packet.senderID) — used for
+     *   signature verification and non-RSR clock-skew attribution.
+     * @param previousHopPeerID Previous radio hop when known. For RSR, solicitation is
+     *   checked against this hop (the peer we asked for sync), not the author of a
+     *   multi-hop replayed packet.
      */
-    fun validatePacket(packet: BitchatPacket, peerID: String): PacketValidationResult {
-        // Skip validation for our own packets
-        if (peerID == myPeerID) {
+    fun validatePacket(
+        packet: BitchatPacket,
+        peerID: String,
+        previousHopPeerID: String? = null,
+    ): PacketValidationResult {
+        // Ordinary self-loopback is dropped. Exception: solicited self-authored RSR
+        // (isRSR && ttl==0) after relaunch — a neighbor returns our public history
+        // (iOS isSelfAuthoredSyncResponse / BLEPublicMessagePolicy ttl==0 self).
+        val isSelfAuthoredRsr = BleIngressLinkRegistry.isSelfAuthoredSyncResponse(
+            packet, peerID, myPeerID,
+        )
+        if (peerID == myPeerID && !isSelfAuthoredRsr) {
             Log.d(TAG, "Skipping validation for our own packet")
             return PacketValidationResult.DROP
         }
@@ -117,39 +133,44 @@ internal class SecurityManager(
         val currentTime = nowMillis()
         val messageType = MessageType.fromValue(packet.type)
 
-        // RSR packets skip clock skew (iOS BLEIngressPacketGuard); non-RSR use 120s window.
-        // Solicitation authenticity for RSR is best-effort without a full RequestSyncManager
-        // peer budget here — we accept signed RSR frames (signature check still applies when
-        // required by type). InvalidRSR only fires when isRSR && isValidSyncResponse returns false.
+        // RSR: skip clock skew; solicitation uses the hop we requested sync from
+        // (previousHopPeerID), not the logical author of the stored packet.
+        // Non-RSR: 120s window attributed to the author peerID.
+        val payloadPeerID = if (packet.isRSR) {
+            previousHopPeerID ?: peerID
+        } else {
+            peerID
+        }
         BleIngressPacketGuard.validatePayload(
             packet = packet,
-            peerID = peerID,
+            peerID = payloadPeerID,
             nowMs = currentTime,
             maxTimestampSkewMs = BleIngressPacketGuard.DEFAULT_MAX_TIMESTAMP_SKEW_MS,
             isRSR = packet.isRSR,
-            isValidSyncResponse = { packet.isRSR },
+            isValidSyncResponse = isValidSyncResponse,
         )?.let { rejection ->
             when (rejection) {
                 is BleIngressPacketGuard.Rejection.TimestampSkew -> {
                     Log.w(
                         TAG,
                         "Packet timestamp skewed by ${rejection.skewMs}ms " +
-                            "(max ${rejection.maxSkewMs}ms) from ${peerID.take(8)}…",
+                            "(max ${rejection.maxSkewMs}ms) from ${payloadPeerID.take(8)}…",
                     )
                     return PacketValidationResult.DROP
                 }
                 is BleIngressPacketGuard.Rejection.InvalidRSR -> {
-                    Log.w(TAG, "Invalid or unsolicited RSR from ${peerID.take(8)}…")
+                    Log.w(TAG, "Invalid or unsolicited RSR from ${payloadPeerID.take(8)}…")
                     return PacketValidationResult.DROP
                 }
                 else -> Unit
             }
         }
 
-        // Duplicate detection
+        // Duplicate detection. Native BLEReceivePipeline skips dedup for ttl==0 self
+        // sync replay so history can re-enter after relaunch.
         val messageID = generateMessageID(packet)
 
-        if (isProcessed(messageID)) {
+        if (isProcessed(messageID) && !isSelfAuthoredRsr) {
             // ANNOUNCE exception: a byte-identical announce re-received at max TTL still
             // proves the direct link is alive (e.g. after a reconnect on a new link), so
             // report it as liveness-only. It must never be reprocessed or relayed again —
@@ -174,10 +195,12 @@ internal class SecurityManager(
         }
 
         // Add to processed messages (cap enforced at insertion — see [recordProcessedMessage])
-        recordProcessedMessage(messageID)
-        messageTimestamps[messageID] = currentTime
+        if (!isSelfAuthoredRsr) {
+            recordProcessedMessage(messageID)
+            messageTimestamps[messageID] = currentTime
+        }
 
-        // Enforce mandatory signature verification
+        // Enforce mandatory signature verification (own Ed25519 key for self-authored RSR).
         if (!verifyPacketSignature(packet, peerID)) {
             Log.w(TAG, "Dropping packet from $peerID due to signature verification failure")
             return PacketValidationResult.DROP
@@ -375,6 +398,10 @@ internal class SecurityManager(
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed to decode announcement for key extraction: ${e.message}")
                 }
+            } else if (peerID == myPeerID) {
+                // Self-authored solicited RSR: verify with our own signing key
+                // (we are not in the peer registry as a remote peer).
+                signingPublicKey = encryptionService.getSigningPublicKey()
             } else {
                 // Standard Case: Get key from known peer info
                 val peerInfo = delegate?.getPeerInfo(peerID)

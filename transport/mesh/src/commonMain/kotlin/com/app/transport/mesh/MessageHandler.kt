@@ -43,6 +43,7 @@ internal class MessageHandler(
     private val incomingFileStore: IncomingFileStore,
     private val meshGraphService: MeshGraphService,
     dispatchers: AppDispatchers = AppDispatchers(),
+    private val selfBroadcastTracker: BleSelfBroadcastTracker = BleSelfBroadcastTracker(),
 ) {
     
     companion object {
@@ -70,7 +71,7 @@ internal class MessageHandler(
 
     /**
      * Handle Noise encrypted transport message - SIMPLIFIED iOS-compatible version
-     * Uses NoisePayloadType system exactly like iOS SimplifiedBluetoothService
+     * NoisePayloadType dispatch for directed noiseEncrypted payloads.
      */
     fun handleNoiseEncrypted(routed: RoutedPacket) {
         val packet = routed.packet
@@ -494,7 +495,12 @@ internal class MessageHandler(
     fun handleMessage(routed: RoutedPacket) {
         val packet = routed.packet
         val peerID = routed.peerID ?: "unknown"
-        if (peerID == myPeerID) return
+        // Ordinary self-echo is dropped; solicited self-authored RSR (ttl=0) is kept
+        // so public history can re-enter after relaunch (iOS BLEPublicMessagePolicy).
+        val isSelfAuthoredRsr = BleIngressLinkRegistry.isSelfAuthoredSyncResponse(
+            packet, peerID, myPeerID,
+        )
+        if (peerID == myPeerID && !isSelfAuthoredRsr) return
         val senderNickname = delegate?.getPeerNickname(peerID)
         if (senderNickname != null) {
             Log.d(TAG, "Received message from $senderNickname")
@@ -519,12 +525,29 @@ internal class MessageHandler(
     private fun handleBroadcastMessage(routed: RoutedPacket) {
         val packet = routed.packet
         val peerID = routed.peerID ?: "unknown"
+        val isSelf = peerID == myPeerID
         
-        // Enforce: only accept public messages from verified peers we know
-        val peerInfo = delegate?.getPeerInfo(peerID)
-        if (peerInfo == null || !peerInfo.isVerifiedNickname) {
-            Log.w(TAG, "🚫 Dropping public message from unverified or unknown peer ${peerID.take(8)}...")
-            return
+        // Enforce: only accept public messages from verified peers we know.
+        // Self-authored solicited RSR is exempt (iOS: isSelf skips registry gate).
+        if (!isSelf) {
+            val peerInfo = delegate?.getPeerInfo(peerID)
+            if (peerInfo == null || !peerInfo.isVerifiedNickname) {
+                Log.w(TAG, "🚫 Dropping public message from unverified or unknown peer ${peerID.take(8)}...")
+                return
+            }
+        }
+
+        // Display name: local nickname for self-RSR, registry nickname for peers.
+        val senderDisplayName = if (isSelf) {
+            delegate?.getMyNickname()?.takeIf { it.isNotBlank() } ?: peerID.take(8)
+        } else {
+            delegate?.getPeerNickname(peerID) ?: "unknown"
+        }
+        val messageId = if (isSelf) {
+            selfBroadcastTracker.takeMessageID(packet)
+                ?: PacketIdUtil.computeIdHex(packet).uppercase()
+        } else {
+            PacketIdUtil.computeIdHex(packet).uppercase()
         }
         
         try {
@@ -537,10 +560,8 @@ internal class MessageHandler(
                 }
                 val savedPath = incomingFileStore.saveIncomingFile(file)
                 val message = BitchatMessage(
-                    // Stable content-derived id: request-sync replays of the same packet
-                    // must collapse to one message (upstream #707)
-                    id = PacketIdUtil.computeIdHex(packet).uppercase(),
-                    sender = delegate?.getPeerNickname(peerID) ?: "unknown",
+                    id = messageId,
+                    sender = senderDisplayName,
                     content = savedPath,
                     type = messageTypeForMime(file.mimeType),
                     senderPeerID = peerID,
@@ -555,8 +576,8 @@ internal class MessageHandler(
 
             // Fallback: plain text
             val message = BitchatMessage(
-                id = PacketIdUtil.computeIdHex(packet).uppercase(),
-                sender = delegate?.getPeerNickname(peerID) ?: "unknown",
+                id = messageId,
+                sender = senderDisplayName,
                 content = packet.payload.decodeToString(),
                 senderPeerID = peerID,
                 timestamp = Instant.fromEpochMilliseconds(packet.timestamp.toLong())

@@ -38,6 +38,9 @@ interface BearerTransport {
     fun startServices(): Boolean
     fun stopServices()
 
+    /** Terminal teardown for a transport generation; implementations must release owned scopes. */
+    fun shutdown() = stopServices()
+
     fun broadcastPacket(routed: RoutedPacket)
     fun sendToPeer(peerID: String, routed: RoutedPacket): Boolean
     fun cancelTransfer(transferId: String): Boolean

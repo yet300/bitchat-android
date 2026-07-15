@@ -577,6 +577,15 @@ class BinaryProtocolTest {
         }
     }
 
+    @Test
+    fun `encoder rejects unsupported versions instead of emitting v2-shaped garbage`() {
+        for (badVersion in listOf<UByte>(0u, 3u, 255u)) {
+            val packet = makePacket(version = badVersion, payload = "version test".toByteArray())
+
+            assertNull("Version $badVersion must not be encoded", BinaryProtocol.encode(packet))
+        }
+    }
+
     /**
      * Garbage data returns null
      *

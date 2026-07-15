@@ -57,6 +57,13 @@ class BleBearer(
     private var myPeerID: String = myPeerID
     private var nicknameResolver: ((String) -> String?)? = null
 
+    /**
+     * Solicitation gate for inbound RSR (Flags.IS_RSR). Wired by [MeshCoordinator] to
+     * [com.app.transport.sync.RequestSyncManager.isValidResponse]. Default rejects all RSR
+     * (safe until the mesh engine attaches a real registry).
+     */
+    var isValidSyncResponse: (peerID: String) -> Boolean = { false }
+
     // Survives reset(): the new radio stack must inherit the current foreground state.
     private var meshServiceActive: Boolean = false
     private var appIsActive: Boolean = true
@@ -194,6 +201,7 @@ class BleBearer(
                         nowMs = now,
                         maxTimestampSkewMs = radioConfig.ingressMaxTimestampSkewMs,
                         isRSR = packet.isRSR,
+                        isValidSyncResponse = isValidSyncResponse,
                     )
                 ) {
                     is BleIngressPacketGuard.EvaluateResult.Reject -> {
@@ -223,20 +231,22 @@ class BleBearer(
                         try {
                             debugSettingsManager.logIncoming(
                                 packet = packet,
-                                // Log the logical origin; radio hop is in deviceAddress.
-                                fromPeerID = context.validationPeerID,
+                                // Always the claimed logical author; radio hop is in deviceAddress.
+                                fromPeerID = claimedSenderID,
                                 fromNickname = null,
                                 fromDeviceAddress = deviceAddress,
                                 myPeerID = myPeerID,
                             )
                         } catch (_: Exception) {}
-                        // peerID MUST be validationPeerID (claimed logical origin) so
-                        // SecurityManager/Noise use the author key — not the previous hop
-                        // bound on this link (iOS packetContext / handleReceivedPacket split).
+                        // peerID is ALWAYS the claimed logical author (packet.senderID) so
+                        // SecurityManager/Noise verify the author key. For RSR, ingress already
+                        // solicited against validationPeerID (= hop); previousHopPeerID carries
+                        // that hop for any downstream re-check (iOS handleReceivedPacket split:
+                        // hop for link liveness, packet.senderID for crypto).
                         _incoming.trySend(
                             RoutedPacket(
                                 packet = packet,
-                                peerID = context.validationPeerID,
+                                peerID = claimedSenderID,
                                 relayAddress = deviceAddress,
                                 previousHopPeerID = context.receivedFromPeerID,
                             ),
@@ -289,7 +299,7 @@ class BleBearer(
      */
     fun reset(myPeerID: String) {
         val old = connectionManager
-        try { old.stopServices() } catch (_: Exception) {}
+        try { old.shutdown() } catch (_: Exception) {}
         // Detach the old stack's delegate: late asynchronous callbacks must neither emit stale
         // packets into the new generation's flow nor evict fresh address bindings.
         old.delegate = null
@@ -305,7 +315,7 @@ class BleBearer(
     }
 
     override fun start(): Boolean = connectionManager.startServices()
-    override fun stop() = connectionManager.stopServices()
+    override fun stop() = connectionManager.shutdown()
     override fun broadcast(packet: RoutedPacket) = connectionManager.broadcastPacket(packet)
     override fun sendToPeer(peerID: String, packet: RoutedPacket): Boolean =
         connectionManager.sendToPeer(peerID, packet)

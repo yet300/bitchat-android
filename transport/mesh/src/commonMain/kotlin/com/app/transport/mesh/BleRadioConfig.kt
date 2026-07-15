@@ -1,5 +1,11 @@
 package com.app.transport.mesh
 
+/** Stable IDs used by the native app and KMP CoreBluetooth state restoration. */
+internal object CoreBluetoothRestoreIds {
+    const val CENTRAL = "chat.bitchat.ble.central"
+    const val PERIPHERAL = "chat.bitchat.ble.peripheral"
+}
+
 /**
  * commonMain parity copy of the reference iOS `TransportConfig` BLE knobs (values verified against
  * `bitchat/bitchat-ios/bitchat/Services/TransportConfig.swift`). Kept as one place both platforms

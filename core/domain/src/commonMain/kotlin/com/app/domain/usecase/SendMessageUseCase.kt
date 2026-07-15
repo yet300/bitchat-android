@@ -41,12 +41,12 @@ class SendMessageUseCase(
         when (target) {
             is ConversationId.PublicMesh -> {
                 messages.append(target, echo(id, target, sender, content, now, mentions))
-                transport.sendPublic(content, mentions, channel = null)
+                transport.sendPublic(content, mentions, channel = null, messageId = id)
             }
 
             is ConversationId.Channel -> {
                 messages.append(target, echo(id, target, sender, content, now, mentions))
-                transport.sendPublic(content, mentions, channel = target.tag)
+                transport.sendPublic(content, mentions, channel = target.tag, messageId = id)
             }
 
             is ConversationId.Private -> {

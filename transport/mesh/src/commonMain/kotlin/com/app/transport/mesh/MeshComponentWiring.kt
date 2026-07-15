@@ -441,8 +441,12 @@ internal class MeshComponentWiring(
 
     private fun wirePacketProcessor() {
         packetProcessor.delegate = object : PacketProcessorDelegate {
-            override fun validatePacketSecurity(packet: BitchatPacket, peerID: String): PacketValidationResult {
-                return securityManager.validatePacket(packet, peerID)
+            override fun validatePacketSecurity(
+                packet: BitchatPacket,
+                peerID: String,
+                previousHopPeerID: String?,
+            ): PacketValidationResult {
+                return securityManager.validatePacket(packet, peerID, previousHopPeerID)
             }
 
             override fun handleDuplicateAnnounceLiveness(routed: RoutedPacket) {
@@ -586,7 +590,8 @@ internal class MeshComponentWiring(
                 scope.launch { messageHandler.handleLeave(routed) }
             }
 
-            override fun handleFragment(packet: BitchatPacket): BitchatPacket? {
+            override fun handleFragment(routed: RoutedPacket): BitchatPacket? {
+                val packet = routed.packet
                 // Track broadcast fragments for gossip sync
                 try {
                     val isBroadcast = (packet.recipientID == null || packet.recipientID.contentEquals(SpecialRecipients.BROADCAST))
@@ -594,6 +599,12 @@ internal class MeshComponentWiring(
                         gossipSyncManager.onPublicPacketSeen(packet)
                     }
                 } catch (_: Exception) { }
+                // iOS BLEFragmentHandler: self-authored fragment replay (incl. RSR after
+                // relaunch) is recorded as seen but never assembled — we authored the
+                // original, so reassembly would only burn fragment budgets.
+                if (!BleFragmentIngressPolicy.shouldAssemble(routed.peerID, myPeerID)) {
+                    return null
+                }
                 return fragmentManager.handleFragment(packet)
             }
 

@@ -18,6 +18,7 @@ import com.app.transport.model.RoutedPacket
 import com.app.transport.notification.ServiceNotifier
 import com.app.transport.protocol.BitchatPacket
 import com.app.transport.protocol.MessageType
+import com.app.transport.protocol.peerIdToRoutingBytes
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -170,11 +171,16 @@ class BluetoothMeshServiceLifecycleTest {
             scheduler.runCurrent()
         }
 
-        /** LEAVE skips signature verification, so it traverses the engine with mocked crypto. */
-        fun leavePacket(timestamp: ULong) = BitchatPacket(
+        /**
+         * LEAVE skips signature verification, so it traverses the engine with mocked crypto.
+         * Timestamp defaults to wall-clock "now" so the 120s ingress skew gate accepts the
+         * probe (fixed epoch values like 1000u fail SecurityManager clock skew).
+         */
+        fun leavePacket(timestamp: ULong = System.currentTimeMillis().toULong()) = BitchatPacket(
             type = MessageType.LEAVE.value,
             ttl = 3u,
-            senderID = ByteArray(8) { 0x22 },
+            // Logical author must match REMOTE_PEER so BleBearer ingress + engine probes agree.
+            senderID = peerIdToRoutingBytes(REMOTE_PEER),
             payload = ByteArray(0),
             timestamp = timestamp,
         )
@@ -184,9 +190,17 @@ class BluetoothMeshServiceLifecycleTest {
          * delivered it to the engine (logIncomingPacket fires past security validation on
          * the PacketProcessor's real-IO actor, hence the verify timeout). Exactly-once also
          * guards against a zombie generation double-processing.
+         *
+         * Each call uses a distinct payload so message-id dedup does not collapse probes.
          */
-        fun assertEngineReceives(timestamp: ULong) {
-            fakeBearer.incomingFlow.tryEmit(RoutedPacket(leavePacket(timestamp), REMOTE_PEER, "WIFI-1"))
+        private var probeSeq = 0
+        fun assertEngineReceives(timestamp: ULong? = null) {
+            probeSeq += 1
+            val packet = leavePacket(timestamp ?: System.currentTimeMillis().toULong()).let {
+                // Distinct payload per probe so SecurityManager messageID differs.
+                it.copy(payload = byteArrayOf(probeSeq.toByte()))
+            }
+            fakeBearer.incomingFlow.tryEmit(RoutedPacket(packet, REMOTE_PEER, "WIFI-1"))
             scheduler.runCurrent()
             verify(telemetry, timeout(5_000).times(1))
                 .logIncomingPacket(eq(REMOTE_PEER), anyOrNull(), eq("LEAVE"), anyOrNull())
@@ -217,7 +231,7 @@ class BluetoothMeshServiceLifecycleTest {
         verify(h.managers[1], timeout(1_000)).startServices()
 
         // No zombie: the new generation's collector receives packets, exactly once.
-        h.assertEngineReceives(timestamp = 1_000u)
+        h.assertEngineReceives()
     }
 
     // ------------------------------------------------------------------
@@ -238,7 +252,7 @@ class BluetoothMeshServiceLifecycleTest {
         h.advancePastGrace()
 
         assertTrue("new generation must stay active", h.bms.isMeshActive)
-        h.assertEngineReceives(timestamp = 2_000u)
+        h.assertEngineReceives()
     }
 
     /**
@@ -262,7 +276,7 @@ class BluetoothMeshServiceLifecycleTest {
         h.bms.simulateStaleTeardown(gen1Scope)
 
         assertTrue("stale teardown must not deactivate the new generation", h.bms.isMeshActive)
-        h.assertEngineReceives(timestamp = 5_000u)
+        h.assertEngineReceives()
 
         // And the service must still stop normally afterwards (not marked terminated).
         h.bms.stopServices()
@@ -296,12 +310,12 @@ class BluetoothMeshServiceLifecycleTest {
         h.advancePastGrace()
 
         assertFalse(h.bms.isMeshActive)
-        verify(h.managers[0], times(1)).stopServices()
+        verify(h.managers[0], times(1)).shutdown()
 
         // A terminated service must revive on the next start.
         h.startAndSettle()
         assertTrue(h.bms.isMeshActive)
-        h.assertEngineReceives(timestamp = 3_000u)
+        h.assertEngineReceives()
     }
 
     // ------------------------------------------------------------------
@@ -323,7 +337,7 @@ class BluetoothMeshServiceLifecycleTest {
         assertTrue("mesh must be active after panic reset", h.bms.isMeshActive)
         assertNotEquals(oldPeerId, h.bms.myPeerID)
         assertEquals(FINGERPRINT_B.take(16), h.bms.myPeerID)
-        h.assertEngineReceives(timestamp = 4_000u)
+        h.assertEngineReceives()
     }
 
     // ------------------------------------------------------------------
@@ -346,7 +360,7 @@ class BluetoothMeshServiceLifecycleTest {
         // reset() must have detached the old stack's delegate (the GATT stack reaches its
         // delegate exclusively through this field, so null = isolated).
         assertNull("old connection manager delegate must be detached", h.delegates[oldCm])
-        verify(oldCm).stopServices()
+        verify(oldCm).shutdown()
 
         val newCm = h.managers.last()
         assertNotEquals(oldCm, newCm)
@@ -359,7 +373,7 @@ class BluetoothMeshServiceLifecycleTest {
         // incoming flow is single-consumer (owned by the coordinator's merge), so engine
         // traversal is observed at logIncomingPacket — the suite's canonical probe — rather than
         // a second competing collector on the flow.
-        h.delegates[oldCm]?.onPacketReceived(h.leavePacket(9_000u), "stalePeer", null)
+        h.delegates[oldCm]?.onPacketReceived(h.leavePacket(), "stalePeer", null)
         h.delegates[oldCm]?.onDeviceDisconnected("AA:BB:CC:DD:EE:FF")
         h.scheduler.runCurrent()
 
@@ -374,7 +388,7 @@ class BluetoothMeshServiceLifecycleTest {
         // Sanity: the NEW stack's delegate is live and its packets traverse the current
         // generation's collector → PacketProcessor pipeline.
         assertNotNull(h.delegates[newCm])
-        h.delegates[newCm]?.onPacketReceived(h.leavePacket(9_001u), REMOTE_PEER, null)
+        h.delegates[newCm]?.onPacketReceived(h.leavePacket(), REMOTE_PEER, null)
         h.scheduler.runCurrent()
         verify(h.telemetry, timeout(5_000).times(1))
             .logIncomingPacket(eq(REMOTE_PEER), anyOrNull(), eq("LEAVE"), anyOrNull())

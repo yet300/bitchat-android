@@ -51,6 +51,7 @@ internal class MeshOutboundSender(
     private val initiateHandshake: (String) -> Unit,
     private val gatewayEnabled: () -> Boolean = { false },
     private val pendingNoise: BleNoiseSessionQueues = BleNoiseSessionQueues(),
+    private val selfBroadcastTracker: BleSelfBroadcastTracker = BleSelfBroadcastTracker(),
 ) {
 
     companion object {
@@ -64,7 +65,7 @@ internal class MeshOutboundSender(
     /**
      * Send public message
      */
-    fun sendMessage(content: String, mentions: List<String>, channel: String?) {
+    fun sendMessage(content: String, mentions: List<String>, channel: String?, messageID: String? = null) {
         if (content.isEmpty()) return
 
         scope.launch {
@@ -81,6 +82,9 @@ internal class MeshOutboundSender(
 
             // Sign the packet before broadcasting
             val signedPacket = signPacketBeforeBroadcast(packet)
+            if (messageID != null) {
+                selfBroadcastTracker.record(messageID, signedPacket, packet.timestamp.toLong())
+            }
             meshNetwork.broadcast(RoutedPacket(signedPacket))
             // Track our own broadcast message for sync
             try { gossipSyncManager.onPublicPacketSeen(signedPacket) } catch (_: Exception) { }
@@ -164,7 +168,7 @@ internal class MeshOutboundSender(
 
     /**
      * Send private message - SIMPLIFIED iOS-compatible version
-     * Uses NoisePayloadType system exactly like iOS SimplifiedBluetoothService
+     * NoisePayloadType private-message path (directed noiseEncrypted).
      */
     fun sendPrivateMessage(content: String, recipientPeerID: String, recipientNickname: String, messageID: String?) {
         if (content.isEmpty() || recipientPeerID.isEmpty()) return
@@ -263,6 +267,7 @@ internal class MeshOutboundSender(
         val payloads = pendingNoise.takeTypedPayloads(peerID)
         if (payloads.isEmpty()) return
         Log.d(TAG, "📤 Sending ${payloads.size} pending Noise payloads after handshake to ${peerID.take(8)}…")
+        val failed = mutableListOf<ByteArray>()
         for (typedPayload in payloads) {
             try {
                 val encrypted = encryptionService.encrypt(typedPayload, peerID)
@@ -279,7 +284,12 @@ internal class MeshOutboundSender(
                 meshNetwork.broadcast(RoutedPacket(signPacketBeforeBroadcast(packet)))
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send pending Noise payload to ${peerID.take(8)}…: ${e.message}")
+                failed.add(typedPayload)
             }
+        }
+        if (failed.isNotEmpty()) {
+            pendingNoise.prependTypedPayloads(failed, peerID)
+            Log.w(TAG, "⚠️ Re-queued ${failed.size} failed pending Noise payloads for ${peerID.take(8)}…")
         }
     }
 
@@ -510,15 +520,36 @@ internal class MeshOutboundSender(
 
     /**
      * DM live voice: [NoisePayloadType.VOICE_FRAME] (0x08) inside directed noiseEncrypted —
-     * iOS `sendVoiceFrame` parity. Requires an established Noise session.
+     * iOS `sendVoiceFrame` parity. Fire-and-forget: without an established Noise session the
+     * frame is dropped immediately (stale live audio must never queue behind a handshake).
      */
     fun sendVoiceFrame(payload: ByteArray, toPeerID: String) {
         if (payload.isEmpty() || toPeerID.isEmpty()) return
-        sendNoisePayloadToPeer(
-            NoisePayload(NoisePayloadType.VOICE_FRAME, payload),
-            toPeerID,
-            "voice frame",
-        )
+        scope.launch {
+            if (!encryptionService.hasEstablishedSession(toPeerID)) {
+                Log.d(TAG, "PTT: dropping voice frame — no established session with ${toPeerID.take(8)}…")
+                return@launch
+            }
+            try {
+                val typed = NoisePayload(NoisePayloadType.VOICE_FRAME, payload).encode()
+                val encrypted = encryptionService.encrypt(typed, toPeerID)
+                val packet = BitchatPacket(
+                    version = 1u,
+                    type = MessageType.NOISE_ENCRYPTED.value,
+                    senderID = peerIdToRoutingBytes(myPeerID),
+                    recipientID = peerIdToRoutingBytes(toPeerID),
+                    timestamp = epochMillis().toULong(),
+                    payload = encrypted,
+                    signature = null,
+                    ttl = MeshConstants.MESSAGE_TTL_HOPS,
+                )
+                val signedPacket = signPacketBeforeBroadcast(packet)
+                meshNetwork.broadcast(RoutedPacket(signedPacket))
+                Log.d(TAG, "📤 Sent voice frame to $toPeerID (${payload.size} bytes)")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send voice frame to $toPeerID: ${e.message}")
+            }
+        }
     }
 
     /** Sends one encoded public live-voice burst without persistence or gossip-sync tracking. */
@@ -576,7 +607,7 @@ internal class MeshOutboundSender(
     }
 
     /**
-     * Send broadcast announce with TLV-encoded identity announcement - exactly like iOS
+     * Send broadcast announce with TLV-encoded identity announcement
      */
     fun sendBroadcastAnnounce() {
         Log.d(TAG, "Sending broadcast announce")
@@ -603,7 +634,7 @@ internal class MeshOutboundSender(
     }
 
     /**
-     * Send announcement to specific peer with TLV-encoded identity announcement - exactly like iOS
+     * Send announcement to specific peer with TLV-encoded identity announcement
      */
     fun sendAnnouncementToPeer(peerID: String) {
         if (peerManager.hasAnnouncedToPeer(peerID)) return

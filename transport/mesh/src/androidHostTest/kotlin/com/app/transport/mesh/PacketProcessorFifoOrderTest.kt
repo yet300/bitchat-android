@@ -26,8 +26,11 @@ class PacketProcessorFifoOrderTest {
     private val myPeerID = "1111111111111111"
 
     private class RecordingDelegate(val order: MutableList<Int>) : PacketProcessorDelegate {
-        override fun validatePacketSecurity(packet: BitchatPacket, peerID: String) =
-            PacketValidationResult.ACCEPT
+        override fun validatePacketSecurity(
+            packet: BitchatPacket,
+            peerID: String,
+            previousHopPeerID: String?,
+        ) = PacketValidationResult.ACCEPT
         override fun handleDuplicateAnnounceLiveness(routed: RoutedPacket) {}
         override fun updatePeerLastSeen(peerID: String) {}
         override fun getPeerNickname(peerID: String): String? = null
@@ -41,7 +44,7 @@ class PacketProcessorFifoOrderTest {
             order.add(routed.packet.timestamp.toInt())
         }
         override fun handleLeave(routed: RoutedPacket) {}
-        override fun handleFragment(packet: BitchatPacket): BitchatPacket? = null
+        override fun handleFragment(routed: RoutedPacket): BitchatPacket? = null
         override fun handleRequestSync(routed: RoutedPacket) {}
         override fun handlePing(routed: RoutedPacket, linkKey: String) {}
         override fun handlePong(routed: RoutedPacket) {}

@@ -51,6 +51,19 @@ class BleNoiseSessionQueuesTest {
     }
 
     @Test
+    fun prependRestoresFailedTypedPayloadsAheadOfNewTraffic() {
+        val q = BleNoiseSessionQueues()
+        q.appendTypedPayload(byteArrayOf(3), "peer1")
+
+        q.prependTypedPayloads(listOf(byteArrayOf(1), byteArrayOf(2)), "peer1")
+
+        assertEquals(
+            listOf(listOf<Byte>(1), listOf<Byte>(2), listOf<Byte>(3)),
+            q.takeTypedPayloads("peer1").map(ByteArray::toList),
+        )
+    }
+
+    @Test
     fun perPeerCapDropsOldestPrivateMessage() {
         val q = BleNoiseSessionQueues(maxPrivateMessagesPerPeer = 2, maxTypedPayloadsPerPeer = 2, maxPeers = 8)
         q.appendPrivateMessage("1", "id1", "peer1")

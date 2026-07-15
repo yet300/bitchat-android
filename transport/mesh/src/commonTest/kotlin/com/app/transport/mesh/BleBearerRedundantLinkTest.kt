@@ -18,9 +18,12 @@ class BleBearerRedundantLinkTest {
         override val addressPeerMap: MutableMap<String, String> = mutableMapOf()
         var clientLinks: MutableList<BleClientLinkSnapshot> = mutableListOf()
         val disconnected = mutableListOf<String>()
+        var stopCalls = 0
+        var shutdownCalls = 0
 
         override fun startServices(): Boolean = true
-        override fun stopServices() {}
+        override fun stopServices() { stopCalls++ }
+        override fun shutdown() { shutdownCalls++ }
         override fun broadcastPacket(routed: RoutedPacket) {}
         override fun sendToPeer(peerID: String, routed: RoutedPacket): Boolean = true
         override fun cancelTransfer(transferId: String): Boolean = true
@@ -44,6 +47,27 @@ class BleBearerRedundantLinkTest {
         }
         override fun getDebugInfo(): String = ""
         override fun clientLinkSnapshots(): List<BleClientLinkSnapshot> = clientLinks.toList()
+    }
+
+    @Test
+    fun stopUsesTerminalTransportShutdown() {
+        val transport = FakeTransport()
+
+        bearer(transport).stop()
+
+        assertEquals(1, transport.shutdownCalls)
+        assertEquals(0, transport.stopCalls)
+    }
+
+    @Test
+    fun resetShutsDownOldTransportGeneration() {
+        val transport = FakeTransport()
+        val bearer = bearer(transport)
+
+        bearer.reset("2222222222222222")
+
+        assertEquals(1, transport.shutdownCalls)
+        assertEquals(0, transport.stopCalls)
     }
 
     private fun bearer(

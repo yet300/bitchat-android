@@ -10,7 +10,7 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 /**
- * Message types - exact same as iOS version with Noise Protocol support
+ * Message type bytes shared with the native wire protocol.
  */
 enum class MessageType(val value: UByte) {
     ANNOUNCE(0x01u),
@@ -44,14 +44,14 @@ enum class MessageType(val value: UByte) {
 }
 
 /**
- * Special recipient IDs - exact same as iOS version
+ * Special recipient IDs shared with the native wire protocol.
  */
 object SpecialRecipients {
     val BROADCAST = ByteArray(8) { 0xFF.toByte() }  // All 0xFF = broadcast
 }
 
 /**
- * Binary packet format - 100% backward compatible with iOS version
+ * Binary packet layout for the shared v1/v2 wire protocol.
  *
  * Header (14 bytes for v1, 16 bytes for v2):
  * - Version: 1 byte
@@ -186,7 +186,8 @@ object BinaryProtocol {
     private const val SENDER_ID_SIZE = 8
     private const val RECIPIENT_ID_SIZE = 8
     private const val SIGNATURE_SIZE = 64
-    private const val MAX_PAYLOAD_LENGTH = 10_485_760  // 10 MiB — wire-level payload cap, same as iOS
+    // Generic decoder guard. BLE/file paths enforce their smaller type-specific limits before this.
+    private const val MAX_PAYLOAD_LENGTH = 10_485_760
 
     object Flags {
         const val HAS_RECIPIENT: UByte = 0x01u
@@ -206,6 +207,10 @@ object BinaryProtocol {
     
     fun encode(packet: BitchatPacket, padding: Boolean = true): ByteArray? {
         try {
+            if (packet.version != 1u.toUByte() && packet.version != 2u.toUByte()) {
+                Log.e("BinaryProtocol", "Refusing to encode unsupported version ${packet.version}")
+                return null
+            }
             // Fail loudly on inputs the wire format cannot represent — a silently
             // truncated frame would be misparsed by the decoder on the other side.
             packet.signature?.let { signature ->

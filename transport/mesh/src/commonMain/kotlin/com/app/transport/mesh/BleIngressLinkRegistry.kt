@@ -45,6 +45,8 @@ class BleIngressLinkRegistry {
     val isEmpty: Boolean
         get() = lock.withLock { ingressByMessageID.isEmpty() }
 
+    internal fun debugRecordCount(): Int = lock.withLock { ingressByMessageID.size }
+
     fun clear() = lock.withLock { ingressByMessageID.clear() }
 
     fun record(forPacket: BitchatPacket): BleIngressLinkRecord? = lock.withLock {
@@ -67,13 +69,23 @@ class BleIngressLinkRegistry {
         if (existing != null && nowMs - existing.timestampMs <= lifetimeMs) {
             return false
         }
+        // An expired sighting is a new FIFO insertion. Plain assignment would retain the old
+        // LinkedHashMap position and make the refreshed record the next eviction candidate.
+        if (existing != null) ingressByMessageID.remove(id)
         ingressByMessageID[id] = BleIngressLinkRecord(link, peerID, nowMs)
-        // Bound growth: drop entries older than lifetime when map is large.
+        // Hard cap: first drop expired, then FIFO-evict oldest insertions until under MAX_RECORDS.
+        // (Previously only expired entries were removed, so all-fresh maps could grow unbounded.)
         if (ingressByMessageID.size > MAX_RECORDS) {
             val cutoff = nowMs - lifetimeMs
             val it = ingressByMessageID.entries.iterator()
             while (it.hasNext()) {
                 if (it.next().value.timestampMs < cutoff) it.remove()
+            }
+            while (ingressByMessageID.size > MAX_RECORDS) {
+                val oldest = ingressByMessageID.entries.iterator()
+                if (!oldest.hasNext()) break
+                oldest.next()
+                oldest.remove()
             }
         }
         true
@@ -107,7 +119,9 @@ class BleIngressLinkRegistry {
             directAnnounceTTL: UByte,
             isRSR: Boolean = false,
         ): Result {
-            if (claimedSenderID == localPeerID && !(isRSR && packet.ttl == 0u.toUByte())) {
+            if (claimedSenderID == localPeerID &&
+                !isSelfAuthoredSyncResponse(packet, claimedSenderID, localPeerID)
+            ) {
                 return Result.Failure(BleIngressRejection.SelfLoopback(packet.type))
             }
 
@@ -139,6 +153,20 @@ class BleIngressLinkRegistry {
 
         fun isDirectAnnounce(packet: BitchatPacket, directAnnounceTTL: UByte): Boolean =
             packet.type == MessageType.ANNOUNCE.value && packet.ttl == directAnnounceTTL
+
+        /**
+         * Neighbor returned our own stored packet as a solicited RSR after relaunch/reset
+         * (iOS `isSelfAuthoredSyncResponse`: isRSR && ttl==0 && sender==local).
+         * Normal self-loopback (non-RSR or ttl>0) must still be rejected.
+         */
+        fun isSelfAuthoredSyncResponse(
+            packet: BitchatPacket,
+            claimedSenderID: String,
+            localPeerID: String,
+        ): Boolean =
+            claimedSenderID == localPeerID &&
+                packet.isRSR &&
+                packet.ttl == 0u.toUByte()
 
         private fun requiresDirectSenderBinding(packet: BitchatPacket): Boolean =
             packet.type == MessageType.REQUEST_SYNC.value

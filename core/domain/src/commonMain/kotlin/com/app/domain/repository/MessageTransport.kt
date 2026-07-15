@@ -14,6 +14,10 @@ interface MessageTransport {
     /** Public/channel message (channel == null -> shared mesh chat). */
     suspend fun sendPublic(content: String, mentions: List<String>, channel: String?)
 
+    /** Public/channel message whose relayed self-copy must retain [messageId]. */
+    suspend fun sendPublic(content: String, mentions: List<String>, channel: String?, messageId: String) =
+        sendPublic(content, mentions, channel)
+
     /** Private message. The route (mesh/Nostr) is chosen by the implementation. */
     suspend fun sendPrivate(content: String, to: PeerId, recipientNickname: String?, messageId: String)
 

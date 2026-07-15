@@ -27,7 +27,7 @@ import kotlinx.coroutines.flow.flowOf
 
 /** Records outgoing transport calls. */
 class FakeMessageTransport : MessageTransport {
-    data class Public(val content: String, val mentions: List<String>, val channel: String?)
+    data class Public(val content: String, val mentions: List<String>, val channel: String?, val messageId: String)
     data class Private(val content: String, val to: PeerId, val recipientNickname: String?, val messageId: String)
     data class Geo(val content: String, val channel: GeohashChannel, val nickname: String?)
     data class Receipt(val messageId: String, val to: PeerId)
@@ -45,7 +45,11 @@ class FakeMessageTransport : MessageTransport {
     var cancelResult = true
 
     override suspend fun sendPublic(content: String, mentions: List<String>, channel: String?) {
-        publics += Public(content, mentions, channel)
+        publics += Public(content, mentions, channel, "")
+    }
+
+    override suspend fun sendPublic(content: String, mentions: List<String>, channel: String?, messageId: String) {
+        publics += Public(content, mentions, channel, messageId)
     }
 
     override suspend fun sendPrivate(content: String, to: PeerId, recipientNickname: String?, messageId: String) {

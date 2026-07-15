@@ -79,6 +79,20 @@ class BleNoiseSessionQueues(
         queue.toList()
     }
 
+    fun prependTypedPayloads(payloads: List<ByteArray>, peerID: String) {
+        lock.withLock {
+            if (payloads.isEmpty()) return
+            ensurePeerCapacity(typedPayloadsByPeerID)
+            val queue = typedPayloadsByPeerID.getOrPut(peerID) { ArrayDeque() }
+            for (i in payloads.indices.reversed()) {
+                queue.addFirst(payloads[i].copyOf())
+            }
+            while (queue.size > maxTypedPayloadsPerPeer) {
+                queue.removeLast()
+            }
+        }
+    }
+
     private fun <T> ensurePeerCapacity(map: LinkedHashMap<String, ArrayDeque<T>>) {
         while (map.size >= maxPeers && map.isNotEmpty()) {
             val eldest = map.entries.first().key

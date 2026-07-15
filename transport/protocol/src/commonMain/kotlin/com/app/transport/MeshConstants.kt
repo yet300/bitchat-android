@@ -9,8 +9,8 @@ import kotlin.uuid.Uuid
  * Mesh-domain configuration constants (commonMain).
  *
  * Extracted from the monolith's god-config (`com.bitchat.android.util.AppConstants`) into the
- * transport module ahead of the `mesh/` extraction. Values are copied verbatim — this move is
- * behavior-neutral. iOS byte-compatibility: the packet TTL and the GATT UUIDs must stay identical.
+ * transport module ahead of the `mesh/` extraction. Wire-facing values are kept aligned with the
+ * native transport where interoperability requires it; local resource budgets may be stricter.
  * The BLE GATT UUIDs ([Mesh.Gatt]) are typed kotlin.uuid.Uuid (the project-wide idiom); platform
  * code adapts each to its native UUID type at the call site (java.util.UUID on Android via
  * Uuid.toJavaUuid(); CBUUID on native via CBUUID.UUIDWithString(uuid.toString())).
@@ -50,12 +50,41 @@ object MeshConstants {
         const val MAX_FRAGMENT_SIZE: Int = 469
         const val FRAGMENT_TIMEOUT_MS: Long = 30_000L
         const val CLEANUP_INTERVAL_MS: Long = 10_000L
-        // 1 MiB payload / 469-byte fragments ≈ 2236; headroom for TLV + packet framing.
+        // 1 MiB content / 469-byte fragments ≈ 2236; headroom for TLV + packet framing.
         // (Previously 256 ≈ 116 KiB — broke native↔KMP 1 MiB file interop.)
         const val MAX_FRAGMENTS_PER_ID: Int = 4096
-        const val MAX_FRAGMENT_TOTAL_BYTES: Int = 1_048_576
+        /**
+         * Cumulative reassembled **binary packet** budget (not bare content).
+         * Matches iOS `FileTransferLimits.maxFramedFileBytes`: 1 MiB content + worst-case
+         * UInt16 filename/MIME TLVs + v2 outer packet envelope (header/sender/recipient/sig).
+         */
+        val MAX_FRAGMENT_TOTAL_BYTES: Int = FileTransferLimits.maxFramedFileBytes
         const val MAX_ACTIVE_FRAGMENT_SETS: Int = 64
-        const val MAX_GLOBAL_FRAGMENT_TOTAL_BYTES: Long = 4L * 1_048_576L
+        val MAX_GLOBAL_FRAGMENT_TOTAL_BYTES: Long =
+            4L * FileTransferLimits.maxFramedFileBytes.toLong()
+    }
+
+    /**
+     * iOS `FileTransferLimits` parity — content ceiling and framed-packet headroom for
+     * BLE file transfers.
+     */
+    object FileTransferLimits {
+        /** Absolute ceiling for file content (voice, image, other). */
+        const val MAX_PAYLOAD_BYTES: Int = 1 * 1024 * 1024 // 1 MiB
+        const val MAX_VOICE_NOTE_BYTES: Int = 512 * 1024
+        const val MAX_IMAGE_BYTES: Int = 512 * 1024
+
+        // BinaryProtocol v2 header (16) + sender(8) + recipient(8) + signature(64) = 96
+        private const val BINARY_ENVELOPE_OVERHEAD: Int = 16 + 8 + 8 + 64
+        // TLV tags+lengths for name/size/mime/content header fields ≈ 18 + metadata
+        private const val TLV_ENVELOPE_BASE: Int = 18
+        private const val MAX_METADATA_BYTES: Int = 0xFFFF * 2 // fileName + mimeType UInt16 max
+
+        /** Worst-case full encoded packet for a max-size file (content + framing). */
+        val maxFramedFileBytes: Int =
+            MAX_PAYLOAD_BYTES + TLV_ENVELOPE_BASE + MAX_METADATA_BYTES + BINARY_ENVELOPE_OVERHEAD
+
+        fun isValidPayload(size: Int): Boolean = size <= MAX_PAYLOAD_BYTES
     }
 
     object Security {

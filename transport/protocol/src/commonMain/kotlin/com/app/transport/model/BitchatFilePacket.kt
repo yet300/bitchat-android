@@ -1,6 +1,7 @@
 package com.app.transport.model
 
 import com.app.common.utils.Log
+import com.app.transport.MeshConstants
 import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
 
@@ -8,16 +9,17 @@ import kotlinx.io.readByteArray
  * BitchatFilePacket: TLV-encoded file transfer payload for BLE mesh.
  * TLVs:
  *  - 0x01: filename (UTF-8)
- *  - 0x02: file size (8 bytes, UInt64)
+ *  - 0x02: file size (4 bytes, UInt32)
  *  - 0x03: mime type (UTF-8)
- *  - 0x04: content (bytes) — may appear multiple times for large files
+ *  - 0x04: content (bytes)
  *
- * Length field for TLV is 2 bytes (UInt16, big-endian) for all TLVs.
- * For large files, CONTENT is chunked into multiple TLVs of up to 65535 bytes each.
+ * Filename, file-size, and MIME TLVs use a 2-byte big-endian length. CONTENT uses a 4-byte
+ * big-endian length and is emitted as one TLV, allowing the outer v2 packet to exceed 64 KiB.
  *
- * Note: The outer BitchatPacket uses version 2 (4-byte payload length), so this
- * TLV payload can exceed 64 KiB even though each TLV value is limited to 65535 bytes.
- * Transport-level fragmentation then splits the final packet for BLE MTU.
+ * Content is capped at [MeshConstants.FileTransferLimits.MAX_PAYLOAD_BYTES] (1 MiB),
+ * matching iOS FileTransferLimits.maxPayloadBytes.
+ *
+ * Transport-level fragmentation splits the final packet for BLE MTU.
  */
 data class BitchatFilePacket(
     val fileName: String,
@@ -33,18 +35,25 @@ data class BitchatFilePacket(
     fun encode(): ByteArray? {
         try {
             Log.d("BitchatFilePacket", "🔄 Encoding: name=$fileName, size=$fileSize, mime=$mimeType")
+            if (content.isEmpty() || !MeshConstants.FileTransferLimits.isValidPayload(content.size)) {
+                Log.e(
+                    "BitchatFilePacket",
+                    "❌ Content size is outside 1..${MeshConstants.FileTransferLimits.MAX_PAYLOAD_BYTES}: ${content.size}",
+                )
+                return null
+            }
+            if (fileSize !in 0..MeshConstants.FileTransferLimits.MAX_PAYLOAD_BYTES.toLong()) {
+                Log.e("BitchatFilePacket", "❌ Declared file size is outside native limit: $fileSize")
+                return null
+            }
             val nameBytes = fileName.encodeToByteArray()
             val mimeBytes = mimeType.encodeToByteArray()
-            // Validate bounds for 2-byte TLV lengths (per-TLV). CONTENT may exceed 65535 and will be chunked.
+            // Validate the fields that use 2-byte TLV lengths. CONTENT has a 4-byte length.
             if (nameBytes.size > 0xFFFF || mimeBytes.size > 0xFFFF) {
                 Log.e("BitchatFilePacket", "❌ TLV field too large: name=${nameBytes.size}, mime=${mimeBytes.size} (max: 65535)")
                 return null
             }
-            if (content.size > 0xFFFF) {
-                Log.d("BitchatFilePacket", "📦 Content exceeds 65535 bytes (${content.size}); will be split into multiple CONTENT TLVs")
-            } else {
-                Log.d("BitchatFilePacket", "📏 TLV sizes OK: name=${nameBytes.size}, mime=${mimeBytes.size}, content=${content.size}")
-            }
+            Log.d("BitchatFilePacket", "📏 TLV sizes OK: name=${nameBytes.size}, mime=${mimeBytes.size}, content=${content.size}")
 
             // kotlinx-io Buffer writes big-endian by default, matching the iOS wire (BIG_ENDIAN).
             val buf = Buffer()
@@ -101,7 +110,13 @@ data class BitchatFilePacket(
                         len = ((data[off].toInt() and 0xFF) shl 8) or (data[off + 1].toInt() and 0xFF)
                         off += 2
                     }
-                    if (len < 0 || off + len > data.size) return null
+                    if (len < 0 || len > data.size - off) return null
+                    if (t == TLVType.CONTENT) {
+                        val accumulated = contentBytes?.size ?: 0
+                        if (len > MeshConstants.FileTransferLimits.MAX_PAYLOAD_BYTES - accumulated) {
+                            return null
+                        }
+                    }
                     val value = data.copyOfRange(off, off + len)
                     off += len
                     when (t) {
@@ -126,8 +141,16 @@ data class BitchatFilePacket(
                     }
                 }
                 val n = name ?: return null
-                val c = contentBytes ?: return null
+                val c = contentBytes?.takeIf { it.isNotEmpty() } ?: return null
+                if (!MeshConstants.FileTransferLimits.isValidPayload(c.size)) {
+                    Log.e(
+                        "BitchatFilePacket",
+                        "❌ Decoded content exceeds max payload: ${c.size} > ${MeshConstants.FileTransferLimits.MAX_PAYLOAD_BYTES}",
+                    )
+                    return null
+                }
                 val s = size ?: c.size.toLong()
+                if (s !in 0..MeshConstants.FileTransferLimits.MAX_PAYLOAD_BYTES.toLong()) return null
                 val m = mime ?: "application/octet-stream"
                 val result = BitchatFilePacket(n, s, m, c)
                 Log.d("BitchatFilePacket", "✅ Decoded: name=$n, size=$s, mime=$m, content=${c.size} bytes")

@@ -44,6 +44,9 @@ interface MeshService {
 
     fun sendMessage(content: String, mentions: List<String> = emptyList(), channel: String? = null)
 
+    fun sendMessage(content: String, mentions: List<String>, channel: String?, messageID: String) =
+        sendMessage(content, mentions, channel)
+
     fun sendPrivateMessage(
         content: String,
         recipientPeerID: String,
@@ -164,7 +167,7 @@ interface MeshService {
 
     /**
      * DM live voice: Noise payload type 0x08 inside directed noiseEncrypted.
-     * Requires an established Noise session (queues until handshake like other typed payloads).
+     * Fire-and-forget: drops when no established Noise session (iOS sendVoiceFrame parity).
      */
     fun sendVoiceFrame(payload: ByteArray, toPeerID: String) = Unit
 

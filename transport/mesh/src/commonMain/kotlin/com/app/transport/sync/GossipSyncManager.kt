@@ -32,11 +32,16 @@ internal class GossipSyncManager(
     private val trafficLog: MeshTrafficLog? = null,
     private val dispatchers: AppDispatchers = AppDispatchers(),
     private val nowMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+    private val requestSyncManager: RequestSyncManager = RequestSyncManager(nowMs = nowMillis),
 ) {
+    /** Exposed so BLE ingress / SecurityManager share the same pending-request window. */
+    fun isValidSyncResponse(peerID: String): Boolean =
+        requestSyncManager.isValidResponse(peerID = peerID, isRSR = true)
     interface Delegate {
         fun sendPacket(packet: BitchatPacket)
         fun sendPacketToPeer(peerID: String, packet: BitchatPacket)
         fun signPacketForBroadcast(packet: BitchatPacket): BitchatPacket
+        fun getConnectedPeers(): List<String> = emptyList()
     }
 
     interface ConfigProvider {
@@ -134,6 +139,7 @@ internal class GossipSyncManager(
                     delay(SyncDefaults.CLEANUP_INTERVAL_MS.milliseconds)
                     pruneStaleAnnouncements()
                     responseRateLimiter.prune(nowMillis())
+                    requestSyncManager.cleanup()
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) { Log.e(TAG, "Periodic cleanup error: ${e.message}") }
             }
@@ -225,8 +231,16 @@ internal class GossipSyncManager(
     }
 
     private fun sendRequestSync(types: SyncTypeFlags = SyncTypeFlags.publicMessages) {
+        // Prefer unicast to connected peers so RSR can be attributed (iOS sendPeriodicSync).
+        val connected = delegate?.getConnectedPeers().orEmpty()
+        if (connected.isNotEmpty()) {
+            for (peerID in connected) {
+                sendRequestSyncToPeer(peerID, types)
+            }
+            return
+        }
+        // Discovery fallback: broadcast without solicitation registry (no peer to attribute).
         val payload = buildGcsPayload(types)
-
         val packet = BitchatPacket(
             type = MessageType.REQUEST_SYNC.value,
             senderID = peerIdToRoutingBytes(myPeerID),
@@ -234,12 +248,14 @@ internal class GossipSyncManager(
             payload = payload,
             ttl = SyncDefaults.SYNC_TTL_HOPS // neighbors only
         )
-        // Sign and broadcast
         val signed = delegate?.signPacketForBroadcast(packet) ?: packet
         delegate?.sendPacket(signed)
     }
 
-    private fun sendRequestSyncToPeer(peerID: String) {
+    private fun sendRequestSyncToPeer(
+        peerID: String,
+        types: SyncTypeFlags = allSyncTypes(),
+    ) {
         // Re-check at send time: the delayed job may fire after another path (or a
         // previous job) already sent a request to this peer within the interval.
         val now = nowMillis()
@@ -249,8 +265,10 @@ internal class GossipSyncManager(
             return
         }
         lastSyncRequestSentAt[peerID] = now
+        // Register solicitation so inbound RSR from this peer passes the ingress gate.
+        requestSyncManager.registerRequest(peerID)
 
-        val payload = buildGcsPayload(allSyncTypes())
+        val payload = buildGcsPayload(types)
 
         val packet = BitchatPacket(
             type = MessageType.REQUEST_SYNC.value,

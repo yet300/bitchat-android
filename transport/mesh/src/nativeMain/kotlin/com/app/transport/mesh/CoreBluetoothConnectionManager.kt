@@ -88,8 +88,6 @@ internal class CoreBluetoothConnectionManager(
         // State-restoration identifiers: let iOS relaunch the app into the background to hand back the
         // same central/peripheral managers (with their connections) after the process was killed. Also
         // requires the app's Info.plist UIBackgroundModes (bluetooth-central/peripheral) — app-side.
-        const val CENTRAL_RESTORE_ID = "chat.bitchat.mesh.central"
-        const val PERIPHERAL_RESTORE_ID = "chat.bitchat.mesh.peripheral"
         // CoreBluetooth has no MTU-request API: the central learns the negotiated ATT MTU and
         // exposes it via maximumWriteValueLengthForType; fragmentation uses the commonMain cap.
     }
@@ -140,11 +138,11 @@ internal class CoreBluetoothConnectionManager(
 
     private val centralManager = CBCentralManager(
         centralDelegate, null,
-        mapOf<Any?, Any?>(CBCentralManagerOptionRestoreIdentifierKey to CENTRAL_RESTORE_ID),
+        mapOf<Any?, Any?>(CBCentralManagerOptionRestoreIdentifierKey to CoreBluetoothRestoreIds.CENTRAL),
     )
     private val peripheralManager = CBPeripheralManager(
         peripheralDelegate, null,
-        mapOf<Any?, Any?>(CBPeripheralManagerOptionRestoreIdentifierKey to PERIPHERAL_RESTORE_ID),
+        mapOf<Any?, Any?>(CBPeripheralManagerOptionRestoreIdentifierKey to CoreBluetoothRestoreIds.PERIPHERAL),
     )
 
     private var active = false
@@ -200,6 +198,10 @@ internal class CoreBluetoothConnectionManager(
     }
 
     override fun stopServices() {
+        shutdown()
+    }
+
+    override fun shutdown() {
         active = false
         centralPolicy.stop()
         try {
@@ -230,11 +232,6 @@ internal class CoreBluetoothConnectionManager(
         subscribedCentrals.clear()
         frameAssemblers.clear()
         addressPeerMap.clear()
-        sendCore.pruneDirectedSpool()
-    }
-
-    fun shutdown() {
-        stopServices()
         sendCore.shutdown()
         outbound.shutdown()
         scope.cancel()
@@ -507,18 +504,18 @@ internal class CoreBluetoothConnectionManager(
                 ?.filterIsInstance<CBCharacteristic>()
                 ?.firstOrNull { it.UUID == characteristicCbUuid } ?: return
             val addr = peripheral.identifier.UUIDString
-            // Cache early so clientLinkSnapshots reports hasCharacteristic during notify setup.
+            // The characteristic is already outbound-writeable; expose it while notify setup runs.
             connectedPeripherals.put(addr, peripheral)
             peripheralCharacteristics.put(addr, char)
             pendingPeripherals.remove(addr)
             discoveredPeripherals.remove(addr)
-            // Link is fully write/notify-ready only after subscription confirms (below).
+            // Connected callbacks and spool flushing wait for inbound notifications below.
             peripheral.setNotifyValue(true, char)
         }
 
         /**
-         * Notify subscription confirmed (or failed). iOS reference flushes directed spool and
-         * treats the peer as connected only after this — writing before notify is enabled is racy.
+         * Notify subscription confirmed (or failed). Flush directed traffic once the link is
+         * bidirectional; [RadioLink.neighbors] may already use it for outbound writes.
          */
         @ObjCSignatureOverride
         override fun peripheral(
